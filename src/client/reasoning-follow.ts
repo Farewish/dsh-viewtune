@@ -1,7 +1,8 @@
 /** Transitions.dev Reasoning stream, adapted to appended content, never a loop. */
 export const REASON_HOLD = 840;
 export const REASON_STEP = 500;
-export const REASON_LINES = 2;
+/** Lines advanced per follow step; only {@link reasoningTarget} reads it. */
+const REASON_LINES = 2;
 
 export function reasoningTarget(top: number, contentHeight: number, viewportHeight: number, lineHeight: number): number {
   const end = Math.max(0, contentHeight - viewportHeight);

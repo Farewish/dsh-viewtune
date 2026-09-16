@@ -1,16 +1,24 @@
-# dsh-better-display
+# dsh-better-display-reforged
 
 [English](./README.en.md)
 
 > 本仓库基于 [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display)（MIT）修改，
 > 调整了阅读页签里的几处显示细节，**顺序**与**用时胶囊**保持上游原样。改动清单见下方
-> [相较上游的改动](#相较上游的改动)。安装方式与上游一致，装这一个即可，不要与上游版本同时装。
+> [相较上游的改动](#相较上游的改动)。
+>
+> 包名是 `dsh-better-display-reforged`（与上游**不同名**），因此它可以和上游包并存于
+> `node_modules`，但**不要同时装进同一个 profile**：两者的 bundle 补丁都插入同一个入口 id
+> `dsh-better-display`，同时挂载会重复。
 
 ```sh
-dsh plugin --profile web add github:你的用户名/dsh-better-display
+# 从本地仓库安装（开发用；pnpm 会为本地目录建链接）
+dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged
+
+# 或从 GitHub 安装
+dsh plugin --profile web add github:你的用户名/dsh-better-display-reforged
 ```
 
-PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**。`dsh plugin add` 会在 `$DSH_HOME/profiles/web` 里跑 pnpm。仓库已提交编译好的 `lib/`，git 安装不用 `prepare`，也不用改 profile 的 `allowBuilds`。
+PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**。`dsh plugin add` 会在 `$DSH_HOME/profiles/web` 里跑 pnpm。仓库已提交编译好的 `lib/`，安装不用 `prepare`，也不用改 profile 的 `allowBuilds`。
 
 然后重启这个 Host，再刷新页面。`dsh plugin add` 只写 profile，不会热挂正在跑的进程。
 
@@ -23,14 +31,14 @@ PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**�
 本地目录或 tarball：
 
 ```sh
-dsh plugin --profile web add ./dsh-better-display
-dsh plugin --profile web add ./dsh-better-display-0.3.0-relayout.1.tgz
+dsh plugin --profile web add ./dsh-better-display-reforged
+dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.2.tgz
 ```
 
 `dsh.bundle` 是开机捕获的。不要再往 profile 的 `cordis.patch.yml` 手写同一条 insert，会重复挂载。
 
 ```sh
-dsh plugin --profile web remove dsh-better-display
+dsh plugin --profile web remove dsh-better-display-reforged
 ```
 
 > **要给这个仓库做开发或推送到 GitHub？先把仓库放在 `node_modules` 之外的目录**，

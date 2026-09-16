@@ -158,11 +158,15 @@
   overflow: auto;
   scroll-behavior: auto;
   overflow-anchor: none;
-  overscroll-behavior-y: contain;
+  /* No `overscroll-behavior-y: contain` here: the wheel handler hands the gesture
+     to the conversation once the transcript sits on an edge, and containment would
+     let the browser chain the same notch a second time underneath that handoff. */
   scrollbar-width: thin;
   scrollbar-color: var(--dsw-alias-border-l1) transparent;
 }
-.reasonCard[data-expanded=true] .reasonViewport { max-height: min(60vh, 560px, var(--reason-reading-height, 560px)); }
+.reasonCard[data-expanded=true] .reasonViewport {
+  max-height: min(60vh, 560px);
+}
 .reasonViewport[data-edges=both], .reasonCard[data-following=true][data-overflow=true] .reasonViewport {
   -webkit-mask-image: linear-gradient(transparent 0, black var(--reason-fade), black calc(100% - var(--reason-fade)), transparent 100%);
   mask-image: linear-gradient(transparent 0, black var(--reason-fade), black calc(100% - var(--reason-fade)), transparent 100%);

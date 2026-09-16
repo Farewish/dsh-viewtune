@@ -1,14 +1,21 @@
-# dsh-better-display
+# dsh-better-display-reforged
 
 [中文](./README.md)
 
 > Based on [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT),
 > with a few display details in the reading view adjusted. Turn order and the
 > elapsed-time pill stay as upstream. See [changes vs upstream](#changes-vs-upstream).
-> Install either this one or upstream, not both.
+>
+> The package name is `dsh-better-display-reforged`, distinct from upstream, so the two
+> can coexist in `node_modules` — but never install both into one profile: their bundle
+> patches insert the same entry id `dsh-better-display`, which would mount twice.
 
 ```sh
-dsh plugin --profile web add github:YOUR_NAME/dsh-better-display
+# from a local checkout (development; pnpm links a local directory)
+dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged
+
+# or from GitHub
+dsh plugin --profile web add github:YOUR_NAME/dsh-better-display-reforged
 ```
 
 You need official `dsh` (or `npx @deepseek-ai/dsh`) and **pnpm** on PATH. `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web`. This repo commits built `lib/`, so a git install does not need `prepare` or a profile `allowBuilds` entry.
@@ -24,8 +31,8 @@ Targets DeepSeek Harness **0.1.5-rc.2**. Display only. It does not change Agent 
 From a local checkout or tarball:
 
 ```sh
-dsh plugin --profile web add ./dsh-better-display
-dsh plugin --profile web add ./dsh-better-display-0.3.0-relayout.1.tgz
+dsh plugin --profile web add ./dsh-better-display-reforged
+dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.2.tgz
 ```
 
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.

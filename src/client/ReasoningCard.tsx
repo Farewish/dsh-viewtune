@@ -5,6 +5,9 @@ import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
 
+/** How long after the last wheel notch a gesture counts as finished. */
+const WHEEL_IDLE_MS = 140;
+
 /** One real transcript: reference transform while following, native scroll while reading. */
 export function ReasoningCard({ children, step, active, motion, selected, onRead }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
@@ -36,25 +39,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     stopFollow.current();
     setFollowing(false);
   }, [selected]);
-
-  useLayoutEffect(() => {
-    if (!expanded) return;
-    const port = viewport.current;
-    const host = port?.closest<HTMLElement>('[data-conversation-scroll]');
-    if (!port || !host) return;
-    const fit = () => {
-      // Public DSH layout variable, updated by the native composer's observer.
-      // Leave room for the permanent identity, footer and reading margin.
-      const composer = parseFloat(getComputedStyle(host).getPropertyValue('--dsh-composer-height')) || 152;
-      const heading = port.parentElement?.querySelector<HTMLElement>('[data-reader-reasoning-heading]')?.offsetHeight || 30;
-      const footer = port.parentElement?.querySelector<HTMLElement>('[data-ud-check=reasoning-controls]')?.offsetHeight || 38;
-      const available = Math.max(120, host.clientHeight - composer - heading - footer - 32);
-      port.style.setProperty('--reason-reading-height', `${available}px`);
-    };
-    fit();
-    const observer = new ResizeObserver(fit); observer.observe(host);
-    return () => { observer.disconnect(); };
-  }, [expanded]);
 
   useLayoutEffect(() => {
     const port = viewport.current;
@@ -159,42 +143,57 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       frame = requestAnimationFrame(tick);
     };
     const onScroll = () => {
+      // A wheel gesture owns the scroll position until it ends, and the browser
+      // applies it natively. Measuring on every notch would set React state
+      // (overflow / edges / data attributes) mid-gesture, and each re-render
+      // interrupts the native scrolling — that is the stutter. Edges settle once
+      // the gesture stops.
+      if (Date.now() < wheelUntil) return;
       measure();
       // Focus/keyboard-induced native scroll wins even while the track moves.
       if (automatic && port.scrollTop > 1) pause();
     };
+    // The card never writes its own scroll position: the browser scrolls the
+    // overflow container natively, which keeps the same feel as the rest of the
+    // page. This listener decides, per notch, whether the card can still use it —
+    // judged from where the notch would land, not from where the card already is,
+    // so the handoff happens on the notch that would overshoot instead of one
+    // notch later.
+    let wheelUntil = 0;
+    let wheelTick = 0;
+    const seenWheelEvents = new Set();
     const onWheel = (event: WheelEvent) => {
       if (!event.deltaY) return;
-      // The compositor picks a wheel scroller before handlers run. A clipped
-      // transform viewport would otherwise lose this first gesture or scroll
-      // the conversation. Consume only this handoff; later wheels stay native.
-      const handoff = automatic && event.cancelable;
-      if (handoff) event.preventDefault();
+      // Keep automatic following from dragging the scroll position mid-gesture.
+      if (automatic) pause();
+      wheelUntil = Date.now() + WHEEL_IDLE_MS;
+      if (event.timeStamp !== undefined) {
+        const key = `${String(event.timeStamp)}:${String(event.deltaY)}`;
+        if (seenWheelEvents.has(key)) return;
+        seenWheelEvents.add(key);
+      } else {
+        seenWheelEvents.add(`t:${String(wheelTick += 1)}`);
+      }
       const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(text).lineHeight) || 24
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? port.clientHeight : 1;
-      pause();
-      if (handoff) { port.scrollTop = clamp(port.scrollTop + event.deltaY * unit); measure(); }
-      else if (overflow && event.cancelable) {
-        // A transcript that already sits on the edge it is being pushed against
-        // keeps the gesture moving the conversation instead of stalling on it.
-        // Non-overflowing (short) reasoning never reaches this branch, so the
-        // wheel passes through untouched.
-        const atTop = port.scrollTop <= 1;
-        const atBottom = port.scrollTop + port.clientHeight >= text.offsetHeight - 1;
-        const atEdge = event.deltaY < 0 ? atTop : atBottom;
-        if (atEdge) {
-          // The conversation scroller is the nearest marked ancestor of the card.
-          // Do not use closest() on the card itself: the card must never carry
-          // that marker, or the reader's scroll hooks adopt the card viewport as
-          // the reading container and its height accounting breaks.
-          let host = port.parentElement;
-          while (host && !host.hasAttribute('data-conversation-scroll')) host = host.parentElement;
-          if (host) {
-            event.preventDefault();
-            host.scrollTop += event.deltaY * unit;
-          }
-        }
-      }
+      const delta = event.deltaY * unit;
+      const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
+      const projected = Math.min(maxOffset, Math.max(0, port.scrollTop + delta));
+      const consumed = projected - port.scrollTop;
+      const remainder = delta - consumed;
+      if (Math.abs(remainder) < .5 || !event.cancelable) return;
+      // The notch runs past the edge the gesture pushes against, so consume the
+      // whole event: rewind the card to the edge (the browser would have scrolled
+      // it natively otherwise) and hand the remainder to the conversation
+      // scroller. The card must never carry that marker itself, or the reader's
+      // scroll hooks adopt the viewport as the reading container and its height
+      // accounting breaks.
+      let host = port.parentElement;
+      while (host && !host.hasAttribute('data-conversation-scroll')) host = host.parentElement;
+      if (!host) return;
+      event.preventDefault();
+      if (Math.abs(consumed) >= .5) port.scrollTop += consumed;
+      host.scrollBy(0, remainder);
     };
     const onSelection = () => { if (hasSelection()) pause(); };
     const onVisibility = () => {
@@ -218,12 +217,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     measure(false); schedule();
     return () => {
       alive = false; cancel(); manual(); observer.disconnect();
+      seenWheelEvents.clear(); wheelUntil = 0;
       port.removeEventListener('scroll', onScroll); port.removeEventListener('wheel', onWheel);
       document.removeEventListener('selectionchange', onSelection);
       document.removeEventListener('visibilitychange', onVisibility);
       stopFollow.current = () => {};
     };
-  }, [allowed, pause, overflow]);
+  }, [allowed, pause]);
 
   useLayoutEffect(() => {
     const port = viewport.current;
@@ -234,22 +234,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     resize.current?.cancel(); resize.current = null;
     port.style.maxHeight = ''; port.style.height = '';
     const target = port.clientHeight;
-    // Explicit reading adjusts only the conversation, never the outer app.
-    // The card is also a reader anchor so resizing cannot pin a later answer
-    // in place at the expense of this card's visible heading.
-    if (changed && !selected) {
-      const card = port.parentElement;
-      const host = port.closest<HTMLElement>('[data-conversation-scroll]');
-      if (card && host) {
-        const composer = parseFloat(getComputedStyle(host).getPropertyValue('--dsh-composer-height')) || 152;
-        const region = host.getBoundingClientRect();
-        const box = card.getBoundingClientRect();
-        const top = region.top + 16;
-        const bottom = region.bottom - composer - 16;
-        const delta = box.top < top ? box.top - top : box.bottom > bottom ? Math.min(box.bottom - bottom, box.top - top) : 0;
-        if (Math.abs(delta) > 1) host.scrollTo({ top: Math.max(0, host.scrollTop + delta), behavior: motion ? 'smooth' : 'instant' });
-      }
-    }
     if (!changed || !motion || from < 1 || Math.abs(target - from) < 1) {
       lastHeight.current = target;
       return;
