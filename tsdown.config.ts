@@ -19,7 +19,18 @@ const adapter = join(resolveHarness(), 'tools/dshx/src/client-build.js');
 if (!existsSync(adapter)) throw new Error('externalClientBundle adapter is missing.');
 const { externalClientBundle } = await import(pathToFileURL(adapter).href);
 
-const bundle = externalClientBundle('dsh-better-display', ['src/dsh-better-display.ts'], {
+/**
+ * The bundle id must be the *package* name: the Host derives the client row id
+ * from this package's manifest, and the browser loader rejects a bundle whose
+ * `__ModuleLoader__.load({ id })` differs from that row (every injected <style>
+ * is also tagged with it, so HMR can remove this plugin's styles by id).
+ * Reading it here keeps a rename from silently breaking the boot again.
+ */
+const packageName = (JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+) as { name: string }).name;
+
+const bundle = externalClientBundle(packageName, ['src/dsh-better-display.ts'], {
   clientEntry: 'src/client/index.tsx',
 }) as UserConfig[];
 
@@ -39,7 +50,7 @@ const portableOutput: TsdownPlugin = {
 };
 
 export default bundle.map((config) => {
-  if (config.name !== 'dsh-better-display/client') return config;
+  if (config.name !== `${packageName}/client`) return config;
   const plugins = Array.isArray(config.plugins)
     ? config.plugins
     : config.plugins === undefined

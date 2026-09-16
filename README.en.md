@@ -44,7 +44,7 @@ dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.2.tgz
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.
 
 ```sh
-dsh plugin --profile web remove dsh-better-display
+dsh plugin --profile web remove dsh-better-display-reforged
 ```
 
 > **Developing this repo, or pushing it to GitHub? Keep it outside `node_modules`**,
