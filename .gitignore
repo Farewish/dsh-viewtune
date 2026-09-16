@@ -1,0 +1,12 @@
+node_modules/
+artifacts/
+.evidence/
+.dsh*/
+.env
+.env.*
+*.log
+*.tgz
+.DS_Store
+
+# local patch backups (not part of the repository)
+lib/*.orig

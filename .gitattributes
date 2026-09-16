@@ -1,0 +1,9 @@
+# Keep one line ending everywhere: the built lib/ and the sources are compared
+# and patched as text, so CRLF conversion would show as spurious churn.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
