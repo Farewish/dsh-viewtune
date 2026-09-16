@@ -78,6 +78,28 @@ npm run typecheck
 `packages/client` 源码），本仓库按上游方式沿用其 `tsdown.config.ts`。**仓库已提交编译好的
 `lib/`，安装时不需要构建。**
 
+### 推送到 GitHub
+
+`github.com:443` 在本机**被 TLS 拦截**（TCP 能连上，TLS 握手超时），所以
+`git push https://github.com/...` 用不了。仓库已配好走 `ssh.github.com:443`：
+
+```sh
+git push            # origin 已指向 ssh://git@ssh.github.com:443/Farewish/dsh-better-display-reforged.git
+```
+
+`core.sshCommand` 固定了密钥与端口，无需任何全局配置：
+
+```sh
+git config --get core.sshCommand
+# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/homes/patches/.ssh/github_farewish_ed25519 \
+#   -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+#   -o UserKnownHostsFile=D:/DSH/homes/patches/.ssh/known_hosts
+```
+
+换机器/换仓库时要一起改这两项（`git remote set-url origin <新的 ssh URL>` 与
+`git config core.sshCommand "<新的密钥路径>"`）。
+
+
 ## 许可
 
 展示与 Markdown 部分来自 DeepSeek Harness（MIT）。上游插件为

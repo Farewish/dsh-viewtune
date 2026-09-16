@@ -85,6 +85,29 @@ Building the browser half needs a DSH monorepo (the `tools/dshx` client-build ad
 plus `packages/client` sources); this repo keeps upstream's `tsdown.config.ts`.
 **The built `lib/` is committed, so installing never builds.**
 
+### Pushing to GitHub
+
+`github.com:443` is blocked by a TLS interception on this machine (TCP connects, the
+TLS handshake times out), so `git push https://github.com/...` does not work. The repo
+is configured for SSH over `ssh.github.com:443`:
+
+```sh
+git push            # origin is ssh://git@ssh.github.com:443/Farewish/dsh-better-display-reforged.git
+```
+
+`core.sshCommand` pins the key and the port, so no global config is involved:
+
+```sh
+git config --get core.sshCommand
+# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/homes/patches/.ssh/github_farewish_ed25519 \
+#   -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+#   -o UserKnownHostsFile=D:/DSH/homes/patches/.ssh/known_hosts
+```
+
+Change both when moving machines or remotes (`git remote set-url origin <new ssh URL>`
+and `git config core.sshCommand "<new key path>"`).
+
+
 ## License
 
 Display and Markdown pieces come from DeepSeek Harness (MIT). The upstream plugin is
