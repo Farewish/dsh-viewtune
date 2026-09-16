@@ -1,5 +1,7 @@
 # Official bundle layer. `dsh plugin add` applies this into the profile.
-# Rows resolve by package name so the installed copy is what boots.
+# Rows resolve by package name so the installed copy is what boots: this fork
+# installs as `dsh-better-display-reforged`, so that is the specifier here. The
+# reinstalled upstream `dsh-better-display` is intentionally not a dependency.
 - insert:
     - id: dsh-better-display
-      name: dsh-better-display
+      name: dsh-better-display-reforged

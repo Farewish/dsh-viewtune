@@ -6,9 +6,13 @@
 > 调整了阅读页签里的几处显示细节，**顺序**与**用时胶囊**保持上游原样。改动清单见下方
 > [相较上游的改动](#相较上游的改动)。
 >
-> 包名是 `dsh-better-display-reforged`（与上游**不同名**），因此它可以和上游包并存于
-> `node_modules`，但**不要同时装进同一个 profile**：两者的 bundle 补丁都插入同一个入口 id
-> `dsh-better-display`，同时挂载会重复。
+> 包名是 `dsh-better-display-reforged`（与上游**不同名**）。**上游的 `dsh-better-display`
+> 不要再装回来**：本仓库的 bundle 补丁把自己的入口解析到 `dsh-better-display-reforged`，
+> 而两者的补丁都插入同一个入口 id `dsh-better-display`，同时挂着会重复挂载。
+>
+> **本仓库是唯一的维护源。** 以后改显示逻辑都改这里，改完重装并重启 Host 生效：
+> `dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged`。
+> 不要再用上游包或对已安装副本打补丁的方式更新。
 
 ```sh
 # 从本地仓库安装（开发用；pnpm 会为本地目录建链接）

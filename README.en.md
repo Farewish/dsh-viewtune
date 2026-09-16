@@ -6,9 +6,15 @@
 > with a few display details in the reading view adjusted. Turn order and the
 > elapsed-time pill stay as upstream. See [changes vs upstream](#changes-vs-upstream).
 >
-> The package name is `dsh-better-display-reforged`, distinct from upstream, so the two
-> can coexist in `node_modules` — but never install both into one profile: their bundle
-> patches insert the same entry id `dsh-better-display`, which would mount twice.
+> The package name is `dsh-better-display-reforged`, distinct from upstream. **Do not
+> reinstall upstream `dsh-better-display`**: this fork's bundle patch resolves its own row to
+> `dsh-better-display-reforged`, and both patches insert the same entry id
+> `dsh-better-display`, so the two would mount twice.
+>
+> **This checkout is the single maintenance source.** Make display changes here, then
+> reinstall and restart the Host:
+> `dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged`.
+> Do not update by reinstalling upstream or by patching an installed copy.
 
 ```sh
 # from a local checkout (development; pnpm links a local directory)
