@@ -34,6 +34,11 @@ dsh plugin --profile web add ./dsh-better-display-0.3.0-relayout.1.tgz
 dsh plugin --profile web remove dsh-better-display
 ```
 
+> **Developing this repo, or pushing it to GitHub? Keep it outside `node_modules`**,
+> e.g. clone to `D:\repos\dsh-better-display`. When pnpm reinstalls dependencies it
+> removes directories under `node_modules` that the profile does not declare, which
+> can take the checkout (and its `.git`) with it.
+
 ## Changes vs upstream
 
 1. **Short thinking is framed too**: the rule that dropped the border/background when

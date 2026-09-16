@@ -33,6 +33,10 @@ dsh plugin --profile web add ./dsh-better-display-0.3.0-relayout.1.tgz
 dsh plugin --profile web remove dsh-better-display
 ```
 
+> **要给这个仓库做开发或推送到 GitHub？先把仓库放在 `node_modules` 之外的目录**，
+> 例如克隆到 `D:\repos\dsh-better-display`。pnpm 在重装依赖时会清理 `node_modules` 下
+> 未在 `package.json` 中声明的目录，仓库（含 `.git`）可能被一起删掉。
+
 ## 相较上游的改动
 
 1. **短思考也带边框**：去掉「无溢出时取消边框/底色」的规则，短思考沿用与长思考相同的框；
