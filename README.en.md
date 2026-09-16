@@ -38,7 +38,7 @@ From a local checkout or tarball:
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display-reforged
-dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.2.tgz
+dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.3.tgz
 ```
 
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.

@@ -36,7 +36,7 @@ PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**�
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display-reforged
-dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.2.tgz
+dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.3.tgz
 ```
 
 `dsh.bundle` 是开机捕获的。不要再往 profile 的 `cordis.patch.yml` 手写同一条 insert，会重复挂载。
