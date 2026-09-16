@@ -91,9 +91,9 @@ git push            # origin 已指向 ssh://git@ssh.github.com:443/Farewish/dsh
 
 ```sh
 git config --get core.sshCommand
-# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/homes/patches/.ssh/github_farewish_ed25519 \
+# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/.ssh/github_farewish_ed25519 \
 #   -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-#   -o UserKnownHostsFile=D:/DSH/homes/patches/.ssh/known_hosts
+#   -o UserKnownHostsFile=D:/DSH/.ssh/known_hosts
 ```
 
 换机器/换仓库时要一起改这两项（`git remote set-url origin <新的 ssh URL>` 与

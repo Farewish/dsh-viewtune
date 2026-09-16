@@ -99,9 +99,9 @@ git push            # origin is ssh://git@ssh.github.com:443/Farewish/dsh-better
 
 ```sh
 git config --get core.sshCommand
-# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/homes/patches/.ssh/github_farewish_ed25519 \
+# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/.ssh/github_farewish_ed25519 \
 #   -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-#   -o UserKnownHostsFile=D:/DSH/homes/patches/.ssh/known_hosts
+#   -o UserKnownHostsFile=D:/DSH/.ssh/known_hosts
 ```
 
 Change both when moving machines or remotes (`git remote set-url origin <new ssh URL>`
