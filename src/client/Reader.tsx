@@ -558,6 +558,27 @@ export function Reader(props: ReaderProps) {
   const motion = useMotionAllowed(motionPreference);
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
   const groups = useMemo(() => groupNodes(order, key => nodes.get(key)), [order, nodes, timeline]);
+  // The reading view opens a running or unfinished turn's process by default, so
+  // "收起" is a reading action rather than a per-turn switch: it folds every turn whose
+  // process is on screen right now, and is offered only while at least one of them is
+  // open. Expansion is read here exactly as TurnGroup reads it, so a turn held open by
+  // the reader's own text selection counts too.
+  const expansionChoices = props.useStore(state => state.expanded);
+  const openProcessKeys = useMemo(() => {
+    const open = new Set<string>();
+    for (const group of groups) {
+      if (group.turn === null) continue;
+      const turn = timeline.turns.get(group.turn);
+      const boundary = boundaryOf(turn);
+      const choice = expansionChoices[processChoiceKey(group.key, boundary)];
+      if (processExpanded(choice, boundary)) open.add(processChoiceKey(group.key, boundary));
+    }
+    return open;
+  }, [groups, timeline, expansionChoices]);
+  const anyProcessOpen = openProcessKeys.size > 0;
+  const collapseAllProcesses = useCallback(() => {
+    for (const key of openProcessKeys) props.actions.setExpanded(key, false);
+  }, [openProcessKeys, props.actions]);
   const scroll = useReadingScroll(root, motion);
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
@@ -710,7 +731,9 @@ export function Reader(props: ReaderProps) {
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
     <div className={css.column} data-chat-flow="">
       <div ref={toolbarRef} className={css.toolbar} data-ud-check="reader-toolbar">
-        <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
+        <div className={css.collapseWrap}>
+          <button type="button" className={css.collapseControl} data-reader-collapse={anyProcessOpen ? 'open' : 'idle'} hidden={!anyProcessOpen} onClick={collapseAllProcesses} title="收起当前对话里所有展开的过程">收起 <span aria-hidden="true">˄</span></button>
+        </div>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
