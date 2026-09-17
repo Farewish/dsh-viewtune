@@ -562,46 +562,6 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
-  // History arrives as a bounded window of recent messages, so the oldest turn can be
-  // cut off: its later steps are loaded while the user message that opened it is not,
-  // which is also why such a turn shows no duration or usage. One more page spans that
-  // boundary and completes it.
-  //
-  // Deliberately a single shot per session and never a loop: an earlier version retried
-  // until the oldest turn "looked complete", but a turn whose user message is simply not
-  // in the snapshot never looks complete, so it kept loading until its cap and dumped
-  // many turns into the view at once. One page, once, cannot misjudge anything.
-  // History arrives as a bounded window of recent messages, so the oldest turn can be
-  // cut off partway: it has steps 21…35 but not 1…20, which is also why such a turn shows
-  // no duration or usage. The turn's own `start` event is outside the window, so there is
-  // no sequence to aim at — but the data does report the earliest *loaded* step, and the
-  // goal is simply for step 1 to be present.
-  //
-  // So: keep loading while that step number is greater than 1. Each successful page lowers
-  // it, which guarantees progress and termination; step 1 appearing stops it immediately, so
-  // it completes the turn in view and never overshoots into the rest of the session. Off by
-  // default, capped at 30 pages, and it reports how many it used.
-  const [fillHistory, setFillHistory] = useState(false);
-  const [fillPages, setFillPages] = useState(0);
-  const backfill = useRef({ session: '', pages: 0 });
-  useEffect(() => {
-    if (!fillHistory) return;
-    if (!hasMore) { setFillPages(backfill.current.pages); return; }
-    if (loadingOlder) return;
-    if (backfill.current.pages >= 30) { setFillPages(backfill.current.pages); return; }
-    const oldest = groups.find(group => group.turn !== null);
-    if (!oldest) return;
-    const first = timeline.turns.get(oldest.turn)?.steps[0]?.step ?? null;
-    if (first === null) return;
-    if (first <= 1) { setFillPages(backfill.current.pages); return; }
-    backfill.current.pages += 1;
-    void props.loadOlder().catch(() => { /* the history button reports failures */ });
-  }, [fillHistory, hasMore, loadingOlder, groups, timeline, props.loadOlder]);
-  // A different session is a different window.
-  useEffect(() => {
-    backfill.current = { session: props.sessionId, pages: 0 };
-    setFillPages(0);
-  }, [props.sessionId]);
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
   // 2. Whole-log turn outline projection
@@ -734,7 +694,6 @@ export function Reader(props: ReaderProps) {
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
-        <button type="button" className={css.textButton} aria-pressed={fillHistory} onClick={() => setFillHistory(v => !v)} title="历史记录按窗口加载，最上面那一轮可能缺少你的话与其中的用时、用量。开启后只在必要时自动多取一页，把最上面那一轮补全；关闭后按窗口原样显示，需要时手动点「加载更早记录」。">{fillHistory ? `补全首轮 · 已开启${fillPages > 0 ? `（${fillPages} 页）` : ''}` : '补全首轮（实验）'}</button>
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
         setHistoryError(false);

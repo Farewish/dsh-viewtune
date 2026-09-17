@@ -49,6 +49,30 @@ dsh plugin --profile web remove dsh-better-display-reforged
 > 例如克隆到 `D:\repos\dsh-better-display`。pnpm 在重装依赖时会清理 `node_modules` 下
 > 未在 `package.json` 中声明的目录，仓库（含 `.git`）可能被一起删掉。
 
+## 一项做不到的改动：自动补全历史
+
+历史补全（自动加载更早记录）不在此仓库中，且不建议重新实现。原因是宿主自身的缺陷：
+分页只能走 `Session.prependWindow`，而宿主自己的 `system-message` 定义在该路径上对一个**已经产出过**的
+目标返回了 `null`，装配器据此抛错：
+
+```
+conversation Definition "system-message" withdrew materialized target "chat";
+return the same key with hidden visibility instead
+```
+
+宿主规定：Definition 一旦产出过节点，就不能再返回 `null`，必须返回同一 key 并标记 hidden。
+插件侧只有 `loadOlder()` / `loadThrough()` 两个翻页入口，**调用即触发**，因此无法从插件规避。
+截断的轮次只能按原样呈现——这也正是「被截断的轮次不显示步骤气泡」的由来。
+
+本仓库试过三次，每次都只是换一种方式踩同一个缺陷：
+
+1. **单页加载**：长轮次仍被切、短轮次又越过边界（窗口按消息条数计，轮次长度可变）；
+2. **循环到「最上面那轮看起来完整」**：用户消息不在快照里的轮次永远不会显得完整，于是一路翻到上限，一次涌入约 20 轮；
+3. **循环到「本轮第 1 步已加载」**（判据本身可靠、必然终止）：一调用就打出上面那条宿主错误。
+
+判断能不能做的关键教训：**先确认那条路径在宿主侧是否本就可用**，再花力气设计判据。
+`loadOlder()` 看着是公开 API，实际在当前版本上不可用。
+
 ## 相较上游的改动
 
 1. **短思考也带边框**：去掉「无溢出时取消边框/底色」的规则，短思考沿用与长思考相同的框；

@@ -2,7 +2,7 @@
 
 ## 0.3.0-relayout.4
 
-- **历史补全改用「补全到本轮第一步」为终止条件**（仍默认关闭，工具栏「补全首轮（实验）」）：窗口按消息条数切，所以固定页数要么切掉长轮次、要么越过短轮次。现在以数据本身可报告的量为准——**最上面那轮已加载的最小步骤号**：只要它大于 1 就继续取下一页，出现**第 1 步**立刻停止。每翻一页这个数字必然变小，因此保证推进与终止；第 1 步一出现即停，也就不会翻过头。上限 30 页，按钮上显示实际用了多少页。
+- **历史补全已移除**：它在当前 DSH 上不可实现——分页只能走 `Session.prependWindow`，而宿主自己的 `system-message` 定义在该路径上对一个已产出过的目标返回 `null`，装配器据此抛错（`withdrew materialized target`）。插件侧只有 `loadOlder()` / `loadThrough()` 两个入口，调用即触发。三次尝试（单页 / 循环到看起来完整 / 循环到第 1 步出现）都只是换一种方式踩同一个缺陷，实现已全部删除，只保留手动「加载更早记录」按钮；被截断的轮次按原样呈现。详见 README。
 
 - **The steps pill stays away for a truncated turn**: the history window cuts into
   older turns, so their step count is a partial sum while the process record reports the
