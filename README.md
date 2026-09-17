@@ -93,6 +93,12 @@ return the same key with hidden visibility instead
 
 ## 开发
 
+**本仓库不发布类型声明**：`lib/` 只含编译好的 `lib/client.js`（Host 真正加载的文件）与宿主入口。
+`lib/types/` 是 `npm run build`（tsconfig 的 `outDir`）的产物，需要一份 DSH 单仓库，本机没有；
+因此 `package.json` 不再声明 `types`。**类型检查同样需要那份单仓库**（`@deepseek-ai/dsh-client-ui-*`
+并未作为独立包发布，本机 launcher 里也没有 react / typescript），所以 `npm run typecheck` 在本机跑不起来。
+验证只能依赖产物层：`check-bundle-markers.mjs`、`probe-linked-host.mjs`、`blank-page-triage.mjs` 等。
+
 ```sh
 npm test
 npm run typecheck
