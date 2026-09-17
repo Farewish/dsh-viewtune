@@ -542,6 +542,25 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   </section>;
 });
 
+/**
+ * The turn the reader is looking at: the uppermost one whose bottom edge has not yet passed
+ * the scrollport's top, i.e. the first turn still visible. This is the predicate the reading
+ * scroll already uses to pick its anchor, so "current" means the same thing in both places.
+ * A viewport straddling two turns therefore resolves to the upper one, which is the rule the
+ * collapse control is specified with.
+ */
+export function currentTurnOf(content: HTMLElement, viewportTop: number): number | null {
+  for (const element of content.querySelectorAll<HTMLElement>('[data-reader-turn]')) {
+    // `data-reader-turn` is the turn number, or the literal 'unresolved' for a group the
+    // snapshot cannot place; only a real turn can own a process.
+    const label = element.dataset.readerTurn;
+    const turnNumber = label === undefined ? Number.NaN : Number(label);
+    if (!Number.isInteger(turnNumber)) continue;
+    if (element.getBoundingClientRect().bottom > viewportTop + 8) return turnNumber;
+  }
+  return null;
+}
+
 export function Reader(props: ReaderProps) {
   const root = useRef<HTMLDivElement>(null);
   const activatedAt = useRef(Date.now());
@@ -558,27 +577,55 @@ export function Reader(props: ReaderProps) {
   const motion = useMotionAllowed(motionPreference);
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
   const groups = useMemo(() => groupNodes(order, key => nodes.get(key)), [order, nodes, timeline]);
-  // The reading view opens a running or unfinished turn's process by default, so
-  // "收起" is a reading action rather than a per-turn switch: it folds every turn whose
-  // process is on screen right now, and is offered only while at least one of them is
-  // open. Expansion is read here exactly as TurnGroup reads it, so a turn held open by
-  // the reader's own text selection counts too.
+  // A "conversation" here is one turn (the question plus its answer), so "收起" folds the
+  // turn the reader is currently looking at — not every open turn on the page. The current
+  // turn is the uppermost one in the viewport, decided by the same predicate the reading
+  // scroll uses to pick its anchor: the first turn whose bottom edge has not yet passed the
+  // scrollport's top. When the viewport straddles two turns, that is the upper one.
+  const [currentTurn, setCurrentTurn] = useState<number | null>(null);
+  // Expansion is read here exactly as TurnGroup reads it, so a turn held open by the
+  // reader's own text selection counts too.
   const expansionChoices = props.useStore(state => state.expanded);
-  const openProcessKeys = useMemo(() => {
+  const openTurnKeys = useMemo(() => {
     const open = new Set<string>();
     for (const group of groups) {
-      if (group.turn === null) continue;
+      if (group.turn === null || group.turn !== currentTurn) continue;
       const turn = timeline.turns.get(group.turn);
       const boundary = boundaryOf(turn);
       const choice = expansionChoices[processChoiceKey(group.key, boundary)];
       if (processExpanded(choice, boundary)) open.add(processChoiceKey(group.key, boundary));
     }
     return open;
-  }, [groups, timeline, expansionChoices]);
-  const anyProcessOpen = openProcessKeys.size > 0;
-  const collapseAllProcesses = useCallback(() => {
-    for (const key of openProcessKeys) props.actions.setExpanded(key, false);
-  }, [openProcessKeys, props.actions]);
+  }, [groups, timeline, expansionChoices, currentTurn]);
+  const currentTurnOpen = openTurnKeys.size > 0;
+  const collapseCurrentTurn = useCallback(() => {
+    for (const key of openTurnKeys) props.actions.setExpanded(key, false);
+  }, [openTurnKeys, props.actions]);
+  // Measuring has to happen after a paint and again whenever the geometry moves, so this is
+  // a layout effect keyed to the turn that is currently in view plus the loaded window.
+  useLayoutEffect(() => {
+    const content = root.current;
+    if (!content) return;
+    const scroller = content.closest<HTMLElement>('[data-conversation-scroll]') ?? content;
+    const read = () => {
+      const next = currentTurnOf(content, scroller.getBoundingClientRect().top);
+      setCurrentTurn(previous => previous === next ? previous : next);
+    };
+    read();
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(read);
+    };
+    scroller.addEventListener('scroll', schedule, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    observer?.observe(scroller);
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener('scroll', schedule);
+      observer?.disconnect();
+    };
+  }, [groups]);
   const scroll = useReadingScroll(root, motion);
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
@@ -714,7 +761,7 @@ export function Reader(props: ReaderProps) {
     <div className={css.column} data-chat-flow="">
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <div className={css.collapseWrap}>
-          <button type="button" className={css.collapseControl} data-reader-collapse={anyProcessOpen ? 'open' : 'idle'} hidden={!anyProcessOpen} onClick={collapseAllProcesses} title="收起当前对话里所有展开的过程">收起 <span aria-hidden="true">˄</span></button>
+          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} onClick={collapseCurrentTurn} title="收起当前这一轮的过程">收起 <span aria-hidden="true">˄</span></button>
         </div>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
       </div>
