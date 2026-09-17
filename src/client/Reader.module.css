@@ -10,7 +10,11 @@
   container-type: inline-size;
 }
 .column { max-width: var(--dsh-chat-content-width, 748px); width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
-.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
+/* The lane's height is stated outright, and `align-items: center` is what centres both
+   switches in it — so the 收起 pill keeps real clearance above and below instead of the
+   container and the pill having to agree by coincidence. The padding is only a floor for
+   that height; the bottom border separates the lane from the transcript scrolling under it. */
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 4px 0; border-bottom: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
 
 /* The toolbar is the one lane that pins: it carries both switches (收起 / 动效), so it has
    to stay reachable while the transcript scrolls under it. The background is what keeps
@@ -285,13 +289,13 @@
 @media (pointer: coarse) { .disclosureButton { min-height: 44px; } }
 @media (max-width: 600px) { .root { padding-inline: 20px; } .column { gap: 18px; } .toolbar { font-size: 11px; } .user { max-width: 90%; } }
 
-/* The reading view opens a process by default, so the way back is a reading action rather
-   than a switch on one turn: the control stays in the pinned toolbar and fades down into
-   view while any process is open, then fades up again once the flow is folded. Both halves
-   are pure CSS on the same node, so they run even with the motion switch off — only the
-   decorative transform is dropped there. */
+/* A "conversation" is one turn (question + answer), so the control is offered only while the
+   turn the reader is looking at has an open process: it stays in the pinned toolbar and fades
+   down into view, then fades up again once that turn is folded. Both halves are pure CSS on
+   the same node, so they run even with the motion switch off — only the decorative transform
+   is dropped there. */
 .collapseWrap { display: flex; align-items: center; }
-.collapseControl { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 999px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; }
+.collapseControl { display: inline-flex; align-items: center; gap: 5px; padding: 5px 14px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 999px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary); font: inherit; font-size: 14px; line-height: 22px; cursor: pointer; }
 .collapseControl:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 /* The control is `hidden` while idle, which drops it from the accessibility tree and
    blocks focusing. `display` is restored so the fade-up can still be seen: a display:none
