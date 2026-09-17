@@ -7,6 +7,9 @@
 - **保留不改的（都不是"被解析的包名"）**：`cordis.patch.yml` / `cordis.yml` 里的 `id: dsh-better-display`（配置行标识，只有 `name:` 参与模块解析）、`data-dsh-better-display` DOM 属性、`dsh-better-display.block` 插槽名、`dsh-better-display-entry` / `dsh-better-display-client` 内部注册 id、`/better-display/reveal` 路由，以及 README 里的 **GitHub 仓库 URL**（仓库没有在 GitHub 上改名）。
 - **工具侧顺带修掉一个隐患**：`plugin-location.mjs` 原本靠「依赖名以 `dsh-better-display` 开头」找插件，**改名即全工具失效**；现在改成「profile 里唯一的非 `@deepseek-ai/` 依赖」，并优先用 manifest 的 bundle 列表消歧义，于是下次再改名也不会坏。
 - profile 侧四处同步改名（manifest、lockfile importer、pnpm 的 `.package-map.json`、`node_modules` 的 junction）。本机 `dsh plugin` 跑不了（没有 pnpm，launcher 只经 corepack 提供 shim），所以这四处是手工改的，改前状态备份在工具目录 `_backup/web-*.before-viewtune`。
+- **修掉一处仓库元数据错误**：`package.json` 的 `repository` / `homepage` / `bugs` 指向 `github.com/aa2246740/dsh-better-display-reforged`——`aa2246740` 是**上游作者**，而那个带 `-reforged` 的仓库**并不存在**（后缀是 fork 才有的）。已改为真实远端 `Farewish/dsh-better-display-reforged`。README/CHANGELOG 里对上游 `aa2246740/dsh-better-display` 的署名是**正确**的，未动。
+- 安装命令处补了一行说明：**从 GitHub 安装要写仓库名而不是包名**（GitHub 上的仓库仍叫 `dsh-better-display-reforged`），否则 `github:Farewish/dsh-viewtune` 指向一个不存在的仓库。
+- 同理**本机 git remote 仍是 `…/Farewish/dsh-better-display-reforged.git`**：包名与仓库名现在是两个东西。若要把 GitHub 仓库也改名，需要同时改 remote、上面三条元数据、以及两份 README 里的推送说明——那是独立的一步，本次没做。
 
 ## 0.3.0-relayout.11
 

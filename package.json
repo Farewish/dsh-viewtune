@@ -99,11 +99,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aa2246740/dsh-better-display-reforged.git"
+    "url": "git+https://github.com/Farewish/dsh-better-display-reforged.git"
   },
-  "homepage": "https://github.com/aa2246740/dsh-better-display-reforged#readme",
+  "homepage": "https://github.com/Farewish/dsh-better-display-reforged#readme",
   "bugs": {
-    "url": "https://github.com/aa2246740/dsh-better-display-reforged/issues"
+    "url": "https://github.com/Farewish/dsh-better-display-reforged/issues"
   },
   "keywords": [
     "deepseek-harness",

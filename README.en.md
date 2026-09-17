@@ -20,8 +20,8 @@
 # from a local checkout (development; pnpm links a local directory)
 dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune
 
-# or from GitHub
-dsh plugin --profile web add github:Farewish/dsh-viewtune
+# or from GitHub (the repository name, not the package name: on GitHub the repo is still dsh-better-display-reforged)
+dsh plugin --profile web add github:Farewish/dsh-better-display-reforged
 ```
 
 You need official `dsh` (or `npx @deepseek-ai/dsh`) and **pnpm** on PATH. `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web`. This repo commits built `lib/`, so a git install does not need `prepare` or a profile `allowBuilds` entry.

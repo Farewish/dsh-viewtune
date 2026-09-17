@@ -18,8 +18,8 @@
 # 从本地仓库安装（开发用；pnpm 会为本地目录建链接）
 dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune
 
-# 或从 GitHub 安装
-dsh plugin --profile web add github:Farewish/dsh-viewtune
+# 或从 GitHub 安装（仓库名，不是包名：GitHub 上的仓库仍叫 dsh-better-display-reforged）
+dsh plugin --profile web add github:Farewish/dsh-better-display-reforged
 ```
 
 PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**。`dsh plugin add` 会在 `$DSH_HOME/profiles/web` 里跑 pnpm。仓库已提交编译好的 `lib/`，安装不用 `prepare`，也不用改 profile 的 `allowBuilds`。
