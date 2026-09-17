@@ -63,9 +63,15 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   if (!data) return null;
   const answerStep = typeof data.answerStep === 'number' ? data.answerStep : null;
   const total = typeof totalSteps === 'number' && totalSteps > 0 ? totalSteps : null;
+  const answer = answerStep;
+  // The count covers only the steps that were loaded, while the answer's position is
+  // absolute. A count that cannot reach the position is a partial sum: it is not used
+  // as a denominator, and the turn is described as truncated.
+  const truncated = answer !== null && total !== null && answer > total;
+  const loaded = truncated ? null : total;
   if (answerStep === null && total === null) return null;
 
-  const label = answerStep !== null && total !== null ? `${answerStep}/${total} 个步骤` : `${answerStep ?? total} 个步骤`;
+  const label = answer !== null && loaded !== null ? `${answer}/${loaded} 个步骤` : `${answer ?? loaded ?? total} 个步骤`;
 
   return (
     <span ref={containerRef} className={css.container}>
@@ -105,16 +111,18 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
               )}
               {total !== null && (
                 <>
-                  <span className={css.popLabel}>本轮总步骤</span>
-                  <span className={css.popValue}>{total} 步</span>
+                  <span className={css.popLabel}>{truncated ? '已加载步骤' : '本轮总步骤'}</span>
+                  <span className={css.popValue}>{total} 步{truncated ? '（已加载）' : ''}</span>
                 </>
               )}
             </div>
             {answerStep !== null && total !== null && (
               <p className={css.popNote}>
-                {answerStep === total
-                  ? '回答落在最后一步：本轮的思考与工具都在它之前。'
-                  : `回答落在第 ${answerStep} 步，其后还有 ${total - answerStep} 步（收尾、产出文件或状态更新）。`}
+                {truncated
+                  ? `本轮更早的步骤不在当前历史窗口内，因此已加载的 ${total} 步不能作为这轮的总步数与第 ${answer} 步相减；本轮至少走到第 ${answer} 步。`
+                  : answer === total
+                    ? '回答落在最后一步：本轮的思考与工具都在它之前。'
+                    : `回答落在第 ${answer} 步，其后还有 ${total - answer} 步（收尾、产出文件或状态更新）。`}
               </p>
             )}
           </div>
