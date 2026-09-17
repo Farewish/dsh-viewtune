@@ -51,7 +51,7 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   if (!node || node.visibility === 'hidden') return null;
   let content: ReactNode = null;
   if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
-  else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={css.systemPrompt}>{node.data.text}</pre></details>;
+  else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={`${css.toolRaw} ${css.systemPrompt}`}>{node.data.text}</pre></details>;
   else if (isNode(node, 'turn-process')) content = <JsonBlock label="轮次过程记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonBlock label="命令记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
