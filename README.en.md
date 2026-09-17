@@ -1,4 +1,4 @@
-# dsh-better-display-reforged
+# dsh-viewtune
 
 [中文](./README.md)
 
@@ -6,22 +6,22 @@
 > with a few display details in the reading view adjusted. Turn order and the
 > elapsed-time pill stay as upstream. See [changes vs upstream](#changes-vs-upstream).
 >
-> The package name is `dsh-better-display-reforged`, distinct from upstream. **Do not
+> The package name is `dsh-viewtune`, distinct from upstream. **Do not
 > reinstall upstream `dsh-better-display`**: this fork's bundle patch resolves its own row to
-> `dsh-better-display-reforged`, and both patches insert the same entry id
+> `dsh-viewtune`, and both patches insert the same entry id
 > `dsh-better-display`, so the two would mount twice.
 >
 > **This checkout is the single maintenance source.** Make display changes here, then
 > reinstall and restart the Host:
-> `dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged`.
+> `dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune`.
 > Do not update by reinstalling upstream or by patching an installed copy.
 
 ```sh
 # from a local checkout (development; pnpm links a local directory)
-dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged
+dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune
 
 # or from GitHub
-dsh plugin --profile web add github:YOUR_NAME/dsh-better-display-reforged
+dsh plugin --profile web add github:Farewish/dsh-viewtune
 ```
 
 You need official `dsh` (or `npx @deepseek-ai/dsh`) and **pnpm** on PATH. `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web`. This repo commits built `lib/`, so a git install does not need `prepare` or a profile `allowBuilds` entry.
@@ -37,14 +37,14 @@ Targets DeepSeek Harness **0.1.5-rc.2**. Display only. It does not change Agent 
 From a local checkout or tarball:
 
 ```sh
-dsh plugin --profile web add ./dsh-better-display-reforged
-dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.4.tgz
+dsh plugin --profile web add ./dsh-viewtune
+dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.12.tgz
 ```
 
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.
 
 ```sh
-dsh plugin --profile web remove dsh-better-display-reforged
+dsh plugin --profile web remove dsh-viewtune
 ```
 
 > **Developing this repo, or pushing it to GitHub? Keep it outside `node_modules`**,
@@ -92,7 +92,7 @@ TLS handshake times out), so `git push https://github.com/...` does not work. Th
 is configured for SSH over `ssh.github.com:443`:
 
 ```sh
-git push            # origin is ssh://git@ssh.github.com:443/Farewish/dsh-better-display-reforged.git
+git push            # origin is ssh://git@ssh.github.com:443/Farewish/dsh-viewtune.git
 ```
 
 `core.sshCommand` pins the key and the port, so no global config is involved:

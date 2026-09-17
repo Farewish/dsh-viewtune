@@ -14,11 +14,11 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export const name = 'dsh-better-display';
+export const name = 'dsh-viewtune';
 export const inject = ['webServer'];
 
 export function apply(ctx: Context): void {
-  console.log('[my-plugins/dsh-better-display] loaded');
+  console.log('[my-plugins/dsh-viewtune] loaded');
 
   if (ctx.webServer) {
     ctx.effect(() => {
@@ -63,6 +63,6 @@ export function apply(ctx: Context): void {
           });
         },
       });
-    }, 'dsh-better-display: /api/better-display/reveal route');
+    }, 'dsh-viewtune: /api/better-display/reveal route');
   }
 }

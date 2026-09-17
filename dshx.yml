@@ -1,5 +1,5 @@
-id: dsh-better-display-reforged
-entry: src/dsh-better-display.ts
+id: dsh-viewtune
+entry: src/dsh-viewtune.ts
 marker: '[my-plugins/dsh-better-display] loaded'
 kind: client
 profile: web

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-relayout.12
+
+- **改名：`dsh-better-display-reforged` → `dsh-viewtune`**。改的不只是字面：宿主按 profile 里安装包的 `name` 生成客户端行 id，浏览器加载器会拒绝注册成别的名字的产物，所以**产物里 15 处必须同时改**——`__ModuleLoader__.load({ id })` 那一处，加上 7 组 CSS 模块的 `tagId` 前缀与 `dataset.plugin`（HMR 是按 plugin id 删本插件 `<style>` 的）。改完由 `check-bundle-markers.mjs`（断言产物注册 id = 包名）与临时宿主端到端共同验证：模块图收录 `dsh-viewtune`、产物注册同名、reveal 路由照常。
+- **入口文件名跟着包名走**：`src/dsh-better-display.ts` → `src/dsh-viewtune.ts`，`lib/dsh-better-display.js` → `lib/dsh-viewtune.js`，并同步 `package.json` 的 `main`/`exports`、`tsdown.config.ts` 的入口、`cordis.yml`/`dshx.yml` 的 entry、以及 `tests/stock-install.test.ts` 里**断言该文件名**的两处——只改 package.json 不改测试，将来一构建测试就会红。
+- **保留不改的（都不是"被解析的包名"）**：`cordis.patch.yml` / `cordis.yml` 里的 `id: dsh-better-display`（配置行标识，只有 `name:` 参与模块解析）、`data-dsh-better-display` DOM 属性、`dsh-better-display.block` 插槽名、`dsh-better-display-entry` / `dsh-better-display-client` 内部注册 id、`/better-display/reveal` 路由，以及 README 里的 **GitHub 仓库 URL**（仓库没有在 GitHub 上改名）。
+- **工具侧顺带修掉一个隐患**：`plugin-location.mjs` 原本靠「依赖名以 `dsh-better-display` 开头」找插件，**改名即全工具失效**；现在改成「profile 里唯一的非 `@deepseek-ai/` 依赖」，并优先用 manifest 的 bundle 列表消歧义，于是下次再改名也不会坏。
+- profile 侧四处同步改名（manifest、lockfile importer、pnpm 的 `.package-map.json`、`node_modules` 的 junction）。本机 `dsh plugin` 跑不了（没有 pnpm，launcher 只经 corepack 提供 shim），所以这四处是手工改的，改前状态备份在工具目录 `_backup/web-*.before-viewtune`。
+
 ## 0.3.0-relayout.11
 
 - **修复：向上淡出看不见**（relayout.5 引入的 bug，用户实测发现）。为了让退出动画有东西可动，我在 `[hidden]` 规则上强制了 `display: inline-flex`（否则浏览器自带的 `[hidden] { display: none }` 会让动画无从播放）——但**同一条规则上还写了 `visibility: hidden`，它是立即生效的**：控件在第一帧就已不可见，而不可见的元素不会绘制动画，所以看到的是「瞬间消失」。`display` 那个坑绕开了，`visibility` 这个坑踩进去了。

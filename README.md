@@ -1,4 +1,4 @@
-# dsh-better-display-reforged
+# dsh-viewtune
 
 [English](./README.en.md)
 
@@ -6,20 +6,20 @@
 > 调整了阅读页签里的几处显示细节，**顺序**与**用时胶囊**保持上游原样。改动清单见下方
 > [相较上游的改动](#相较上游的改动)。
 >
-> 包名是 `dsh-better-display-reforged`（与上游**不同名**）。**上游的 `dsh-better-display`
-> 不要再装回来**：本仓库的 bundle 补丁把自己的入口解析到 `dsh-better-display-reforged`，
+> 包名是 `dsh-viewtune`（与上游**不同名**）。**上游的 `dsh-better-display`
+> 不要再装回来**：本仓库的 bundle 补丁把自己的入口解析到 `dsh-viewtune`，
 > 而两者的补丁都插入同一个入口 id `dsh-better-display`，同时挂着会重复挂载。
 >
 > **本仓库是唯一的维护源。** 以后改显示逻辑都改这里，改完重装并重启 Host 生效：
-> `dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged`。
+> `dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune`。
 > 不要再用上游包或对已安装副本打补丁的方式更新。
 
 ```sh
 # 从本地仓库安装（开发用；pnpm 会为本地目录建链接）
-dsh plugin --profile web add D:\DSH\Plugin\dsh-better-display-reforged
+dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune
 
 # 或从 GitHub 安装
-dsh plugin --profile web add github:你的用户名/dsh-better-display-reforged
+dsh plugin --profile web add github:Farewish/dsh-viewtune
 ```
 
 PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**。`dsh plugin add` 会在 `$DSH_HOME/profiles/web` 里跑 pnpm。仓库已提交编译好的 `lib/`，安装不用 `prepare`，也不用改 profile 的 `allowBuilds`。
@@ -35,14 +35,14 @@ PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**�
 本地目录或 tarball：
 
 ```sh
-dsh plugin --profile web add ./dsh-better-display-reforged
-dsh plugin --profile web add ./dsh-better-display-reforged-0.3.0-relayout.4.tgz
+dsh plugin --profile web add ./dsh-viewtune
+dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.12.tgz
 ```
 
 `dsh.bundle` 是开机捕获的。不要再往 profile 的 `cordis.patch.yml` 手写同一条 insert，会重复挂载。
 
 ```sh
-dsh plugin --profile web remove dsh-better-display-reforged
+dsh plugin --profile web remove dsh-viewtune
 ```
 
 > **要给这个仓库做开发或推送到 GitHub？先把仓库放在 `node_modules` 之外的目录**，
@@ -132,7 +132,7 @@ npm run typecheck
 `git push https://github.com/...` 用不了。仓库已配好走 `ssh.github.com:443`：
 
 ```sh
-git push            # origin 已指向 ssh://git@ssh.github.com:443/Farewish/dsh-better-display-reforged.git
+git push            # origin 已指向 ssh://git@ssh.github.com:443/Farewish/dsh-viewtune.git
 ```
 
 `core.sshCommand` 固定了密钥与端口，无需任何全局配置：

@@ -27,10 +27,10 @@ test('declares dsh.bundle.patch so official add joins the profile layer stack', 
 
 test('commits compiled lib entries and does not require a prepare script', () => {
   assert.equal(pkg.scripts?.prepare, undefined);
-  assert.equal(pkg.main, 'lib/dsh-better-display.js');
+  assert.equal(pkg.main, 'lib/dsh-viewtune.js');
   const client = pkg.exports['./client'];
   assert.equal(typeof client === 'object' && client !== null ? client.default : client, './lib/client.js');
-  assert.equal(existsSync(resolve(root, 'lib/dsh-better-display.js')), true);
+  assert.equal(existsSync(resolve(root, 'lib/dsh-viewtune.js')), true);
   assert.equal(existsSync(resolve(root, 'lib/client.js')), true);
   assert.match(clientJs, /window\.__ModuleLoader__\.load/);
 });

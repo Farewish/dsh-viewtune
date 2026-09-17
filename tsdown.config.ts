@@ -30,7 +30,7 @@ const packageName = (JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ) as { name: string }).name;
 
-const bundle = externalClientBundle(packageName, ['src/dsh-better-display.ts'], {
+const bundle = externalClientBundle(packageName, ['src/dsh-viewtune.ts'], {
   clientEntry: 'src/client/index.tsx',
 }) as UserConfig[];
 
