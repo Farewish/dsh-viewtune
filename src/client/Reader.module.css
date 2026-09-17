@@ -277,17 +277,6 @@
 @media (pointer: coarse) { .disclosureButton { min-height: 44px; } }
 @media (max-width: 600px) { .root { padding-inline: 20px; } .column { gap: 18px; } .toolbar { font-size: 11px; } .user { max-width: 90%; } }
 
-/* Sticky lanes: the toolbar pins to the top of the reading column, and a turn's process
-   status row pins just below it for the length of that turn. Both get a background so the
-   transcript scrolls under them rather than through them, and the status row is offset by
-   the toolbar's measured height (see the reader) so a wrapped toolbar cannot overlap it.
-   Ancestors stop clipping for the same reason: a clipping box breaks sticky. */
-.root { overflow: visible; }
-.toolbar { position: sticky; top: 0; z-index: 9; background: var(--dsw-alias-bg-base); }
-.turn { overflow: visible; }
-.mainFlow { position: relative; overflow: visible; }
-.disclosure { position: sticky; top: calc(var(--reader-toolbar-height, 4px) + 4px); z-index: 8; background: var(--dsw-alias-bg-base); }
-
 /* The reading view opens a process by default, so the way back is a reading action rather
    than a switch on one turn: the control stays in the pinned toolbar and fades down into
    view while any process is open, then fades up again once the flow is folded. Both halves

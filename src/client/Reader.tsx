@@ -583,24 +583,6 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
-  // The toolbar's height feeds the sticky status lane's offset, so a wrapped toolbar
-  // cannot overlap it. Measured rather than assumed, because the label wraps.
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = toolbarRef.current;
-    if (!el) return;
-    const scope = el.closest<HTMLElement>('[data-dsh-better-display]') ?? el.ownerDocument.documentElement;
-    const update = () => {
-      scope.style.setProperty('--reader-toolbar-height', `${el.getBoundingClientRect().height}px`);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      scope.style.removeProperty('--reader-toolbar-height');
-    };
-  }, [props.sessionId]);
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
   // 2. Whole-log turn outline projection
@@ -730,7 +712,7 @@ export function Reader(props: ReaderProps) {
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
     <div className={css.column} data-chat-flow="">
-      <div ref={toolbarRef} className={css.toolbar} data-ud-check="reader-toolbar">
+      <div className={css.toolbar} data-ud-check="reader-toolbar">
         <div className={css.collapseWrap}>
           <button type="button" className={css.collapseControl} data-reader-collapse={anyProcessOpen ? 'open' : 'idle'} hidden={!anyProcessOpen} onClick={collapseAllProcesses} title="收起当前对话里所有展开的过程">收起 <span aria-hidden="true">˄</span></button>
         </div>
