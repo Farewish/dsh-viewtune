@@ -9,7 +9,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, incompleteOldestTurn, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -562,28 +562,25 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
+  // History arrives as a bounded window of recent messages, so the oldest turn can be
+  // cut off: its later steps are loaded while the user message that opened it is not,
+  // which is also why such a turn shows no duration or usage. One more page spans that
+  // boundary and completes it.
+  //
+  // Deliberately a single shot per session and never a loop: an earlier version retried
+  // until the oldest turn "looked complete", but a turn whose user message is simply not
+  // in the snapshot never looks complete, so it kept loading until its cap and dumped
+  // many turns into the view at once. One page, once, cannot misjudge anything.
   const [fillHistory, setFillHistory] = useState(true);
-  const backfillTried = useRef(0);
-
-  // The history window is a bounded slice of recent messages, so it can cut into a
-  // turn: the oldest loaded turn keeps its later steps but loses the user message that
-  // opened it. That turn — and only that turn — can be made whole by loading one more
-  // page, so a page is requested while it stays incomplete and another page exists.
-  // Bounded by attempts, and it stops as soon as the oldest turn is whole, which keeps
-  // this to "finish the turn you are looking at" rather than "load the whole session".
-  const isUserKey = useCallback((key: string) => {
-    const kind = nodes.get(key)?.kind;
-    return kind === 'user' || kind === 'steering';
-  }, [nodes]);
-  const incompleteTurn = useMemo(() => incompleteOldestTurn(groups, isUserKey), [groups, isUserKey]);
+  const backfillDone = useRef(false);
   useEffect(() => {
-    if (!fillHistory || !hasMore || loadingOlder || !incompleteTurn) return;
-    if (backfillTried.current >= 30) return;
-    backfillTried.current += 1;
-    void props.loadOlder().catch(() => { /* the disabled history button reports failures */ });
-  }, [fillHistory, hasMore, loadingOlder, incompleteTurn, props.loadOlder]);
+    if (!fillHistory || backfillDone.current || loadingOlder) return;
+    if (!hasMore) { backfillDone.current = true; return; }
+    backfillDone.current = true;
+    void props.loadOlder().catch(() => { /* the history button reports failures */ });
+  }, [fillHistory, hasMore, loadingOlder, props.loadOlder]);
   // A different session is a different window.
-  useEffect(() => { backfillTried.current = 0; }, [props.sessionId]);
+  useEffect(() => { backfillDone.current = false; }, [props.sessionId]);
 
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);

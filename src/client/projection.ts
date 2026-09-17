@@ -24,27 +24,6 @@ export function groupNodes(order: readonly string[], get: (key: string) => ChatC
   return groups;
 }
 
-/**
- * The oldest loaded turn that is missing its own human message.
- *
- * History is loaded as a bounded window of recent messages, so the window can cut
- * into a turn: its later steps are present while the user message that opened it is
- * not. Such a turn is the only one that can be made whole by loading more, and it is
- * always the oldest one loaded — so this is what a backfill has to watch.
- *
- * @param groups - the projected turn groups, oldest first.
- * @param isUser - whether a node key holds a user or steering message.
- * @returns the group to complete, or undefined when the oldest turn is already whole.
- */
-export function incompleteOldestTurn(
-  groups: readonly ReaderGroup[],
-  isUser: (key: string) => boolean,
-): ReaderGroup | undefined {
-  const oldest = groups.find(group => group.turn !== null);
-  if (!oldest) return undefined;
-  return oldest.keys.some(isUser) ? undefined : oldest;
-}
-
 export function boundaryOf(turn: TurnLocation | undefined): TurnBoundary {  return {
     status: turn?.status ?? 'unknown',
     reason: turn?.end?.data.reason.kind ?? null,
