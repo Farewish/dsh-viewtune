@@ -1,4 +1,5 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { Component, memo, useEffect, useRef, useState } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import type { TurnProcessChatData } from './types.js';
 import css from './TurnMetrics.module.css';
 
@@ -14,13 +15,32 @@ import css from './TurnMetrics.module.css';
  * The record carries no protocol-level names for the individual phases, so the
  * popover lists what the fields do describe and says so, rather than inventing
  * step titles.
+ *
+ * An optional extra, so it is wrapped in its own error boundary: the record is
+ * published by the host and its shape can differ from what is assumed here. Without
+ * the boundary a surprise in this decoration takes down the whole reading view —
+ * which is exactly what happened once, and cost a blank page.
  */
 export interface StepsPillProps {
   data?: TurnProcessChatData;
   totalSteps?: number;
 }
 
-export const StepsPill = memo(function StepsPill({ data, totalSteps }: StepsPillProps) {
+class QuietBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Keep the failure visible in the console but out of the reader's way.
+    console.warn('[dsh-better-display] steps pill failed to render:', error, info.componentStack);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement>(null);
 
@@ -140,3 +160,7 @@ export const StepsPill = memo(function StepsPill({ data, totalSteps }: StepsPill
     </span>
   );
 });
+
+export function StepsPill(props: StepsPillProps) {
+  return <QuietBoundary><Pill {...props} /></QuietBoundary>;
+}

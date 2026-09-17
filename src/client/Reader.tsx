@@ -471,10 +471,20 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   }, [group.keys, nodes]);
   // The record is published on a `turn-process` node. It is not guaranteed to be
   // one of the group's own keys (the tail lookup above relies on that, and this
-  // node is produced differently), so the turn's own steps are searched too, with
-  // the group's keys as the fallback ordering.
+  // node is produced differently), so the turn's own steps are searched too.
+  // Every step access is guarded: a step whose payload is missing or is not a Map
+  // must degrade to "no record", never throw — a throw here takes down the whole
+  // reading view, which is exactly what happened once.
   const turnProcess = useMemo(() => {
-    const keys = [...group.keys, ...(turn?.steps.flatMap(step => [...step.data.keys()]) ?? [])];
+    const keys: string[] = [...group.keys];
+    for (const step of turn?.steps ?? []) {
+      const data = (step as { data?: unknown }).data;
+      if (data instanceof Map) {
+        for (const key of data.keys()) {
+          if (typeof key === 'string') keys.push(key);
+        }
+      }
+    }
     for (const key of keys) {
       const n = nodes.get(key);
       if (n && isNode(n, 'turn-process')) return n.data as TurnProcessChatData;
