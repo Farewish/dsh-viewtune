@@ -137,3 +137,11 @@
   color: var(--dsw-alias-label-secondary);
   margin-left: 4px;
 }
+
+/* Explanatory line under a popover section; not a label/value pair. */
+.popNote {
+  margin: 2px 0 0;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--dsw-alias-label-tertiary);
+}

@@ -133,6 +133,7 @@ export const Blocks = memo(function Blocks({ blocks, streaming = false, source =
 });
 
 import { TurnMetrics } from './TurnMetrics.js';
+import { StepsPill } from './StepsPill.js';
 
 function CopyGlyph() {
   return <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" /><path d="M3 10H2.8A.8.8 0 0 1 2 9.2V2.8a.8.8 0 0 1 .8-.8h6.4a.8.8 0 0 1 .8.8V3" /></svg>;
@@ -159,7 +160,7 @@ export function CopyAnswer({ blocks, onFork, metrics }: { blocks: readonly Assis
   const { receipt, copy } = useCopyReceipt();
   const text = blocks.filter((block): block is Extract<AssistantBlock, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
   const endedAt = metrics?.endedAt;
-  const hasMetrics = metrics !== undefined && (metrics.usage !== undefined || metrics.runMs !== undefined || endedAt !== undefined);
+  const hasMetrics = metrics !== undefined && (metrics.usage !== undefined || metrics.runMs !== undefined || endedAt !== undefined || metrics.steps !== undefined);
   if (!text.trim() && !onFork && !hasMetrics) return null;
   return <div className={css.answerActions}>
     {text.trim() !== '' && (
@@ -184,6 +185,7 @@ export function CopyAnswer({ blocks, onFork, metrics }: { blocks: readonly Assis
       </button>
     )}
     {metrics && <TurnMetrics usage={metrics.usage} runMs={metrics.runMs} tokensPerSecond={metrics.tokensPerSecond} ttftMs={metrics.ttftMs} />}
+    {metrics?.steps && <StepsPill data={metrics.steps.data} totalSteps={metrics.steps.totalSteps} />}
     {endedAt !== undefined && <MessageClock time={endedAt} />}
     <span role="status" className={css.meta}>{receipt}</span>
   </div>;

@@ -7,6 +7,26 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type {} from '@deepseek-ai/dsh-client-ui-session/client';
 import type { createReaderStore } from './store.js';
 
+/**
+ * The host's turn-process record, as published on the `turn-process` node.
+ *
+ * Declared here rather than imported: the host package does not export this type
+ * (its field names appear only inside the implementation). The field set matches
+ * what the host's own record comparison uses, so a change there is a real change
+ * here. `answerStep` counts from 1 and is the step the final answer landed on.
+ */
+export interface TurnProcessChatData {
+  readonly turn?: number;
+  readonly controlAnchorSeq?: number;
+  readonly processStartSeq?: number;
+  readonly answerAnchorSeq?: number | null;
+  readonly answerStep?: number | null;
+  readonly inlineReasoning?: boolean;
+  readonly messageCount?: number;
+  readonly toolCallCount?: number;
+  readonly subagentCount?: number;
+}
+
 export interface ReaderBlockOwner {
   block: AssistantBlock;
   streaming: boolean;
@@ -57,5 +77,11 @@ export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'
     ttftMs?: number;
     /** Closing assistant-message time (turn-tail `closing.time`). */
     endedAt?: number;
+    /**
+     * The turn's process record plus its total step count, for the steps pill.
+     * `data` is the host's `turn-process` node payload; `totalSteps` is the count
+     * the process disclosure shows and is not part of that record.
+     */
+    steps?: { data?: TurnProcessChatData; totalSteps?: number };
   };
 };

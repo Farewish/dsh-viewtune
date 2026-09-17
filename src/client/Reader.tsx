@@ -16,7 +16,7 @@ import { TimelineRail } from './TimelineRail.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
-import type { BlockRenderProps, ReaderProps } from './types.js';
+import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
 import css from './Reader.module.css';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 
@@ -469,6 +469,18 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     }
     return undefined;
   }, [group.keys, nodes]);
+  // The record is published on a `turn-process` node. It is not guaranteed to be
+  // one of the group's own keys (the tail lookup above relies on that, and this
+  // node is produced differently), so the turn's own steps are searched too, with
+  // the group's keys as the fallback ordering.
+  const turnProcess = useMemo(() => {
+    const keys = [...group.keys, ...(turn?.steps.flatMap(step => [...step.data.keys()]) ?? [])];
+    for (const key of keys) {
+      const n = nodes.get(key);
+      if (n && isNode(n, 'turn-process')) return n.data as TurnProcessChatData;
+    }
+    return undefined;
+  }, [group.keys, nodes, turn?.steps]);
   const runMs = turn?.start && turn?.end ? Math.max(0, turn.end.time - turn.start.time) : undefined;
   const metrics = useMemo(() => ({
     usage: tailData?.tokenUsage,
@@ -476,7 +488,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     tokensPerSecond: tailData?.tokensPerSecond,
     ttftMs: tailData?.ttftMs,
     endedAt: tailData?.closing?.time ?? turn?.end?.time,
-  }), [tailData, runMs, turn?.end?.time]);
+    steps: turnProcess ? { data: turnProcess, totalSteps: turn?.steps.length } : undefined,
+  }), [tailData, runMs, turn?.end?.time, turnProcess, turn?.steps.length]);
   const forkSeq = forkAnchorSeq([tailData?.closing?.finalNode]);
   const shared = {
     useChat: props.useChat,

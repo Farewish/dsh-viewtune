@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-relayout.4
+
+- **Steps pill in the answer's action row**: between the usage/duration pills and the
+  closing clock, a `N/M 个步骤` pill opens the turn's process record rendered in
+  Chinese — the answer's step and the turn's total steps, what came before the answer
+  (messages, tool calls, subagents, whether thinking sat inline), and the process
+  start/answer anchor event numbers.
+
 ## 0.3.0-relayout.3
 
 Relayout fork of [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT).
