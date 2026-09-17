@@ -74,7 +74,7 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   if (truncated) return null;
   if (answerStep === null && total === null) return null;
 
-  const label = answer !== null && loaded !== null ? `${answer}/${total} 个步骤` : `${answer ?? total} 个步骤`;
+  const label = answer !== null ? `${answer}/${total} 个步骤` : `${answer ?? total} 个步骤`;
 
   return (
     <span ref={containerRef} className={css.container}>
