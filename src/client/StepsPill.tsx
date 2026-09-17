@@ -69,6 +69,10 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   // as a denominator, and the turn is described as truncated.
   const truncated = answer !== null && total !== null && answer > total;
   const loaded = truncated ? null : total;
+  // A turn whose start is outside the history window cannot be described by this
+  // record: the count is a partial sum while the position is absolute. Nothing is
+  // shown for it, matching how the usage/duration pills already behave here.
+  if (truncated) return null;
   if (answerStep === null && total === null) return null;
 
   const label = answer !== null && loaded !== null ? `${answer}/${loaded} 个步骤` : `${answer ?? loaded ?? total} 个步骤`;
@@ -118,11 +122,9 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
             </div>
             {answerStep !== null && total !== null && (
               <p className={css.popNote}>
-                {truncated
-                  ? `本轮更早的步骤不在当前历史窗口内，因此已加载的 ${total} 步不能作为这轮的总步数与第 ${answer} 步相减；本轮至少走到第 ${answer} 步。`
-                  : answer === total
-                    ? '回答落在最后一步：本轮的思考与工具都在它之前。'
-                    : `回答落在第 ${answer} 步，其后还有 ${total - answer} 步（收尾、产出文件或状态更新）。`}
+                {answer === total
+                  ? '回答落在最后一步：本轮的思考与工具都在它之前。'
+                  : `回答落在第 ${answer} 步，其后还有 ${total - answer} 步（收尾、产出文件或状态更新）。`}
               </p>
             )}
           </div>

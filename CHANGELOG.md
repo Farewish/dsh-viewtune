@@ -2,12 +2,11 @@
 
 ## 0.3.0-relayout.4
 
-- **The steps pill no longer invents a total for a truncated turn**: the history window
-  cuts into older turns, so only their later steps are loaded while the process record
-  still reports the absolute step the answer landed on. The two were rendered as a ratio,
-  which could read `16/10` and print a negative remainder. The position now stands alone,
-  the count is labelled as what was loaded, and the popover says the earlier steps are not
-  in the window.
+- **The steps pill stays away for a truncated turn**: the history window cuts into
+  older turns, so their step count is a partial sum while the process record reports the
+  absolute step the answer landed on. The two are not comparable, and rather than show a
+  number with a caveat the pill renders nothing for those turns — the same treatment the
+  usage/duration pills already get. Complete turns are unchanged.
 
 - **Steps pill in the answer's action row**: between the usage/duration pills and the
   closing clock, a `N/M 个步骤` pill opens the turn's process record rendered in
