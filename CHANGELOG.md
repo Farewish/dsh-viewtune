@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-relayout.11
+
+- **修复：向上淡出看不见**（relayout.5 引入的 bug，用户实测发现）。为了让退出动画有东西可动，我在 `[hidden]` 规则上强制了 `display: inline-flex`（否则浏览器自带的 `[hidden] { display: none }` 会让动画无从播放）——但**同一条规则上还写了 `visibility: hidden`，它是立即生效的**：控件在第一帧就已不可见，而不可见的元素不会绘制动画，所以看到的是「瞬间消失」。`display` 那个坑绕开了，`visibility` 这个坑踩进去了。
+- 修法：把可见性变化从 `[hidden]` 移到 **idle 状态**上，并给它**等于退出时长的延迟**——`transition: visibility 0s linear 140ms`。于是控件在整个 140ms 动画期间保持可见，动画结束后才隐藏。`open` 规则里那句 `visibility: visible` 也随之删掉：没有东西再隐藏它，那句只是在掩盖问题。
+- **新增 `test-collapse-fade.mjs`**：它把产物 CSS 字面量求值，**按浏览器的方式解析层叠**（区分无条件规则与 `@media` 内的规则、处理 `[data-motion=off]` 这类祖先选择器），然后断言"退出动画期间可见性不会被提前改掉"。写成这样是因为：**这个 bug 无法用子串断言发现**——动画声明、关键帧、`visibility` 规则全都在文件里，字面看毫无问题。
+- **配 `selftest-collapse-fade.mjs`**：把当初出问题的那版 CSS 造成临时产物喂给检查器，要求它**报错**（再确认健康产物仍通过）。一个从未报过错的检查器，和一个什么都不报的检查器无法区分。
+
 ## 0.3.0-relayout.10
 
 - **边框与分界线加深到与宿主同级**。原来用的是 `1px solid var(--dsw-alias-border-l1)`——`l1` 是**最浅的一档**（浅色主题下 `#0000000a`，即 4% 黑），而且比宿主自己的线还粗。查了宿主实际服务的前端产物后改成 **`.5px solid var(--dsw-alias-border-l2)`**：宿主一共 107 处 `border-bottom`，其中 55 处是 `l2`、16 处是 `l3`、只有 12 处是 `l1`，header/tabs 一类分隔线都用 `l2`~`l3`。工具栏下沿分界线与「收起」胶囊的描边现在**同宽同档**（`test-toolbar-geometry.mjs` 会断言两者字面一致）。

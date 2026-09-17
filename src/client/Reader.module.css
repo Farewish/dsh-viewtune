@@ -300,12 +300,15 @@
    has to step up to its solid sibling — otherwise the fill would erase the hover state. */
 .collapseControl { display: inline-flex; align-items: center; gap: 5px; padding: 5px 14px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font: inherit; font-size: 14px; line-height: 22px; cursor: pointer; }
 .collapseControl:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover-solid); }
-/* The control is `hidden` while idle, which drops it from the accessibility tree and
-   blocks focusing. `display` is restored so the fade-up can still be seen: a display:none
-   element cannot animate, so the exit has to happen through visibility instead. */
-.collapseControl[hidden] { display: inline-flex; visibility: hidden; }
-.collapseControl[data-reader-collapse=open] { visibility: visible; animation: readerCollapseIn 180ms ease-out; }
-.collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; }
+/* While idle the control is `hidden`, which drops it from the accessibility tree and blocks
+   focusing. `display` has to be forced on that rule, because the browser's own
+   `[hidden] { display: none }` would otherwise leave the exit animation with nothing to run
+   on. The visibility change must NOT go on this rule: it would apply on the first frame and
+   hide the control before the fade could be seen. It belongs to the idle state below, where
+   it can be delayed until the animation has finished. */
+.collapseControl[hidden] { display: inline-flex; }
+.collapseControl[data-reader-collapse=open] { animation: readerCollapseIn 180ms ease-out; }
+.collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; visibility: hidden; transition: visibility 0s linear 140ms; }
 [data-motion=off] .collapseControl[data-reader-collapse=open] { animation: none; }
 @media (prefers-reduced-motion: reduce) { .collapseControl[data-reader-collapse=open] { animation: none; } }
 @keyframes readerCollapseIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }

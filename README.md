@@ -105,6 +105,9 @@ return the same key with hidden visibility instead
    胶囊的描边与工具栏分隔线**同宽同档**（`.5px solid var(--dsw-alias-border-l2)`），
    填充用 `--dsw-alias-interactive-bg-hover`（宿主里最常用的静止填充 token），
    hover 则升到 `--dsw-alias-interactive-bg-hover-solid`，免得填充把 hover 反馈吃掉。
+   进出的淡入淡出是同一节点上的纯 CSS，但**退出时必须把可见性变化延迟到动画结束**
+   （`[hidden]` 只强制 `display`，`visibility` 与 `transition: visibility 0s linear 140ms` 放在 idle 状态上）——
+   否则控件在第一帧就不可见，而不可见的元素不绘制动画，表现成「瞬间消失」而不是向上淡出。
 
 ## 开发
 
