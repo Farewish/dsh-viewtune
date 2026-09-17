@@ -2,6 +2,8 @@
 
 ## 0.3.0-relayout.4
 
+- **The oldest turn is completed automatically**（默认开启，工具栏「补全首轮」可关）：历史按窗口加载，最上面那一轮常被截断——只剩后半段步骤，缺了开启它的那句用户消息，于是用时、用量、折叠开关的时长一起缺失。现在每当发现最上面那轮缺自己的用户消息，就自动多取一页，**一旦这轮补全立即停止**，所以是补全「正在看的这一轮」而非加载整个会话；有 30 次的硬上限，换会话时重置。
+
 - **The steps pill stays away for a truncated turn**: the history window cuts into
   older turns, so their step count is a partial sum while the process record reports the
   absolute step the answer landed on. The two are not comparable, and rather than show a

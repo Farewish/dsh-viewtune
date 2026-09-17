@@ -9,7 +9,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, incompleteOldestTurn, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -562,6 +562,28 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
+  const [fillHistory, setFillHistory] = useState(true);
+  const backfillTried = useRef(0);
+
+  // The history window is a bounded slice of recent messages, so it can cut into a
+  // turn: the oldest loaded turn keeps its later steps but loses the user message that
+  // opened it. That turn — and only that turn — can be made whole by loading one more
+  // page, so a page is requested while it stays incomplete and another page exists.
+  // Bounded by attempts, and it stops as soon as the oldest turn is whole, which keeps
+  // this to "finish the turn you are looking at" rather than "load the whole session".
+  const isUserKey = useCallback((key: string) => {
+    const kind = nodes.get(key)?.kind;
+    return kind === 'user' || kind === 'steering';
+  }, [nodes]);
+  const incompleteTurn = useMemo(() => incompleteOldestTurn(groups, isUserKey), [groups, isUserKey]);
+  useEffect(() => {
+    if (!fillHistory || !hasMore || loadingOlder || !incompleteTurn) return;
+    if (backfillTried.current >= 30) return;
+    backfillTried.current += 1;
+    void props.loadOlder().catch(() => { /* the disabled history button reports failures */ });
+  }, [fillHistory, hasMore, loadingOlder, incompleteTurn, props.loadOlder]);
+  // A different session is a different window.
+  useEffect(() => { backfillTried.current = 0; }, [props.sessionId]);
 
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
@@ -695,6 +717,7 @@ export function Reader(props: ReaderProps) {
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
+        <button type="button" className={css.textButton} aria-pressed={fillHistory} onClick={() => setFillHistory(v => !v)} title="历史记录按窗口加载，最上面那一轮可能缺少你的话与其中的用时、用量。开启后只在必要时自动多取一页，把最上面那一轮补全；关闭后按窗口原样显示，需要时手动点「加载更早记录」。">{`补全首轮${fillHistory ? '开' : '关'}`}</button>
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
         setHistoryError(false);
