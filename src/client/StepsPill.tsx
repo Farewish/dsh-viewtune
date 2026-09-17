@@ -68,14 +68,13 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   // absolute. A count that cannot reach the position is a partial sum: it is not used
   // as a denominator, and the turn is described as truncated.
   const truncated = answer !== null && total !== null && answer > total;
-  const loaded = truncated ? null : total;
   // A turn whose start is outside the history window cannot be described by this
   // record: the count is a partial sum while the position is absolute. Nothing is
   // shown for it, matching how the usage/duration pills already behave here.
   if (truncated) return null;
   if (answerStep === null && total === null) return null;
 
-  const label = answer !== null && loaded !== null ? `${answer}/${loaded} 个步骤` : `${answer ?? loaded ?? total} 个步骤`;
+  const label = answer !== null && loaded !== null ? `${answer}/${total} 个步骤` : `${answer ?? total} 个步骤`;
 
   return (
     <span ref={containerRef} className={css.container}>
@@ -115,8 +114,8 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
               )}
               {total !== null && (
                 <>
-                  <span className={css.popLabel}>{truncated ? '已加载步骤' : '本轮总步骤'}</span>
-                  <span className={css.popValue}>{total} 步{truncated ? '（已加载）' : ''}</span>
+                  <span className={css.popLabel}>本轮总步骤</span>
+                  <span className={css.popValue}>{total} 步</span>
                 </>
               )}
             </div>
@@ -162,9 +161,6 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
             </div>
           </div>
 
-          <p className={css.popNote}>
-            这里只有事件序号与计数：当前协议不为单个步骤提供名称或时间，所以本轮的每一阶段无法逐条列出。
-          </p>
         </div>
       )}
     </span>
