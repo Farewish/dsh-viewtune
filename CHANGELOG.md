@@ -1,15 +1,19 @@
 # Changelog
 
+## 0.3.0-relayout.13
+
+- **GitHub 仓库也改名为 `dsh-viewtune`**（原来叫 `dsh-better-display-reforged`）。包名与仓库名现在**同名**，从 GitHub 安装的写法随之回到最简形式：`dsh plugin --profile web add github:Farewish/dsh-viewtune`。
+- 同步的四处：`git remote` 的 URL、`package.json` 的 `repository` / `homepage` / `bugs`、两份 README 里从 GitHub 安装的命令与推送说明。GitHub 会为旧路径保留重定向，所以改名前克隆的副本不会立刻失效。
+- 保留不改的：CHANGELOG 里记录改名历史的条目、README/CHANGELOG 对上游 `aa2246740/dsh-better-display` 的署名，以及 `tests/stock-install.test.ts` 里"禁止安装上游"的反向断言——它们指的是**上游**，不是本仓库。
+
 ## 0.3.0-relayout.12
 
-- **改名：`dsh-better-display-reforged` → `dsh-viewtune`**。改的不只是字面：宿主按 profile 里安装包的 `name` 生成客户端行 id，浏览器加载器会拒绝注册成别的名字的产物，所以**产物里 15 处必须同时改**——`__ModuleLoader__.load({ id })` 那一处，加上 7 组 CSS 模块的 `tagId` 前缀与 `dataset.plugin`（HMR 是按 plugin id 删本插件 `<style>` 的）。改完由 `check-bundle-markers.mjs`（断言产物注册 id = 包名）与临时宿主端到端共同验证：模块图收录 `dsh-viewtune`、产物注册同名、reveal 路由照常。
+- **改名：包名 `dsh-better-display-reforged` → `dsh-viewtune`**。改的不只是字面：宿主按 profile 里安装包的 `name` 生成客户端行 id，浏览器加载器会拒绝注册成别的名字的产物，所以**产物里 15 处必须同时改**——`__ModuleLoader__.load({ id })` 那一处，加上 7 组 CSS 模块的 `tagId` 前缀与 `dataset.plugin`（HMR 是按 plugin id 删本插件 `<style>` 的）。改完由 `check-bundle-markers.mjs`（断言产物注册 id = 包名）与临时宿主端到端共同验证：模块图收录 `dsh-viewtune`、产物注册同名、reveal 路由照常。
 - **入口文件名跟着包名走**：`src/dsh-better-display.ts` → `src/dsh-viewtune.ts`，`lib/dsh-better-display.js` → `lib/dsh-viewtune.js`，并同步 `package.json` 的 `main`/`exports`、`tsdown.config.ts` 的入口、`cordis.yml`/`dshx.yml` 的 entry、以及 `tests/stock-install.test.ts` 里**断言该文件名**的两处——只改 package.json 不改测试，将来一构建测试就会红。
-- **保留不改的（都不是"被解析的包名"）**：`cordis.patch.yml` / `cordis.yml` 里的 `id: dsh-better-display`（配置行标识，只有 `name:` 参与模块解析）、`data-dsh-better-display` DOM 属性、`dsh-better-display.block` 插槽名、`dsh-better-display-entry` / `dsh-better-display-client` 内部注册 id、`/better-display/reveal` 路由，以及 README 里的 **GitHub 仓库 URL**（仓库没有在 GitHub 上改名）。
+- **保留不改的（都不是"被解析的包名"）**：`cordis.patch.yml` / `cordis.yml` 里的 `id: dsh-better-display`（配置行标识，只有 `name:` 参与模块解析）、`data-dsh-better-display` DOM 属性、`dsh-better-display.block` 插槽名、`dsh-better-display-entry` / `dsh-better-display-client` 内部注册 id、`/better-display/reveal` 路由。
 - **工具侧顺带修掉一个隐患**：`plugin-location.mjs` 原本靠「依赖名以 `dsh-better-display` 开头」找插件，**改名即全工具失效**；现在改成「profile 里唯一的非 `@deepseek-ai/` 依赖」，并优先用 manifest 的 bundle 列表消歧义，于是下次再改名也不会坏。
 - profile 侧四处同步改名（manifest、lockfile importer、pnpm 的 `.package-map.json`、`node_modules` 的 junction）。本机 `dsh plugin` 跑不了（没有 pnpm，launcher 只经 corepack 提供 shim），所以这四处是手工改的，改前状态备份在工具目录 `_backup/web-*.before-viewtune`。
-- **修掉一处仓库元数据错误**：`package.json` 的 `repository` / `homepage` / `bugs` 指向 `github.com/aa2246740/dsh-better-display-reforged`——`aa2246740` 是**上游作者**，而那个带 `-reforged` 的仓库**并不存在**（后缀是 fork 才有的）。已改为真实远端 `Farewish/dsh-better-display-reforged`。README/CHANGELOG 里对上游 `aa2246740/dsh-better-display` 的署名是**正确**的，未动。
-- 安装命令处补了一行说明：**从 GitHub 安装要写仓库名而不是包名**（GitHub 上的仓库仍叫 `dsh-better-display-reforged`），否则 `github:Farewish/dsh-viewtune` 指向一个不存在的仓库。
-- 同理**本机 git remote 仍是 `…/Farewish/dsh-better-display-reforged.git`**：包名与仓库名现在是两个东西。若要把 GitHub 仓库也改名，需要同时改 remote、上面三条元数据、以及两份 README 里的推送说明——那是独立的一步，本次没做。
+- **修掉一处仓库元数据错误**：`package.json` 的 `repository` / `homepage` / `bugs` 当时指向 `github.com/aa2246740/dsh-better-display-reforged`——`aa2246740` 是**上游作者**，而那个带 `-reforged` 的仓库**并不存在**（后缀是 fork 才有的）。先改为当时的真实远端，relayout.13 随仓库改名收敛为 `Farewish/dsh-viewtune`。
 
 ## 0.3.0-relayout.11
 

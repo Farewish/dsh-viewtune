@@ -1,6 +1,6 @@
 {
   "name": "dsh-viewtune",
-  "version": "0.3.0-relayout.12",
+  "version": "0.3.0-relayout.13",
   "description": "A calmer reading view for DeepSeek Harness: native process details, live reasoning, and clean final answers. (Relayout fork of aa2246740/dsh-better-display: framed short reasoning, native-scroll reasoning card with edge handoff, all user/context messages above the process disclosure.)",
   "type": "module",
   "license": "MIT",
@@ -99,11 +99,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Farewish/dsh-better-display-reforged.git"
+    "url": "git+https://github.com/Farewish/dsh-viewtune.git"
   },
-  "homepage": "https://github.com/Farewish/dsh-better-display-reforged#readme",
+  "homepage": "https://github.com/Farewish/dsh-viewtune#readme",
   "bugs": {
-    "url": "https://github.com/Farewish/dsh-better-display-reforged/issues"
+    "url": "https://github.com/Farewish/dsh-viewtune/issues"
   },
   "keywords": [
     "deepseek-harness",
