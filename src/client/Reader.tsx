@@ -571,8 +571,38 @@ export function Reader(props: ReaderProps) {
   // until the oldest turn "looked complete", but a turn whose user message is simply not
   // in the snapshot never looks complete, so it kept loading until its cap and dumped
   // many turns into the view at once. One page, once, cannot misjudge anything.
-  const [fillHistory, setFillHistory] = useState(true);
+  // Off by default: the window counts messages while a turn's length varies, so no fixed
+  // number of pages completes a turn reliably. Switching it on loads one page and reports
+  // what the reader sees, which is what the correct version needs.
+  const [fillHistory, setFillHistory] = useState(false);
   const backfillDone = useRef(false);
+  // Diagnostic for the experimental backfill: prints what the reader actually sees for
+  // the oldest turn — its node kinds, the location field names, the loaded step count and
+  // the process record. Runs at most once per session, only once the feature is switched
+  // on, because a reliable "load until this turn's start" needs those names for real.
+  const diagnoseOnce = useRef(false);
+  useEffect(() => {
+    if (!fillHistory || diagnoseOnce.current) return;
+    diagnoseOnce.current = true;
+    const oldest = groups.find(group => group.turn !== null);
+    const first = oldest?.keys[0];
+    const node = first === undefined ? undefined : nodes.get(first);
+    const record = oldest?.keys.map(k => nodes.get(k)).find(n => n?.kind === 'turn-process');
+    try {
+      console.info('[dsh-better-display] backfill probe', {
+        oldestTurn: oldest?.turn ?? null,
+        keyCount: oldest?.keys.length ?? 0,
+        firstKey: first ?? null,
+        kinds: (oldest?.keys ?? []).map(k => nodes.get(k)?.kind ?? '?'),
+        locationKeys: node ? Object.keys(node.location ?? {}) : [],
+        location: node ? node.location : null,
+        loadedSteps: oldest ? (timeline.turns.get(oldest.turn)?.steps.length ?? null) : null,
+        record: record?.data ?? null,
+      });
+    } catch (error) {
+      console.info('[dsh-better-display] backfill probe failed', error);
+    }
+  }, [fillHistory, groups, nodes, timeline]);
   useEffect(() => {
     if (!fillHistory || backfillDone.current || loadingOlder) return;
     if (!hasMore) { backfillDone.current = true; return; }
@@ -714,7 +744,7 @@ export function Reader(props: ReaderProps) {
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
-        <button type="button" className={css.textButton} aria-pressed={fillHistory} onClick={() => setFillHistory(v => !v)} title="历史记录按窗口加载，最上面那一轮可能缺少你的话与其中的用时、用量。开启后只在必要时自动多取一页，把最上面那一轮补全；关闭后按窗口原样显示，需要时手动点「加载更早记录」。">{`补全首轮${fillHistory ? '开' : '关'}`}</button>
+        <button type="button" className={css.textButton} aria-pressed={fillHistory} onClick={() => setFillHistory(v => !v)} title="历史记录按窗口加载，最上面那一轮可能缺少你的话与其中的用时、用量。开启后只在必要时自动多取一页，把最上面那一轮补全；关闭后按窗口原样显示，需要时手动点「加载更早记录」。">{fillHistory ? '补全首轮 · 已开启（实验）' : '补全首轮（实验）'}</button>
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
         setHistoryError(false);
