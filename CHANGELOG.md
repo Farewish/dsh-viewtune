@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0-relayout.10
+
+- **边框与分界线加深到与宿主同级**。原来用的是 `1px solid var(--dsw-alias-border-l1)`——`l1` 是**最浅的一档**（浅色主题下 `#0000000a`，即 4% 黑），而且比宿主自己的线还粗。查了宿主实际服务的前端产物后改成 **`.5px solid var(--dsw-alias-border-l2)`**：宿主一共 107 处 `border-bottom`，其中 55 处是 `l2`、16 处是 `l3`、只有 12 处是 `l1`，header/tabs 一类分隔线都用 `l2`~`l3`。工具栏下沿分界线与「收起」胶囊的描边现在**同宽同档**（`test-toolbar-geometry.mjs` 会断言两者字面一致）。
+- **「收起」加了填充色**：用 `--dsw-alias-interactive-bg-hover`——这是宿主里用作静止填充最多的 token（309 处），所以它是"应用自己的做法"而不是我挑的颜色。因为静止态已经用了这个色，hover 改成它的强化兄弟 `--dsw-alias-interactive-bg-hover-solid`，否则填充会把 hover 反馈吃掉（这条也有断言）。
+
 ## 0.3.0-relayout.9
 
 - **工具栏与「收起」的外观**：工具栏的**高度由 `min-height: 42px` 明确给定**，靠 `align-items: center` 把两个开关居中——所以「收起」上下各有 **4px** 余量，而不是让容器和药丸碰巧对上。字号从 `12px/18px` 提到 `14px/22px`，内边距 `2px 10px` → `5px 14px`（圆角仍是 `999px`）。工具栏加了 `border-bottom: 1px solid var(--dsw-alias-border-l1)` 作分界线。

@@ -91,8 +91,9 @@ return the same key with hidden visibility instead
 
    回答末尾的动作行（复制 / 分叉 / 用时胶囊 / 时间戳）与上游一致，未改动。
 5. **工具栏吸顶**：工具栏（「收起」+「动效」两个开关）固定在阅读列顶部，滚动时始终够得到；
-   底色保证正文从下方滚过而不穿透，下沿有一条 `border-bottom` 分界线。车道高度由
-   `min-height: 42px` 明确给定，两个开关在其中居中——所以「收起」上下各有 4px 余量。
+   底色保证正文从下方滚过而不穿透，下沿有一条分隔线——用 `.5px solid var(--dsw-alias-border-l2)`，
+   与宿主自己画分隔线的方式一致（宿主 107 处 `border-bottom` 里 55 处是 `l2`，`l1` 只有 12 处且最浅）。
+   车道高度由 `min-height: 42px` 明确给定，两个开关在其中居中——所以「收起」上下各有 4.5px 余量。
    **过程状态行不吸顶**——它曾一起固定在工具栏下方（relayout.4），已在 relayout.6 撤掉、
    relayout.7 只把工具栏装回。因此也不需要工具栏的高度实测：那个 `--reader-toolbar-height`
    唯一的消费者就是状态行的偏移。
@@ -101,6 +102,9 @@ return the same key with hidden visibility instead
    不是页面上所有轮次。判定「正在看哪一轮」用的是阅读滚动同一条谓词：**第一个底边还没越过视口顶边的
    轮次**——视口横跨两轮时即为**上面那一轮**。因此滚动到一轮已折叠的对话时，按钮会自己淡出。
    过程是否展开用的是 `TurnGroup` 同一套判据，所以被文本选区临时顶开的那一轮也算在内。
+   胶囊的描边与工具栏分隔线**同宽同档**（`.5px solid var(--dsw-alias-border-l2)`），
+   填充用 `--dsw-alias-interactive-bg-hover`（宿主里最常用的静止填充 token），
+   hover 则升到 `--dsw-alias-interactive-bg-hover-solid`，免得填充把 hover 反馈吃掉。
 
 ## 开发
 
