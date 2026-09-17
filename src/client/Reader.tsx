@@ -475,22 +475,22 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // Every step access is guarded: a step whose payload is missing or is not a Map
   // must degrade to "no record", never throw — a throw here takes down the whole
   // reading view, which is exactly what happened once.
+    // The record is published on a `turn-process` node, which sits inside this turn
+  // like the tail does — so it is read from this turn's own keys and nowhere else.
+  // An earlier version also walked the turn's step payloads, which could pick up a
+  // *different* turn's record and pair its `answerStep` with this turn's step count
+  // (printing a negative remainder). Anything not consistently this turn's is
+  // ignored rather than displayed.
   const turnProcess = useMemo(() => {
-    const keys: string[] = [...group.keys];
-    for (const step of turn?.steps ?? []) {
-      const data = (step as { data?: unknown }).data;
-      if (data instanceof Map) {
-        for (const key of data.keys()) {
-          if (typeof key === 'string') keys.push(key);
-        }
-      }
-    }
-    for (const key of keys) {
+    for (const key of group.keys) {
       const n = nodes.get(key);
-      if (n && isNode(n, 'turn-process')) return n.data as TurnProcessChatData;
+      if (!n || !isNode(n, 'turn-process')) continue;
+      const data = n.data as TurnProcessChatData;
+      if (typeof data.turn === 'number' && group.turn !== null && data.turn !== group.turn) continue;
+      return data;
     }
     return undefined;
-  }, [group.keys, nodes, turn?.steps]);
+  }, [group.keys, nodes, group.turn]);
   const runMs = turn?.start && turn?.end ? Math.max(0, turn.end.time - turn.start.time) : undefined;
   const metrics = useMemo(() => ({
     usage: tailData?.tokenUsage,
