@@ -580,6 +580,15 @@ export function Reader(props: ReaderProps) {
   // the oldest turn — its node kinds, the location field names, the loaded step count and
   // the process record. Runs at most once per session, only once the feature is switched
   // on, because a reliable "load until this turn's start" needs those names for real.
+  /** Shallow field dump: name → value for scalars, name → type otherwise. */
+  const shallow = (value: unknown): Record<string, unknown> | null => {
+    if (value === null || typeof value !== 'object') return null;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = v === null || typeof v !== 'object' ? v : Array.isArray(v) ? `array(${v.length})` : `${typeof v}`;
+    }
+    return out;
+  };
   const diagnoseOnce = useRef(false);
   useEffect(() => {
     if (!fillHistory || diagnoseOnce.current) return;
@@ -598,6 +607,11 @@ export function Reader(props: ReaderProps) {
         location: node ? node.location : null,
         loadedSteps: oldest ? (timeline.turns.get(oldest.turn)?.steps.length ?? null) : null,
         record: record?.data ?? null,
+        locationTurn: shallow(node?.location?.turn),
+        locationStep: shallow(node?.location?.step),
+        turnEntry: shallow(oldest ? timeline.turns.get(oldest.turn) : null),
+        stepEntry: shallow(oldest ? timeline.turns.get(oldest.turn)?.steps.at(-1) : null),
+        stepEntryKeys: oldest ? Object.keys(timeline.turns.get(oldest.turn)?.steps.at(-1) ?? {}) : [],
       });
     } catch (error) {
       console.info('[dsh-better-display] backfill probe failed', error);
