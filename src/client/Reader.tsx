@@ -659,7 +659,9 @@ export function Reader(props: ReaderProps) {
 
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
-    <div className={css.column}>
+    {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
+        scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
+    <div className={css.column} data-chat-flow="">
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
