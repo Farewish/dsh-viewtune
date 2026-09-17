@@ -562,6 +562,24 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
+  // The toolbar's height feeds the sticky status lane's offset, so a wrapped toolbar
+  // cannot overlap it. Measured rather than assumed, because the label wraps.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const scope = el.closest<HTMLElement>('[data-dsh-better-display]') ?? el.ownerDocument.documentElement;
+    const update = () => {
+      scope.style.setProperty('--reader-toolbar-height', `${el.getBoundingClientRect().height}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      scope.style.removeProperty('--reader-toolbar-height');
+    };
+  }, [props.sessionId]);
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
   // 2. Whole-log turn outline projection
@@ -691,7 +709,7 @@ export function Reader(props: ReaderProps) {
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
     <div className={css.column} data-chat-flow="">
-      <div className={css.toolbar} data-ud-check="reader-toolbar">
+      <div ref={toolbarRef} className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
       </div>
