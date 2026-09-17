@@ -11,6 +11,14 @@
 }
 .column { max-width: var(--dsh-chat-content-width, 748px); width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
+
+/* The toolbar is the one lane that pins: it carries both switches (收起 / 动效), so it has
+   to stay reachable while the transcript scrolls under it. The background is what keeps
+   the text from showing through. A turn's process status row deliberately does NOT pin —
+   its offset above would need the toolbar's measured height, and the lane itself read as
+   a second overlay over the content. No ancestor needs unclipping for this to work:
+   .root declares overflow-anchor (not a clipping box) and .jumpDock already sticks. */
+.toolbar { position: sticky; top: 0; z-index: 9; background: var(--dsw-alias-bg-base); }
 .textButton, .historyButton, .iconButton, .jump, .disclosureButton, .imageOpen, .dialogClose { font: inherit; cursor: pointer; }
 .textButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
 .textButton:hover, .iconButton:hover, .disclosureButton:hover { background: var(--dsw-alias-interactive-bg-hover); }

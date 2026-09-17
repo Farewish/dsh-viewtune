@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-relayout.7
+
+- **工具栏装回吸顶，状态行不装**。relayout.6 把两条泳道一起撤了，但意图只是不要**状态行**那条：工具栏承载「收起」和「动效」两个开关，滚到深处够不到就等于没有。现在只有 `.toolbar` 是 `position: sticky; top: 0; z-index: 9` + 底色，过程状态行照旧随内容滚走。
+- **清掉只为状态行而存在的三样东西**，它们没有别的消费者：`--reader-toolbar-height` 的实测、那个 `ResizeObserver` 效果与 `toolbarRef`、以及 `.root` / `.turn` / `.mainFlow` 的 `overflow` / `position` 覆盖。第三条尤其值得说明：`.root` 唯一的 `overflow` 声明是 `overflow-anchor: auto`，那是**另一个属性、不形成裁剪盒**，而上游的 `.jumpDock` 本来就在这套祖先链下正常吸顶——所以工具栏吸顶根本不需要动祖先。少这三处覆盖，就少三处与上游的无声分歧。
+- 验收判据现在是**形状**而不是「有没有回退」：工具栏那条 sticky 必须在（源码 + 产物）、状态行那条必须 0 次、`reader-toolbar-height` 必须 0 次。见 `check-lane-shape.mjs`（原 `check-sticky-reverted.mjs`，已改名以匹配它真正断言的东西）。
+
 ## 0.3.0-relayout.6
 
 - **撤回吸顶泳道**（relayout.4 引入，整体回退）。工具栏不再固定在阅读列顶部，每轮的过程状态行也不再固定在工具栏下方——两者都回到正常文档流，滚过去就滚过去。连同它们的依赖一起移除：工具栏高度的实测（`--reader-toolbar-height` 与那个 `ResizeObserver` 效果），以及为了让 `sticky` 生效而覆盖掉的 `.root` / `.turn` 的 `overflow: visible`、`.mainFlow` 的 `position: relative`。产物里已无任何 `reader-toolbar-height`。
@@ -17,7 +23,7 @@
 
 - **吸顶泳道**：阅读页的工具栏（「阅读 · 原始记录完整保留」+ 开关）固定在阅读列顶部；每一轮的过程状态行（「正在使用工具」/「用时 X 秒」那个折叠开关）在该轮范围内固定在工具栏**下方**，滚过长轮次时始终能看到当前状态。两行都带底色，内容从下方滚过而不是穿透；状态行的偏移量取工具栏的**实测高度**（`--reader-toolbar-height`），所以标签换行时不会重叠。同一条链上的 `.root` / `.turn` / `.mainFlow` 取消裁剪——祖先一旦形成裁剪盒，`sticky` 就失效。
 
-  与上游的差别：上游的吸顶是叠在它那次「工具栏整行、无分割线、右对齐」的布局改版上的；本仓库**只取吸顶**，保留原有的工具栏外观。（那行说明文字已在 0.3.0-relayout.5 撤掉，位置改放固定「收起」开关；**吸顶本身已在 0.3.0-relayout.6 整体回退**。）
+  与上游的差别：上游的吸顶是叠在它那次「工具栏整行、无分割线、右对齐」的布局改版上的；本仓库**只取吸顶**，保留原有的工具栏外观。（那行说明文字已在 0.3.0-relayout.5 撤掉，位置改放固定「收起」开关；**状态行那条泳道已在 0.3.0-relayout.6 撤掉，工具栏那条在 0.3.0-relayout.7 装回**。）
 
 - **修复：步骤胶囊消失**。上一条清理把死分支里的 `const loaded` 一起删掉，却漏了标签条件里对它的引用（`answer !== null && loaded !== null`），于是渲染时抛 `ReferenceError`；而胶囊自带错误边界把这个异常吞掉、只在控制台留一条 warning，症状就成了「胶囊直接不见了」。两处引用已改为 `total`，并新增 `check-pill-scope.mjs`（配有 `selftest-pill-scope.mjs` 自证有效）来挡住这一类「声明被删、使用还在」。
 
