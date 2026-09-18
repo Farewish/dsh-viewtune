@@ -2,114 +2,89 @@
 
 [中文](./README.md)
 
-> Based on [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT),
-> with a few display details in the reading view adjusted. Turn order and the
-> elapsed-time pill stay as upstream. See [changes vs upstream](#changes-vs-upstream).
->
-> The package name is `dsh-viewtune`, distinct from upstream. **Do not
-> reinstall upstream `dsh-better-display`**: this fork's bundle patch resolves its own row to
-> `dsh-viewtune`, and both patches insert the same entry id
-> `dsh-better-display`, so the two would mount twice.
->
-> **This checkout is the single maintenance source.** Make display changes here, then
-> reinstall and restart the Host:
-> `dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune`.
-> Do not update by reinstalling upstream or by patching an installed copy.
+A **reading** tab for DeepSeek Harness: while a turn runs you can see the process — thinking as it is written, tools as they run, which step it is on. When a turn finishes successfully the process folds away and the final answer stays.
+
+Upstream's Chat / Trajectory tabs, the composer, the model picker, tools and approvals are all untouched; this plugin adds a reading view alongside them.
+
+Targets DeepSeek Harness **0.1.5-rc.2**. Display only — it does not change agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`.
+
+## Features
+
+- **The process is visible**: reasoning, tool calls, subagents and progress render live, so a long turn is never just a spinner.
+- **Folds itself away when done**: a turn that ends successfully collapses its process and leaves the answer; running or unfinished turns stay open.
+- **Short reasoning is framed like long reasoning**: the rule that dropped the border when a transcript did not overflow is gone, and short reasoning now shares the long form's heading and body padding.
+- **Wheel handoff from the reasoning area**: once the transcript reaches the edge it is being pushed against, the wheel scrolls the conversation instead. A short transcript that does not overflow never intercepts the wheel at all.
+- **Every user message renders first**: a turn may open with a system prompt and carry several user/steering messages (the system prompt, your message, injected context). All of them render, in source order, above the process disclosure — so turns read the same with or without a system prompt:
+
+  ```
+  the user's message → disclosure (用时 X 秒, clickable) → process (system prompt / reasoning / tools / answer)
+  ```
+
+- **Pinned toolbar**: the toolbar, carrying both switches (收起 and 动效), stays at the top of the reading column while the transcript scrolls under it.
+- **收起 acts on one turn**: a "conversation" here is one turn (a question and its answer). The button folds the turn the reader is looking at rather than every open turn on the page, and it decides which turn that is with the same predicate the reading scroll uses for its anchor — so a viewport straddling two turns resolves to the upper one.
+- **Steps pill**: the answer's action row shows which step the answer landed on out of the turn's total, and opens a readable process record rather than raw JSON.
+- **Interactive mcp-app cards**: an ````mcp-app` fence in the answer mounts as an interactive card inside `<iframe sandbox="allow-scripts allow-forms">` — **without** `allow-same-origin`. A card can fill the next prompt over JSON-RPC. Skill pack: [`skills/generative-mcpapps/`](skills/generative-mcpapps/).
+
+## Install
+
+You need official `dsh` on PATH (otherwise `npx @deepseek-ai/dsh`) and **pnpm** — `dsh plugin add` runs pnpm inside `$DSH_HOME/profiles/web`.
 
 ```sh
-# from a local checkout (development; pnpm links a local directory)
-dsh plugin --profile web add D:\DSH\Plugin\dsh-viewtune
-
-# or from GitHub
+# from GitHub
 dsh plugin --profile web add github:Farewish/dsh-viewtune
-```
 
-You need official `dsh` (or `npx @deepseek-ai/dsh`) and **pnpm** on PATH. `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web`. This repo commits built `lib/`, so a git install does not need `prepare` or a profile `allowBuilds` entry.
-
-Then restart that Host and reload the page. `dsh plugin add` writes the profile. It does not hot-load a running process.
-
-Adds a **阅读** tab to DeepSeek Harness. While a turn runs you see steps, thinking, and progress. After a successful turn those collapse and the final answer stays. Native Chat / Trajectory, the composer, model picker, tools, and approvals stay.
-
-A ````mcp-app` fence in the final answer mounts as an interactive card in the reading view, inside `<iframe sandbox="allow-scripts allow-forms">` without `allow-same-origin`. The card can fill the next prompt via JSON-RPC. The skill pack is [`skills/generative-mcpapps/`](skills/generative-mcpapps/).
-
-Targets DeepSeek Harness **0.1.5-rc.2**. Display only. It does not change Agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`. New sessions default to reading.
-
-From a local checkout or tarball:
-
-```sh
+# or from a local checkout / tarball
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.12.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.13.tgz
 ```
 
-`dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.
+Then **restart the Host** and reload the page: `dsh plugin add` only writes the profile, it does not hot-load a running process.
+
+Remove:
 
 ```sh
 dsh plugin --profile web remove dsh-viewtune
 ```
 
-> **Developing this repo, or pushing it to GitHub? Keep it outside `node_modules`**,
-> e.g. clone to `D:\repos\dsh-better-display`. When pnpm reinstalls dependencies it
-> removes directories under `node_modules` that the profile does not declare, which
-> can take the checkout (and its `.git`) with it.
+Three things worth knowing:
 
-## Changes vs upstream
+- `dsh.bundle` is captured at boot. Do not also insert the same row by hand in the profile's `cordis.patch.yml`, or it mounts twice.
+- This repo **commits its compiled `lib/`**, so an install needs no `prepare` step and no `allowBuilds` entry.
+- Do not run this plugin and upstream `dsh-better-display` at the same time: both bundle patches insert the same entry id, so the two would mount twice. Removing this one with the command above first is what makes going back to upstream clean.
 
-1. **Short thinking is framed too**: the rule that dropped the border/background when
-   the transcript does not overflow is gone, so short reasoning uses the same frame as
-   long reasoning. The box still sizes to its content, never scrolls, and has no
-   fold/expand control.
-2. **Frame padding**: heading `10px 16px 0`, text `8px 16px 16px`, matching long
-   reasoning so nothing touches the border.
-3. **Wheel handoff from the reasoning area**: once the transcript sits on the edge it is
-   being pushed against, the wheel scrolls the conversation instead. A
-   non-overflowing (short) transcript never intercepts the wheel.
-4. **Every user/context message renders above the process disclosure**: a real turn may
-   open with a system prompt and carry several user/steering messages (system prompt,
-   the user's message, injected context). They now all render before the disclosure, so
-   turns with and without a system prompt read the same:
+## Known limitations
 
-   ```
-   用户的话 → 折叠开关（用时 X 秒，可点击）→ 流程（系统提示词 / 思考卡 / 工具 / 回答正文）
-   ```
+- **Turns truncated by the history window** show no steps pill and no timing/usage. Harness pages by message count, so the topmost turn may be only partly loaded; its step count would then be a partial sum that cannot be compared with the absolute step in the process record. Rather than show a misleadingly small number, nothing is shown.
+- **The usage pill is sometimes absent, by design.** The Host only reports usage when it can *prove* the turn's accounting exactly — for instance when one attempt of that turn carries no usable usage sample, or when the turn has not ended yet, it returns "not determinable" instead of an estimate. This plugin follows that stance: it does not guess.
 
-   The answer's action row (copy / fork / elapsed-time pill / clock) is unchanged.
+## Development
 
-## Develop
+### Why the build output is committed
 
-```sh
-npm test
-npm run typecheck
-```
+The browser half is the prebuilt `lib/client.js`, which the Host loads directly. **Rebuilding it from source needs a full DSH monorepo** (it provides the client build adapter and the `packages/client` sources); this repo follows upstream's `tsdown.config.ts`. Because a build carries that requirement, the compiled output is committed — installing and sharing need no build at all.
 
-Building the browser half needs a DSH monorepo (the `tools/dshx` client-build adapter
-plus `packages/client` sources); this repo keeps upstream's `tsdown.config.ts`.
-**The built `lib/` is committed, so installing never builds.**
+Type checking needs the same monorepo (the client UI packages are not published standalone), so `npm run typecheck` cannot run without it. `lib/` holds only compiled output and the Host entry; this repo **does not publish type declarations** and `package.json` has no `types` field.
 
-### Pushing to GitHub
+### Changing the code
 
-`github.com:443` is blocked by a TLS interception on this machine (TCP connects, the
-TLS handshake times out), so `git push https://github.com/...` does not work. The repo
-is configured for SSH over `ssh.github.com:443`:
+When you change display behaviour, **the source in `src/` and the artifact `lib/client.js` have to change together** — the Host loads the artifact. Two identity markers in the artifact must match `package.json`'s `name` exactly, or the whole page fails with
+`loaded without registering "<id>" via __ModuleLoader__.load`:
 
-```sh
-git push            # origin is ssh://git@ssh.github.com:443/Farewish/dsh-viewtune.git
-```
+- the row id in `window.__ModuleLoader__.load({ id })` (the Host derives it from the installed manifest's package name);
+- each CSS module's `tagId` prefix and its `data-plugin` on the injected `<style>` (HMR removes this plugin's styles by that id).
 
-`core.sshCommand` pins the key and the port, so no global config is involved:
+`tests/stock-install.test.ts` guards both, and also checks that this document's install commands name the package correctly.
 
-```sh
-git config --get core.sshCommand
-# "C:/Windows/System32/OpenSSH/ssh.exe" -i D:/DSH/.ssh/github_farewish_ed25519 \
-#   -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-#   -o UserKnownHostsFile=D:/DSH/.ssh/known_hosts
-```
+> **Keep the checkout outside `node_modules`.** `dsh plugin add` runs pnpm inside the profile directory, and pnpm prunes directories under `node_modules` that `package.json` does not declare — the checkout, `.git` included, could be deleted with them.
 
-Change both when moving machines or remotes (`git remote set-url origin <new ssh URL>`
-and `git config core.sshCommand "<new key path>"`).
+### Verifying
 
+`npm test` runs the repo's own tests. Beyond that, this project leans on verification at the artifact level: checking the artifact's structural markers, lifting compiled functions out of it to run behavioural cases against a fake DOM, and booting a throwaway Host to confirm the row id in the module graph matches the id the artifact registers.
+
+One premise behind that is worth stating: **parsing is not correctness.** This repo edits minified output, so it has produced changes that were syntactically perfect and still threw at runtime, because a declaration was removed while a use of it stayed. Only a check of the "is this name declared" kind catches that class of mistake.
 
 ## License
 
-Display and Markdown pieces come from DeepSeek Harness (MIT). The upstream plugin is
-[`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT).
-Motion is based on [Transitions.dev](https://transitions.dev/). This repo is [MIT](LICENSE).
+MIT, see [LICENSE](LICENSE).
+
+It started from [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT), which is where the reading tab, the streaming motion and the Markdown rendering come from. Parts of the display and Markdown layers come from DeepSeek Harness (MIT). Motion is inspired by [Transitions.dev](https://transitions.dev/).
