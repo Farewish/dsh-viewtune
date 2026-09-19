@@ -56,24 +56,21 @@ Three things worth knowing:
 
 ## Known limitations (and what it shows instead)
 
-Neither limit is presented by silently disappearing any more. When the data cannot supply a number,
-the interface says so — a dashed, muted marker whose tooltip is one short line:
-
 - **Turns truncated by the history window** show no step *number*. Harness pages by message count, so
   the topmost turn may be only partly loaded; its step count is then a partial sum that cannot be
   compared with the absolute step in the process record, and a misleadingly small denominator is
   worse than none. What appears instead is a **「步骤记录」** marker whose tooltip reads
-  **该轮未加载完全** ("this turn is not fully loaded").
-- **Usage is sometimes unavailable, by design.** The Host reports usage only when it can *prove* the
-  turn's accounting exactly (one attempt of that turn carrying no usable sample, or the turn sitting
-  in a compacted context, makes it answer "not determinable"). This plugin does not guess — and no
-  longer goes blank either: once a turn has ended without provable usage, the action row shows a
-  **「用量 —」** marker (tooltip: 宿主未提供该轮用量，未估算) and the popover beside it states the same.
-  It sits immediately left of the steps marker, and the two appear independently — a turn whose usage
-  the Host *can* prove never shows it.
+  **请完全加载该轮次记录后查看** ("load this turn's record fully to see it").
+- **Usage is sometimes unavailable, by design**, and it is left absent. The Host reports usage only
+  when it can *prove* the turn's accounting exactly (one attempt of that turn carrying no usable
+  sample, or the turn sitting in a compacted context, makes it answer "not determinable"). This
+  plugin does not guess — and deliberately adds no marker for it: a missing number is a missing
+  number, and a second 「用量 —」 marker was judged to be noise rather than information. The
+  truncation marker earns its place because it explains *why no number can exist here*; an
+  unavailable usage figure has no such position to explain.
 
-Both markers are explanations, not controls: no click target, no hover highlight, and never an
-estimated number.
+The 「步骤记录」 marker is an explanation, not a control: no click target, no hover highlight, and
+never an estimated number.
 
 One more thing, **by decision rather than by omission**: **the interface strings are Chinese only.**
 The Host offers a locale seat, and this plugin already borrows it to translate two strings the Host

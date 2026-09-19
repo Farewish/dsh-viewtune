@@ -84,7 +84,7 @@ const add = (name, pass, detail = "") => checks.push({ name, pass, detail });
   // already returned — and no partial number reaches the marker.
   add("ratio uses the turn's own total", text.includes("`${answer}/${total} 个步骤`"));
   add("the marker carries no number", !/步骤记录[\s\S]{0,40}?\$\{/.test(text));
-  add("the marker's explanation stays short", /该轮未加载完全/.test(text));
+  add("the marker tells the reader what to do", /请完全加载该轮次记录后查看/.test(text));
   // The reason is also present as hidden text inside the pill module: a `title` alone is not a
   // reliable accessible name, so a screen reader must be able to read it from the content.
   add("the marker's reason is readable, not title-only", (sourceRegion(text, "StepsPill.tsx") ?? "").includes("srOnly"));

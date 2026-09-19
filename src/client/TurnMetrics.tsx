@@ -73,21 +73,11 @@ export const TurnMetrics = memo(function TurnMetrics({
           <span>用量 {formatTokens(totalTokens)}</span>
         </button>
       )}
-      {hasTiming && !hasTokens && (
-        // A closed turn with no provable usage. `runMs` only exists once the turn has ended, so
-        // this branch means "the turn is over and the host would not tell us what it cost" — not
-        // "still running". The pill used to be simply absent, which is indistinguishable from the
-        // plugin having lost it; the marker says which it is and promises no estimate.
-        <span
-          className={css.pillMuted}
-          data-ud-check="usage-unavailable"
-          title="宿主未提供该轮用量，未估算"
-        >
-          用量 —
-          {/* The reason as hidden text, not only a title: a title is not a reliable accessible name. */}
-          <span className={css.srOnly}>宿主未提供该轮用量，未估算</span>
-        </span>
-      )}
+      {/* A closed turn with no provable usage shows no usage pill. That absence is deliberate and
+          documented in the README ("已知限制"): the Host answers "not determinable" rather than
+          guessing, and this plugin does not estimate. It was briefly given a "用量 —" marker; the
+          maintainer judged one explanation (on the steps pill, for a turn the window cut) to be
+          enough, and a second marker to be noise rather than information. */}
       {hasTiming && typeof runMs === 'number' && (
         <button
           type="button"
@@ -133,13 +123,6 @@ export const TurnMetrics = memo(function TurnMetrics({
                   </>
                 )}
               </div>
-            </div>
-          )}
-
-          {hasTiming && !hasTokens && (
-            <div className={css.popSection}>
-              <div className={css.popSectionTitle}>Token 消耗</div>
-              <p className={css.popNote}>宿主未提供该轮用量，未估算。</p>
             </div>
           )}
 
