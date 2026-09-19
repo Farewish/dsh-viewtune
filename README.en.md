@@ -85,9 +85,15 @@ weighed and left out.
 The browser half is the prebuilt `lib/client.js`, which the Host loads directly. The compiled output is committed, so **installing and sharing need no build** — but **building from source does work**:
 
 ```sh
-npm install
+npm ci                # install from the checked-in package-lock.json
 npm run build         # src/ -> lib/client.js and lib/dsh-viewtune.js
 ```
+
+Use `npm ci` rather than `npm install`: `tsdown`, `lightningcss` and `typescript` are all declared in `^`
+ranges, so only the lockfile guarantees that another machine installs the same toolchain that
+**reproduces the committed `lib/`** — which is exactly what `npm run guard`'s `verify-build` does: it
+rebuilds for real and reports `REBUILD REPRODUCES THE SHIPPED SHAPE`. Reach for `npm install` only when
+you change a dependency in `package.json`, to write the lockfile back.
 
 Upstream's `tsdown.config.ts` imported `externalClientBundle` from a Harness adapter
 (`<harness>/tools/dshx/src/client-build.js`) that is published nowhere, which is why its build could
@@ -99,7 +105,7 @@ inlined. The artifact contract is unchanged, so the artifact-level guards below 
 Commit `lib/` together with the source: an installer receives the committed artifact and is not asked
 to build.
 
-**Type checking does not need that monorepo.** The client UI packages are published standalone on npm, and `npm install` pulls them in through `peerDependencies` — including `dsh-client-store`, `dsh-client-ui-primitives` and `dsh-client-ui-slots`, which the launcher itself does not carry:
+**Type checking does not need that monorepo.** The client UI packages are published standalone on npm, and installing dependencies pulls them in through `peerDependencies` — including `dsh-client-store`, `dsh-client-ui-primitives` and `dsh-client-ui-slots`, which the launcher itself does not carry:
 
 ```sh
 npm run typecheck     # tsc -p tsconfig.json --noEmit, against the real declarations
@@ -125,7 +131,7 @@ Two layers, because they answer different questions:
 
 ```sh
 npm test        # source level: 12 test files through Node's test runner
-npm run guard   # artifact level: 18 assertions, all against the built lib/client.js
+npm run guard   # artifact level: 19 assertions, all against the built lib/client.js
 ```
 
 `npm run guard` asserts the **artifact**: the module-table registration id and the `require()` set, that

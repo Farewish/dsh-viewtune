@@ -77,9 +77,14 @@ dsh plugin --profile web remove dsh-viewtune
 浏览器半边是预编译的 `lib/client.js`，Host 启动时直接加载它。仓库把编译结果一并提交，所以**安装与分享都不需要构建**；但**从源码构建现在是可以的**：
 
 ```sh
-npm install
+npm ci                # 按仓库里的 package-lock.json 装依赖
 npm run build         # src/ -> lib/client.js 与 lib/dsh-viewtune.js
 ```
+
+用 `npm ci` 而不是 `npm install`：`package.json` 里 `tsdown` / `lightningcss` / `typescript` 都写在 `^`
+区间上，只有锁文件能保证在别的机器上装出**能复现当前 `lib/`** 的同一套工具链——`npm run guard` 里的
+`verify-build` 正是这么比的：它真的重建一遍，再报 `REBUILD REPRODUCES THE SHIPPED SHAPE`。只有改动了
+`package.json` 的依赖时才用 `npm install` 去回写锁文件。
 
 上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器（`<harness>/tools/dshx/src/client-build.js`）
 取 `externalClientBundle`，所以那个配置在克隆出来的仓库里跑不起来。本仓库把它的真身——
@@ -89,7 +94,7 @@ npm run build         # src/ -> lib/client.js 与 lib/dsh-viewtune.js
 
 改完记得**同时提交 `lib/`**：安装别人拿到的是这份产物，而不是让他在本地构建。
 
-**类型检查同样不需要那份单仓库。** 客户端 UI 包在 npm 上是独立发布的，`npm install` 会按
+**类型检查同样不需要那份单仓库。** 客户端 UI 包在 npm 上是独立发布的，装依赖时会按
 `peerDependencies` 把它们（含 launcher 自己没装的 `dsh-client-store`、`dsh-client-ui-primitives`、
 `dsh-client-ui-slots`）一并装好：
 
@@ -118,7 +123,7 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
 
 ```sh
 npm test     # 源码层：Node 自带测试跑 12 个测试文件
-npm run guard   # 产物层：18 条断言，全部针对构建出来的 lib/client.js
+npm run guard   # 产物层：19 条断言，全部针对构建出来的 lib/client.js
 ```
 
 `npm run guard` 检查的是**产物**：模块表注册 id 与 `require()` 集合、注入的 CSS 字面量是否完整、
