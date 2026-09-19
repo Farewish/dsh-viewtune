@@ -59,10 +59,21 @@ const markers = [
   // the compiled handler and runs 23 cases); these markers only assert it is still there, so
   // they match the expressions rather than the minifier's choice of local name and spacing.
   ['wheel-native-scroll', () => /Math\.min\(maxOffset[^;]*scrollTop \+ delta/.test(bundle)],
-  // Handoff is gated on the card already sitting on the edge this gesture pushes against. The
-  // minifier inlines the local and negates the test, so assert the two identifiers of that
-  // comparison on one line rather than any particular spelling of the expression.
-  ['wheel-edge-handoff', () => /maxOffset/.test(bundle) && /Math\.min\(maxOffset[\s\S]{0,80}?=== port\.scrollTop/.test(bundle)],
+  // Handoff is gated on the card already sitting on the edge this gesture pushes against, and
+  // that test is a named helper carrying a tolerance: exact equality spent the notch that first
+  // reached the edge on a card that could not move, so the handoff happened one notch late and
+  // the gesture stuck then stepped. Assert the helper is called and that the tolerance is
+  // non-zero, rather than any particular spelling of the comparison.
+  ['wheel-edge-handoff', () => {
+    const start = bundle.indexOf('const onWheel = (event) => {');
+    if (start === -1) return false;
+    const end = bundle.indexOf('const onSelection', start);
+    const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
+    return /atScrollEdge\(port\.scrollTop, delta, maxOffset\)/.test(handler);
+  }],
+  // The bundler inlines the constant into the default parameter, so the tolerance is asserted
+  // where it actually lands: `slack = <n>`, with n non-zero.
+  ['wheel-edge-tolerance-is-not-zero', () => /function atScrollEdge\([^)]*slack = [1-9]/.test(bundle)],
   // The wheel path must not write the card's position: doing so replaces a composited subpixel
   // scroll with an integer jump, which is the stutter the rework removed. `manual()` may still
   // write once when it converts transform-following back to a native scrollable viewport, so

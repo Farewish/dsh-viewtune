@@ -40,8 +40,8 @@ function extractFn(name) {
 
 const context = createContext({ console });
 runInContext(
-  `${extractFn('isNearTail')}\n${extractFn('wheelClaimsScroll')}\n`
-  + 'this.isNearTail = isNearTail; this.wheelClaimsScroll = wheelClaimsScroll;',
+  `${extractFn('isNearTail')}\n${extractFn('wheelClaimsScroll')}\n${extractFn('atScrollEdge')}\n`
+  + 'this.isNearTail = isNearTail; this.wheelClaimsScroll = wheelClaimsScroll; this.atScrollEdge = atScrollEdge;',
   context,
 );
 
@@ -73,8 +73,45 @@ check('exactly at the tail counts', context.isNearTail(CONTENT - VIEW, CONTENT, 
 check('within the tail window counts', context.isNearTail(CONTENT - VIEW - 71, CONTENT, VIEW) === true);
 // Just outside it — this is the case that must not follow.
 check('beyond the tail window does not count', context.isNearTail(CONTENT - VIEW - 73, CONTENT, VIEW) === false);
-// A card that does not overflow at all is always at its tail.
+// --- a card that does not overflow at all is always at its tail.
 check('a non-overflowing card is at its tail', context.isNearTail(0, VIEW, VIEW) === true);
+
+// --- the edge tolerance: this is what decides where the gesture stops being the card's
+const MAX = CONTENT - VIEW;   // the largest scrollTop the card can reach
+const NOTCH = 120;
+
+// Mid-transcript: the notch moves the card, so the card keeps it.
+check('mid-card is not at an edge', context.atScrollEdge(100, NOTCH, MAX) === false);
+
+// Sitting exactly on the bottom: the conversation takes this notch.
+check('exactly on the bottom edge counts', context.atScrollEdge(MAX, NOTCH, MAX) === true);
+
+// The subpixel case the slack exists for: a fraction short of the limit still counts as there,
+// so the notch that reaches the edge is not wasted on a card that cannot move.
+check('a subpixel short of the edge counts', context.atScrollEdge(MAX - 0.4, NOTCH, MAX) === true);
+check('one pixel short still counts', context.atScrollEdge(MAX - 1, NOTCH, MAX) === true);
+
+// Past the slack it must NOT count, or the card would hand off before it has scrolled — that is
+// the opposite failure, and the reason the number has to stay small.
+check('two pixels short does not count', context.atScrollEdge(MAX - 2, NOTCH, MAX) === false);
+check('half a notch short does not count', context.atScrollEdge(MAX - NOTCH / 2, NOTCH, MAX) === false);
+
+// The top edge works through the same expression.
+check('exactly on the top edge counts', context.atScrollEdge(0, -NOTCH, MAX) === true);
+check('a pixel below the top counts', context.atScrollEdge(1, -NOTCH, MAX) === true);
+check('mid-card upward is not at an edge', context.atScrollEdge(MAX, -NOTCH, MAX) === false);
+
+// A short card can scroll nowhere, so every notch belongs to the conversation.
+check('a non-scrollable card is always at its edge', context.atScrollEdge(0, NOTCH, 0) === true);
+
+// Prove this check can see the shape that caused the bug: zero slack. A card a fraction short of
+// the limit would then be judged "not at the edge" and swallow the notch.
+{
+  const zeroSlack = createContext({ console });
+  runInContext('this.atScrollEdge = (scrollTop, delta, maxOffset) => Math.min(maxOffset, Math.max(0, scrollTop + delta)) === scrollTop;', zeroSlack);
+  check('the check can see a zero-slack rule', zeroSlack.atScrollEdge(MAX - 0.4, NOTCH, MAX) === false);
+  check('the real rule differs from zero slack', context.atScrollEdge(MAX - 0.4, NOTCH, MAX) !== zeroSlack.atScrollEdge(MAX - 0.4, NOTCH, MAX));
+}
 
 let ok = true;
 for (const [name, pass, detail] of tests) {

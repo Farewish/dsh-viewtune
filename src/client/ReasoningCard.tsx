@@ -8,6 +8,36 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 /** How long after the last wheel notch a gesture counts as finished. */
 const WHEEL_IDLE_MS = 140;
 
+/**
+ * How close to a limit still counts as being on it, in CSS pixels.
+ *
+ * Native scrolling accumulates subpixel offsets, so a card that looks like it sits on its edge is
+ * usually a fraction away from the exact limit. Demanding exact equality spends the notch that
+ * first reaches the edge on a card that cannot move, and the handoff only happens on the *next*
+ * notch — which reads as the scroll sticking and then stepping, right where the gesture crosses
+ * from the card into the page. One pixel absorbs the fraction and stays far below what a reader
+ * could notice as "it stopped a little short".
+ */
+export const EDGE_SLACK_PX = 1;
+
+/**
+ * Is the card already sitting on the edge this gesture pushes against?
+ *
+ * Asked as "would this notch move the card at all": clamping the projection is what the browser
+ * itself does, so a notch landing on or past a limit consumes nothing — and one expression covers
+ * both directions (up at the top, down at the bottom). Pure and exported so the tolerance is
+ * testable instead of tuned by eye, which is how it got missed the first time.
+ */
+export function atScrollEdge(
+  scrollTop: number,
+  delta: number,
+  maxOffset: number,
+  slack = EDGE_SLACK_PX,
+): boolean {
+  const projected = Math.min(maxOffset, Math.max(0, scrollTop + delta));
+  return Math.abs(projected - scrollTop) <= slack;
+}
+
 /** One real transcript: reference transform while following, native scroll while reading. */
 export function ReasoningCard({ children, step, active, motion, selected, onRead }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
@@ -183,12 +213,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // instead of glide. So this handler never writes the card's position.
       if (!overflow) return;
       const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
-      const projected = Math.min(maxOffset, Math.max(0, port.scrollTop + delta));
       // Hand off only when the card already sits on the edge this gesture pushes against: the
       // browser has nothing left to give there, so the conversation should take the notch.
       // Mid-transcript this is false and the browser scrolls the card natively, untouched.
-      const atEdge = projected === port.scrollTop;
-      if (!atEdge || !event.cancelable) return;
+      if (!atScrollEdge(port.scrollTop, delta, maxOffset) || !event.cancelable) return;
       // The conversation scroller is the nearest marked ancestor. The card must never carry that
       // marker itself, or the reader's scroll hooks adopt the card as the reading container and
       // its height accounting breaks.

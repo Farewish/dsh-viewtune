@@ -40,6 +40,22 @@ function extractWheelSection() {
   return bundle.slice(start, end).replace(/^\t{4}/gmu, '');
 }
 
+/**
+ * A top-level helper the handler calls. The edge test lives in its own declaration now, so the
+ * sandbox has to be given it or the extracted handler runs with an undefined name.
+ */
+function extractHelper(name) {
+  const start = bundle.indexOf(`function ${name}(`);
+  if (start === -1) throw new Error(`compiled ${name} not found`);
+  let depth = 0;
+  let i = bundle.indexOf('{', start);
+  for (; i < bundle.length; i++) {
+    if (bundle[i] === '{') depth++;
+    else if (bundle[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  return bundle.slice(start, i + 1);
+}
+
 let clock = 1_000_000;
 const sandbox = {
   WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 },
@@ -49,7 +65,7 @@ const sandbox = {
   console,
 };
 const context = createContext(sandbox);
-runInContext(`${extractWheelSection()}\nthis.onWheel = onWheel;`, context);
+runInContext(`${extractHelper('atScrollEdge')}\n${extractWheelSection()}\nthis.onWheel = onWheel;`, context);
 
 const clampIn = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -167,16 +183,18 @@ const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
   check('near the bottom: nothing is prevented', result.prevented === false, `prevented ${String(result.prevented)}`);
 }
 
-// 4c. Once the card really is on the edge, the whole notch goes over and the card is not written
-// again — the sub-pixel gap is left alone rather than closed by a scripted write.
+// 4c. A sub-pixel gap counts as being on the edge. This is exactly what the slack is for: native
+// scrolling leaves subpixel offsets, so a card that looks like it is sitting on its bottom is
+// usually a fraction away from the exact limit. Without the slack the notch that first reaches
+// the edge is spent on a card that cannot move, and the handoff only happens on the next notch —
+// the scroll sticks and then steps right where the gesture crosses into the page.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 - 0.5 });
   const result = wheel({ port, talk, deltaY: 120 });
-  check('sub-pixel gap: the browser closes the gap natively', result.cardMoved === 0.5,
-    `card moved ${String(result.cardMoved)}`);
-  check('sub-pixel gap: the card is not written', port.writes === 1, `${String(port.writes)} writes (one native)`);
-  check('sub-pixel gap: the conversation waits', result.talkMoved === 0, `talk moved ${String(result.talkMoved)}`);
+  check('sub-pixel gap: treated as being on the edge', result.talkMoved === 120,
+    `talk moved ${String(result.talkMoved)}`);
+  check('sub-pixel gap: the card is not written', port.writes === 0, `${String(port.writes)} writes`);
 }
 
 // 4d. Already on the edge: that is the notch the conversation takes.
