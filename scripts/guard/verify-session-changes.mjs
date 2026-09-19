@@ -70,16 +70,20 @@ const add = (name, pass, detail = "") => checks.push({ name, pass, detail });
   const clockAt = (row ?? "").indexOf("MessageClock");
   add("pill sits before the closing clock", pillAt !== -1 && clockAt !== -1 && pillAt < clockAt);
 
-  // Truncation: hidden, so the numbers can never contradict each other.
+  // Truncation: the number is withheld, so the counts can never contradict each other — and since
+  // B1 the pill says so rather than disappearing. Both halves are asserted: withholding the number
+  // is the data decision, rendering the marker is the visibility one.
   // The published artifact kept `const truncated = …` as a declaration; a rebuild inlines the
-  // single-use constant into the guard, so the expression — not the statement — is the anchor.
+  // single-use constant into the branch, so the expression — not the statement — is the anchor.
   const guard = text.includes("answer !== null && total !== null && answer > total");
   add("truncation is detected", guard);
-  add("truncated turns render nothing", /if \(truncated\) return null;|if \(answer !== null && total !== null && answer > total\) return null;/.test(text));
+  const windowMarker = text.includes('"data-ud-check": "steps-window"') && text.includes("步骤记录 · 窗口外");
+  add("an out-of-window turn is marked, not silent", windowMarker);
   add("no cross-scope subtraction", !text.includes("${total - answerStep}"));
-  // A truncated turn renders nothing, so nothing downstream needs a partial-count branch:
-  // the ratio is built from the turn's own total, after the guard has already returned.
+  // The ratio is built from the turn's own total, after the branch for an out-of-window turn has
+  // already returned — and no partial number reaches the marker.
   add("ratio uses the turn's own total", text.includes("`${answer}/${total} 个步骤`"));
+  add("the marker carries no number", !/步骤记录 · 窗口外[\s\S]{0,40}?\$\{/.test(text));
   add("no dead partial-count branch", !text.includes('truncated ? "已加载步骤"') && !text.includes("const loaded = truncated"));
   add("the caveat line is gone", !text.includes("这里只有事件序号与计数"));
 }

@@ -68,10 +68,28 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   // absolute. A count that cannot reach the position is a partial sum: it is not used
   // as a denominator, and the turn is described as truncated.
   const truncated = answer !== null && total !== null && answer > total;
-  // A turn whose start is outside the history window cannot be described by this
-  // record: the count is a partial sum while the position is absolute. Nothing is
-  // shown for it, matching how the usage/duration pills already behave here.
-  if (truncated) return null;
+  // A turn whose start is outside the loaded history window cannot be described by this record:
+  // the count is a partial sum while the answer's position is absolute, so the two are not
+  // comparable. The number is still withheld — a partial denominator would mislead — but the pill
+  // no longer disappears, because an absent control reads as a broken plugin rather than as a
+  // limit of what is loaded. See README, "已知限制", and the guard that pins this decision.
+  if (truncated) {
+    return (
+      <span className={css.container}>
+        <span
+          className={css.pillMuted}
+          data-ud-check="steps-window"
+          title="这一轮的开头在已加载的历史窗口之外：步骤数是局部和，与回答所在的绝对步数不可比，所以不显示数字。用「加载更早记录」把它载入后即可看到。"
+        >
+          <svg className={css.pillIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+            <path d="M3 3.4h10M3 8h10M3 12.6h6.4" strokeWidth="1.2" strokeLinecap="round" />
+            <circle cx="12.4" cy="12.6" r="1.5" strokeWidth="1.2" />
+          </svg>
+          <span>步骤记录 · 窗口外</span>
+        </span>
+      </span>
+    );
+  }
   if (answer === null && total === null) return null;
 
   const label = answer !== null ? `${answer}/${total} 个步骤` : `${answer ?? total} 个步骤`;

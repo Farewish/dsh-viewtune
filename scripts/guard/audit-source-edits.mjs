@@ -43,9 +43,10 @@ const note = (severity, file, message) => findings.push({ severity, file, messag
 const has = (text, needle) => text.includes(needle);
 
 // ---------------------------------------------------------------- 1. dead branches
-// The pill decides truncation, then returns null before any branch that assumed it could
-// still render. Text that only that branch could reach is unreachable.
-if (has(source.pill, "if (truncated) return null;")) {
+// The pill decides truncation and then renders the muted "out of window" marker, which builds no
+// label and no numbers. Text that only a numbered branch could reach is still unreachable — the
+// decision to withhold the number did not change, only the decision to say so.
+if (has(source.pill, "if (truncated) {")) {
   for (const [name, needle] of [
     ["历史窗口截断", "历史窗口截断"],
     ["不在当前历史窗口内", "不在当前历史窗口内"],
@@ -73,7 +74,8 @@ for (const [name, needle] of [
 // ------------------------------------------------------ 3. the pill's own structure
 {
   const p = source.pill;
-  const guardAt = p.indexOf("if (truncated) return null;");
+  const guardAt = p.indexOf("if (truncated) {");
+  const markerAt = p.indexOf('data-ud-check="steps-window"');
   const labelAt = p.indexOf("const label =");
   const truncAt = p.indexOf("const truncated =");
   const answerAt = p.indexOf("const answer = answerStep;");
@@ -81,14 +83,20 @@ for (const [name, needle] of [
   for (const [name, at] of [
     ["truncation computed", truncAt],
     ["answer position kept absolute", answerAt],
-    ["nothing rendered when truncated", guardAt],
+    ["the out-of-window branch", guardAt],
+    ["the out-of-window marker", markerAt],
     ["label built", labelAt],
   ]) {
     if (at === -1) note("BAD", "StepsPill.tsx", `missing step: ${name}`);
   }
-  // The guard has to run before the label exists, or a truncated turn still builds one.
+  // The branch has to run before the label exists, or a truncated turn still builds one.
   if (guardAt !== -1 && labelAt !== -1 && guardAt > labelAt) {
-    note("BAD", "StepsPill.tsx", "the truncation guard runs after the label is built");
+    note("BAD", "StepsPill.tsx", "the truncation branch runs after the label is built");
+  }
+  // ...and it must render the marker rather than a bare null: that was the old decision, and a
+  // silent pill is what this fork set out to remove.
+  if (guardAt !== -1 && markerAt !== -1 && markerAt < guardAt) {
+    note("BAD", "StepsPill.tsx", "the marker is declared before the branch that renders it");
   }
   if (truncAt !== -1 && guardAt !== -1 && truncAt > guardAt) {
     note("BAD", "StepsPill.tsx", "truncation is tested after the guard that needs it");
@@ -144,7 +152,7 @@ for (const [name, needle] of [
 // --------------------------------------------------------- 6. artifact cross-check
 {
   const decisions = [
-    ["pill hides a truncated turn", has(source.pill, "if (truncated) return null;"), has(bundle, "if (truncated) return null;") || has(bundle, "answer !== null && total !== null && answer > total")],
+    ["pill marks an out-of-window turn", has(source.pill, 'data-ud-check="steps-window"'), has(bundle, '"data-ud-check": "steps-window"')],
     ["pill is boundary-wrapped", has(source.pill, "QuietBoundary"), pillBoundaryClass(bundle) !== undefined],
     ["reader scopes the record to this turn", has(source.reader, "data.turn !== group.turn"), has(bundle, "data.turn !== group.turn")],
     ["chat-flow hook", has(source.reader, "data-chat-flow"), has(bundle, '"data-chat-flow": ""')],

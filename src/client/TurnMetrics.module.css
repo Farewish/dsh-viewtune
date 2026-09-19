@@ -30,6 +30,26 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/*
+ * A marker for something the reader asked about and the data cannot answer: a turn whose start is
+ * outside the loaded history window, or a turn whose token usage the host will not prove. It shares
+ * the pill's geometry so it sits in the same action row, but it is not a control — no hover, no
+ * pointer cursor, dashed rather than solid — because there is nothing to open. Silence used to be
+ * the answer here, and silence reads as a bug in the plugin rather than a limit of the data.
+ */
+.pillMuted {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  cursor: default;
+  font-family: inherit;
+}
+
 .timeButton {
   display: inline-flex;
   align-items: center;

@@ -46,7 +46,10 @@ const bundle = readFileSync(`${REPO}/lib/client.js`, "utf8");
  */
 const pairs = [
   ["pill: truncation test", "const truncated = answer !== null && total !== null && answer > total;", (b) => b.includes("answer !== null && total !== null && answer > total")],
-  ["pill: hides when truncated", "if (truncated) return null;", (b) => /if \(truncated\) return null;|if \(answer !== null && total !== null && answer > total\) return null;/.test(b)],
+  // The decision this row pins changed in B1: the pill still withholds the number for an
+  // out-of-window turn, but it now says so instead of rendering nothing. What the two sides must
+  // agree on is the marker, not the absence.
+  ["pill: marks a turn outside the window", 'data-ud-check="steps-window"', '"data-ud-check": "steps-window"'],
   ["pill: loaded count only in the ratio", "`${answer}/${loaded} 个步骤`", "`${answer}/${loaded} 个步骤`"],
   ["pill: error boundary", "class QuietBoundary", (b) => pillBoundaryClass(b) !== undefined],
   ["pill: boundary wraps the component", "<QuietBoundary>", (b) => {

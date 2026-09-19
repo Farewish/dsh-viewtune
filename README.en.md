@@ -52,10 +52,24 @@ Three things worth knowing:
 - This repo **commits its compiled `lib/`**, so an install needs no `prepare` step and no `allowBuilds` entry.
 - Do not run this plugin and upstream `dsh-better-display` at the same time: both bundle patches insert the same entry id, so the two would mount twice. Removing this one with the command above first is what makes going back to upstream clean.
 
-## Known limitations
+## Known limitations (and what it shows instead)
 
-- **Turns truncated by the history window** show no steps pill and no timing/usage. Harness pages by message count, so the topmost turn may be only partly loaded; its step count would then be a partial sum that cannot be compared with the absolute step in the process record. Rather than show a misleadingly small number, nothing is shown.
-- **The usage pill is sometimes absent, by design.** The Host only reports usage when it can *prove* the turn's accounting exactly — for instance when one attempt of that turn carries no usable usage sample, or when the turn has not ended yet, it returns "not determinable" instead of an estimate. This plugin follows that stance: it does not guess.
+Neither limit is presented by silently disappearing any more. When the data cannot supply a number,
+the interface says why: a dashed, muted marker whose tooltip carries the reason.
+
+- **Turns truncated by the history window** show no step *number*. Harness pages by message count, so
+  the topmost turn may be only partly loaded; its step count is then a partial sum that cannot be
+  compared with the absolute step in the process record, and a misleadingly small denominator is
+  worse than none. What appears instead is a **「步骤记录 · 窗口外」** marker — the tooltip explains,
+  and points at 加载更早记录 to load the rest.
+- **Usage is sometimes unavailable, by design.** The Host reports usage only when it can *prove* the
+  turn's accounting exactly (one attempt of that turn carrying no usable sample, or the turn sitting
+  in a compacted context, makes it answer "not determinable"). This plugin does not guess — and no
+  longer goes blank either: once the turn has ended without provable usage, the action row shows a
+  **「用量 —」** marker, and the popover it sits beside states the reason.
+
+Both markers are explanations, not controls: no click target, no hover highlight, and never an
+estimated number.
 
 ## Development
 

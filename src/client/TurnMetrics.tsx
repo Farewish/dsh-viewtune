@@ -73,6 +73,19 @@ export const TurnMetrics = memo(function TurnMetrics({
           <span>用量 {formatTokens(totalTokens)}</span>
         </button>
       )}
+      {hasTiming && !hasTokens && (
+        // A closed turn with no provable usage. `runMs` only exists once the turn has ended, so
+        // this branch means "the turn is over and the host would not tell us what it cost" — not
+        // "still running". The pill used to be simply absent, which is indistinguishable from the
+        // plugin having lost it; the marker says which it is and promises no estimate.
+        <span
+          className={css.pillMuted}
+          data-ud-check="usage-unavailable"
+          title="宿主未提供该轮可证明的 Token 用量（例如某次尝试缺少用量样本，或该轮落在压缩上下文里）。本插件不估算，所以这里不显示数字。"
+        >
+          用量 —
+        </span>
+      )}
       {hasTiming && typeof runMs === 'number' && (
         <button
           type="button"
@@ -118,6 +131,18 @@ export const TurnMetrics = memo(function TurnMetrics({
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {hasTiming && !hasTokens && (
+            // Explains the muted pill rather than leaving the reader to wonder why there is no
+            // number here. Same wording as the tooltip, so the two cannot drift.
+            <div className={css.popSection}>
+              <div className={css.popSectionTitle}>Token 消耗</div>
+              <p className={css.popNote}>
+                宿主未提供该轮可证明的用量（例如某次尝试缺少用量样本，或该轮落在压缩上下文里）。
+                本插件不估算，所以这里不显示数字。
+              </p>
             </div>
           )}
 

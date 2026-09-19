@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+**从源码构建回来了。** 上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器取
+`externalClientBundle`，所以克隆出来的仓库构建不了；本仓库把它的真身——官方预设
+`packages/client/tsdown.client.ts` 的 `clientBundle()`（Harness tag `dsh-v0.1.5-rc.2`）——
+移植成 `scripts/client-bundle.mjs` 并内联了它引用的三处 Harness 内部模块。`npm run build`
+现在能从 `src/` 产出 `lib/`，`npm run guard`（18 条针对产物的断言）与 `npm test` 一起构成两层验证。
+
+**类型检查不再需要那份单仓库**：客户端 UI 包在 npm 上是独立发布的，`npm install` 会按
+`peerDependencies` 装齐（含 launcher 自己没带的 `dsh-client-store`、`dsh-client-ui-primitives`、
+`dsh-client-ui-slots`），`npm run typecheck` 对着真实声明检查。<br>
+顺带修掉一处装不出来的缺陷：peer 范围从前写 `^0.1.2-rc.1`，semver 的预发布规则使它**匹配不到**
+`0.1.5-rc.2`，于是干净安装拿到的是与本插件目标不同的宿主 API 类型；现在按目标版本声明并钉进 devDependencies。
+
+**重建暴露并修掉的三处漂移**（只有能构建才看得见）：
+- 已发布的 `lib/client.js` 在 6 处 CSS 模块 region 注释里带着上游维护者的本机绝对路径
+  （`/Users/wu/Documents/DeepSeekHarness/…`）；移植版改用仓库相对路径。
+- 已发布的宿主半边 `lib/dsh-viewtune.js` 仍导出 `name = "dsh-better-display"`，而源码早已改名；
+  `dshx.yml` 的加载标记也跟着修正。
+- `src/client/StepsPill.tsx` 与产物在局部变量名、组件名、以及两处调用次数上不一致；
+  重建以源码为准，守卫从此按**源码命名**断言（`scripts/guard/bundle-anchors.mjs`），
+  于是这类不一致以后会被守卫直接报出来，而不是等到下一次构建。
+
+**B1：两处"静默消失"改成显式标记。**
+- 被历史窗口截断的轮次不再什么都不显示，而是给出 **「步骤记录 · 窗口外」** 标记（虚线灰标记，
+  悬停说明原因并指向「加载更早记录」）。**仍然不显示任何数字**——偏小的分母会误导。
+- 轮次结束后若宿主未能给出可证明的用量，动作行出现 **「用量 —」** 标记，浮层里写明原因。
+  同样不估算、不给数字。
+- 两枚标记只是说明、不是控件：无点击、无 hover 高亮。README 的「已知限制」一节按新行为重写。
+
 ## 0.3.0-relayout.13
 
 - **GitHub 仓库也改名为 `dsh-viewtune`**（原来叫 `dsh-better-display-reforged`）。包名与仓库名现在**同名**，从 GitHub 安装的写法随之回到最简形式：`dsh plugin --profile web add github:Farewish/dsh-viewtune`。
