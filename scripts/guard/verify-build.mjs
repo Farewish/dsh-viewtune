@@ -44,6 +44,21 @@ function gitLines(args) {
   return readFileSync(out, 'utf8').split('\n').filter((line) => line !== '');
 }
 
+// This guard rebuilds from a *checkout*: it enumerates tracked files so the scratch copy is the
+// source of truth rather than whatever happens to sit next to `lib/`. An installed package has no
+// git history, so the guard is not applicable there — say that plainly instead of failing with
+// "git ls-files failed (128)", which reads like a broken invariant.
+const insideWorkTree = spawnSync('git', ['-C', ROOT, 'rev-parse', '--is-inside-work-tree'], {
+  stdio: 'ignore',
+});
+if (insideWorkTree.status !== 0) {
+  console.log(
+    `SKIP — ${ROOT} is not a git checkout, so there is nothing to rebuild from.\n`
+    + 'This guard verifies that a build reproduces the committed artifact; run it in a clone.',
+  );
+  process.exit(0);
+}
+
 const scratch = mkdtempSync(join(tmpdir(), 'guard-build-'));
 for (const name of gitLines(['ls-files'])) {
   const destination = join(scratch, name);
