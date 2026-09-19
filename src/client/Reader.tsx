@@ -549,17 +549,17 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
  * A viewport straddling two turns therefore resolves to the upper one, which is the rule the
  * collapse control is specified with.
  *
- * Takes the turn rows rather than querying them, so one scroll pass can hand the same rows to
- * both readings instead of walking the DOM twice, and stays a plain function over a DOM-shaped
- * argument so this rule can be tested on its own.
+ * Takes the turn rows rather than querying them, so one scroll pass hands both readings the same
+ * list instead of running the query twice, and stays a plain function over array-like rows so this
+ * rule can be tested on its own.
  */
 export function currentTurnOf(
   content: { querySelectorAll: (selector: string) => ArrayLike<HTMLElement> },
   viewportTop: number,
   rows?: ArrayLike<HTMLElement>,
 ): number | null {
-  // Indexed rather than for..of: the rows may be a NodeList, which is array-like but not
-  // iterable without the DOM iterable lib, and a test hands it a plain array.
+  // Indexed rather than for..of: the parameter is typed ArrayLike, which is indexable but not
+  // iterable, and a test hands it a plain array.
   const list = rows ?? content.querySelectorAll('[data-reader-turn]');
   for (let index = 0; index < list.length; index += 1) {
     const element = list[index]!;
@@ -672,19 +672,23 @@ export function Reader(props: ReaderProps) {
   }, [currentTurnOpen, otherTurnsOpen, collapseEveryTurn, collapseCurrentTurn, rememberCollapseFocus]);
   // One scroll spy feeds both readings, because both need the same measurement: the turn in
   // view ("收起" scope, and the header the shortcut targets) and the turn the rail marks
-  // active. Measuring them in one pass matters — each getBoundingClientRect() flushes layout,
-  // and running two listeners meant walking every turn row twice per scroll, which is what
-  // made a handoff stutter while the pointer stayed over the transcript. A single rAF tick
-  // now reads each rect at most once, and only one listener exists.
+  // active. Measuring them in one pass matters — the first getBoundingClientRect() flushes
+  // layout, and two listeners meant two rAF ticks, two queries and two flushes per scroll,
+  // which is what made a handoff stutter while the pointer stayed over the transcript. One tick
+  // now queries the rows once and reads both thresholds inside the same flush.
   useLayoutEffect(() => {
     const content = root.current;
     if (!content) return;
     const scroller = content.closest<HTMLElement>('[data-conversation-scroll]') ?? content;
     const measure = () => {
       const viewportTop = scroller.getBoundingClientRect().top;
+      // The reading line is 35% down the scrollport, measured from the scrollport's own top edge
+      // rather than the window's, so it means the same thing wherever the transcript sits on
+      // screen. currentTurnOf uses the same origin, so both readings share one coordinate system.
       const line = scroller.clientHeight * 0.35;
       // One query for both readings: currentTurnOf keeps its documented shape but is handed the
-      // rows we already have, so the DOM is walked once per scroll instead of twice.
+      // rows we already have, so the transcript is queried once and both thresholds are read
+      // inside the same layout flush.
       const rows = content.querySelectorAll<HTMLElement>('[data-reader-turn]');
       let firstVisible = currentTurnOf(content, viewportTop, rows);
       let active: number | null = null;

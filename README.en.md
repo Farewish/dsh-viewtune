@@ -13,7 +13,7 @@ Targets DeepSeek Harness **0.1.5-rc.2**. Display only — it does not change age
 - **The process is visible**: reasoning, tool calls, subagents and progress render live, so a long turn is never just a spinner.
 - **Folds itself away when done**: a turn that ends successfully collapses its process and leaves the answer; running or unfinished turns stay open.
 - **Short reasoning is framed like long reasoning**: the rule that dropped the border when a transcript did not overflow is gone, and short reasoning now shares the long form's heading and body padding.
-- **Wheel handoff from the reasoning area**: once the transcript reaches the edge it is being pushed against, the wheel scrolls the conversation instead. A short transcript that does not overflow never intercepts the wheel at all.
+- **The reasoning area's wheel belongs to the browser**: the card scrolls natively, and once it is on its edge the whole notch chains up to the conversation, natively. Whatever part of an overshooting notch the card cannot take is dropped (at most one notch, once per gesture) — the price of never taking a notch away from the browser. A short transcript that does not overflow never intercepts the wheel at all.
 - **Every user message renders first**: a turn may open with a system prompt and carry several user/steering messages (the system prompt, your message, injected context). All of them render, in source order, above the process disclosure — so turns read the same with or without a system prompt:
 
   ```
