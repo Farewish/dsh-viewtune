@@ -69,6 +69,10 @@ dsh plugin --profile web remove dsh-viewtune
 
 两枚标记都只是**说明**，不是控件：没有点击行为、没有 hover 高亮，也不会出现任何估算出来的数字。
 
+另外一条**有意为之**：**界面文案目前只有中文**。宿主提供了语言座位，本插件也已经在借用它翻译宿主自己的
+两条文案（`message.contextRecall` / `message.contextInjection`），但插件**自身**的文案没有走本地化——
+做成完整的 zh/en 需要先给插件加一个 locale provider 边（要重启 Host）。这条是权衡后的取舍，不是遗漏。
+
 ## 开发
 
 ### 构建

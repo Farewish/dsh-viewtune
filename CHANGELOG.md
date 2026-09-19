@@ -48,6 +48,11 @@
 - DESIGN.md 的「Reading and accessibility」补了一句契约：数据给不出的信息用文字说明、理由进入
   accessible name；有快捷键的动作声明它；**动作把自己藏起来时，焦点交给仍然可见的控件**。
 
+**B3（英文 UI）：经权衡后不做。** 宿主提供语言座位，插件也已经借用它翻译宿主自己的两条文案，
+但插件自身文案的完整 zh/en 化需要先加一个 locale provider 边（`@deepseek-ai/dsh-client-locale`
+进 `dsh.client.inject`）**并重启 Host**，收益（界面文案，上游同样是中文）与代价不成比例。
+这条是决定，不是漏项——README 的「已知限制」两版都写明了。
+
 ## 0.3.0-relayout.13
 
 - **GitHub 仓库也改名为 `dsh-viewtune`**（原来叫 `dsh-better-display-reforged`）。包名与仓库名现在**同名**，从 GitHub 安装的写法随之回到最简形式：`dsh plugin --profile web add github:Farewish/dsh-viewtune`。

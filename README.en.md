@@ -75,6 +75,12 @@ the interface says so — a dashed, muted marker whose tooltip is one short line
 Both markers are explanations, not controls: no click target, no hover highlight, and never an
 estimated number.
 
+One more thing, **by decision rather than by omission**: **the interface strings are Chinese only.**
+The Host offers a locale seat, and this plugin already borrows it to translate two strings the Host
+owns (`message.contextRecall` / `message.contextInjection`), but the plugin's *own* strings are not
+localized — a full zh/en pass would first need a locale provider edge (and a Host restart). It was
+weighed and left out.
+
 ## Development
 
 ### Building
