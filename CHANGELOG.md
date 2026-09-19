@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased (configurable shortcuts)
+
+**新功能：设置面板的「快捷键」页不再是占位——本插件自己的两个快捷键可以改了。**
+
+先把现状说清楚，因为它决定了这一页能做什么：查过已安装的 harness，**DSH 本体没有应用级快捷键这一层**（没有快捷键注册表、没有任何 `aria-keyshortcuts`、也没有「快捷键」文案），存在的都是组件级按键——输入框的 Enter 提交 / Shift+Enter 换行 / Ctrl-Cmd+Enter 加速提交（忙时作为 steering 插进当前运行）、Escape 关弹层、方向键在菜单与页签里移动。**所以「能配置的」只有我们自己加的那两个**：收起本轮、收起全部。
+
+这一版把它们做成可配置：
+
+- 绑定存在 `store.ts` 的 `dsh.reader.v1` 里，**只记改动**：键缺失 = 用默认（`Alt+C` / `Alt+Shift+C`），空字符串 = 清除。持久化是**整体替换**而不是与 `init` 合并，所以旧记录里根本没有这个字段——读取端一律带回退，写入端自己补字段。
+- 绑定用 **`aria-keyshortcuts` 的语法**存（`Alt+Shift+C`），于是按钮上那个属性、tooltip 里那个提示、监听器匹配的**是同一个字符串**；tooltip 与 `aria-keyshortcuts` 现在跟着绑定走（清空则整个属性省略）。
+- 录制就在行里：点键帽 → 「按下新的组合…」，`Esc` 取消，`Backspace`/`Delete` 清除。录制期间**吞掉按键**（`preventDefault` + `stopPropagation`）：否则正在按的组合会顺手触发已经在用的那个快捷键，`Esc` 也会被面板自己的关闭逻辑抢走。
+- 两条校验、一条冲突检测（纯模型 `src/client/shortcuts.ts` + `tests/shortcuts.test.ts`）：**必须带 Alt/Ctrl/Cmd**（只按 Shift 仍然是打字，裸字母会被输入框吞掉）；**拒绝浏览器已占用的组合**（`Ctrl/Cmd + C/V/X/A/Z/F/S/P/N/T/W`、`Alt+Tab/F4`）——在文档级监听里 `preventDefault` 掉复制粘贴，比让快捷键换个字母糟糕得多；两个动作不能绑同一个组合。
+- 匹配是**精确**的（四个修饰键逐一比较），所以 `Alt+C` 不会被 `Ctrl+Alt+C` 触发；而 `Ctrl+C` 被拒绝之后，页面里的复制依旧是复制。
+- **键数不固定**（这条特意说明，因为默认值看起来像规则）：`收起` 默认 2 键、`全部收起` 默认 3 键只是默认值，模型**从不数键**——任意修饰键层级 + 末尾一个主键都行，`Alt+J` 给「全部收起」或 `Alt+Control+Shift+K` 给「收起」都合法。测试里专门钉了一条，免得以后被"顺手加个对称性校验"破坏。
+
+面板为此加宽到 280px（两行「动作名 + 键帽 + 清除」在 252px 里太挤）。守卫换了口径：`check-collapse-control.mjs` 原先断言的是写死的 `event.code !== "KeyC"` 与 `"aria-keyshortcuts": "Alt+C"` **字面量**，现在断言的是**接线**——处理器用配置值匹配、属性与 tooltip 跟随绑定、默认值只有一处表；另加一条标记盯住这一页。
+
 ## Unreleased (settings)
 
 **新功能：工具栏右侧的「动效」开关变成一个设置入口——`viewtune ⚙`，点开是个小面板，动效开关搬进去了。**
@@ -24,6 +41,12 @@
   守卫 `test-collapse-fade.mjs` 的口径随之从「motion off 只压入场」改成「motion off 把两半都立即结束、且退场不留幽灵」。顺带一条经验：门里不能写光秃秃的 `animation-duration: 0s`——浏览器会把它合并进简写，但守卫是按属性名查声明的简化级联，它看不见，断言会误报。用同名简写，浏览器和守卫看到的是同一件事。
 
 改这次的 CSS 还顺带暴露了一条**守卫工具的缺陷**：`bundle-anchors.mjs` 的 `normaliseCss` 在文档里声称会剥掉「keyframe-name hashes」，实现却是一份**手写的关键帧名清单**（`readerCollapse…|thinkShimmer|slideUp|…`）。于是新加一个关键帧（这次的 `settingsIn`），`verify-build` 就把「两次构建的哈希前缀不同」报成「规则声明不同」——`shipped: [".settingsPanelIn"] vs rebuilt: []`，读起来像行为回归，其实只是哈希。现在按**形状**剥前缀（`<hash>_<local>`），与类名那条同源：文档说的本来就是这件事，只是实现没做到。
+
+**再加一层结构：面板分页。** 顶上多了「视效」「快捷键」两个页签——`role="tab"` 配 roving tabindex，方向键 / Home / End 把**焦点和选中一起**移动（就是工具账本里那套；这个视图里不该有第二处要靠猜的键盘交互）。「视效」页放着动效开关；「快捷键」页先只放一句占位说明，列出目前内置的两个固定动作（Alt+C、Alt+Shift+C），等你决定要做哪些设置时，加一行就是加一项。页签是**导航状态不是偏好**，只活在打开期间，不写进 `dsh.reader.v1`。顺手把外部点击关闭换成了产品自己的 `useDismissOnOutsidePointer`（我手写的那段正是它的复制品）。
+
+页签的**皮**照抄产品会话头那三个（阅读/对话/轨迹）：选中文字转 `--dsw-alias-state-business-primary`，底下一段 **2px 同色圆角横线**用 `::after` 压在行下那条 `.5px` 分隔线上（`bottom: -1px`），未选中是 `label-tertiary`。**度量与排布仍用面板自己的**——整宽页签、2px 间距、13px/20px、标签位置一律不动（第一版我连字号和排布一起照搬了产品：36px 行距、`font-weight:500`、16px 行高，那是多改的，已改回）。横线挂在页签自己的盒子上，所以底部内边距取「原来的行内边距 6px + 原来的页签内边距 5px」，标签因此纹丝不动。
+
+**页签的蓝线会滑过去。** 改成一根**共享的滑杆**——挂在页签行自己的 `::after` 上，切页时用 `transform` 从「视效」平移到「快捷键」（180ms `cubic-bezier(.22,1,.36,1)`），文字颜色同时用 160ms 过渡，切换读起来是一个动作。原来每个页签各有一条 `::after`，那种结构只能「出现/消失」，滑不起来。两页签是 `flex: 1` 等宽的，所以几何不用测量：滑杆宽度正好是一个页签，第二站的 `+2px` 就是行自己的间距。两半都归动效开关管——`[data-motion=off]` 下 `transition: none`，直接跳过去。这一次**不需要**额外的 `prefers-reduced-motion` 媒体查询：系统那项已经折进 `data-motion`，而且 `transition` 不像 `animation` 那样会在门抬起时重播（上一节那个闪的教训只适用于 animation）。
 
 ## Unreleased (tool presentation)
 

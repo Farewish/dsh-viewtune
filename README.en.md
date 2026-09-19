@@ -21,7 +21,7 @@ Targets DeepSeek Harness **0.1.5-rc.2**. Display only — it does not change age
   ```
 
 - **Pinned toolbar**: 「收起」 and the viewtune settings button stay at the top of the reading column while the transcript scrolls under it.
-- **Settings panel**: the viewtune gear opens a small panel with one row per preference — 动效 today, which also reports when the system's reduced-motion setting overrides it. A preference is a row, so the lane never grows a control wider.
+- **Settings panel**: the viewtune gear opens a small panel with two pages, 视效 and 快捷键 (the arrows, Home and End move between them). 视效 holds one row per preference — 动效 today, which also reports when the system's reduced-motion setting overrides it; 快捷键 records new bindings for this plugin's own two shortcuts (click the key to record, Escape cancels, clearing drops it), refusing combinations without a modifier or ones the browser already owns. A preference is a row, so the lane never grows a control wider.
 - **收起 acts on one turn**: a "conversation" here is one turn (a question and its answer). The button folds the turn the reader is looking at rather than every open turn on the page, and it decides which turn that is with the same predicate the reading scroll uses for its anchor — so a viewport straddling two turns resolves to the upper one.
   **Alt+C** is the keyboard equivalent. If other turns are expanded too, a **「全部收起」** control appears in the toolbar (**Alt+Shift+C**, only while there really is another expanded turn), so you need not scroll back to each one.
   When collapsing makes the button itself disappear, focus moves to **the toolbar's other control** rather than to `<body>`: a keyboard reader is not dropped back to the top of the document for pressing it.
@@ -131,7 +131,7 @@ Change `src/`, then `npm run build`. Two identity markers in the artifact must m
 Two layers, because they answer different questions:
 
 ```sh
-npm test        # source level: 14 test files through Node's test runner
+npm test        # source level: 15 test files through Node's test runner
 npm run guard   # artifact level: 19 assertions, all against the built lib/client.js
 ```
 

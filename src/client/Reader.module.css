@@ -358,7 +358,7 @@
 .settingsButton { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 /* Anchored to the wrap rather than to the toolbar: the lane wears no inline padding (asserted), so
    `right: 0` lines the panel up with the button's own right edge. */
-.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 252px; display: flex; flex-direction: column; padding: 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
+.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 280px; display: flex; flex-direction: column; padding: 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
 /* The entrance lives on its own class, applied only for an opening that should animate
    (SettingsMenu decides). It must NOT be gated by `[data-motion=off]`: lifting such a gate
    re-applies the animation, so turning 动效 on from inside this panel replayed its entrance. */
@@ -368,4 +368,36 @@
 .settingsCopy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .settingsLabel { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
 .settingsNote { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+/* The panel's pages keep the shape and type they already had — two full-width tabs, 2px apart,
+   13px/20px, the label where it was — and take the product's skin: the selected page turns
+   `state-business-primary`, and a 2px bar of that colour sits on the rule under the row, which is
+   how the session header's 阅读/对话/轨迹 tabs read.
+
+   The bar is ONE element, the row's own ::after, and it slides between the tabs. A bar per tab
+   (`tab[aria-selected]::after`) can only appear and disappear; a single bar can move, and it is
+   what makes switching pages read as one gesture. The tabs are equal width by construction
+   (`flex: 1`), so the geometry needs no measurement: the bar is one tab wide, and the extra 2px in
+   the second stop is the row's own gap. */
+.settingsTabs { position: relative; display: flex; gap: 2px; padding: 0; margin-bottom: 6px; border-bottom: .5px solid var(--dsw-alias-border-l1); }
+.settingsTabs::after { content: ""; position: absolute; left: 0; bottom: -1px; width: calc((100% - 2px) / 2); height: 2px; border-radius: 2px; background: var(--dsw-alias-state-business-primary); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
+.settingsTabs[data-settings-page=shortcuts]::after { transform: translateX(calc(100% + 2px)); }
+.settingsTab { flex: 1; padding: 5px 8px 11px; border: 0; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; transition: color 160ms ease; }
+.settingsTab[aria-selected=true] { color: var(--dsw-alias-state-business-primary); }
+/* The switch governs both halves of that gesture. The system's reduced-motion request reaches this
+   through `data-motion` (the root attribute folds it in), and unlike an `animation`, a transition
+   cannot replay when the gate lifts — so this one needs no separate media query. */
+[data-motion=off] .settingsTabs::after, [data-motion=off] .settingsTab { transition: none; }
+.settingsEmpty { margin: 0; padding: 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+/* The shortcut rows: the saved combination reads as a key, and recording turns that key blue so
+   the row says which one is listening. The chip is `flex: none`, so a long action name wraps
+   instead of squeezing the key. */
+.settingsShortcuts { display: flex; flex-direction: column; }
+.settingsKeys { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.shortcutKey { padding: 3px 8px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
+.shortcutKey:hover { border-color: var(--dsw-alias-border-l3); }
+.shortcutKey[data-recording] { border-color: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-state-business-primary); }
+.shortcutClear { padding: 2px 4px; border: 0; border-radius: 5px; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer; }
+.shortcutClear:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+/* Touch keeps the 44px target; the label rides the bottom of the box so the bar stays on the rule. */
+@media (pointer: coarse) { .settingsTab { min-height: 44px; display: inline-flex; align-items: flex-end; justify-content: center; } }
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

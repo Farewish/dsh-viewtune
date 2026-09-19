@@ -67,15 +67,22 @@ want('motion preference reaches the settings panel', 'preference: motionPreferen
 want('the panel still writes the stored preference', 'onChange: props.actions.setMotion', 1);
 // B2: a keyboard path for both actions, and a focus handoff so collapsing never drops the reader to
 // <body> when the button that was just used goes away.
-want('alt+c shortcut', 'event.code !== "KeyC"', 1);
-want('shortcut requires alt', 'if (!event.altKey', 1);
+//
+// The keys are the reader's own bindings now, so what is asserted is the WIRING: the handler matches
+// the configured value, and the attribute and the tooltip advertise that same value instead of a
+// literal that would go stale the moment someone rebinds.
+want('the collapse shortcut matches the configured binding', 'matchesShortcut(event, collapseTurnKey)', 1);
+want('and so does collapse-all', 'matchesShortcut(event, collapseAllKey)', 1);
+want('holding the key does not repeat the action', 'if (event.repeat) return;', 1);
 want('focus handoff', 'focusWasInCollapseWrap', 4);
-// The shortcut is advertised to assistive tech, not only written into a tooltip. JSX compiles a
-// hyphenated attribute to a quoted key, so the assertion spells it that way.
-want('shortcut advertised via aria-keyshortcuts', '"aria-keyshortcuts": "Alt+C"', 1);
-want('the advertised collapse-all shortcut', '"aria-keyshortcuts": "Alt+Shift+C"', 1);
+// JSX compiles a hyphenated attribute to a quoted key, so the assertion spells it that way.
+want('the advertised shortcut follows the binding', '"aria-keyshortcuts": collapseTurnKey || void 0', 1);
+want('and the collapse-all one follows its own', '"aria-keyshortcuts": collapseAllKey || void 0', 1);
+want('the tooltip names the binding in force', 'keyHint(collapseTurnKey)', 1);
 present('collapse-all label', '全部收起');
-present('shortcut is documented in a tooltip', 'Alt+Shift+C');
+// The two defaults, in the one table the resolver and the settings panel both read.
+want('the defaults live in one table', 'collapseAll: "Alt+Shift+C"', 1);
+want('including the turn default', 'collapseTurn: "Alt+C"', 1);
 
 console.log('\n--- state');
 /**

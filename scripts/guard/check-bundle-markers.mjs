@@ -121,6 +121,13 @@ const markers = [
   // The reading view's preferences live behind one toolbar button: the lane keeps its geometry and
   // a preference becomes a row in this panel instead of another control in the lane.
   ['settings panel holds the preferences', '"data-ud-check": "reader-settings"'],
+  // The panel's subjects are pages: a tablist rather than a longer scroll of rows.
+  ['and offers its pages as tabs', '"data-ud-check": "reader-settings-tabs"'],
+  // The shortcut page is where a reader changes the two bindings; it holds the recorder.
+  ['the shortcut page records new bindings', '"data-ud-check": "reader-settings-shortcuts"'],
+  // The selected page's bar is ONE element on the row, translated between equal-width tabs — a bar
+  // per tab can only appear and disappear, never slide.
+  ['the page indicator is one sliding bar', 'data-settings-page=shortcuts'],
   // Two calls the product renders with its own keyed cards are rendered here instead of collapsing
   // into a generic row: a question set (what was asked, what was answered) and a delivery (which
   // files were handed over). Asserted by the data attribute they render with, matched with either

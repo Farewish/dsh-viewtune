@@ -14,6 +14,7 @@ import { basename, createProducedFileMentions, dirname, getTurnDeliverables, sho
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
+import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
@@ -588,6 +589,14 @@ export function Reader(props: ReaderProps) {
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion);
   const motion = useMotionAllowed(motionPreference);
+  // The two collapse verbs and the bindings they answer to. A record written before the field
+  // existed has no `shortcuts` at all, so the defaults are resolved here rather than assumed; a
+  // CLEARED slot is the empty string and stays cleared.
+  const storedShortcuts = props.useStore(state => state.shortcuts);
+  const collapseTurnKey = storedShortcuts?.collapseTurn ?? DEFAULT_SHORTCUTS.collapseTurn;
+  const collapseAllKey = storedShortcuts?.collapseAll ?? DEFAULT_SHORTCUTS.collapseAll;
+  /** The advertised key, or nothing at all when the reader cleared the slot. */
+  const keyHint = (binding: string) => binding === '' ? '' : `（${shortcutLabel(binding)}）`;
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
   const groups = useMemo(() => groupNodes(order, key => nodes.get(key)), [order, nodes, timeline]);
   // A "conversation" here is one turn (the question plus its answer), so "收起" folds the
@@ -648,29 +657,30 @@ export function Reader(props: ReaderProps) {
     focusWasInCollapseWrap.current = false;
     settingsRef.current?.focus();
   }, [currentTurnOpen, otherTurnsOpen]);
-  // Alt+C collapses the turn in view; Alt+Shift+C collapses everything expanded. Alt keeps the
-  // shortcut out of the composer's way — a bare letter would be swallowed while typing, and the
-  // reader should be able to collapse without leaving a half-written message. Nothing is prevented
-  // when the shortcut would be a no-op, so the browser keeps its own bindings elsewhere.
+  // The two collapse verbs, on whatever bindings the reader chose (Alt+C and Alt+Shift+C by
+  // default). Alt keeps them out of the composer's way — a bare letter would be swallowed while
+  // typing, and the reader should be able to collapse without abandoning a half-written message,
+  // which is why the panel refuses a binding without Alt, Ctrl or Cmd. Nothing is prevented when
+  // the shortcut would be a no-op, so the browser keeps its own bindings everywhere else.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
-      if (event.code !== 'KeyC') return;
-      if (event.shiftKey) {
-        if (!currentTurnOpen && !otherTurnsOpen) return;
+      if (event.repeat) return;
+      if (matchesShortcut(event, collapseTurnKey)) {
+        if (!currentTurnOpen) return;
         event.preventDefault();
         rememberCollapseFocus();
-        collapseEveryTurn();
+        collapseCurrentTurn();
         return;
       }
-      if (!currentTurnOpen) return;
+      if (!matchesShortcut(event, collapseAllKey)) return;
+      if (!currentTurnOpen && !otherTurnsOpen) return;
       event.preventDefault();
       rememberCollapseFocus();
-      collapseCurrentTurn();
+      collapseEveryTurn();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [currentTurnOpen, otherTurnsOpen, collapseEveryTurn, collapseCurrentTurn, rememberCollapseFocus]);
+  }, [currentTurnOpen, otherTurnsOpen, collapseTurnKey, collapseAllKey, collapseEveryTurn, collapseCurrentTurn, rememberCollapseFocus]);
   // One scroll spy feeds both readings, because both need the same measurement: the turn in
   // view ("收起" scope, and the header the shortcut targets) and the turn the rail marks
   // active. Measuring them in one pass matters — the first getBoundingClientRect() flushes
@@ -823,10 +833,11 @@ export function Reader(props: ReaderProps) {
     <div className={css.column} data-chat-flow="">
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <div className={css.collapseWrap} ref={collapseWrapRef} data-ud-check="collapse-wrap">
-          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} aria-keyshortcuts="Alt+C" onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title="收起当前这一轮的过程（Alt+C）">收起 <span aria-hidden="true">˄</span></button>
-          <button type="button" className={`${css.textButton} ${css.collapseAll}`} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} aria-keyshortcuts="Alt+Shift+C" onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title="收起所有已展开的过程（Alt+Shift+C）">全部收起</button>
+          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} aria-keyshortcuts={collapseTurnKey || undefined} onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title={`收起当前这一轮的过程${keyHint(collapseTurnKey)}`}>收起 <span aria-hidden="true">˄</span></button>
+          <button type="button" className={`${css.textButton} ${css.collapseAll}`} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} aria-keyshortcuts={collapseAllKey || undefined} onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title={`收起所有已展开的过程${keyHint(collapseAllKey)}`}>全部收起</button>
         </div>
-        <SettingsMenu motion={motion} preference={motionPreference} onChange={props.actions.setMotion} buttonRef={settingsRef} />
+        <SettingsMenu motion={motion} preference={motionPreference} onChange={props.actions.setMotion}
+          shortcuts={{ collapseTurn: collapseTurnKey, collapseAll: collapseAllKey }} onShortcut={props.actions.setShortcut} buttonRef={settingsRef} />
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
         setHistoryError(false);
