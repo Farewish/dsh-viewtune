@@ -68,40 +68,26 @@ const markers = [
   ['short-thinking-frame', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]`, ['background:var(--dsw-alias-bg-module-platform)', 'border-color:var(--dsw-alias-border-l2)', 'border-radius:12px'])],
   ['short-thinking-heading-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
   ['short-thinking-text-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
-  // The wheel implementation is verified behaviourally by test-wheel-handler.mjs (it extracts
-  // the compiled handler and runs 22 cases) and test-follow-rules.mjs (27 cases, including how
-  // one notch is split); these markers only assert the shape is still there, so they match
-  // expressions rather than the minifier's choice of local name and spacing.
-  ['wheel-native-scroll', () => /Math\.min\(maxOffset[^;]*scrollTop \+ delta/.test(bundle)],
-  // Handoff must be decided by PROJECTING the notch, not by asking whether the card is already on
-  // its edge: the wheel event is dispatched before the browser applies the scroll, so an
-  // already-at-edge test sees the pixels still left, spends the notch on the card, and only hands
-  // over on the next one — the gesture sticks and then jumps.
-  ['wheel-projects-the-notch', () => /splitNotch\(port\.scrollTop, delta, maxOffset\)/.test(bundle)],
-  ['wheel-handoff-on-overshoot', () => /Math\.abs\(remainder\) < \.5/.test(wheelHandler)
-    && /host\.scrollBy\(0, remainder\)/.test(wheelHandler)],
-  // A notch the card cannot use at all is the browser's: left alone it chains that notch to the
-  // conversation and animates it like every other wheel scroll. Intercepting it instead re-issued
-  // each notch as a programmatic scrollBy, which lands in a single frame, and kept doing so for as
-  // long as the pointer stayed over the card. So this guard must return BEFORE the preventDefault.
-  ['wheel-lets-the-browser-chain-at-the-edge', () => {
-    const guard = wheelHandler.indexOf('if (consumed === 0) return;');
-    const prevent = wheelHandler.indexOf('event.preventDefault()');
-    return guard !== -1 && prevent !== -1 && guard < prevent;
-  }],
-  // The card is placed exactly on its edge at the handoff, and never scrolls past a limit.
-  ['wheel-cards-the-remainder', () => /port\.scrollTop \+= consumed/.test(wheelHandler)],
-  // The card keeps the notch natively whenever it fits, and is written ONLY on the handoff, to
-  // land it on its edge. A write on every notch is what made the card step instead of glide, so
-  // this pins the count: exactly one write in the handler, and it uses the consumed amount.
-  ['wheel-writes-the-card-once-at-handoff', () => {
-    const writes = wheelHandler.match(/port\.scrollTop\s*(\+=|=)/g) ?? [];
-    return writes.length === 1 && /port\.scrollTop \+= consumed/.test(wheelHandler);
-  }],
+  // The wheel implementation is verified behaviourally by test-wheel-handler.mjs (it extracts the
+  // compiled handler and drives every notch shape through it). What is left to assert here is the
+  // one rule that survived four attempts at "improving" on the browser:
+  //
+  //   the wheel over the card is the browser's. This handler notices the gesture and does nothing
+  //   else — it never consumes a notch and never writes a scroll position.
+  //
+  // Every previous version broke that rule somewhere and each break was felt as stepping instead of
+  // gliding: writing scrollTop on every notch, then intercepting the notch that overshoots and
+  // re-issuing its leftover as scrollBy, then intercepting every notch once the card was on its
+  // edge. Splitting the overshooting notch by hand does recover those last pixels, but the leftover
+  // is at most one notch and a programmatic write lands in a single frame, so the trade is not
+  // worth it. Keeping the handler empty is the invariant; a marker for any particular division
+  // would only pin one build's spelling of it.
+  ['wheel-leaves-scrolling-to-the-browser', () => wheelHandler !== ''
+    && !/preventDefault|scrollBy|scrollTop\s*[-+]?=/.test(wheelHandler)],
   ['wheel-gesture-guard', 'if (Date.now() < wheelUntil) return;'],
-  // `overflow` decides whether this card can scroll at all, so the handler reads it; a stale
-  // closure here means the card never hands off after it grows past its preview height.
-  ['wheel-effect-tracks-overflow', () => /\[[^\]]*\ballowed\b[^\]]*\bpause\b[^\]]*\boverflow\b[^\]]*\]/.test(bundle)],
+  // The handler still has to RUN before the browser applies the notch, or the scroll events that
+  // notch causes are measured before wheelUntil is set and re-render the card mid-gesture.
+  ['wheel-handler-runs-before-the-scroll', () => /addEventListener\("wheel", onWheel, \{\s*passive: false\s*\}\)/.test(bundle)],
   ['all user/steering nodes collected', 'group.keys.filter((key) => {\n\t\t\t\tconst kind = snapshot.nodes.get(key)?.kind;'],
   ['every user message rendered in the leading slot', 'turnUserKeys.map((userKey) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BlockBoundary, {'],
   ['user nodes excluded from the flow', 'const mainKeys = group.keys.filter((key) => !turnUserKeys.includes(key));'],

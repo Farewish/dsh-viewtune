@@ -37,7 +37,7 @@ const GUARDS = [
   ['verify-session-changes.mjs', 'the reading-view changes survive compilation'],
   ['compare-source-and-bundle.mjs', 'source and artifact agree on every decision this fork made'],
   ['audit-source-edits.mjs', 'no dead branches, leftovers, or drift between the two'],
-  ['test-wheel-handler.mjs', 'wheel handoff behaviour, run against the compiled handler'],
+  ['test-wheel-handler.mjs', 'the wheel leaves every notch to the browser, in every notch shape'],
   ['test-follow-rules.mjs', 'what keeps auto-follow running, and what takes it over'],
   ['test-current-turn.mjs', 'which turn is "current" when the viewport spans two'],
   ['test-toolbar-geometry.mjs', 'toolbar and pill geometry computed from the compiled CSS'],

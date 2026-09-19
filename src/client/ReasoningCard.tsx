@@ -8,42 +8,6 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 /** How long after the last wheel notch a gesture counts as finished. */
 const WHEEL_IDLE_MS = 140;
 
-/**
- * Split one notch between the card and the conversation.
- *
- * The wheel event is dispatched BEFORE the browser applies the scroll, so asking "is the card on
- * its edge right now" answers the wrong question: with 5px left, the notch looks like the card's
- * to take, the card is released to scroll them, and only the NEXT notch sees an edge and hands
- * over — the gesture sticks, then jumps. Ask instead what this notch would do: the card may keep
- * the part it can actually consume, and the remainder belongs to the conversation in the same
- * event.
- *
- * `consumed === 0` means the card is already on the edge the notch pushes against, and the browser
- * chains such a notch to the conversation on its own. `remainder === 0` means the notch fits in
- * the card. Only a notch that straddles the edge has to be split by hand.
- *
- * @returns `consumed` for the card (never more than the notch, never past a limit) and
- *          `remainder` for the conversation.
- */
-export function splitNotch(
-  scrollTop: number,
-  delta: number,
-  maxOffset: number,
-): { consumed: number; remainder: number } {
-  const projected = Math.min(maxOffset, Math.max(0, scrollTop + delta));
-  const consumed = projected - scrollTop;
-  return { consumed, remainder: delta - consumed };
-}
-
-/**
- * How small a remainder still counts as no remainder.
- *
- * Subpixel offsets mean a notch that lands exactly on the edge can leave a fraction behind. That
- * fraction is not worth splitting a whole notch over: the browser spends the notch on the card,
- * the card lands on its edge, and nothing perceptible is left over.
- */
-export const REMAINDER_EPSILON_PX = 0.5;
-
 /** One real transcript: reference transform while following, native scroll while reading. */
 export function ReasoningCard({ children, step, active, motion, selected, onRead }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
@@ -189,59 +153,25 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // Focus/keyboard-induced native scroll wins even while the track moves.
       if (automatic && port.scrollTop > 1) pause();
     };
-    // The card never writes its own scroll position: the browser scrolls the
-    // overflow container natively, which keeps the same feel as the rest of the
-    // page. This listener decides, per notch, whether the card can still use it —
-    // judged from where the notch would land, not from where the card already is,
-    // so the handoff happens on the notch that would overshoot instead of one
-    // notch later.
+    // No notch is ever taken away from the browser, and the card's position is never written by
+    // script. The browser alone decides what a notch does:
+    //
+    //   - it scrolls this card's overflow container natively;
+    //   - it drops whatever part of the notch that container cannot take (a wheel over the card is
+    //     latched to the card's scroll node, and the browser chains the leftover only when the card
+    //     cannot move at all);
+    //   - once the card is on its edge, it chains the whole notch up to the conversation, animated
+    //     exactly like any other wheel scroll.
+    //
+    // Splitting the overshooting notch by hand does recover those last pixels, but a programmatic
+    // scrollBy lands in a single frame where the browser's own scroll glides — and the leftover is
+    // at most one notch — so the pixels are not worth a visible step.
     let wheelUntil = 0;
-    let wheelTick = 0;
-    const seenWheelEvents = new Set();
     const onWheel = (event: WheelEvent) => {
       if (!event.deltaY) return;
       // Keep automatic following from dragging the scroll position mid-gesture.
       if (automatic) pause();
       wheelUntil = Date.now() + WHEEL_IDLE_MS;
-      if (event.timeStamp !== undefined) {
-        const key = `${String(event.timeStamp)}:${String(event.deltaY)}`;
-        if (seenWheelEvents.has(key)) return;
-        seenWheelEvents.add(key);
-      } else {
-        seenWheelEvents.add(`t:${String(wheelTick += 1)}`);
-      }
-      const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(text).lineHeight) || 24
-        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? port.clientHeight : 1;
-      const delta = event.deltaY * unit;
-      // A notch the card can use is left entirely to the browser: writing scrollTop on every
-      // notch replaces a composited subpixel scroll with an integer jump, which is what made the
-      // card step instead of glide. The only write is at a handoff, to land it on its edge.
-      if (!overflow) return;
-      if (!event.cancelable) return;
-      const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
-      const { consumed, remainder } = splitNotch(port.scrollTop, delta, maxOffset);
-      // Two notches are none of this handler's business, and taking them over is what made the
-      // gesture jump.
-      //
-      //  - The card is already on its bottom edge, so the notch is not the card's at all. Left
-      //    alone, the browser chains it to the conversation by itself and animates it exactly like
-      //    every other wheel scroll. Intercepting it here replaced that with a programmatic
-      //    scrollBy, which lands in a single frame — and it did so on every notch for as long as
-      //    the pointer stayed over the card.
-      if (consumed === 0) return;
-      //  - The notch fits inside the card, so it is not the conversation's either; the browser
-      //    scrolls the card natively.
-      if (Math.abs(remainder) < REMAINDER_EPSILON_PX) return;
-      // Only a notch that straddles the edge is split, because the browser would spend the whole
-      // notch on the card and drop the rest. The card takes the pixels it still has and the
-      // remainder walks up to the conversation in the same event, so a gesture that ends on the
-      // edge never loses part of a notch and never needs one more notch to hand over.
-      let host = port.parentElement;
-      while (host && !host.hasAttribute('data-conversation-scroll')) host = host.parentElement;
-      if (!host) return;
-      event.preventDefault();
-      port.scrollTop += consumed;
-      host.scrollBy(0, remainder);
     };
     const onSelection = () => { if (hasSelection()) pause(); };
     const onVisibility = () => {
@@ -258,6 +188,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     });
     observer.observe(text); observer.observe(port);
     port.addEventListener('scroll', onScroll, { passive: true });
+    // Not passive on purpose: the browser has to wait for this handler before it applies the
+    // notch, so the scroll events that notch produces see wheelUntil already set and stay out of
+    // React state. A passive listener would let the scroll land first.
     port.addEventListener('wheel', onWheel, { passive: false });
     document.addEventListener('selectionchange', onSelection);
     document.addEventListener('visibilitychange', onVisibility);
@@ -265,13 +198,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     measure(false); schedule();
     return () => {
       alive = false; cancel(); manual(); observer.disconnect();
-      seenWheelEvents.clear(); wheelUntil = 0;
+      wheelUntil = 0;
       port.removeEventListener('scroll', onScroll); port.removeEventListener('wheel', onWheel);
       document.removeEventListener('selectionchange', onSelection);
       document.removeEventListener('visibilitychange', onVisibility);
       stopFollow.current = () => {};
     };
-  }, [allowed, pause, overflow]);
+  }, [allowed, pause]);
 
   useLayoutEffect(() => {
     const port = viewport.current;
