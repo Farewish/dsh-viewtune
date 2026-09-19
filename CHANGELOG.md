@@ -52,6 +52,19 @@
 进 `dsh.client.inject`）**并重启 Host**，收益（界面文案，上游同样是中文）与代价不成比例。
 这条是决定，不是漏项——README 的「已知限制」两版都写明了。
 
+**打磨：「全部收起」与「收起」同族。** 它原来是纯文字按钮，现在和「收起」一样有**描边**
+（`.5px solid var(--dsw-alias-border-l2)`、`border-radius:999px`）和**同样的进入/退出**
+（共用 `readerCollapseIn` / `readerCollapseOut`：自上方向下淡入、向上淡出；`hidden` 上强制
+`display`、`idle` 上把可见性变化延后到动画结束——与主控件同一套机制，动效开关与
+`prefers-reduced-motion` 的处理一并共用）。两处刻意**不同于**「收起」：**不加任何填充**
+（静止无填充，悬停也不加——否则 `.textButton:hover` 的填充会把它变成主按钮；悬停只提亮文字并把描边
+升一档到 `l3`，该 token 已用 `inventory-tokens.mjs` 核实存在 `#0000001f` / `#ffffff29`），以及
+**不设字号**（它仍走 `.textButton` 的字号，由工具栏下发）。收起组同时加了 6px 间距。
+
+`check-collapse-control` 新增 8 条断言把这些差别钉住，其中"无填充"按**值**断言而不是拼写——
+压缩器会把 `background:transparent` 改写成 `background:0 0`。
+
+
 ## 0.3.0-relayout.13
 
 - **GitHub 仓库也改名为 `dsh-viewtune`**（原来叫 `dsh-better-display-reforged`）。包名与仓库名现在**同名**，从 GitHub 安装的写法随之回到最简形式：`dsh plugin --profile web add github:Farewish/dsh-viewtune`。

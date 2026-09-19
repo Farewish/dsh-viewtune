@@ -295,7 +295,7 @@
    down into view, then fades up again once that turn is folded. Both halves are pure CSS on
    the same node, so they run even with the motion switch off — only the decorative transform
    is dropped there. */
-.collapseWrap { display: flex; align-items: center; }
+.collapseWrap { display: flex; align-items: center; gap: 6px; }
 /* The fill is the token the shell uses for resting fills (interactive-bg-hover), so hover
    has to step up to its solid sibling — otherwise the fill would erase the hover state. */
 .collapseControl { display: inline-flex; align-items: center; gap: 5px; padding: 5px 14px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font: inherit; font-size: 14px; line-height: 22px; cursor: pointer; }
@@ -311,5 +311,19 @@
 .collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; visibility: hidden; transition: visibility 0s linear 140ms; }
 [data-motion=off] .collapseControl[data-reader-collapse=open] { animation: none; }
 @media (prefers-reduced-motion: reduce) { .collapseControl[data-reader-collapse=open] { animation: none; } }
+/* 「全部收起」: the same frame and the same enter/exit as 「收起」, one step quieter. It keeps the
+   text button's own type (no font-size here on purpose — it sits on `.textButton`, so the size is
+   whatever that rule and the toolbar hand down) and gets no fill at all: no resting fill, and the
+   hover cannot inherit `.textButton:hover`'s fill either, or the two controls would stop reading
+   as primary and secondary. The frame is what makes it look like a sibling rather than loose text.
+   Its own animation name is used as the state hook because the attribute differs
+   (`data-reader-collapse-all`), while the keyframes are shared. */
+.collapseAll { display: inline-flex; align-items: center; padding: 5px 14px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 999px; background: transparent; color: var(--dsw-alias-label-tertiary); }
+.collapseAll:hover { color: var(--dsw-alias-label-primary); background: transparent; border-color: var(--dsw-alias-border-l3); }
+.collapseAll[hidden] { display: inline-flex; }
+.collapseAll[data-reader-collapse-all=open] { animation: readerCollapseIn 180ms ease-out; }
+.collapseAll[data-reader-collapse-all=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; visibility: hidden; transition: visibility 0s linear 140ms; }
+[data-motion=off] .collapseAll[data-reader-collapse-all=open] { animation: none; }
+@media (prefers-reduced-motion: reduce) { .collapseAll[data-reader-collapse-all=open] { animation: none; } }
 @keyframes readerCollapseIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes readerCollapseOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px); } }

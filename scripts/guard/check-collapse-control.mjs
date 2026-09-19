@@ -139,9 +139,23 @@ console.log('\n--- styles');
 // keyframe names are re-hashed per build and the minifier chooses its own property order, so a
 // verbatim rule string verifies one build's output rather than the control's behaviour.
 const collapse = classSel(bundleCss, 'collapseControl');
+const collapseAll = classSel(bundleCss, 'collapseAll');
 const wrap = classSel(bundleCss, 'collapseWrap');
 const intro = keyframeOf(bundleCss, 'readerCollapseIn');
 const exit = keyframeOf(bundleCss, 'readerCollapseOut');
+/**
+ * Whether a rule paints no background at all.
+ *
+ * Asserted by *value*, not by spelling: the minifier rewrites `background: transparent` to
+ * `background: 0 0`, and both mean "no fill". The rule must also declare a background — an absent
+ * declaration would let `.textButton`'s hover fill show through, which is the thing being ruled out.
+ */
+const isUnfilled = (selector) => {
+  const values = [...ruleDecls(bundleCss, selector)]
+    .filter((declaration) => declaration.startsWith('background:'))
+    .map((declaration) => declaration.slice('background:'.length).trim());
+  return values.length > 0 && values.every((value) => value === 'transparent' || value === '0 0' || value === 'none');
+};
 const styleChecks = [
   ['wrap lays the control out', ruleDecls(bundleCss, wrap).size > 0],
   ['control is a pill', hasDecls(bundleCss, collapse, ['display:inline-flex'])],
@@ -156,6 +170,21 @@ const styleChecks = [
       && new RegExp(`${escapeRegExp(collapse)}\\[data-reader-collapse=idle\\]\\{[^}]*animation:[^;}]*${escapeRegExp(exit)}`).test(bundleCss)
       && new RegExp(`${escapeRegExp(collapse)}\\[data-reader-collapse=idle\\]\\{[^}]*transition:[^;}]*visibility\\s+0s[^;}]*[\\d.]+m?s`).test(bundleCss),
   ],
+  // 「全部收起」 is meant to read as 「收起」's quieter sibling: the same frame, the same enter/exit
+  // motion, one visual step down. It was plain text, then briefly a bare (unframed) text button, so
+  // these four assertions pin what the difference is supposed to be — and, just as importantly, what
+  // it is NOT: no fill, and no font-size of its own (it rides on `.textButton`, keeping the size the
+  // toolbar hands down).
+  ['collapse-all is framed like the control', hasDecls(bundleCss, collapseAll, ['border:.5px solid var(--dsw-alias-border-l2)', 'border-radius:999px'])],
+  ['collapse-all has no fill', isUnfilled(collapseAll)],
+  ['collapse-all hover also stays unfilled', isUnfilled(`${collapseAll}:hover`)],
+  ['collapse-all leaves the font size alone', !new RegExp(`${escapeRegExp(collapseAll)}\\{[^}]*\\bfont(-size)?:`).test(bundleCss)],
+  ['collapse-all enters with the same motion', new RegExp(`${escapeRegExp(collapseAll)}\\[data-reader-collapse-all=open\\]\\{[^}]*animation:[^;}]*${escapeRegExp(intro)}`).test(bundleCss)],
+  ['collapse-all exits with the same motion, delayed visibility and all',
+    hasDecls(bundleCss, `${collapseAll}[data-reader-collapse-all=idle]`, ['pointer-events:none', 'visibility:hidden'])
+      && new RegExp(`${escapeRegExp(collapseAll)}\\[data-reader-collapse-all=idle\\]\\{[^}]*animation:[^;}]*${escapeRegExp(exit)}`).test(bundleCss)
+      && new RegExp(`${escapeRegExp(collapseAll)}\\[data-reader-collapse-all=idle\\]\\{[^}]*transition:[^;}]*visibility\\s+0s[^;}]*[\\d.]+m?s`).test(bundleCss)],
+  ['collapse-all still forces display while hidden', hasDecls(bundleCss, `${collapseAll}[hidden]`, ['display:inline-flex'])],
   ['intro keyframes shipped', bundleCss.includes(`@keyframes ${intro}{`)],
   ['exit keyframes shipped', bundleCss.includes(`@keyframes ${exit}{`)],
 ];
