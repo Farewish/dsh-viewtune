@@ -59,14 +59,28 @@ Three things worth knowing:
 
 ## Development
 
-### Why the build output is committed
+### Building
 
-The browser half is the prebuilt `lib/client.js`, which the Host loads directly. **Rebuilding it from source needs a full DSH monorepo** (it provides the client build adapter and the `packages/client` sources); this repo follows upstream's `tsdown.config.ts`. Because a build carries that requirement, the compiled output is committed — installing and sharing need no build at all.
-
-**Type checking does not need that monorepo.** The client UI packages are published standalone on npm, and `npm install` pulls them in through `peerDependencies` — including `dsh-client-store`, `dsh-client-ui-primitives` and `dsh-client-ui-slots`, which the launcher itself does not carry. So:
+The browser half is the prebuilt `lib/client.js`, which the Host loads directly. The compiled output is committed, so **installing and sharing need no build** — but **building from source does work**:
 
 ```sh
 npm install
+npm run build         # src/ -> lib/client.js and lib/dsh-viewtune.js
+```
+
+Upstream's `tsdown.config.ts` imported `externalClientBundle` from a Harness adapter
+(`<harness>/tools/dshx/src/client-build.js`) that is published nowhere, which is why its build could
+not run from a clone. This repo vendors that adapter's real body — the official preset
+`packages/client/tsdown.client.ts` → `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2` — as
+[`scripts/client-bundle.mjs`](scripts/client-bundle.mjs), with its three Harness-internal imports
+inlined. The artifact contract is unchanged, so the artifact-level guards below still apply.
+
+Commit `lib/` together with the source: an installer receives the committed artifact and is not asked
+to build.
+
+**Type checking does not need that monorepo.** The client UI packages are published standalone on npm, and `npm install` pulls them in through `peerDependencies` — including `dsh-client-store`, `dsh-client-ui-primitives` and `dsh-client-ui-slots`, which the launcher itself does not carry:
+
+```sh
 npm run typecheck     # tsc -p tsconfig.json --noEmit, against the real declarations
 ```
 
@@ -74,21 +88,38 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit, against the real declarat
 
 ### Changing the code
 
-When you change display behaviour, **the source in `src/` and the artifact `lib/client.js` have to change together** — the Host loads the artifact. Two identity markers in the artifact must match `package.json`'s `name` exactly, or the whole page fails with
+Change `src/`, then `npm run build`. Two identity markers in the artifact must match `package.json`'s `name` exactly, or the whole page fails with
 `loaded without registering "<id>" via __ModuleLoader__.load`:
 
 - the row id in `window.__ModuleLoader__.load({ id })` (the Host derives it from the installed manifest's package name);
 - each CSS module's `tagId` prefix and its `data-plugin` on the injected `<style>` (HMR removes this plugin's styles by that id).
 
-`tests/stock-install.test.ts` guards both, and also checks that this document's install commands name the package correctly.
+`tests/stock-install.test.ts` guards both, and also checks that this document's install commands name the package correctly. (`tsdown.config.ts` reads the name from `package.json`, so a rename cannot drift again.)
 
 > **Keep the checkout outside `node_modules`.** `dsh plugin add` runs pnpm inside the profile directory, and pnpm prunes directories under `node_modules` that `package.json` does not declare — the checkout, `.git` included, could be deleted with them.
 
 ### Verifying
 
-`npm test` runs the repo's own tests. Beyond that, this project leans on verification at the artifact level: checking the artifact's structural markers, lifting compiled functions out of it to run behavioural cases against a fake DOM, and booting a throwaway Host to confirm the row id in the module graph matches the id the artifact registers.
+Two layers, because they answer different questions:
 
-One premise behind that is worth stating: **parsing is not correctness.** This repo edits minified output, so it has produced changes that were syntactically perfect and still threw at runtime, because a declaration was removed while a use of it stayed. Only a check of the "is this name declared" kind catches that class of mistake.
+```sh
+npm test        # source level: 12 test files through Node's test runner
+npm run guard   # artifact level: 18 assertions, all against the built lib/client.js
+```
+
+`npm run guard` asserts the **artifact**: the module-table registration id and the `require()` set, that
+each injected CSS literal is whole, turn render order, the collapse control's scope and fade, the
+toolbar lane shape, that the steps pill declares every identifier it uses — plus the correspondence
+between `src/` and the artifact (`compare-source-and-bundle`, `audit-source-edits`) and **"a fresh
+build still reproduces the committed shape"** (`verify-build`). That last one is the only form of
+source/artifact agreement available here: byte equality is not (the compiler's output is not stable),
+so it compares the contract-bearing parts and the stylesheet's rules.
+
+One premise behind all of it is worth stating: **parsing is not correctness.** Much of this repo's
+history was editing minified output directly, which produced changes that were syntactically perfect
+and still threw at runtime, because a declaration was removed while a use of it stayed. Only a check of
+the "is this name declared" kind catches that (`check-pill-scope`) — or building once, which exposes
+drift between the sources and the artifact. Both run under `npm run guard`.
 
 ## License
 

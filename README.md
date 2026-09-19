@@ -59,16 +59,28 @@ dsh plugin --profile web remove dsh-viewtune
 
 ## 开发
 
-### 为什么仓库提交了编译产物
+### 构建
 
-浏览器半边是预编译的 `lib/client.js`，Host 启动时直接加载它。**从源码重新构建需要一份 DSH 单仓库**（提供客户端构建适配器与 `packages/client` 源码），本仓库沿用上游的 `tsdown.config.ts`。正因为构建有这一层依赖，仓库才把编译结果一并提交——安装与分享都不需要构建。
-
-**但类型检查不需要那份单仓库。** 客户端 UI 包在 npm 上是独立发布的，`npm install` 会按
-`peerDependencies` 把它们（含 launcher 自己没装的 `dsh-client-store`、`dsh-client-ui-primitives`、
-`dsh-client-ui-slots`）一并装好，于是：
+浏览器半边是预编译的 `lib/client.js`，Host 启动时直接加载它。仓库把编译结果一并提交，所以**安装与分享都不需要构建**；但**从源码构建现在是可以的**：
 
 ```sh
 npm install
+npm run build         # src/ -> lib/client.js 与 lib/dsh-viewtune.js
+```
+
+上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器（`<harness>/tools/dshx/src/client-build.js`）
+取 `externalClientBundle`，所以那个配置在克隆出来的仓库里跑不起来。本仓库把它的真身——
+官方预设 `packages/client/tsdown.client.ts` 的 `clientBundle()`（Harness tag `dsh-v0.1.5-rc.2`）——
+移植成了 [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs)，并内联了它引用的三处 Harness 内部模块。
+产物契约不变，所以下面那套针对产物的断言依然有效。
+
+改完记得**同时提交 `lib/`**：安装别人拿到的是这份产物，而不是让他在本地构建。
+
+**类型检查同样不需要那份单仓库。** 客户端 UI 包在 npm 上是独立发布的，`npm install` 会按
+`peerDependencies` 把它们（含 launcher 自己没装的 `dsh-client-store`、`dsh-client-ui-primitives`、
+`dsh-client-ui-slots`）一并装好：
+
+```sh
 npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
 ```
 
@@ -76,21 +88,35 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
 
 ### 改代码
 
-改动显示逻辑时，**源码 `src/` 与产物 `lib/client.js` 必须一起改**——Host 加载的是产物。请务必留意产物里的两处身份标记，它们必须与 `package.json` 的 `name` 完全一致，否则整页会因为
-`loaded without registering "<id>" via __ModuleLoader__.load` 而失败：
+改动显示逻辑时，改 `src/` 然后 `npm run build`。产物里的两处身份标记必须与 `package.json` 的
+`name` 完全一致，否则整页会因为 `loaded without registering "<id>" via __ModuleLoader__.load` 而失败：
 
 - `window.__ModuleLoader__.load({ id })` 的行 id（宿主由安装清单的包名派生）；
 - 每个 CSS 模块的 `tagId` 前缀与 `document.createElement("style")` 的 `data-plugin`（HMR 按 plugin id 移除本插件的样式）。
 
 `tests/stock-install.test.ts` 就是这两条的守卫；同一测试还会检查本文档的安装命令与包名一致。
+（`tsdown.config.ts` 从 `package.json` 读包名，所以改包名不会再漂。）
 
 > **把克隆出来的仓库放在 `node_modules` 之外。** `dsh plugin add` 会在 profile 目录里跑 pnpm，而 pnpm 会清理 `node_modules` 下未在 `package.json` 中声明的目录——仓库连同 `.git` 可能被一起删掉。
 
 ### 验证
 
-`npm test` 跑仓库自带的测试。此外，本项目开发时主要依赖**产物层**的验证：检查产物的结构标记、把编译后的函数从产物里抠出来在假 DOM 上跑行为用例、并起一个临时 Host 确认模块图收录的 id 与产物注册的 id 一致。
+分两层，因为它们回答的是不同的问题：
 
-这套做法有个前提值得说明：**能解析（`node --check` 通过）不等于正确**。本仓库改动的是压缩过的产物，所以出现过语法完全合法、却因为一个引用被删掉而在运行时抛错的情况——那类错误只有"名字是否有声明"这一层的检查能抓住。
+```sh
+npm test     # 源码层：Node 自带测试跑 12 个测试文件
+npm run guard   # 产物层：18 条断言，全部针对构建出来的 lib/client.js
+```
+
+`npm run guard` 检查的是**产物**：模块表注册 id 与 `require()` 集合、注入的 CSS 字面量是否完整、
+轮次渲染顺序、§ 收起开关的作用域与淡出、工具栏吸顶形状、步骤胶囊用到的标识符是否都有声明，
+以及**`src/` 与产物的对应关系**（`compare-source-and-bundle`、`audit-source-edits`）与
+**"重新构建仍能复现已提交的形状"**（`verify-build`）。最后一条是这类仓库唯一能做的"产物与源码一致"证明——
+字节相等不可用（压缩器输出本就不稳定），所以它比对的是契约面与样式表规则。
+
+这套做法有个前提值得说明：**能解析（`node --check` 通过）不等于正确**。本仓库的历史大量是直接改压缩产物，
+出现过语法完全合法、却因为一个引用被删掉而在运行时抛错的情况——那类错误只有"名字是否有声明"这一层检查能抓住
+（`check-pill-scope`），或者"重新构建一次"能暴露（漂移在源码与产物之间）。两条都在 `npm run guard` 里。
 
 ## 许可
 
