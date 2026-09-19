@@ -23,6 +23,19 @@ const pluginPackageName = () => JSON.parse(readFileSync(join(ROOT, 'package.json
 // The bundle the profile actually installs, not a hardcoded package name.
 const bundle = readFileSync(join(installedPluginDir(), 'lib', 'client.js'), 'utf8');
 
+/**
+ * The compiled reasoning-card wheel handler: the region every wheel invariant below lives in.
+ *
+ * Extracted once by its real boundaries rather than per marker, because a marker that sliced the
+ * wrong region would happily assert against a string that is not the handler at all.
+ */
+const wheelHandler = (() => {
+  const start = bundle.indexOf('const onWheel = (event) => {');
+  if (start === -1) return '';
+  const end = bundle.indexOf('const onSelection', start);
+  return bundle.slice(start, end === -1 ? start + 2000 : end);
+})();
+
 // The Host derives the client row id from the installed manifest's package name,
 // and the browser loader refuses a bundle that registers anything else — the
 // failure mode is the whole page reporting "Failed to load plugins", so assert
@@ -65,32 +78,25 @@ const markers = [
   // already-at-edge test sees the pixels still left, spends the notch on the card, and only hands
   // over on the next one — the gesture sticks and then jumps.
   ['wheel-projects-the-notch', () => /splitNotch\(port\.scrollTop, delta, maxOffset\)/.test(bundle)],
-  ['wheel-handoff-on-overshoot', () => {
-    const start = bundle.indexOf('const onWheel = (event) => {');
-    if (start === -1) return false;
-    const end = bundle.indexOf('const onSelection', start);
-    const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
-    // Hands over when the notch leaves something, and walks only that remainder up.
-    return /Math\.abs\(remainder\) < \.5/.test(handler) && /host\.scrollBy\(0, remainder\)/.test(handler);
+  ['wheel-handoff-on-overshoot', () => /Math\.abs\(remainder\) < \.5/.test(wheelHandler)
+    && /host\.scrollBy\(0, remainder\)/.test(wheelHandler)],
+  // A notch the card cannot use at all is the browser's: left alone it chains that notch to the
+  // conversation and animates it like every other wheel scroll. Intercepting it instead re-issued
+  // each notch as a programmatic scrollBy, which lands in a single frame, and kept doing so for as
+  // long as the pointer stayed over the card. So this guard must return BEFORE the preventDefault.
+  ['wheel-lets-the-browser-chain-at-the-edge', () => {
+    const guard = wheelHandler.indexOf('if (consumed === 0) return;');
+    const prevent = wheelHandler.indexOf('event.preventDefault()');
+    return guard !== -1 && prevent !== -1 && guard < prevent;
   }],
-  // The card is placed exactly on its edge at the handoff (one write, at the handoff only — a
-  // write on every notch is what made the card step), and never scrolls past a limit.
-  ['wheel-cards-the-remainder', () => {
-    const start = bundle.indexOf('const onWheel = (event) => {');
-    const end = bundle.indexOf('const onSelection', start);
-    const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
-    return /port\.scrollTop \+= consumed/.test(handler);
-  }],
+  // The card is placed exactly on its edge at the handoff, and never scrolls past a limit.
+  ['wheel-cards-the-remainder', () => /port\.scrollTop \+= consumed/.test(wheelHandler)],
   // The card keeps the notch natively whenever it fits, and is written ONLY on the handoff, to
   // land it on its edge. A write on every notch is what made the card step instead of glide, so
   // this pins the count: exactly one write in the handler, and it uses the consumed amount.
   ['wheel-writes-the-card-once-at-handoff', () => {
-    const start = bundle.indexOf('const onWheel = (event) => {');
-    if (start === -1) return false;
-    const end = bundle.indexOf('const onSelection', start);
-    const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
-    const writes = handler.match(/port\.scrollTop\s*(\+=|=)/g) ?? [];
-    return writes.length === 1 && /port\.scrollTop \+= consumed/.test(handler);
+    const writes = wheelHandler.match(/port\.scrollTop\s*(\+=|=)/g) ?? [];
+    return writes.length === 1 && /port\.scrollTop \+= consumed/.test(wheelHandler);
   }],
   ['wheel-gesture-guard', 'if (Date.now() < wheelUntil) return;'],
   // `overflow` decides whether this card can scroll at all, so the handler reads it; a stale

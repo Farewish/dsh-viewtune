@@ -18,6 +18,10 @@ const WHEEL_IDLE_MS = 140;
  * the part it can actually consume, and the remainder belongs to the conversation in the same
  * event.
  *
+ * `consumed === 0` means the card is already on the edge the notch pushes against, and the browser
+ * chains such a notch to the conversation on its own. `remainder === 0` means the notch fits in
+ * the card. Only a notch that straddles the edge has to be split by hand.
+ *
  * @returns `consumed` for the card (never more than the notch, never past a limit) and
  *          `remainder` for the conversation.
  */
@@ -32,10 +36,11 @@ export function splitNotch(
 }
 
 /**
- * How much of the remainder still counts as "the card took this notch".
+ * How small a remainder still counts as no remainder.
  *
- * Subpixel offsets mean a notch that lands exactly on the edge can leave a fraction behind; the
- * card must still be placed on its edge for a fraction that small, or it stops a hair short.
+ * Subpixel offsets mean a notch that lands exactly on the edge can leave a fraction behind. That
+ * fraction is not worth splitting a whole notch over: the browser spends the notch on the card,
+ * the card lands on its edge, and nothing perceptible is left over.
  */
 export const REMAINDER_EPSILON_PX = 0.5;
 
@@ -208,26 +213,34 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(text).lineHeight) || 24
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? port.clientHeight : 1;
       const delta = event.deltaY * unit;
-      // The card's own scrolling is the browser's, and only the browser's. Writing scrollTop
-      // here — even merely to "put it back" at the edge — replaces a composited, subpixel scroll
-      // with an integer jump the moment the gesture hands off, which is what made this step
-      // instead of glide. So this handler never writes the card's position.
+      // A notch the card can use is left entirely to the browser: writing scrollTop on every
+      // notch replaces a composited subpixel scroll with an integer jump, which is what made the
+      // card step instead of glide. The only write is at a handoff, to land it on its edge.
       if (!overflow) return;
+      if (!event.cancelable) return;
       const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
       const { consumed, remainder } = splitNotch(port.scrollTop, delta, maxOffset);
-      // The notch fits inside the card: the browser scrolls it natively and this returns without
-      // touching anything. This is the common case and the reason the card feels native.
-      if (Math.abs(remainder) < REMAINDER_EPSILON_PX || !event.cancelable) return;
-      // The notch runs past the edge this gesture pushes against, so it is consumed whole and
-      // finished here rather than being spread over two notches: the card is placed exactly on
-      // its edge (the browser will not scroll it now that the event is prevented, so this is the
-      // only thing that can land it there) and the remainder walks up to the conversation. One
-      // write per handoff, not per notch — a write on every notch is what made the card step.
+      // Two notches are none of this handler's business, and taking them over is what made the
+      // gesture jump.
+      //
+      //  - The card is already on its bottom edge, so the notch is not the card's at all. Left
+      //    alone, the browser chains it to the conversation by itself and animates it exactly like
+      //    every other wheel scroll. Intercepting it here replaced that with a programmatic
+      //    scrollBy, which lands in a single frame — and it did so on every notch for as long as
+      //    the pointer stayed over the card.
+      if (consumed === 0) return;
+      //  - The notch fits inside the card, so it is not the conversation's either; the browser
+      //    scrolls the card natively.
+      if (Math.abs(remainder) < REMAINDER_EPSILON_PX) return;
+      // Only a notch that straddles the edge is split, because the browser would spend the whole
+      // notch on the card and drop the rest. The card takes the pixels it still has and the
+      // remainder walks up to the conversation in the same event, so a gesture that ends on the
+      // edge never loses part of a notch and never needs one more notch to hand over.
       let host = port.parentElement;
       while (host && !host.hasAttribute('data-conversation-scroll')) host = host.parentElement;
       if (!host) return;
       event.preventDefault();
-      if (Math.abs(consumed) >= REMAINDER_EPSILON_PX) port.scrollTop += consumed;
+      port.scrollTop += consumed;
       host.scrollBy(0, remainder);
     };
     const onSelection = () => { if (hasSelection()) pause(); };

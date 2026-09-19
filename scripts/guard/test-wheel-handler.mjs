@@ -2,12 +2,14 @@
  * Behavioural test for the reasoning card's wheel handling.
  *
  * The card scrolls natively — the handler never writes its scroll position. Each
- * modelled event therefore runs the handler and then lets the browser scroll the
- * card by the delta, unless the handler consumed the event to hand it off.
+ * modelled event therefore runs the handler and then, unless the handler consumed
+ * the event, applies the browser's own scroll for it.
  *
  * Invariants asserted per case:
  *   - mid-transcript the card moves natively, the conversation does not;
- *   - at the edge the notch is consumed and the conversation moves instead, once;
+ *   - the notch that straddles the edge is split in that same event;
+ *   - at the edge the handler stays out of the way and the browser chains the notch
+ *     to the conversation itself, which is what keeps that motion animated;
  *   - a short (non-scrollable) transcript hands the notch over immediately;
  *   - nothing moves twice for one notch, and repeated dispatches count once;
  *   - a scroll event during a gesture does not touch React state.
@@ -57,6 +59,8 @@ function extractHelper(name) {
 }
 
 let clock = 1_000_000;
+/** Wheel events the browser has already applied, so a duplicate delivery is not applied twice. */
+const appliedEvents = new Set();
 const sandbox = {
   WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 },
   getComputedStyle: () => ({ lineHeight: '24px' }),
@@ -101,13 +105,27 @@ function wheel({ port, talk, deltaY, deltaMode = 0, cancelable = true, timeStamp
   sandbox.pause = () => events.push('pause');
   sandbox.measure = () => events.push('measure');
   port.parentElement = talk.host;
-  sandbox.__event = { deltaY, deltaMode, cancelable, timeStamp: timeStamp ?? (clock += 1), preventDefault: () => events.push('preventDefault') };
+  const stamp = timeStamp ?? (clock += 1);
+  sandbox.__event = { deltaY, deltaMode, cancelable, timeStamp: stamp, preventDefault: () => events.push('preventDefault') };
   const cardBefore = port.scrollTop;
   const talkBefore = talk.scrollTop;
   runInContext('this.onWheel(__event)', context);
   const prevented = events.includes('preventDefault');
-  if (!prevented) {
-    port.scrollTop = clampIn(port.scrollTop + deltaY, 0, Math.max(0, port.scrollHeight - port.clientHeight));
+  // The browser applies each wheel event it was allowed to keep exactly once, and how it applies it
+  // was measured in a real browser: the notch goes to the card under the pointer and any leftover
+  // is DROPPED — the browser does not chain it — unless the card cannot move at all in that
+  // direction, in which case the whole notch goes to the conversation. A duplicate delivery of one
+  // event is therefore applied by the browser once, not twice.
+  const delivered = `${String(stamp)}:${String(deltaY)}`;
+  const firstDelivery = !appliedEvents.has(delivered);
+  appliedEvents.add(delivered);
+  if (!prevented && firstDelivery) {
+    // The browser scrolls by the notch in PIXELS: a line-mode event means lines, not pixels.
+    const native = deltaY * (deltaMode === 1 ? 24 : deltaMode === 2 ? port.clientHeight : 1);
+    const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
+    const room = native > 0 ? maxOffset - port.scrollTop : port.scrollTop;
+    if (room <= 0) talk.host.scrollBy(0, native);
+    else port.scrollTop = clampIn(port.scrollTop + native, 0, maxOffset);
   }
   return { cardMoved: port.scrollTop - cardBefore, talkMoved: talk.scrollTop - talkBefore, prevented, events, port, talk };
 }
@@ -139,7 +157,7 @@ const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
   check('mid-card: the handler never writes the card', port.writes === 1, `${String(port.writes)} writes`);
 }
 
-// 2. Bottom edge: the notch is consumed and the conversation takes it, once.
+// 2. Bottom edge: the conversation takes the notch, once.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 });
@@ -195,7 +213,11 @@ const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
     `card at ${String(port.scrollTop)}`);
 }
 
-// 4d. Already on the edge: the whole notch belongs to the conversation.
+// 4d. Already on the edge: the whole notch belongs to the conversation, and the browser is left to
+// move it there itself. Intercepting this notch is what made a long transcript jump: every notch
+// was re-issued as a programmatic scrollBy, which lands in one frame, and it kept doing that for as
+// long as the pointer stayed over the card. Letting it through instead runs the browser's own
+// (animated) chaining, exactly as if the pointer were over the conversation.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 });
@@ -204,6 +226,22 @@ const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
     `talk moved ${String(result.talkMoved)}`);
   check('on the edge: the card does not move', result.cardMoved === 0, `card moved ${String(result.cardMoved)}`);
   check('on the edge: the card is not written', port.writes === 0, `${String(port.writes)} writes`);
+  check('on the edge: the handler does not consume the event', !result.prevented,
+    `prevented ${String(result.prevented)}`);
+  check('on the edge: the conversation is scrolled by the browser, not by the handler', talk.writes === 1,
+    `${String(talk.writes)} scroll writes`);
+}
+
+// 4e. Every notch after that is the same case: while the pointer rests on a card that has finished
+// scrolling, nothing may be intercepted, or the gesture jumps for as long as the pointer stays.
+{
+  const talk = makeConversation();
+  const port = makePort({ ...longCard, scrollTop: 1200 - 224 });
+  const results = [1, 2, 3].map(() => wheel({ port, talk, deltaY: 120 }));
+  check('staying on the edge: no notch is consumed', results.every((r) => !r.prevented),
+    `prevented ${results.map((r) => String(r.prevented)).join(' ')}`);
+  check('staying on the edge: the conversation keeps moving', results.every((r) => r.talkMoved === 120),
+    `moved ${results.map((r) => String(r.talkMoved)).join(' ')}`);
 }
 
 // 5. Upward from the top edge.
