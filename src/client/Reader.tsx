@@ -548,9 +548,21 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
  * scroll already uses to pick its anchor, so "current" means the same thing in both places.
  * A viewport straddling two turns therefore resolves to the upper one, which is the rule the
  * collapse control is specified with.
+ *
+ * Takes the turn rows rather than querying them, so one scroll pass can hand the same rows to
+ * both readings instead of walking the DOM twice, and stays a plain function over a DOM-shaped
+ * argument so this rule can be tested on its own.
  */
-export function currentTurnOf(content: HTMLElement, viewportTop: number): number | null {
-  for (const element of content.querySelectorAll<HTMLElement>('[data-reader-turn]')) {
+export function currentTurnOf(
+  content: { querySelectorAll: (selector: string) => ArrayLike<HTMLElement> },
+  viewportTop: number,
+  rows?: ArrayLike<HTMLElement>,
+): number | null {
+  // Indexed rather than for..of: the rows may be a NodeList, which is array-like but not
+  // iterable without the DOM iterable lib, and a test hands it a plain array.
+  const list = rows ?? content.querySelectorAll('[data-reader-turn]');
+  for (let index = 0; index < list.length; index += 1) {
+    const element = list[index]!;
     // `data-reader-turn` is the turn number, or the literal 'unresolved' for a group the
     // snapshot cannot place; only a real turn can own a process.
     const label = element.dataset.readerTurn;
@@ -658,27 +670,51 @@ export function Reader(props: ReaderProps) {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [currentTurnOpen, otherTurnsOpen, collapseEveryTurn, collapseCurrentTurn, rememberCollapseFocus]);
-  // Measuring has to happen after a paint and again whenever the geometry moves, so this is
-  // a layout effect keyed to the turn that is currently in view plus the loaded window.
+  // One scroll spy feeds both readings, because both need the same measurement: the turn in
+  // view ("收起" scope, and the header the shortcut targets) and the turn the rail marks
+  // active. Measuring them in one pass matters — each getBoundingClientRect() flushes layout,
+  // and running two listeners meant walking every turn row twice per scroll, which is what
+  // made a handoff stutter while the pointer stayed over the transcript. A single rAF tick
+  // now reads each rect at most once, and only one listener exists.
   useLayoutEffect(() => {
     const content = root.current;
     if (!content) return;
     const scroller = content.closest<HTMLElement>('[data-conversation-scroll]') ?? content;
-    const read = () => {
-      const next = currentTurnOf(content, scroller.getBoundingClientRect().top);
-      setCurrentTurn(previous => previous === next ? previous : next);
+    const measure = () => {
+      const viewportTop = scroller.getBoundingClientRect().top;
+      const line = scroller.clientHeight * 0.35;
+      // One query for both readings: currentTurnOf keeps its documented shape but is handed the
+      // rows we already have, so the DOM is walked once per scroll instead of twice.
+      const rows = content.querySelectorAll<HTMLElement>('[data-reader-turn]');
+      let firstVisible = currentTurnOf(content, viewportTop, rows);
+      let active: number | null = null;
+      let first: number | null = null;
+      for (const row of rows) {
+        const value = Number(row.dataset.readerTurn);
+        if (!Number.isSafeInteger(value)) continue;
+        if (first === null) first = value;
+        // The rail marks the last turn that has reached the reading line, i.e. the one being
+        // read rather than merely visible.
+        if (row.getBoundingClientRect().top <= viewportTop + line) active = value;
+        else break;
+      }
+      setCurrentTurn(previous => previous === firstVisible ? previous : firstVisible);
+      setActiveTurn(previous => {
+        const next = active ?? first;
+        return previous === next ? previous : next;
+      });
     };
-    read();
+    measure();
     let frame = 0;
     const schedule = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(read);
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(() => { frame = 0; measure(); });
     };
     scroller.addEventListener('scroll', schedule, { passive: true });
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     observer?.observe(scroller);
     return () => {
-      cancelAnimationFrame(frame);
+      if (frame !== 0) cancelAnimationFrame(frame);
       scroller.removeEventListener('scroll', schedule);
       observer?.disconnect();
     };
@@ -710,46 +746,10 @@ export function Reader(props: ReaderProps) {
   );
 
   // 5. Active & busy turn tracking
+  // Both are written by the single scroll spy above, so there is deliberately no second
+  // listener here: a duplicate spy measured every turn row again on every scroll.
   const [activeTurn, setActiveTurn] = useState<number | null>(null);
   const [busyTurn, setBusyTurn] = useState<number | null>(null);
-
-  // Scroll spy to update activeTurn
-  useEffect(() => {
-    const el = root.current;
-    if (!el) return;
-    const scroller = el.closest('[data-conversation-scroll]') ?? el;
-
-    let ticking = false;
-    const updateActive = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        ticking = false;
-        const line = (scroller instanceof HTMLElement ? scroller.clientHeight : window.innerHeight) * 0.35;
-        const turnRows = el.querySelectorAll<HTMLElement>('[data-reader-turn]:not([data-reader-turn="unresolved"])');
-        let current: number | null = null;
-        for (const row of turnRows) {
-          const rect = row.getBoundingClientRect();
-          if (rect.top <= line) {
-            const num = Number(row.dataset.readerTurn);
-            if (Number.isSafeInteger(num)) current = num;
-          } else {
-            break;
-          }
-        }
-        if (current !== null) {
-          setActiveTurn(current);
-        } else if (turnRows.length > 0) {
-          const first = Number(turnRows[0].dataset.readerTurn);
-          if (Number.isSafeInteger(first)) setActiveTurn(first);
-        }
-      });
-    };
-
-    scroller.addEventListener('scroll', updateActive, { passive: true });
-    updateActive();
-    return () => scroller.removeEventListener('scroll', updateActive);
-  }, [groups]);
 
   // Navigation handler (supports loaded jump & unloaded loadThrough).
   // Land on the conversation scroller only — scrollIntoView also moves

@@ -118,21 +118,32 @@ want('gate flag', 'const currentTurnOpen = openTurnKeys.size > 0;', 1);
 present('action proxy exists', 'actions.setExpanded(key, false)');
 
 console.log('\n--- which turn is "current" (viewport-driven)');
-want('the predicate is a named function', 'function currentTurnOf(content, viewportTop) {', 1);
-want('it walks the turn list', 'for (const element of content.querySelectorAll("[data-reader-turn]")) {', 1);
+want('the predicate is a named function', 'function currentTurnOf(content, viewportTop, rows) {', 1);
+// It must still be reachable with just a DOM-shaped argument, because test-current-turn.mjs
+// runs this rule on its own against a fake DOM. Indexed so a NodeList works without the DOM
+// iterable lib.
+want('it walks the turn list when not handed one', 'const list = rows ?? content.querySelectorAll("[data-reader-turn]");', 1);
+want('the walk is indexed, not iterated', 'for (let index = 0; index < list.length; index += 1) {', 1);
 // Same predicate the reading scroll uses for its anchor, so the two agree on what is current.
 want('first turn whose bottom passed the top edge', 'if (element.getBoundingClientRect().bottom > viewportTop + 8) return turnNumber;', 1);
 want('skips groups without a turn number', 'if (!Number.isInteger(turnNumber)) continue;', 1);
-want('nothing visible yields no turn', '\t\t\treturn null;\n\t\t}\n\t\tfunction Reader(props) {', 1);
-want('the effect calls it', 'const next = currentTurnOf(content, scroller.getBoundingClientRect().top);', 1);
+want('the effect asks it for the turn in view', 'let firstVisible = currentTurnOf(content, viewportTop, rows);', 1);
 // Resolving the scroller this way is deliberate: useReadingScroll does exactly the same, so
 // "the viewport" means one container in both places. Hence 2 occurrences, not 1.
 want('uses the same scrollport as the reading scroll', 'content.closest("[data-conversation-scroll]") ?? content;', 2);
 want('and listens to that scroller itself', 'scroller.addEventListener("scroll", schedule, { passive: true });', 1);
-want('re-measures on scroll', 'scroller.addEventListener("scroll", schedule, { passive: true });', 1);
-want('throttled to one read per frame', 'frame = requestAnimationFrame(read);', 1);
-want('state only changes on a real move', 'setCurrentTurn((previous) => previous === next ? previous : next);', 1);
+want('throttled to one read per frame', 'frame = requestAnimationFrame(() => {', 1);
+want('state only changes on a real move', 'setCurrentTurn((previous) => previous === firstVisible ? previous : firstVisible);', 1);
 want('cleans up its listeners', 'scroller.removeEventListener("scroll", schedule);', 1);
+
+console.log('\n--- one scroll spy, not two (the handoff stutter regression)');
+// Both readings need the same measurement, and every getBoundingClientRect() flushes layout.
+// Two listeners meant walking every turn row twice per scroll, which is what made a wheel
+// handoff stutter while the pointer stayed over the transcript. Pin the single-spy shape.
+want('exactly one scroll listener on the scroller', 'scroller.addEventListener("scroll",', 1);
+absent('no second spy walking the rows again', 'updateActive');
+want('one query feeds both readings', 'const rows = content.querySelectorAll("[data-reader-turn]");', 1);
+want('the current turn reuses that query', 'let firstVisible = currentTurnOf(content, viewportTop, rows);', 1);
 
 console.log('\n--- styles');
 // Asserted by the declarations each rule carries, through the anchor helpers: class names and

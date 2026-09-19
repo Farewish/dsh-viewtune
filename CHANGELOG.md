@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+**修复：手动滚轮从思考区交接给页面时卡顿。** 原因是阅读视图里有**两个滚动监听器在做同一件测量**：老的"活跃轮次"滚动侦测，与 relayout.13 之前新增的"当前轮"侦测（`收起` 的作用域要用它）。两者各自 `querySelectorAll('[data-reader-turn]')`，再对**每一个**轮次元素读一次 `getBoundingClientRect()` —— 而每次 rect 读取都会强制布局刷新。交接那一刻卡片会写 `scrollTop`、页面会 `scrollBy`，布局随即失效，于是一个滚轮事件要触发**两遍、每遍几十次**强制重排；只要指针还停在思考区上，每个滚轮事件都会继续走这条路，所以表现成"从交接那刻起一直卡，鼠标移开就好"。
+
+现在合并成**一个**滚动监听器、**一次遍历同时算出两个值**（当前轮 + 活跃轮次），并且只查询一次 DOM、把结果传给两侧。滚动监听器数量回到 3 个（与 relayout.3 相同），每次滚动的 DOM 遍历从两遍降为一遍。
+
+`currentTurnOf` 仍然是一个具名函数（`test-current-turn.mjs` 靠它单独验证"横跨两轮取上面那个"这条规则），只是多了一个可选的 `rows` 参数，好让滚动回调复用已查到的元素。`check-collapse-control` 里 6 条与旧写法耦合的断言改为断言不变式，并**新增 4 条断言把这次的回归钉住**：滚动监听器只能有一个、不得再有第二个遍历轮次的侦测、一次查询供两处使用。
+
+## Unreleased (previous)
+
 **从源码构建回来了。** 上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器取
 `externalClientBundle`，所以克隆出来的仓库构建不了；本仓库把它的真身——官方预设
 `packages/client/tsdown.client.ts` 的 `clientBundle()`（Harness tag `dsh-v0.1.5-rc.2`）——

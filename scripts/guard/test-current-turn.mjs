@@ -31,7 +31,10 @@ const bundle = readFileSync(bundlePath, 'utf8');
 
 /** Lift the compiled predicate out of the bundle. */
 function extractFn() {
-  const start = bundle.indexOf('function currentTurnOf(content, viewportTop) {');
+  // Match the signature by its name and first parameters rather than the whole parameter list:
+  // the predicate gained an optional rows argument so one scroll pass can reuse its query, and a
+  // guard pinned to the old exact spelling would have failed for that rather than for behaviour.
+  const start = bundle.indexOf('function currentTurnOf(content, viewportTop');
   if (start === -1) throw new Error('compiled currentTurnOf not found');
   // Walk to the matching closing brace of the function body.
   let depth = 0;
