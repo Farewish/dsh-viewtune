@@ -598,9 +598,66 @@ export function Reader(props: ReaderProps) {
     return open;
   }, [groups, timeline, expansionChoices, currentTurn]);
   const currentTurnOpen = openTurnKeys.size > 0;
+  // Every turn the reader has expanded, not just the one in view. The toolbar button stays scoped to
+  // the current turn (that was a deliberate narrowing), but a reader who has opened several turns
+  // needs a way back in one step, and a keyboard path to both.
+  const allOpenKeys = useMemo(() => {
+    const open = new Set<string>();
+    for (const group of groups) {
+      if (group.turn === null) continue;
+      const turn = timeline.turns.get(group.turn);
+      const boundary = boundaryOf(turn);
+      const choice = expansionChoices[processChoiceKey(group.key, boundary)];
+      if (processExpanded(choice, boundary)) open.add(processChoiceKey(group.key, boundary));
+    }
+    return open;
+  }, [groups, timeline, expansionChoices]);
+  const otherTurnsOpen = allOpenKeys.size > openTurnKeys.size;
   const collapseCurrentTurn = useCallback(() => {
     for (const key of openTurnKeys) props.actions.setExpanded(key, false);
   }, [openTurnKeys, props.actions]);
+  const collapseEveryTurn = useCallback(() => {
+    for (const key of allOpenKeys) props.actions.setExpanded(key, false);
+  }, [allOpenKeys, props.actions]);
+  // Collapsing hides the button that was just used, and a hidden element cannot hold focus: the
+  // keyboard reader would be dropped to <body> and have to tab back in from the top of the page.
+  // Remember where focus was, and hand it to the toolbar's other control once the wrap is empty.
+  const collapseWrapRef = useRef<HTMLDivElement>(null);
+  const motionRef = useRef<HTMLButtonElement>(null);
+  const focusWasInCollapseWrap = useRef(false);
+  const rememberCollapseFocus = useCallback(() => {
+    focusWasInCollapseWrap.current = collapseWrapRef.current?.contains(document.activeElement) ?? false;
+  }, []);
+  useEffect(() => {
+    if (!focusWasInCollapseWrap.current) return;
+    // Something is still visible in the wrap (another button, or another expanded turn).
+    if (currentTurnOpen || otherTurnsOpen) return;
+    focusWasInCollapseWrap.current = false;
+    motionRef.current?.focus();
+  }, [currentTurnOpen, otherTurnsOpen]);
+  // Alt+C collapses the turn in view; Alt+Shift+C collapses everything expanded. Alt keeps the
+  // shortcut out of the composer's way — a bare letter would be swallowed while typing, and the
+  // reader should be able to collapse without leaving a half-written message. Nothing is prevented
+  // when the shortcut would be a no-op, so the browser keeps its own bindings elsewhere.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+      if (event.code !== 'KeyC') return;
+      if (event.shiftKey) {
+        if (!currentTurnOpen && !otherTurnsOpen) return;
+        event.preventDefault();
+        rememberCollapseFocus();
+        collapseEveryTurn();
+        return;
+      }
+      if (!currentTurnOpen) return;
+      event.preventDefault();
+      rememberCollapseFocus();
+      collapseCurrentTurn();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [currentTurnOpen, otherTurnsOpen, collapseEveryTurn, collapseCurrentTurn, rememberCollapseFocus]);
   // Measuring has to happen after a paint and again whenever the geometry moves, so this is
   // a layout effect keyed to the turn that is currently in view plus the loaded window.
   useLayoutEffect(() => {
@@ -760,10 +817,11 @@ export function Reader(props: ReaderProps) {
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
     <div className={css.column} data-chat-flow="">
       <div className={css.toolbar} data-ud-check="reader-toolbar">
-        <div className={css.collapseWrap}>
-          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} onClick={collapseCurrentTurn} title="收起当前这一轮的过程">收起 <span aria-hidden="true">˄</span></button>
+        <div className={css.collapseWrap} ref={collapseWrapRef} data-ud-check="collapse-wrap">
+          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title="收起当前这一轮的过程（Alt+C）">收起 <span aria-hidden="true">˄</span></button>
+          <button type="button" className={css.textButton} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title="收起所有已展开的过程（Alt+Shift+C）">全部收起</button>
         </div>
-        <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
+        <button ref={motionRef} type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
         setHistoryError(false);

@@ -52,11 +52,23 @@ want('collapse wrapper', 'className: Reader_module_css_default.collapseWrap', 1)
 want('collapse control', 'className: Reader_module_css_default.collapseControl', 1);
 want('collapse state hook', '"data-reader-collapse": currentTurnOpen ? "open" : "idle"', 1);
 want('hidden gate', 'hidden: !currentTurnOpen', 1);
-want('click handler', 'onClick: collapseCurrentTurn', 1);
+// The handlers run through a wrapper that records where focus was before the button disappears.
+want('current-turn handler', 'collapseCurrentTurn();', 2);
+want('collapse-all state hook', '"data-reader-collapse-all": otherTurnsOpen ? "open" : "idle"', 1);
+want('collapse-all gate', 'hidden: !otherTurnsOpen', 1);
+want('collapse-all handler', 'collapseEveryTurn()', 2);
+want('toolbar wrap hook', '"data-ud-check": "collapse-wrap"', 1);
 want('control label', '"收起 "', 1);
 want('chevron', 'children: "˄"', 1);
 want('tooltip names the scope', '收起当前这一轮的过程', 1);
 want('motion toggle kept', '"aria-pressed": motionPreference', 1);
+// B2: a keyboard path for both actions, and a focus handoff so collapsing never drops the reader to
+// <body> when the button that was just used goes away.
+want('alt+c shortcut', 'event.code !== "KeyC"', 1);
+want('shortcut requires alt', 'if (!event.altKey', 1);
+want('focus handoff', 'focusWasInCollapseWrap', 4);
+present('collapse-all label', '全部收起');
+present('shortcut is documented in a tooltip', 'Alt+Shift+C');
 
 console.log('\n--- state');
 /**
@@ -78,8 +90,23 @@ function wantAsSource(label, needle) {
 want('current turn state', 'const [currentTurn, setCurrentTurn] = (0, react.useState)(null);', 1);
 want('open set memo', 'const openTurnKeys = (0, react.useMemo)', 1);
 want('expansion read', 'state.expanded);', 1);
-wantAsSource('boundary read', 'boundaryOf(turn)');
+/**
+ * Assert the bundle carries AT LEAST as many occurrences as the decision needs.
+ *
+ * Exact source/bundle counts are not usable for everything: the compiler inlines a `const turn`
+ * that is used once, and duplicates a call while inlining, so `boundaryOf(` reads 3 in the source
+ * and 4 in the bundle. What the decision actually requires is that the call sites still exist —
+ * the definition plus the turns that compute a boundary.
+ */
+function wantAtLeast(label, needle, minimum) {
+  const inSource = readerSource.split(needle).length - 1;
+  const inBundle = count(needle);
+  const ok = inSource >= minimum && inBundle >= minimum;
+  if (!ok) bad++;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}: bundle ${inBundle}, source ${inSource} (want >= ${minimum})`);
+}
 wantAsSource('choice key', 'processChoiceKey(group.key, boundary)');
+wantAtLeast('boundary read', 'boundaryOf(', 3);
 // The scope itself: the loop must skip every turn but the one in view.
 want('open set is narrowed to one turn', 'if (group.turn === null || group.turn !== currentTurn) continue;', 1);
 want('collapse loop', 'for (const key of openTurnKeys) props.actions.setExpanded(key, false);', 1);

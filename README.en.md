@@ -22,6 +22,8 @@ Targets DeepSeek Harness **0.1.5-rc.2**. Display only — it does not change age
 
 - **Pinned toolbar**: the toolbar, carrying both switches (收起 and 动效), stays at the top of the reading column while the transcript scrolls under it.
 - **收起 acts on one turn**: a "conversation" here is one turn (a question and its answer). The button folds the turn the reader is looking at rather than every open turn on the page, and it decides which turn that is with the same predicate the reading scroll uses for its anchor — so a viewport straddling two turns resolves to the upper one.
+  **Alt+C** is the keyboard equivalent. If other turns are expanded too, a **「全部收起」** control appears in the toolbar (**Alt+Shift+C**, only while there really is another expanded turn), so you need not scroll back to each one.
+  When collapsing makes the button itself disappear, focus moves to **the toolbar's other control** rather than to `<body>`: a keyboard reader is not dropped back to the top of the document for pressing it.
 - **Steps pill**: the answer's action row shows which step the answer landed on out of the turn's total, and opens a readable process record rather than raw JSON.
 - **Interactive mcp-app cards**: an ````mcp-app` fence in the answer mounts as an interactive card inside `<iframe sandbox="allow-scripts allow-forms">` — **without** `allow-same-origin`. A card can fill the next prompt over JSON-RPC. Skill pack: [`skills/generative-mcpapps/`](skills/generative-mcpapps/).
 
