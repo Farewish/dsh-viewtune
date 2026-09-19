@@ -63,7 +63,16 @@ dsh plugin --profile web remove dsh-viewtune
 
 浏览器半边是预编译的 `lib/client.js`，Host 启动时直接加载它。**从源码重新构建需要一份 DSH 单仓库**（提供客户端构建适配器与 `packages/client` 源码），本仓库沿用上游的 `tsdown.config.ts`。正因为构建有这一层依赖，仓库才把编译结果一并提交——安装与分享都不需要构建。
 
-类型检查同样需要那份单仓库（客户端 UI 包并未作为独立包发布），所以在没有它的机器上 `npm run typecheck` 跑不起来。`lib/` 只含编译产物与宿主入口，本仓库**不发布类型声明**，`package.json` 也没有 `types` 字段。
+**但类型检查不需要那份单仓库。** 客户端 UI 包在 npm 上是独立发布的，`npm install` 会按
+`peerDependencies` 把它们（含 launcher 自己没装的 `dsh-client-store`、`dsh-client-ui-primitives`、
+`dsh-client-ui-slots`）一并装好，于是：
+
+```sh
+npm install
+npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
+```
+
+`lib/` 只含编译产物与宿主入口，本仓库**不发布类型声明**，`package.json` 也没有 `types` 字段。
 
 ### 改代码
 

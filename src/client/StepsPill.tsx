@@ -72,7 +72,7 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   // record: the count is a partial sum while the position is absolute. Nothing is
   // shown for it, matching how the usage/duration pills already behave here.
   if (truncated) return null;
-  if (answerStep === null && total === null) return null;
+  if (answer === null && total === null) return null;
 
   const label = answer !== null ? `${answer}/${total} 个步骤` : `${answer ?? total} 个步骤`;
 
@@ -103,13 +103,13 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
           <div className={css.popSection}>
             <div className={css.popSectionTitle}>步骤</div>
             <div className={css.popGrid}>
-              {answerStep !== null && (
+              {answer !== null && (
                 <>
                   <span className={css.popLabel}>
                     回答所在步骤
                     <span className={css.popBadge}>过程记录字段</span>
                   </span>
-                  <span className={css.popValue}>第 {answerStep} 步</span>
+                  <span className={css.popValue}>第 {answer} 步</span>
                 </>
               )}
               {total !== null && (
@@ -119,7 +119,7 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
                 </>
               )}
             </div>
-            {answerStep !== null && total !== null && (
+            {answer !== null && total !== null && (
               <p className={css.popNote}>
                 {answer === total
                   ? '回答落在最后一步：本轮的思考与工具都在它之前。'

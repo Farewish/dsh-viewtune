@@ -63,7 +63,14 @@ Three things worth knowing:
 
 The browser half is the prebuilt `lib/client.js`, which the Host loads directly. **Rebuilding it from source needs a full DSH monorepo** (it provides the client build adapter and the `packages/client` sources); this repo follows upstream's `tsdown.config.ts`. Because a build carries that requirement, the compiled output is committed — installing and sharing need no build at all.
 
-Type checking needs the same monorepo (the client UI packages are not published standalone), so `npm run typecheck` cannot run without it. `lib/` holds only compiled output and the Host entry; this repo **does not publish type declarations** and `package.json` has no `types` field.
+**Type checking does not need that monorepo.** The client UI packages are published standalone on npm, and `npm install` pulls them in through `peerDependencies` — including `dsh-client-store`, `dsh-client-ui-primitives` and `dsh-client-ui-slots`, which the launcher itself does not carry. So:
+
+```sh
+npm install
+npm run typecheck     # tsc -p tsconfig.json --noEmit, against the real declarations
+```
+
+`lib/` holds only compiled output and the Host entry; this repo **does not publish type declarations** and `package.json` has no `types` field.
 
 ### Changing the code
 
