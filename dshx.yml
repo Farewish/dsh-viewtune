@@ -1,5 +1,8 @@
 id: dsh-viewtune
 entry: src/dsh-viewtune.ts
-marker: '[my-plugins/dsh-better-display] loaded'
+# The marker must be the literal line the built host half prints. It said
+# `dsh-better-display` while `src/dsh-viewtune.ts` had already been renamed, so the check
+# could never match — the same source/artifact drift the rebuild exposed in `lib/dsh-viewtune.js`.
+marker: '[my-plugins/dsh-viewtune] loaded'
 kind: client
 profile: web

@@ -1,35 +1,28 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 import type { TsdownPlugin, UserConfig } from 'tsdown';
-
-function resolveHarness(): string {
-  const configured = process.env.DSHX_HARNESS?.trim();
-  if (configured) return resolve(configured);
-  const configPath = join(homedir(), '.config/dshx/harness');
-  const recorded = existsSync(configPath) ? readFileSync(configPath, 'utf8').trim() : undefined;
-  if (!recorded) {
-    throw new Error('client rebuild requires a Harness root from DSHX_HARNESS or ~/.config/dshx/harness');
-  }
-  return resolve(recorded);
-}
-
-const adapter = join(resolveHarness(), 'tools/dshx/src/client-build.js');
-if (!existsSync(adapter)) throw new Error('externalClientBundle adapter is missing.');
-const { externalClientBundle } = await import(pathToFileURL(adapter).href);
+import { externalClientBundle } from './scripts/client-bundle.mjs';
 
 /**
- * The bundle id must be the *package* name: the Host derives the client row id
- * from this package's manifest, and the browser loader rejects a bundle whose
- * `__ModuleLoader__.load({ id })` differs from that row (every injected <style>
- * is also tagged with it, so HMR can remove this plugin's styles by id).
- * Reading it here keeps a rename from silently breaking the boot again.
+ * The bundle id must be the *package* name: the Host derives the client row id from this
+ * package's manifest, and the browser loader rejects a bundle whose
+ * `__ModuleLoader__.load({ id })` differs from that row (every injected <style> is also
+ * tagged with it, so HMR can remove this plugin's styles by id). Reading it here keeps a
+ * rename from silently breaking the boot again.
  */
 const packageName = (JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ) as { name: string }).name;
 
+/**
+ * Where the client-bundle preset comes from
+ * -----------------------------------------
+ * Upstream imported `externalClientBundle` from a prepared Harness checkout
+ * (`<harness>/tools/dshx/src/client-build.js`), which is not published anywhere — so a fresh
+ * clone could not build. `scripts/client-bundle.mjs` is a vendored port of the official
+ * preset that wrapper wrapped (`packages/client/tsdown.client.ts` → `clientBundle`, at tag
+ * `dsh-v0.1.5-rc.2`), with its three harness-internal imports inlined. The emitted artifact
+ * keeps the same contract, so the guard suite over `lib/client.js` stays valid.
+ */
 const bundle = externalClientBundle(packageName, ['src/dsh-viewtune.ts'], {
   clientEntry: 'src/client/index.tsx',
 }) as UserConfig[];
