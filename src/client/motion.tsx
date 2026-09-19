@@ -141,12 +141,35 @@ export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, 
 }) {
   const body = useRef<HTMLDivElement>(null);
   const running = useRef<Animation | null>(null);
+  const watcher = useRef<ResizeObserver | null>(null);
   const previous = useRef(open);
   const [present, setPresent] = useState(open);
   useLayoutEffect(() => {
     const element = body.current;
     if (!element) return;
-    const from = running.current ? element.getBoundingClientRect().height : previous.current ? element.scrollHeight : 0;
+    watcher.current?.disconnect();
+    watcher.current = null;
+    const animating = running.current !== null;
+    const from = animating ? element.getBoundingClientRect().height : previous.current ? element.scrollHeight : 0;
+    // What a frame occupies is not only its height. The flow is a flex column with a `row-gap`, and
+    // a frame that has shrunk to nothing still owns the gap that sits beside it; that gap leaves the
+    // layout only when the frame unmounts. So a collapse that animated the height to 0 and stopped
+    // there left one gap of blank space per collapsed step, and the answer below jumped up by
+    // exactly that much the moment `present` went false. The gap has to leave with the height, and
+    // the frame's own margin is what can pull it out: one gap of negative margin on either side of
+    // the frame's box removes exactly the one gap that its removal will remove, wherever the frame
+    // sits in the flow. A frame alone in its container owns no gap, hence 0. `.disclosureBody`
+    // carries no margin of its own, so cancelling the parent's gap is the whole of it.
+    const parent = element.parentElement;
+    const alone = element.nextElementSibling === null && element.previousElementSibling === null;
+    // Only a flex/grid parent spaces its items with a gap; a block parent can carry the property
+    // without it doing anything, and then there is no space to cancel.
+    const box = parent === null ? null : getComputedStyle(parent);
+    const spaced = box !== null && (box.display.includes('flex') || box.display.includes('grid'));
+    const measured = box === null || !spaced || alone ? 0 : parseFloat(box.rowGap);
+    const gap = Number.isFinite(measured) ? measured : 0;
+    // Resuming an interrupted animation starts from wherever the margin actually is.
+    const marginFrom = animating ? parseFloat(getComputedStyle(element).marginTop) || 0 : open ? -gap : 0;
     running.current?.cancel();
     running.current = null;
     const changed = previous.current !== open;
@@ -154,21 +177,61 @@ export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, 
     if (open) setPresent(true);
     if (!open && element.contains(document.activeElement)) returnFocusTo.current?.focus();
     element.style.height = open ? 'auto' : '0px';
-    const target = open ? element.scrollHeight : 0;
-    if (!motion || !changed || Math.abs(from - target) < 1) {
+    // The frame after the animation has to find the layout the animation ended on, or it snaps: a
+    // collapsed frame keeps its gap out of the layout until it unmounts, an open one must not
+    // carry the compensation.
+    element.style.marginTop = open || gap === 0 ? '' : `-${gap}px`;
+    // `scrollHeight` is the content's own height — the height the reveal has to end on. It is read
+    // here, but on the way open the subtree is still settling: the reasoning card only learns that
+    // it overflows once it has been laid out, and the reading row that update renders
+    // ("可滚动阅读 / 展开阅读", ~38px) reaches the DOM only after this effect — child effects run
+    // first, and the state they set is flushed after this one. An end keyframe frozen to the height
+    // read here therefore leaves that row outside the reveal: it stays clipped for the whole
+    // animation, and `height: auto` snaps it into view at the end. So the end keyframe follows the
+    // content for as long as the animation runs.
+    let end = open ? element.scrollHeight : 0;
+    if (!motion || !changed || Math.abs(from - end) < 1) {
       setPresent(open);
       return;
     }
-    const animation = element.animate([{ height: `${from}px` }, { height: `${target}px` }], { duration: 260, easing: EASING, fill: 'both' });
+    const marginTo = open ? 0 : -gap;
+    const frames = (height: number) => [
+      { height: `${from}px`, marginTop: `${marginFrom}px` },
+      { height: `${height}px`, marginTop: `${marginTo}px` },
+    ];
+    const animation = element.animate(frames(end), { duration: 260, easing: EASING, fill: 'both' });
     running.current = animation;
+    if (open) {
+      // Watch the content box, not the body: the body's own height changes on every animated
+      // frame, while the content changes only when the subtree actually grows.
+      const content = element.firstElementChild;
+      if (content !== null && typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(() => {
+          if (running.current !== animation) return;
+          const settled = element.scrollHeight;
+          if (Math.abs(settled - end) < 1) return;
+          end = settled;
+          const effect = animation.effect;
+          if (effect instanceof KeyframeEffect) effect.setKeyframes(frames(settled));
+        });
+        observer.observe(content);
+        watcher.current = observer;
+      }
+    }
     animation.onfinish = () => {
       if (running.current !== animation) return;
+      watcher.current?.disconnect();
+      watcher.current = null;
       running.current = null;
       animation.cancel();
       setPresent(open);
     };
   }, [open, motion, returnFocusTo]);
-  useEffect(() => () => { running.current?.cancel(); }, []);
+  useEffect(() => () => {
+    watcher.current?.disconnect();
+    watcher.current = null;
+    running.current?.cancel();
+  }, []);
   if (!open && !present) return null;
   return <div ref={body} className={css.disclosureBody} data-reader-process data-reader-process-key={nodeKey} data-ud-motion="reader-process-size"
     aria-hidden={!open} onPointerDown={() => { if (open) onRead(); }} onFocusCapture={() => { if (open) onRead(); }} {...(!open ? { inert: '' } : {})}>
