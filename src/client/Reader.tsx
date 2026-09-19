@@ -13,6 +13,7 @@ import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessCon
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
+import { SettingsMenu } from './SettingsMenu.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
@@ -635,7 +636,7 @@ export function Reader(props: ReaderProps) {
   // keyboard reader would be dropped to <body> and have to tab back in from the top of the page.
   // Remember where focus was, and hand it to the toolbar's other control once the wrap is empty.
   const collapseWrapRef = useRef<HTMLDivElement>(null);
-  const motionRef = useRef<HTMLButtonElement>(null);
+  const settingsRef = useRef<HTMLButtonElement>(null);
   const focusWasInCollapseWrap = useRef(false);
   const rememberCollapseFocus = useCallback(() => {
     focusWasInCollapseWrap.current = collapseWrapRef.current?.contains(document.activeElement) ?? false;
@@ -645,7 +646,7 @@ export function Reader(props: ReaderProps) {
     // Something is still visible in the wrap (another button, or another expanded turn).
     if (currentTurnOpen || otherTurnsOpen) return;
     focusWasInCollapseWrap.current = false;
-    motionRef.current?.focus();
+    settingsRef.current?.focus();
   }, [currentTurnOpen, otherTurnsOpen]);
   // Alt+C collapses the turn in view; Alt+Shift+C collapses everything expanded. Alt keeps the
   // shortcut out of the composer's way — a bare letter would be swallowed while typing, and the
@@ -825,7 +826,7 @@ export function Reader(props: ReaderProps) {
           <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} aria-keyshortcuts="Alt+C" onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title="收起当前这一轮的过程（Alt+C）">收起 <span aria-hidden="true">˄</span></button>
           <button type="button" className={`${css.textButton} ${css.collapseAll}`} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} aria-keyshortcuts="Alt+Shift+C" onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title="收起所有已展开的过程（Alt+Shift+C）">全部收起</button>
         </div>
-        <button ref={motionRef} type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
+        <SettingsMenu motion={motion} preference={motionPreference} onChange={props.actions.setMotion} buttonRef={settingsRef} />
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
         setHistoryError(false);

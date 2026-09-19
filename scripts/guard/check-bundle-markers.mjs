@@ -118,6 +118,9 @@ const markers = [
   ['collapse exit waits for the animation to finish', () => /transition:[^;}]*visibility\s+0s[^;}]*[\d.]+m?s/.test(readerCss)],
   // The toolbar is the one lane that pins, so both switches stay reachable.
   ['toolbar pins to the top', () => cssDecls(sel('toolbar'), ['position:sticky', 'top:0', 'z-index:9'])],
+  // The reading view's preferences live behind one toolbar button: the lane keeps its geometry and
+  // a preference becomes a row in this panel instead of another control in the lane.
+  ['settings panel holds the preferences', '"data-ud-check": "reader-settings"'],
   // Two calls the product renders with its own keyed cards are rendered here instead of collapsing
   // into a generic row: a question set (what was asked, what was answered) and a delivery (which
   // files were handed over). Asserted by the data attribute they render with, matched with either
@@ -143,6 +146,10 @@ const forbidden = [
   // the toolbar's measured height. Both are gone; only the toolbar lane remains.
   ['no sticky status lane', () => /_disclosure\{[^}]*position:sticky/.test(readerCss)],
   ['no measured toolbar height', 'reader-toolbar-height'],
+  // The settings panel's entrance is decided when it opens (SettingsMenu), never by a state gate on
+  // the animation property: lifting such a gate re-applies the animation, so turning 动效 on from
+  // inside that very panel replayed its entrance as a flash.
+  ['no state gate on the settings panel entrance', () => /\[data-motion=off\][^{]*_settingsPanel\{/.test(readerCss)],
 ];
 
 let ok = true;

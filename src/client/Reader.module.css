@@ -17,7 +17,7 @@
    1px solid l1 was both the faintest tier and heavier than the app's dividers. */
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 4px 0; border-bottom: .5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
 
-/* The toolbar is the one lane that pins: it carries both switches (收起 / 动效), so it has
+/* The toolbar is the one lane that pins: it carries 「收起」 and the settings button, so it has
    to stay reachable while the transcript scrolls under it. The background is what keeps
    the text from showing through. A turn's process status row deliberately does NOT pin —
    its offset above would need the toolbar's measured height, and the lane itself read as
@@ -321,7 +321,15 @@
 .collapseControl[hidden] { display: inline-flex; }
 .collapseControl[data-reader-collapse=open] { animation: readerCollapseIn 180ms ease-out; }
 .collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; visibility: hidden; transition: visibility 0s linear 140ms; }
-[data-motion=off] .collapseControl[data-reader-collapse=open] { animation: none; }
+/* The motion preference governs BOTH halves of this control, and it does so by ENDING them rather
+   than removing them: removing an animation and putting it back replays it, which is what made
+   turning the setting on replay the entrance of a control that was already on screen. The gate
+   restates the shorthand with a zero duration — the animation-name is unchanged, so nothing
+   restarts — because a bare `animation-duration` override is invisible to the cascade the guards
+   resolve. The idle half also drops the visibility delay: that delay exists to keep the control
+   painted until the exit finishes, and with no exit to wait for it would only leave a ghost. */
+[data-motion=off] .collapseControl[data-reader-collapse=open] { animation: readerCollapseIn 0s ease-out; }
+[data-motion=off] .collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 0s ease-in both; transition: none; }
 @media (prefers-reduced-motion: reduce) { .collapseControl[data-reader-collapse=open] { animation: none; } }
 /* 「全部收起」: the same frame and the same enter/exit as 「收起」, one step quieter. It keeps the
    text button's own type (no font-size here on purpose — it sits on `.textButton`, so the size is
@@ -335,7 +343,29 @@
 .collapseAll[hidden] { display: inline-flex; }
 .collapseAll[data-reader-collapse-all=open] { animation: readerCollapseIn 180ms ease-out; }
 .collapseAll[data-reader-collapse-all=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; visibility: hidden; transition: visibility 0s linear 140ms; }
-[data-motion=off] .collapseAll[data-reader-collapse-all=open] { animation: none; }
+/* Same contract as 「收起」 above: the switch governs both halves, by duration rather than removal. */
+[data-motion=off] .collapseAll[data-reader-collapse-all=open] { animation: readerCollapseIn 0s ease-out; }
+[data-motion=off] .collapseAll[data-reader-collapse-all=idle] { animation: readerCollapseOut 0s ease-in both; transition: none; }
 @media (prefers-reduced-motion: reduce) { .collapseAll[data-reader-collapse-all=open] { animation: none; } }
 @keyframes readerCollapseIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes readerCollapseOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px); } }
+
+/* The settings lane: one button in the pinned toolbar, a small popover under it. Every preference
+   is a row in there rather than another control in the lane, so the toolbar keeps the geometry
+   test-toolbar-geometry.mjs asserts. The panel is a plain disclosure — no backdrop, nothing
+   trapped — because the document behind it stays readable while it is open. */
+.settingsWrap { position: relative; display: flex; align-items: center; }
+.settingsButton { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+/* Anchored to the wrap rather than to the toolbar: the lane wears no inline padding (asserted), so
+   `right: 0` lines the panel up with the button's own right edge. */
+.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 252px; display: flex; flex-direction: column; padding: 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
+/* The entrance lives on its own class, applied only for an opening that should animate
+   (SettingsMenu decides). It must NOT be gated by `[data-motion=off]`: lifting such a gate
+   re-applies the animation, so turning 动效 on from inside this panel replayed its entrance. */
+.settingsPanelIn { animation: settingsIn 140ms ease-out; }
+.settingsRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px; border-radius: 8px; }
+.settingsRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.settingsCopy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.settingsLabel { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+.settingsNote { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+@keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

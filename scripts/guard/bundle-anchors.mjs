@@ -160,10 +160,11 @@ export function normaliseCss(css) {
     // between builds: `g2GnNq`, `zln1-a` (hyphen), `_2v6iGa` (leading underscore). Allowing
     // hyphen and underscore in the prefix is what keeps this independent of that.
     .replace(/\.([A-Za-z0-9_-]+)_([A-Za-z][A-Za-z0-9_]*)/g, '.$2')
-    .replace(
-      /([A-Za-z0-9_-]+)_(readerCollapse[A-Za-z]*|thinkShimmer|slideUp|pulse|popIn|markBusyPulse|previewFadeIn)/g,
-      '$2',
-    )
+    // Keyframe references — in `animation`/`animation-name` values and after `@keyframes` — carry
+    // the same generated prefix as class selectors. This used to name every keyframe by hand
+    // (`readerCollapse…|thinkShimmer|slideUp|…`), so adding a keyframe made the rebuild comparison
+    // report a difference that was only a hash. The prefix shape is the stable part, not the names.
+    .replace(/([A-Za-z0-9_-]+)_([A-Za-z][A-Za-z0-9_]*)(?=[\s,;}{!]|$)/g, '$2')
     .replace(/(\d*\.\d+)s\b/g, (_, seconds) => `${String(Math.round(Number.parseFloat(seconds) * 1000))}ms`)
     .replace(/\b(animation|transition):([^;}]+)/g, (_, property, value) =>
       `${property}:${value.trim().split(/\s+/).sort().join(' ')}`)

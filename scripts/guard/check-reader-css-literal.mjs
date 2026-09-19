@@ -40,6 +40,7 @@ const COLLAPSE = classSel(value, 'collapseControl');
 const WRAP = classSel(value, 'collapseWrap');
 const INTRO = keyframeOf(value, 'readerCollapseIn');
 const EXIT = keyframeOf(value, 'readerCollapseOut');
+const TAIL = keyframeOf(value, 'settingsIn');
 
 let bad = 0;
 const check = (label, pass) => {
@@ -58,10 +59,11 @@ check(
     && !value.includes('reader-toolbar-height'),
 );
 // The rule set ends where intended: the literal must not have been cut short, which is what a
-// stray raw quote inside it would do.
+// stray raw quote inside it would do. The anchor is the LAST rule the stylesheet declares, so
+// appending a rule moves it here — that is the price of this check being exact.
 check(
   'rule set ends where intended',
-  new RegExp(`@keyframes ${EXIT}\\{(?:from|0%)\\{opacity:1;transform:none\\}(?:to|100%)\\{opacity:0;transform:translateY\\(-6px\\)\\}\\}$`).test(value),
+  new RegExp(`@keyframes ${TAIL}\\{(?:from|0%)\\{opacity:0;transform:translateY\\(-4px\\)\\}(?:to|100%)\\{opacity:1;transform:none\\}\\}$`).test(value),
 );
 
 // A stray raw quote would have ended the literal early; balanced braces are a second signal.

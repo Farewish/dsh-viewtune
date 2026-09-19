@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased (settings)
+
+**新功能：工具栏右侧的「动效」开关变成一个设置入口——`viewtune ⚙`，点开是个小面板，动效开关搬进去了。**
+
+先说为什么不是「在工具栏上再加几个开关」：工具栏是一条**钉住的、几何被断言的**车道（`test-toolbar-geometry.mjs` 会核它上下留白是否对称、「收起」那颗胶囊的描边要不要和分隔线同款），而且是 `justify-content: space-between`——左边「收起」，右边原来那个「动效」。每加一个开关，都从「收起」身上拿走横向空间。所以偏好改成**面板里的一行**：以后加偏好就是加一行，车道宽度不变。
+
+面板是个 disclosure，不是模态：按钮带 `aria-expanded`/`aria-controls`，面板是 `role="group"`，DOM 顺序紧跟按钮（Tab 自然进得去），**Esc 关闭并把焦点还给按钮**，点面板外任意处也关闭——不做焦点陷阱，因为面板后面的正文仍然可读，读者往往只是想顺手关掉动效。
+
+动效那一行用产品自带的 `Switch`（受控 + 自带无障碍名）。开关显示的是**存下来的偏好**（`store.ts` 的 `motion`，持久化在 `dsh.reader.v1`）；是否真的生效还取决于系统设置，这一点没丢——偏好开着但系统要求减少动态效果时，行下面写「已按系统的『减少动态效果』关闭」（原来这条信息在按钮文字里，是「动效 · 跟随系统关闭」）。
+
+顺带一处耦合：「收起」消失后焦点原来回退到「动效」按钮，现在回退到设置按钮（`settingsRef`）；`check-collapse-control.mjs` 的焦点回退断言按标识符计数，照旧通过。`check-bundle-markers.mjs` 加了一条，防止这个面板被悄悄拆掉。
+
+**你上手之后发现的，都修了：**
+
+- **在面板里把动效打开时，面板会闪一下。** 入场动画原来挂在 `[data-motion=off] .settingsPanel { animation: none; }` 这条门上，而你在面板里打开动效，那扇门恰好抬起——`animation: settingsIn` 于是被**重新应用**，入场又播了一遍。现在「这一次开要不要动」在**打开那一刻**定下来（`SettingsMenu` 的 `reveal` 状态，动画只挂在 `.settingsPanelIn` 上），开关再也碰不到面板；偏好与系统设置照旧生效（`motion` 里已经折进了系统那一项）。守卫里加了条 `forbidden` 专门盯这个坑：面板的入场不得由状态属性开关。
+- **`viewtune` 的字大一点点**：12px → 13px，只加在 `.settingsButton` 上。没有碰 `.textButton`——「全部收起」的字体是它和工具栏递下去的，工具栏几何守卫依赖这一点。
+
+- **「收起 / 全部收起」也跟着刷新一下。** 你观察对了一半，而那一半正好解释了这个闪：这两颗按钮的**入场**（`readerCollapseIn`）一直就挂在 `[data-motion=off]` 上——所以你打开动效时那扇门抬起，停在屏幕上的按钮就把入场又播了一遍，跟面板那个是完全同一个病。而**退场**（`readerCollapseOut`）是当年**故意豁免**的，理由就在守卫里：退场才是真正把控件藏起来的那一半，若被覆盖，控件会靠一个 reduced-motion 也可能被丢掉的 transition 留在无障碍树里。
+
+  现在两半都归开关管，并且换掉了「移除动画」这种会重播的手法：门里改成**同名、零时长**的简写（`animation: readerCollapseIn 0s ease-out` / `readerCollapseOut 0s ease-in both`）——动画名没变，所以不重播；时长 0，所以立即结束；开关再也不碰已经画出来的像素。退场那半同时去掉 `transition: visibility 0s linear 140ms`：那个延迟的意义是「等退场演完再隐藏」，没有退场可等时它只会留下一个幽灵。系统级减少动态效果照旧经 `data-motion` 走同一条路，`@media (prefers-reduced-motion)` 那条保险仍然只压入场。
+
+  守卫 `test-collapse-fade.mjs` 的口径随之从「motion off 只压入场」改成「motion off 把两半都立即结束、且退场不留幽灵」。顺带一条经验：门里不能写光秃秃的 `animation-duration: 0s`——浏览器会把它合并进简写，但守卫是按属性名查声明的简化级联，它看不见，断言会误报。用同名简写，浏览器和守卫看到的是同一件事。
+
+改这次的 CSS 还顺带暴露了一条**守卫工具的缺陷**：`bundle-anchors.mjs` 的 `normaliseCss` 在文档里声称会剥掉「keyframe-name hashes」，实现却是一份**手写的关键帧名清单**（`readerCollapse…|thinkShimmer|slideUp|…`）。于是新加一个关键帧（这次的 `settingsIn`），`verify-build` 就把「两次构建的哈希前缀不同」报成「规则声明不同」——`shipped: [".settingsPanelIn"] vs rebuilt: []`，读起来像行为回归，其实只是哈希。现在按**形状**剥前缀（`<hash>_<local>`），与类名那条同源：文档说的本来就是这件事，只是实现没做到。
+
 ## Unreleased (tool presentation)
 
 **修复：`ask_user_question`（提问）和 `present`（交付文件）在流程里显示成 "Tool call"——不是设计如此，是移植漏了。**

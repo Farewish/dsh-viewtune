@@ -80,7 +80,7 @@ assert(
     && new RegExp(`transition:[^;}]*visibility\\s+0s[^;}]*[\\d.]+m?s`).test(bundleCss),
 );
 here('toolbar still carries its hook', '"data-ud-check": "reader-toolbar"', 'bundle');
-here('motion toggle intact', '"aria-pressed": motionPreference', 'bundle');
+here('settings panel wired to the motion preference', 'preference: motionPreference', 'bundle');
 
 console.log('\n--- compiler-shaped output (the swap artifact is gone)');
 gone('no doubled @__PURE__ marker', '/* @__PURE__ */ \t\t\t\t\t\t\t\t/* @__PURE__ */', 'bundle');

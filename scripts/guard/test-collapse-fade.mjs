@@ -177,8 +177,8 @@ function check(name, pass, detail) {
 
 const pad = (value) => String(value ?? '—').padEnd(34);
 
-// The motion switch lives on an ancestor, so the states are evaluated with it ON: with
-// motion off the intro is deliberately suppressed, and that is a separate assertion below.
+// The motion switch lives on an ancestor, so the states are evaluated with it ON; its own contract
+// (both halves ended, not removed) is asserted separately below.
 const ancestor = { 'data-motion': 'on' };
 
 // --- the idle state: it has to end up hidden, but not before the animation is over
@@ -256,10 +256,29 @@ check(
   rootMotion() !== undefined && rootMotion() !== false,
   `data-motion ${JSON.stringify(rootMotion())}`,
 );
-// With motion off the intro is intentionally suppressed (the exit still plays, since it is
-// the only thing that hides the control).
+// The motion preference governs both halves, and it does so with a zero duration rather than
+// `animation: none`: removing an animation and putting it back REPLAYS it, which is what made
+// turning the setting on replay the entrance of a control that was already on screen.
 const mutedOpenAnim = computed('animation', open, { 'data-motion': 'off' });
-check('motion off suppresses only the intro', mutedOpenAnim === 'none', `animation ${mutedOpenAnim}`);
+check(
+  'motion off ends the intro instead of removing it',
+  mutedOpenAnim !== undefined && mutedOpenAnim !== 'none' && durationMs(mutedOpenAnim) === 0,
+  `animation ${mutedOpenAnim}`,
+);
+const mutedIdleAnim = computed('animation', idle, { 'data-motion': 'off' });
+check(
+  'motion off ends the exit too',
+  mutedIdleAnim !== undefined && durationMs(mutedIdleAnim) === 0,
+  `animation ${mutedIdleAnim}`,
+);
+// A zero-duration exit has nothing to wait for, so the delay that keeps the control painted until
+// the animation finishes would only leave a ghost behind.
+const mutedIdleTransition = computed('transition', idle, { 'data-motion': 'off' }) ?? '';
+check(
+  'and an instant exit waits for nothing',
+  !mutedIdleTransition.includes('visibility'),
+  `transition ${mutedIdleTransition}`,
+);
 
 // A reduced-motion user must still get a working exit. The media query is expected to
 // suppress only the INTRO; the exit is what actually hides the control, so no media query

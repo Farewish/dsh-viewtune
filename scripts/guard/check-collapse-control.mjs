@@ -61,7 +61,10 @@ want('toolbar wrap hook', '"data-ud-check": "collapse-wrap"', 1);
 want('control label', '"收起 "', 1);
 want('chevron', 'children: "˄"', 1);
 want('tooltip names the scope', '收起当前这一轮的过程', 1);
-want('motion toggle kept', '"aria-pressed": motionPreference', 1);
+// The motion preference moved into the settings panel: what has to hold now is that it still
+// reaches that panel and that the panel still writes the stored value.
+want('motion preference reaches the settings panel', 'preference: motionPreference', 1);
+want('the panel still writes the stored preference', 'onChange: props.actions.setMotion', 1);
 // B2: a keyboard path for both actions, and a focus handoff so collapsing never drops the reader to
 // <body> when the button that was just used goes away.
 want('alt+c shortcut', 'event.code !== "KeyC"', 1);
