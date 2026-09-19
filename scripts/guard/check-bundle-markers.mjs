@@ -56,16 +56,29 @@ const markers = [
   ['short-thinking-heading-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
   ['short-thinking-text-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
   // The wheel implementation is verified behaviourally by test-wheel-handler.mjs (it extracts
-  // the compiled handler and runs 17 cases); these markers only assert it is still there, so
+  // the compiled handler and runs 23 cases); these markers only assert it is still there, so
   // they match the expressions rather than the minifier's choice of local name and spacing.
   ['wheel-native-scroll', () => /Math\.min\(maxOffset[^;]*scrollTop \+ delta/.test(bundle)],
-  ['wheel-edge-handoff', 'const remainder = delta - consumed;'],
+  // Handoff is gated on the card already sitting on the edge this gesture pushes against. The
+  // minifier inlines the local and negates the test, so assert the two identifiers of that
+  // comparison on one line rather than any particular spelling of the expression.
+  ['wheel-edge-handoff', () => /maxOffset/.test(bundle) && /Math\.min\(maxOffset[\s\S]{0,80}?=== port\.scrollTop/.test(bundle)],
+  // The wheel path must not write the card's position: doing so replaces a composited subpixel
+  // scroll with an integer jump, which is the stutter the rework removed. `manual()` may still
+  // write once when it converts transform-following back to a native scrollable viewport, so
+  // this asserts the write is absent from the handler itself rather than from the whole bundle.
+  ['wheel-never-writes-the-card', () => {
+    const start = bundle.indexOf('const onWheel = (event) => {');
+    if (start === -1) return false;
+    const end = bundle.indexOf('const onSelection', start);
+    const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
+    return !/port\.scrollTop \+=/.test(handler) && !/port\.scrollTop =/.test(handler)
+      && /host\.scrollBy\(0, delta\)/.test(handler);
+  }],
   ['wheel-gesture-guard', 'if (Date.now() < wheelUntil) return;'],
-  // The published artifact listed `overflow` here and the source never did. The rebuild drops
-  // it, so this asserts the two declared inputs — the marker cannot tell "the artifact fixed a
-  // stale closure" from "the artifact listed a dependency nothing reads", and the effect's body
-  // was checked: it contains no reference to `overflow` outside comments.
-  ['wheel-deps', () => /\[[^\]]*\ballowed\b[^\]]*\bpause\b[^\]]*\]/.test(bundle)],
+  // `overflow` decides whether this card can scroll at all, so the handler reads it; a stale
+  // closure here means the card never hands off after it grows past its preview height.
+  ['wheel-effect-tracks-overflow', () => /\[[^\]]*\ballowed\b[^\]]*\bpause\b[^\]]*\boverflow\b[^\]]*\]/.test(bundle)],
   ['all user/steering nodes collected', 'group.keys.filter((key) => {\n\t\t\t\tconst kind = snapshot.nodes.get(key)?.kind;'],
   ['every user message rendered in the leading slot', 'turnUserKeys.map((userKey) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BlockBoundary, {'],
   ['user nodes excluded from the flow', 'const mainKeys = group.keys.filter((key) => !turnUserKeys.includes(key));'],

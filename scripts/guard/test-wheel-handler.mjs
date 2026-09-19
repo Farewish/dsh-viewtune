@@ -151,24 +151,43 @@ const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
   check('short card: card stays put', result.cardMoved === 0, `moved ${String(result.cardMoved)}`);
 }
 
-// 4b. A notch that would overshoot hands off in the same event, absorbing what is left.
+// 4b. A notch that would overshoot is left to the browser: the card glides the last few pixels
+// itself and the conversation waits for the next notch. The old design clamped the card to its
+// edge and forwarded the remainder in the same event — but clamping means writing the card's
+// scroll position, which replaces a composited subpixel scroll with an integer jump. That trade
+// is the stutter this design exists to remove, so the handoff is all-or-nothing instead.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 - 5 });
   const result = wheel({ port, talk, deltaY: 120 });
-  check('near the bottom: the overshooting notch hands off at once', result.talkMoved === 115,
+  check('near the bottom: the card scrolls the last pixels natively', result.cardMoved === 5,
+    `card moved ${String(result.cardMoved)}`);
+  check('near the bottom: the conversation waits for the next notch', result.talkMoved === 0,
     `talk moved ${String(result.talkMoved)}`);
-  check('near the bottom: the card lands exactly on the edge', port.scrollTop === 1200 - 224,
-    `card at ${String(port.scrollTop)}`);
+  check('near the bottom: nothing is prevented', result.prevented === false, `prevented ${String(result.prevented)}`);
 }
 
-// 4c. A sub-pixel gap is absorbed the same way, without stalling.
+// 4c. Once the card really is on the edge, the whole notch goes over and the card is not written
+// again — the sub-pixel gap is left alone rather than closed by a scripted write.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 - 0.5 });
   const result = wheel({ port, talk, deltaY: 120 });
-  check('sub-pixel gap: the notch hands off at once', result.talkMoved === 119.5,
+  check('sub-pixel gap: the browser closes the gap natively', result.cardMoved === 0.5,
+    `card moved ${String(result.cardMoved)}`);
+  check('sub-pixel gap: the card is not written', port.writes === 1, `${String(port.writes)} writes (one native)`);
+  check('sub-pixel gap: the conversation waits', result.talkMoved === 0, `talk moved ${String(result.talkMoved)}`);
+}
+
+// 4d. Already on the edge: that is the notch the conversation takes.
+{
+  const talk = makeConversation();
+  const port = makePort({ ...longCard, scrollTop: 1200 - 224 });
+  const result = wheel({ port, talk, deltaY: 120 });
+  check('on the edge: the conversation takes the whole notch', result.talkMoved === 120,
     `talk moved ${String(result.talkMoved)}`);
+  check('on the edge: the card does not move', result.cardMoved === 0, `card moved ${String(result.cardMoved)}`);
+  check('on the edge: the card is not written', port.writes === 0, `${String(port.writes)} writes`);
 }
 
 // 5. Upward from the top edge.

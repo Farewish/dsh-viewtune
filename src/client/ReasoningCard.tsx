@@ -177,23 +177,26 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(text).lineHeight) || 24
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? port.clientHeight : 1;
       const delta = event.deltaY * unit;
+      // The card's own scrolling is the browser's, and only the browser's. Writing scrollTop
+      // here — even merely to "put it back" at the edge — replaces a composited, subpixel scroll
+      // with an integer jump the moment the gesture hands off, which is what made this step
+      // instead of glide. So this handler never writes the card's position.
+      if (!overflow) return;
       const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
       const projected = Math.min(maxOffset, Math.max(0, port.scrollTop + delta));
-      const consumed = projected - port.scrollTop;
-      const remainder = delta - consumed;
-      if (Math.abs(remainder) < .5 || !event.cancelable) return;
-      // The notch runs past the edge the gesture pushes against, so consume the
-      // whole event: rewind the card to the edge (the browser would have scrolled
-      // it natively otherwise) and hand the remainder to the conversation
-      // scroller. The card must never carry that marker itself, or the reader's
-      // scroll hooks adopt the viewport as the reading container and its height
-      // accounting breaks.
+      // Hand off only when the card already sits on the edge this gesture pushes against: the
+      // browser has nothing left to give there, so the conversation should take the notch.
+      // Mid-transcript this is false and the browser scrolls the card natively, untouched.
+      const atEdge = projected === port.scrollTop;
+      if (!atEdge || !event.cancelable) return;
+      // The conversation scroller is the nearest marked ancestor. The card must never carry that
+      // marker itself, or the reader's scroll hooks adopt the card as the reading container and
+      // its height accounting breaks.
       let host = port.parentElement;
       while (host && !host.hasAttribute('data-conversation-scroll')) host = host.parentElement;
       if (!host) return;
       event.preventDefault();
-      if (Math.abs(consumed) >= .5) port.scrollTop += consumed;
-      host.scrollBy(0, remainder);
+      host.scrollBy(0, delta);
     };
     const onSelection = () => { if (hasSelection()) pause(); };
     const onVisibility = () => {
@@ -223,7 +226,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       document.removeEventListener('visibilitychange', onVisibility);
       stopFollow.current = () => {};
     };
-  }, [allowed, pause]);
+  }, [allowed, pause, overflow]);
 
   useLayoutEffect(() => {
     const port = viewport.current;
