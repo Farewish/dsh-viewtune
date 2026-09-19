@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased (configurable shortcuts)
+## 0.3.0-relayout.14
+
+本次发布的条目按主题倒序列在下面。旧主题的标题只降了一级、去掉了 `Unreleased` 字样，正文一个字
+没动——记录用的措辞与当时的讨论保持原样。
+
+### configurable shortcuts
 
 **新功能：设置面板的「快捷键」页不再是占位——本插件自己的两个快捷键可以改了。**
 
@@ -17,7 +22,7 @@
 
 面板为此加宽到 280px（两行「动作名 + 键帽 + 清除」在 252px 里太挤）。守卫换了口径：`check-collapse-control.mjs` 原先断言的是写死的 `event.code !== "KeyC"` 与 `"aria-keyshortcuts": "Alt+C"` **字面量**，现在断言的是**接线**——处理器用配置值匹配、属性与 tooltip 跟随绑定、默认值只有一处表；另加一条标记盯住这一页。
 
-## Unreleased (settings)
+### settings
 
 **新功能：工具栏右侧的「动效」开关变成一个设置入口——`viewtune ⚙`，点开是个小面板，动效开关搬进去了。**
 
@@ -48,7 +53,7 @@
 
 **页签的蓝线会滑过去。** 改成一根**共享的滑杆**——挂在页签行自己的 `::after` 上，切页时用 `transform` 从「视效」平移到「快捷键」（180ms `cubic-bezier(.22,1,.36,1)`），文字颜色同时用 160ms 过渡，切换读起来是一个动作。原来每个页签各有一条 `::after`，那种结构只能「出现/消失」，滑不起来。两页签是 `flex: 1` 等宽的，所以几何不用测量：滑杆宽度正好是一个页签，第二站的 `+2px` 就是行自己的间距。两半都归动效开关管——`[data-motion=off]` 下 `transition: none`，直接跳过去。这一次**不需要**额外的 `prefers-reduced-motion` 媒体查询：系统那项已经折进 `data-motion`，而且 `transition` 不像 `animation` 那样会在门抬起时重播（上一节那个闪的教训只适用于 animation）。
 
-## Unreleased (tool presentation)
+### tool presentation
 
 **修复：`ask_user_question`（提问）和 `present`（交付文件）在流程里显示成 "Tool call"——不是设计如此，是移植漏了。**
 
@@ -71,7 +76,7 @@
 
 还没做的是**更彻底的那条**：让本仓库成为 `tool.call.toolview` 的 owner（`children: { 'tool.call.toolview': { kind: 'keyed', scope: 'session' } }`，就是 `ui-tool` 的写法），产品以后新增的卡片便自动就有、不必再维护镜像表。代价是新增对产品槽位契约（`ToolCallOwnerProps`）的依赖，而且那些卡是聊天 UI 的样式。
 
-## Unreleased (disclosure animation)
+### disclosure animation
 
 **修复：展开和收起的动画，终点都比 DOM 实际停下来的位置早一步——所以两处都在动画结束时"啪"地跳一下。**
 
@@ -94,7 +99,7 @@
 
 两处改动都在 `ProcessFragment` 一个函数里（展开：终点跟随内容；收起：终点含该帧带走的 gap）。
 
-## Unreleased
+### 滚轮完全交给浏览器
 
 **改动：跨过底边的那一格不再由我拆——剩下的余量直接不要了。** 这是你提的方案，我照做，并把理由记在这里。
 
@@ -125,7 +130,7 @@ const onWheel = (event: WheelEvent) => {
 
 **守卫随之换了口径，而且是更强的口径。** 之前几条 marker 都在描述"怎么拆那一格"（投影、越界交棒、恰好写一次、边缘不得拦截）——每一次拆法都变成了台阶。现在只剩一条：**`wheel-leaves-scrolling-to-the-browser`** —— 处理器区域里不得出现 `preventDefault`、`scrollBy`、以及对 `scrollTop` 的任何写入。`test-wheel-handler.mjs` 全部重写为对**每一种格子形状**断言"处理器没消费事件、没写卡片、没写会话、也没伸手要手势之外的东西"，并把浏览器的默认行为照实测建模（闩住时丢余量、完全不能滚时整格上链、line 模式按行高换算）。第 10 组是**自证能失败**：把"越界就拆"的旧形状塞进同一套检查，它必须被判红。`test-follow-rules.mjs` 里那 27 条拆分用例删掉了，原处留了一段说明为什么它们不该再存在。
 
-## Unreleased (edge pass-through — superseded, kept as a record)
+### edge pass-through — superseded, kept as a record
 
 > **更正：这一条只解决了一半。** 它正确地取消了"卡片已在底边时仍拦截"（那让指针停在卡片上的每一格都变成硬跳），但**保留了"跨过底边那一格由我拆"**——而 `host.scrollBy(0, 余量)` 同样是程序化写入，同样是一个台阶。上一节把这一半也去掉了：**余量丢掉，换全程原生**。
 
@@ -161,7 +166,7 @@ host.scrollBy(0, remainder);
 
 `test-wheel-handler.mjs` 现在把浏览器的默认行为**照实建模**（闩住时丢余量、完全不能滚时整格上链、line 模式按行高换算），并新增两条**在旧产物上必然失败**的断言：边缘那一格不得被消费、连续三格都不得被消费（反向验证：同一份测试跑旧产物 → 2 条 BAD）。守卫侧加 `wheel-lets-the-browser-chain-at-the-edge`：`consumed === 0` 的返回必须出现在 `event.preventDefault()` **之前**。
 
-## Unreleased (projection handoff — superseded, kept as a record)
+### projection handoff — superseded, kept as a record
 
 > **更正：这一条把"改了写法"当成了"改了行为"。** 下面的 `Math.abs(consumed - delta) < ε` 与它声称要取代的 `Math.abs(remainder) < ε` 恒等，实际行为一字未变；文中引用的浏览器读数也来自一个没在测量目标代码的探针。仍然成立的部分：交棒判据应当**投影这一格**而不是问"现在在不在边缘"，以及"交棒那一次必须写卡片位置、且只能写一次"。而真正缺的那部分——**已经在边缘时不得拦截，越界那一格也不再拆**——由上面两条补上，最后这一格干脆整个交给浏览器。
 
@@ -183,11 +188,11 @@ host.scrollBy(0, remainder);                               // 越过的那部分
 
 **这里必须更正我上一条的说法**：我曾断言"手势路径不得写卡片位置"。那是对的，但不够——**交棒那一次必须写**（`preventDefault` 之后浏览器不会再滚卡片，只有这一写能让它精确落在边缘）。真正会毁掉平滑度的是**每一格都写**；每手势一次不是。守卫因此从"禁止写入"改为**"处理器内恰好一次写入，且用的是 `consumed`"**。
 
-## Unreleased (edge slack — superseded, kept as a record)
+### edge slack — superseded, kept as a record
 
 **~~修复：交棒判定没有余量~~**（方向错误，见上一条）。我用的判据是精确相等，而 `port.scrollTop` 是小数，于是加了 1px 余量。**余量不是问题所在**：无论余量多少，"当前是否已经在边缘"这个提问方式都会让越界的那一格被卡片吃掉。这段改动已由上面的投影判定取代。
 
-## Unreleased (auto-follow takeover)
+### auto-follow takeover
 
 > **与上面第一条的关系**：这一条是**同一个症状**（长思考滚到底后页面"跳格"）的另一套解释。用户后来的描述——"并非自动跟随，我说的一直是已经完成的轮次"——说明症状与自动跟随无关；可以在真实浏览器里复现的成因是"卡片已在底边时仍被拦截"（见文首）。本条的改动（任何方向的滚轮都解除跟随）**保留**：读者一碰滚轮就算接管，这本身就是对的；但它不是这个症状的解药。
 
@@ -207,7 +212,7 @@ if (event.deltaY < 0) { following.current = false; setDetached(true); capture();
 
 **这次改成可单测的行为**：把两个判断抽成纯函数 `isNearTail` / `wheelClaimsScroll`，新增 `test-follow-rules.mjs`（10 条，含一条"能识别只允许向上滚动的坏实现"，避免提取错了还全绿）。这类"方向判断写反"的回归，字符串断言表达不出来。
 
-## Unreleased (native scroll)
+### native scroll
 
 **修复：手动滚轮时卡片不再"跳格"，因为它不再被脚本写位置。** 上一条把"卡"当成了性能问题，方向错了——你描述的是**没有平滑滚动、位置瞬间跳过去**，而不是掉帧。原因就在滚轮处理器自己身上：
 
@@ -225,7 +230,7 @@ if (Math.abs(consumed) >= .5) port.scrollTop += consumed;   // ← 就是它
 
 守卫相应更新：`test-wheel-handler` 从 17 条扩到 **23 条**，新增"处理器从不写卡片""卡在边缘时交棒整个 notch""浏览器原生滚掉最后几像素时页面不动"；`check-bundle-markers` 的滚轮标记改为按语义断言（旧标记找的是已删除的 `remainder` 表达式），并新增两条：**手势路径不得写卡片位置**、**effect 依赖必须包含 `overflow`**。
 
-## Unreleased (scroll spy)
+### scroll spy
 
 **修复：手动滚轮从思考区交接给页面时卡顿。** 原因是阅读视图里有**两个滚动监听器在做同一件测量**：老的"活跃轮次"滚动侦测，与 relayout.13 之前新增的"当前轮"侦测（`收起` 的作用域要用它）。两者各自 `querySelectorAll('[data-reader-turn]')`，再对**每一个**轮次元素读一次 `getBoundingClientRect()` —— 而每次 rect 读取都会强制布局刷新。交接那一刻卡片会写 `scrollTop`、页面会 `scrollBy`，布局随即失效，于是一个滚轮事件要触发**两遍、每遍几十次**强制重排；只要指针还停在思考区上，每个滚轮事件都会继续走这条路，所以表现成"从交接那刻起一直卡，鼠标移开就好"。
 
@@ -233,7 +238,7 @@ if (Math.abs(consumed) >= .5) port.scrollTop += consumed;   // ← 就是它
 
 `currentTurnOf` 仍然是一个具名函数（`test-current-turn.mjs` 靠它单独验证"横跨两轮取上面那个"这条规则），只是多了一个可选的 `rows` 参数，好让滚动回调复用已查到的元素。`check-collapse-control` 里 6 条与旧写法耦合的断言改为断言不变式，并**新增 4 条断言把这次的回归钉住**：滚动监听器只能有一个、不得再有第二个遍历轮次的侦测、一次查询供两处使用。
 
-## Unreleased (previous)
+### previous
 
 **从源码构建回来了。** 上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器取
 `externalClientBundle`，所以克隆出来的仓库构建不了；本仓库把它的真身——官方预设

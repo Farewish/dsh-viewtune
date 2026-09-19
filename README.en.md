@@ -38,7 +38,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # or from a local checkout / tarball
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.13.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.14.tgz
 ```
 
 Then **restart the Host** and reload the page: `dsh plugin add` only writes the profile, it does not hot-load a running process.
