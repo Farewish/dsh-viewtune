@@ -23,7 +23,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import {
-  closeSync, cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync,
+  closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync,
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -44,10 +44,12 @@ function gitLines(args) {
   return readFileSync(out, 'utf8').split('\n').filter((line) => line !== '');
 }
 
-// This guard rebuilds from a *checkout*: it enumerates tracked files so the scratch copy is the
-// source of truth rather than whatever happens to sit next to `lib/`. An installed package has no
-// git history, so the guard is not applicable there — say that plainly instead of failing with
-// "git ls-files failed (128)", which reads like a broken invariant.
+// This guard rebuilds from a *checkout with its dependencies installed*: it enumerates tracked files
+// so the scratch copy is the source of truth rather than whatever happens to sit next to `lib/`, and
+// it needs tsdown to run. Two places legitimately lack one of those — an installed package has no git
+// history, and a `link:`-installed plugin directory (the profile's own `node_modules` is where its
+// dependencies live, not beside the sources). Say which, instead of failing with "git ls-files failed
+// (128)" or an ENOENT on a junction that has no target: both read like broken invariants.
 const insideWorkTree = spawnSync('git', ['-C', ROOT, 'rev-parse', '--is-inside-work-tree'], {
   stdio: 'ignore',
 });
@@ -55,6 +57,14 @@ if (insideWorkTree.status !== 0) {
   console.log(
     `SKIP — ${ROOT} is not a git checkout, so there is nothing to rebuild from.\n`
     + 'This guard verifies that a build reproduces the committed artifact; run it in a clone.',
+  );
+  process.exit(0);
+}
+if (!existsSync(join(ROOT, 'node_modules', 'tsdown', 'dist', 'run.mjs'))) {
+  console.log(
+    `SKIP — ${ROOT} has no installed dependencies, so it cannot rebuild anything.\n`
+    + 'A plugin installed by `link:` uses the profile\'s node_modules; this guard needs a checkout\n'
+    + 'where `npm install` has run. The other guards here still assert the served artifact.',
   );
   process.exit(0);
 }
