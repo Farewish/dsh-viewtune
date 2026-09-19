@@ -38,15 +38,26 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const bundlePath = process.argv[2] ?? join(ROOT, 'lib/client.js');
 const bundle = readFileSync(bundlePath, 'utf8');
 
-/** The scroll listener plus the wheel section, so both are in scope. */
+/**
+ * The scroll listener plus the wheel section, so both are in scope.
+ *
+ * TWO components declare `const onWheel = (event) => {` in this bundle — the reasoning card and the
+ * reader's scroll follower in motion.tsx — and their emission order belongs to the bundler. The
+ * card's is claimed by its shape: preceded by its own `const onScroll` and closed by
+ * `const onSelection`, which is what the effect it lives in looks like. Claiming "the first
+ * occurrence" would break the day the bundler emits motion.tsx first.
+ */
 function extractWheelSection() {
-  const handlerStart = bundle.indexOf('const onWheel = (event) => {');
-  if (handlerStart === -1) throw new Error('compiled onWheel not found');
-  const scrollStart = bundle.lastIndexOf('const onScroll = () => {', handlerStart);
-  const start = scrollStart === -1 ? handlerStart : scrollStart;
-  const end = bundle.indexOf('\n\t\t\t\tconst onSelection = () =>', handlerStart);
-  if (end === -1) throw new Error('the listener after onWheel was not found');
-  return bundle.slice(start, end).replace(/^\t{4}/gmu, '');
+  const needle = 'const onWheel = (event) => {';
+  const MAX_SECTION = 4000;
+  for (let at = bundle.indexOf(needle); at !== -1; at = bundle.indexOf(needle, at + 1)) {
+    const end = bundle.indexOf('\n\t\t\t\tconst onSelection = () =>', at);
+    const scrollStart = bundle.lastIndexOf('const onScroll = () => {', at);
+    const closable = end !== -1 && end - at < MAX_SECTION;
+    const openable = scrollStart !== -1 && at - scrollStart < MAX_SECTION;
+    if (closable && openable) return bundle.slice(scrollStart, end).replace(/^\t{4}/gmu, '');
+  }
+  throw new Error('the reasoning card wheel section was not found in the bundle');
 }
 
 let clock = 1_000_000;
@@ -159,13 +170,18 @@ const longCard = { clientHeight: 224, scrollHeight: 1200 };
 const tests = [];
 const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
 
-/** Every shape of notch, run through the same "the handler touched nothing" assertions. */
+/**
+ * The shapes of the SHIPPED handler. A closed set: only `record()` calls for the real handler go in
+ * here. A deliberately broken handler is measured into its own list (see the control at the end), so
+ * that neither the order of these sections nor a later addition can put a bad handler into the set
+ * the assertions below call "passing".
+ */
 const shapes = [];
-const record = (label, setup, deltaY, deltaMode = 0, handler = 'onWheel') => {
+const record = (label, setup, deltaY, deltaMode = 0, handler = 'onWheel', into = shapes) => {
   const talk = makeConversation();
   const port = makePort({ ...longCard, ...setup });
   const result = wheel({ port, talk, deltaY, deltaMode, handler });
-  shapes.push({ label, result });
+  into.push({ label, result });
   return result;
 };
 
@@ -233,14 +249,23 @@ const record = (label, setup, deltaY, deltaMode = 0, handler = 'onWheel') => {
 // The invariant that covers all of the above at once, and the one every previous attempt broke:
 // this handler is not a scroll handler. It must not consume a notch and must not write any scroll
 // position, whatever shape the notch has.
+//
+// Written as a predicate over a list it is HANDED, so the same yardstick can measure the broken
+// shape at the end without that shape ever joining the set the named checks below describe.
+const leavesScrollingAlone = (list) => list.every(({ result }) => !result.prevented
+  && result.handlerCardWrites === 0 && result.handlerTalkWrites === 0 && result.threw === '');
+const detail = (list, of) => list.map(({ label, result }) => `${label} ${of(result)}`).join(', ');
+
 check('no shape is consumed by the handler', shapes.every(({ result }) => !result.prevented),
-  `prevented ${shapes.map(({ label, result }) => `${label}=${String(result.prevented)}`).join(' ')}`);
+  detail(shapes, (r) => String(r.prevented)));
 check('no shape writes the card', shapes.every(({ result }) => result.handlerCardWrites === 0),
-  `writes ${shapes.map(({ label, result }) => `${label}=${String(result.handlerCardWrites)}`).join(' ')}`);
+  detail(shapes, (r) => String(r.handlerCardWrites)));
 check('no shape writes the conversation', shapes.every(({ result }) => result.handlerTalkWrites === 0),
-  `writes ${shapes.map(({ label, result }) => `${label}=${String(result.handlerTalkWrites)}`).join(' ')}`);
+  detail(shapes, (r) => String(r.handlerTalkWrites)));
 check('the handler needs nothing but the gesture', shapes.every(({ result }) => result.threw === ''),
-  `threw ${shapes.filter(({ result }) => result.threw !== '').map(({ label, result }) => `${label}: ${result.threw}`).join(' | ')}`);
+  detail(shapes, (r) => r.threw));
+check('every shipped shape leaves the scrolling alone', leavesScrollingAlone(shapes),
+  detail(shapes, (r) => `prevented=${String(r.prevented)} writes=${String(r.handlerCardWrites)}/${String(r.handlerTalkWrites)} threw=${r.threw}`));
 
 // 8. What the handler IS for: releasing auto-follow, and marking the gesture so the scroll events it
 // causes stay out of React state. Without the first, a streaming card re-arms its follow animation
@@ -289,16 +314,19 @@ check('the handler needs nothing but the gesture', shapes.every(({ result }) => 
       host.scrollBy(0, remainder);
     };
   `, context);
-  const broken = [
-    record('broken mid-card', { scrollTop: 100 }, 120, 0, 'onWheelIntercepting'),
-    record('broken last notch', { scrollTop: 1200 - 224 - 5 }, 120, 0, 'onWheelIntercepting'),
-  ];
-  check('the checks can see an intercepting handler', broken.some((r) => r.prevented),
-    `prevented ${broken.map((r) => String(r.prevented)).join(' ')}`);
-  check('the checks can see a handler that writes the card', broken.some((r) => r.handlerCardWrites > 0),
-    `card writes ${broken.map((r) => String(r.handlerCardWrites)).join(' ')}`);
-  check('the checks can see a handler that writes the conversation', broken.some((r) => r.handlerTalkWrites > 0),
-    `talk writes ${broken.map((r) => String(r.handlerTalkWrites)).join(' ')}`);
+  // Its own list, and the same predicate the shipped shapes were judged by — so this control cannot
+  // contaminate that judgement no matter where these sections end up.
+  const broken = [];
+  record('broken mid-card', { scrollTop: 100 }, 120, 0, 'onWheelIntercepting', broken);
+  record('broken last notch', { scrollTop: 1200 - 224 - 5 }, 120, 0, 'onWheelIntercepting', broken);
+  check('the checks can see an intercepting handler', broken.some(({ result }) => result.prevented),
+    detail(broken, (r) => String(r.prevented)));
+  check('the checks can see a handler that writes the card', broken.some(({ result }) => result.handlerCardWrites > 0),
+    detail(broken, (r) => String(r.handlerCardWrites)));
+  check('the checks can see a handler that writes the conversation', broken.some(({ result }) => result.handlerTalkWrites > 0),
+    detail(broken, (r) => String(r.handlerTalkWrites)));
+  check('the broken shape fails the shipped yardstick', !leavesScrollingAlone(broken),
+    detail(broken, (r) => `prevented=${String(r.prevented)} writes=${String(r.handlerCardWrites)}/${String(r.handlerTalkWrites)}`));
 }
 
 let ok = true;

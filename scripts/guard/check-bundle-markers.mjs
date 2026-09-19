@@ -26,14 +26,27 @@ const bundle = readFileSync(join(installedPluginDir(), 'lib', 'client.js'), 'utf
 /**
  * The compiled reasoning-card wheel handler: the region every wheel invariant below lives in.
  *
- * Extracted once by its real boundaries rather than per marker, because a marker that sliced the
- * wrong region would happily assert against a string that is not the handler at all.
+ * TWO components declare `const onWheel = (event) => {` in this bundle — the reasoning card and the
+ * reader's scroll follower in motion.tsx — and which the bundler emits first is its business, not
+ * this guard's: measured today at 1063990 (card, 147 chars) and 1084073 (follower). So the handler
+ * is claimed by its END rather than by its position: the card's is the occurrence the card's effect
+ * closes with `const onSelection`, while the follower's runs on into more scroll code.
+ *
+ * If no occurrence has that terminator this returns '' and every wheel marker fails loudly, which
+ * is the point: a marker that silently asserted against a truncated slice of the WRONG function
+ * would be worse than no marker. (Checked: the follower's slice does contain a scrollTop write, so
+ * a mis-claim fails rather than passes — but that is luck, not design.)
  */
 const wheelHandler = (() => {
-  const start = bundle.indexOf('const onWheel = (event) => {');
-  if (start === -1) return '';
-  const end = bundle.indexOf('const onSelection', start);
-  return bundle.slice(start, end === -1 ? start + 2000 : end);
+  const needle = 'const onWheel = (event) => {';
+  // A handler is a handful of statements; a terminator thousands of characters away belongs to
+  // something else in the file.
+  const MAX_HANDLER = 4000;
+  for (let at = bundle.indexOf(needle); at !== -1; at = bundle.indexOf(needle, at + 1)) {
+    const end = bundle.indexOf('const onSelection', at);
+    if (end !== -1 && end - at < MAX_HANDLER) return bundle.slice(at, end);
+  }
+  return '';
 })();
 
 // The Host derives the client row id from the installed manifest's package name,
