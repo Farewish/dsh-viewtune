@@ -5,6 +5,36 @@ import { StreamMotionContext } from './streaming.js';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
 
+/** How close to the tail counts as "the reader is at the bottom". */
+export const FOLLOW_TAIL_PX = 72;
+/** A wheel has to move something to count as the reader taking over. */
+export const WHEEL_EPSILON_PX = 0;
+
+/**
+ * Is the viewport close enough to the tail to keep auto-following?
+ *
+ * Pure and exported so this rule can be tested directly: it is what decides whether the reader
+ * keeps following the stream or is left where they scrolled to.
+ */
+export function isNearTail(scrollTop: number, scrollHeight: number, clientHeight: number, tailPx = FOLLOW_TAIL_PX): boolean {
+  return scrollHeight - scrollTop - clientHeight < tailPx;
+}
+
+/**
+ * Does this wheel take scroll control away from auto-follow?
+ *
+ * ANY direction, not just upward. The listener sits on the conversation scroller, so it also
+ * sees wheels that bubbled out of the reasoning card — and while the card is being scrolled it
+ * handles the wheel natively and lets the event through. Treating only upward wheels as
+ * "the reader took over" left `following` true during a downward gesture; the card keeps
+ * growing as the model streams, every growth re-armed the follow animation, and that animation
+ * wrote scrollTop back toward the bottom each frame. The reader's own scroll fought the wheel
+ * and the page stepped instead of gliding until the pointer left the card.
+ */
+export function wheelClaimsScroll(deltaY: number, epsilon = WHEEL_EPSILON_PX): boolean {
+  return Math.abs(deltaY) > epsilon;
+}
+
 export function useMotionAllowed(enabled: boolean): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(() => {
@@ -217,7 +247,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
       if (followFrame !== 0) return;
       // Our easing frames must not be mistaken for a user leaving the bottom.
       if (lastWrittenTop !== null && Math.abs(scroll.scrollTop - lastWrittenTop) < 1) return;
-      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 72;
+      const atBottom = isNearTail(scroll.scrollTop, scroll.scrollHeight, scroll.clientHeight);
       following.current = atBottom;
       setDetached(!atBottom);
       if (!atBottom) { cancelAnimationFrame(followFrame); followFrame = 0; }
@@ -225,7 +255,9 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     };
     const onWheel = (event: WheelEvent) => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
-      if (event.deltaY < 0) { following.current = false; setDetached(true); capture(); }
+      // Any wheel takes over, not only an upward one — see wheelClaimsScroll for why that
+      // distinction is the difference between gliding and stepping on a long transcript.
+      if (wheelClaimsScroll(event.deltaY)) { following.current = false; setDetached(true); capture(); }
     };
     const onTouch = () => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
