@@ -118,6 +118,12 @@ const markers = [
   ['collapse exit waits for the animation to finish', () => /transition:[^;}]*visibility\s+0s[^;}]*[\d.]+m?s/.test(readerCss)],
   // The toolbar is the one lane that pins, so both switches stay reachable.
   ['toolbar pins to the top', () => cssDecls(sel('toolbar'), ['position:sticky', 'top:0', 'z-index:9'])],
+  // Two calls the product renders with its own keyed cards are rendered here instead of collapsing
+  // into a generic row: a question set (what was asked, what was answered) and a delivery (which
+  // files were handed over). Asserted by the data attribute they render with, matched with either
+  // spelling of a valueless JSX attribute so a restyle of that markup is not a false failure.
+  ['question set renders its own card', () => /"data-reader-tool-question":\s*(?:""|true)/.test(bundle)],
+  ['delivery renders its own list', () => /"data-reader-tool-present":\s*(?:""|true)/.test(bundle)],
 ];
 
 const forbidden = [

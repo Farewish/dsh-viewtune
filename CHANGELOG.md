@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased (tool presentation)
+
+**修复：`ask_user_question`（提问）和 `present`（交付文件）在流程里显示成 "Tool call"——不是设计如此，是移植漏了。**
+
+你问的这两条我都查了，结论是：**产品给它们各做了一张卡，而阅读视图没有消费那套机制**。DSH 客户端有一个按工具名选渲染器的 keyed 槽位 **`tool.call.toolview`**，键命中会**替换**通用行（这件事本仓库 `tool-call-model.ts` 的注释里就写着）。已安装 harness 里实际注册的键有：`dsh-client-ui-tool` 的 `ask_user_question`（→ `AskQuestionRow`）、`bash`、`read`、`read_image`、`edit`、`write`、`grep`、`glob`、`todo_write`、`web_search`、`web_fetch`，`dsh-client-ui-deliverables` 的 `present`（→ `PresentRow`），以及 `ui-skill` / `ui-cordis` 的几个。对照本仓库的 `TOOL_VARIANTS` / `TOOL_TITLES`，**漏了四个**：`ask_user_question`、`present`、`read_image`、`todo_write`。
+
+漏掉的不止是名字：`others` 变体的摘要槽读不到顶层字符串参数时会退回**原始参数 JSON 的首行**，所以那两行长得像 `Tool call | {"questions":[{"id":"…`。
+
+这一版按「把四个名字补进本仓库自己的行词汇」做（自洽，不新增对产品槽位契约的依赖）：
+
+| 工具 | 行 | 结果体 |
+| --- | --- | --- |
+| `ask_user_question` | 标题 `Question`，摘要为第一个问题（多个时 `N 个问题 · …`） | 一张卡：问题用 tertiary、回答用 primary，逐条配对 |
+| `present` | 标题 `Deliveries`，摘要 `N 个文件 · a.md、b.md`（多于两个缀「等」） | 交付清单：路径 + 说明 |
+| `read_image` | 归入 `read` 行族，标题 `Read image` | 图片本身仍由 `ToolMedia` 渲染 |
+| `todo_write` | 标题 `Todo`，摘要 `1/2 完成` | 沿用通用结果 |
+
+图标也得跟着改：这四条以前都落在 `other` 类，用那颗**通用星星**，而产品给它们各有图案。现在按产品的口径归类——`ask_user_question` → `IconQuestionOutline14`、`todo_write` → `IconChecklistOutline14`、`read_image` 归入 read 家族（产品那边它的行就是 read 行，用 `IconBrowseOutline16`）。`present` 照产品来：那张交付行**没有图案**，用的是 `StateDot`（状态点），本仓库同样用点，并按行的阶段映射到 `ongoing`/`done`/`warning`/`error`。归类由 `tool-activity.ts` 的 `ToolCategory` 承担，图标表的键类型是 `Exclude<ToolCategory, 'delivery'>`——每个有图案的类都必须有图标，漏一个编译就过不去。
+
+提问卡的配对是**严格**的：按问题 id 配对，结果里没有对应 id 的问题显示「未回答」，重复 id 丢掉——配错会让读者以为自己做了一个其实没做过的选择。这条规则由新增的 `tests/question-card.test.ts` 与 `tests/tool-row-model.test.ts` 覆盖（测试文件 12 → 14），`check-bundle-markers.mjs` 另加两条标记，防止这两张卡以后被改回通用行。
+
+还没做的是**更彻底的那条**：让本仓库成为 `tool.call.toolview` 的 owner（`children: { 'tool.call.toolview': { kind: 'keyed', scope: 'session' } }`，就是 `ui-tool` 的写法），产品以后新增的卡片便自动就有、不必再维护镜像表。代价是新增对产品槽位契约（`ToolCallOwnerProps`）的依赖，而且那些卡是聊天 UI 的样式。
+
 ## Unreleased (disclosure animation)
 
 **修复：展开和收起的动画，终点都比 DOM 实际停下来的位置早一步——所以两处都在动画结束时"啪"地跳一下。**

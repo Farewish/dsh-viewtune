@@ -116,6 +116,18 @@
 .rowSeparator { flex: none; width: 2px; height: 2px; margin: 0 8px; border-radius: 1px; background: var(--dsw-alias-label-caption); }
 .nativeToolSummary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-tertiary); font-size: 14px; line-height: 24px; }
 .nativeToolRow:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; border-radius: 4px; }
+/* A question set and a delivery are the two calls that read as content rather than as a machine
+   step. The question is tertiary and the answer primary, as the product's own card has them. */
+.questionCard { display: flex; flex-direction: column; gap: 8px; border: .5px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-bg-base); padding: 12px 14px; margin: 4px 0; max-height: 360px; overflow-y: auto; }
+.questionNote { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+.questionItem { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.questionText { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.questionAnswer { margin: 0; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.questionUnanswered { color: var(--dsw-alias-label-tertiary); }
+.presentList { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.presentItem { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.presentPath { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.presentNote { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
 .toolHeading { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; padding: 10px 14px 4px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 11px; }
 .toolHeading:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .toolHeading:focus-visible { outline-offset: -3px !important; }

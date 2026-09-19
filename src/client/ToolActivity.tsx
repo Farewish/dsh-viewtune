@@ -2,19 +2,29 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { DiffHunk, ReadBlockLine, SearchFileGroup } from '@deepseek-ai/dsh-client-ui-primitives';
 import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlock, WebBlock,
-  IconApiOutline14, IconBrowseOutline16, IconEditOutline16, IconSearchOutline16, IconSkillOutline16, IconSparkle16 } from '@deepseek-ai/dsh-client-ui-primitives';
+  IconApiOutline14, IconBrowseOutline16, IconChecklistOutline14, IconEditOutline16,
+  IconQuestionOutline14, IconSearchOutline16, IconSkillOutline16, IconSparkle16, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
+import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
 import { activityPhase, activitySummary, executionFacts, objectValue, toolIdentity } from './tool-activity.js';
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
+import { questionCardModel } from './native/question-card-model.js';
 import { McpAppFrame, StreamingMcpAppPlaceholder } from './McpAppFrame.js';
 import { diffBlockLabels, jsonTreeLabels, readBlockLabels, searchBlockLabels, terminalBlockLabels, webBlockLabels } from './primitive-labels.js';
 import css from './Reader.module.css';
 
 const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running: '执行中', returned: '已返回', succeeded: '已完成', failed: '失败', interrupted: '已中断' };
-const ICONS = { write: IconEditOutline16, read: IconBrowseOutline16, terminal: IconApiOutline14, search: IconSearchOutline16, web: IconSearchOutline16, other: IconSparkle16 } satisfies Record<ToolCategory, unknown>;
+// One glyph per kind of call, each taken from the row its product counterpart uses: the question
+// and todo glyphs are the product's own, and `read_image` belongs to the read family there too.
+// Delivery is deliberately absent: the product's present row leads with a state dot rather than a
+// glyph, this follows it, and the table's key type is what keeps that honest.
+const ICONS = { write: IconEditOutline16, read: IconBrowseOutline16, terminal: IconApiOutline14, search: IconSearchOutline16, web: IconSearchOutline16, question: IconQuestionOutline14, todo: IconChecklistOutline14, other: IconSparkle16 } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
+
+/** The delivery row's leading mark: this view's phase mapped onto the dot's states. */
+const DOT_STATE = { preparing: 'ongoing', running: 'ongoing', returned: 'done', succeeded: 'done', failed: 'error', interrupted: 'warning' } as const satisfies Record<ToolPhase, StateDotState>;
 const number = new Intl.NumberFormat('zh-CN');
 const language = (path: string | undefined) => path?.split('.').at(-1);
 const duration = (ms: number) => ms < 1000 ? `${Math.round(ms)} 毫秒` : `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} 秒`;
@@ -77,6 +87,23 @@ function searchFiles(value: unknown): SearchFileGroup[] | null {
   return files;
 }
 
+interface PresentedFile { readonly path: string; readonly description: string | undefined }
+
+/** `present` arguments: the files handed over, in the order the call declared them. */
+function presentedFiles(raw: string): PresentedFile[] | null {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  const files = objectValue(parsed)?.files;
+  if (!Array.isArray(files) || files.length === 0) return null;
+  const out: PresentedFile[] = [];
+  for (const item of files) {
+    const file = objectValue(item);
+    if (typeof file?.path !== 'string' || file.path === '') return null;
+    out.push({ path: file.path, description: typeof file.description === 'string' && file.description !== '' ? file.description : undefined });
+  }
+  return out;
+}
+
 function ResultView({ entry, model, phase, ...render }: BlockRenderProps & { entry: ToolActivityEntry; model: ReturnType<typeof activitySummary>; phase: ToolPhase }) {
   if ((model.name === 'render_ui' || model.name === 'show_widget') && typeof model.args?.html === 'string') {
     return <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} fillComposer={render.fillComposer} />;
@@ -89,6 +116,31 @@ function ResultView({ entry, model, phase, ...render }: BlockRenderProps & { ent
   const meta = objectValue(block.meta);
   const text = block.content.filter(item => item.type === 'text').map(item => item.text).join('\n');
   if (phase === 'interrupted') return <><p className={css.toolDetailNote}>工具已取消，未正常完成。输入和原始返回记录仍可查看。</p><InputView model={model} preparing={false} fillComposer={render.fillComposer} /><pre className={css.toolRaw}>{text}</pre></>;
+  // Two calls carry something the reader is meant to read rather than a file-shaped payload, so
+  // they get their own body instead of the generic result: a question set (what was asked and what
+  // was answered) and a delivery (which files were handed over). Both fall through when their
+  // arguments are absent, which happens when window truncation left the call head outside it.
+  if (model.name === 'ask_user_question') {
+    const card = questionCardModel(model.raw, text);
+    if (card !== null) return <div className={css.questionCard} data-reader-tool-question>
+      {card.total > 1 && <p className={css.questionNote}>已回答 {card.answered}/{card.total}</p>}
+      {card.entries.map(entry => <div key={entry.id} className={css.questionItem}>
+        <p className={css.questionText}>{entry.question}</p>
+        <p className={entry.answers.length === 0 ? `${css.questionAnswer} ${css.questionUnanswered}` : css.questionAnswer}>
+          {entry.answers.length === 0 ? '未回答' : entry.answers.join('、')}
+        </p>
+      </div>)}
+    </div>;
+  }
+  if (model.name === 'present') {
+    const files = presentedFiles(model.raw);
+    if (files !== null) return <div className={css.presentList} data-reader-tool-present>
+      {files.map(file => <div key={file.path} className={css.presentItem}>
+        <span className={css.presentPath}>{file.path}</span>
+        {file.description !== undefined && <span className={css.presentNote}>{file.description}</span>}
+      </div>)}
+    </div>;
+  }
   if (model.category === 'terminal') {
     const facts = executionFacts(block);
     const output = text.replace(/\n\[(?:exit code: \d+|killed by signal: [^\]\n]+)\]$/, '');
@@ -151,7 +203,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
     return () => document.removeEventListener('selectionchange', track);
   }, []);
   const facts = executionFacts(entry.block);
-  const Icon = model.name === 'skill' ? IconSkillOutline16 : ICONS[model.category];
+  const Icon = model.name === 'skill' ? IconSkillOutline16 : model.category === 'delivery' ? null : ICONS[model.category];
   const block = entry.block;
   const native = block ? toolRowModel(model.name, block) : null;
   const skillName = typeof model.args?.name === 'string' ? model.args.name.split('\n')[0] : model.raw.split('\n')[0];
@@ -168,7 +220,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const activate = (index: number) => { const item = tabs[(index + tabs.length) % tabs.length]!; setTab(item[0]); tabRefs.current[(index + tabs.length) % tabs.length]?.focus(); };
   if (depth > 6) return <p className={css.meta}>更深的嵌套调用可在原对话查看。</p>;
   return <div ref={element => { control.current = element?.querySelector<HTMLElement>('[data-disclosure-row]') ?? null; }} className={css.toolActivity} data-reader-tool-call={entry.callId} data-tool-phase={phase} data-tool-args-length={model.raw.length} data-tool-category={model.category} data-expanded={open} data-ud-check="reader-tool-activity">
-    <DisclosureRow icon={<Icon size={14} />} title={rowTitle} open={open} expandable expandOnRowClick keepContentWhenOpen
+    <DisclosureRow icon={Icon === null ? <StateDot state={DOT_STATE[phase]} /> : <Icon size={14} />} title={rowTitle} open={open} expandable expandOnRowClick keepContentWhenOpen
       onToggle={() => { onRead(); setOpen(value => !value); }} rowClassName={css.nativeToolRow}
       collapsedContent={<><span className={css.rowSeparator} aria-hidden /><span className={css.nativeToolSummary} title={rowSummary} data-reader-tool-summary>{rowSummary}</span>
         {showState && <span className={css.toolState} data-phase={phase}>{LABEL[phase]}</span>}</>} />

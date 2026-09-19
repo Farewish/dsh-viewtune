@@ -11,6 +11,8 @@
 // that produces the values).
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { basename } from '../deliverables.js'
+import { objectValue, stringValue } from '../tool-activity.js'
 
 export type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
@@ -41,6 +43,9 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   // with its own title from TOOL_TITLES, not the generic `others` row.
   pwsh: 'bash',
   read: 'read',
+  // A file read that happens to return an image: the row is the path, the image itself renders
+  // as media beside the ledger (ToolMedia).
+  read_image: 'read',
   web_fetch: 'read',
   web_search: 'search',
   grep: 'search',
@@ -59,7 +64,15 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   cordis_undefine: 'others',
 }
 
-/** Tool-owned titles that refine a generic row variant without replacing it. */
+/**
+ * Tool-owned titles that refine a generic row variant without replacing it.
+ *
+ * Four entries here are calls the product renders with keyed `tool.call.toolview` cards —
+ * `ask_user_question`, `present`, `todo_write` and `read_image`. The reading view renders the
+ * process itself and never consults that registry, so without a name they all arrived as
+ * "Tool call". A title at least names the act; the first two also get their own body in
+ * ToolActivity, which is where a question's answers and a delivery's files belong.
+ */
 const TOOL_TITLES: Record<string, string> = {
   cordis_package_inspect: 'Inspect',
   cordis_runtime_inspect: 'Inspect',
@@ -67,6 +80,47 @@ const TOOL_TITLES: Record<string, string> = {
   cordis_stop: 'Stop Cordis Plugin',
   cordis_undefine: 'Remove Cordis Plugin',
   pwsh: 'Pwsh',
+  ask_user_question: 'Question',
+  present: 'Deliveries',
+  read_image: 'Read image',
+  todo_write: 'Todo',
+}
+
+/** One list-shaped argument field as records, ignoring entries of another shape. */
+function records(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.flatMap((item) => { const row = objectValue(item); return row === null ? [] : [row] })
+    : []
+}
+
+/**
+ * Tool-owned summaries for calls whose payload is a list rather than one of the file-shaped slots
+ * the variant keys read (`path`, `query`, `command`). Without an entry these fall through to the
+ * raw arguments, which is how half a JSON object — `{"questions":[{"id"…` — used to reach the
+ * summary slot beside the words "Tool call".
+ */
+const TOOL_SUMMARIES: Record<string, (args: Record<string, unknown>) => string | undefined> = {
+  ask_user_question: (args) => {
+    const lines = records(args.questions).flatMap((question) => {
+      const value = stringValue(question, 'question')
+      return value === undefined ? [] : [firstLine(value)]
+    })
+    if (lines.length === 0) return undefined
+    return lines.length === 1 ? lines[0]! : `${lines.length} 个问题 · ${lines[0]!}`
+  },
+  present: (args) => {
+    const names = records(args.files).flatMap((file) => {
+      const value = stringValue(file, 'path')
+      return value === undefined ? [] : [basename(value)]
+    })
+    if (names.length === 0) return undefined
+    return `${names.length} 个文件 · ${names.slice(0, 2).join('、')}${names.length > 2 ? ' 等' : ''}`
+  },
+  todo_write: (args) => {
+    const todos = records(args.todos)
+    if (todos.length === 0) return undefined
+    return `${todos.filter(todo => todo.status === 'completed').length}/${todos.length} 完成`
+  },
 }
 
 /**
@@ -163,10 +217,12 @@ export function relativizeToCwd(text: string, cwd: string | undefined): string {
   return text
 }
 
-function deriveSummary(variant: ToolRowVariant, argsRaw: string): string {
+function deriveSummary(toolName: string, variant: ToolRowVariant, argsRaw: string): string {
   const parsed = parseArgs(argsRaw)
   if (typeof parsed !== 'object' || parsed === null) return firstLine(argsRaw)
   const args = parsed as Record<string, unknown>
+  const owned = TOOL_SUMMARIES[toolName]?.(args)
+  if (owned !== undefined) return owned
   if (variant === 'search' && Array.isArray(args.queries)) {
     const queries = args.queries.filter((query): query is string => typeof query === 'string' && query !== '')
     if (queries.length > 0) return queries.map(firstLine).join(', ')
@@ -223,7 +279,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
       : block.isError ? 'error' : 'ok'
   const base = argsRaw === ''
     ? block.callId
-    : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
+    : abbreviateHomePath(relativizeToCwd(deriveSummary(toolName, variant, argsRaw), cwd), home)
   const toolTitle = TOOL_TITLES[toolName]
   // Others keeps the static "Tool call" title (figma literal); the real tool
   // name rides the mutable summary slot unless the tool owns a specific title.

@@ -5,7 +5,7 @@ import type { ReaderGroup } from './projection.js';
 
 export type ToolDraft = Extract<AssistantBlock, { kind: 'tool-call' }>;
 export type ToolPhase = 'preparing' | 'running' | 'returned' | 'succeeded' | 'failed' | 'interrupted';
-export type ToolCategory = 'write' | 'read' | 'terminal' | 'search' | 'web' | 'other';
+export type ToolCategory = 'write' | 'read' | 'terminal' | 'search' | 'web' | 'question' | 'todo' | 'delivery' | 'other';
 export interface ToolActivityEntry {
   kind: 'tool'; key: string; callId: string; step: number; order: number;
   draft?: ToolDraft; block?: ToolCallBlock;
@@ -133,15 +133,25 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
   const description = stringValue(args, 'description');
   const file = target?.split(/[/\\]/).at(-1);
   const category: ToolCategory = /^(write|edit|apply_patch|patch|str_replace_editor)$/.test(name) ? 'write'
-    : /^(read|read_file)$/.test(name) ? 'read'
+    : /^(read|read_file|read_image)$/.test(name) ? 'read'
     : /^(bash|shell|terminal|terminal_send|exec_command|pwsh)$/.test(name) ? 'terminal'
     : /^(grep|glob|find|search)$/.test(name) ? 'search'
-    : /^(web_search|web_fetch|web_open)$/.test(name) ? 'web' : 'other';
+    : /^(web_search|web_fetch|web_open)$/.test(name) ? 'web'
+    // Three calls the product renders with its own keyed card, each its own kind of thing rather
+    // than a machine step: they take their product counterpart's glyph and title instead of the
+    // generic sparkle. The product's read_image row is a read row, so it is one here too.
+    : name === 'ask_user_question' ? 'question'
+    : name === 'todo_write' ? 'todo'
+    : name === 'present' ? 'delivery'
+    : 'other';
   const title = category === 'write' ? `${name === 'write' ? '写入' : '修改'}${file ? ` ${file}` : name === 'apply_patch' ? '代码补丁' : '文件'}`
     : category === 'read' ? `读取${file ? ` ${file}` : '文件'}`
     : category === 'terminal' ? description || '运行命令'
     : category === 'search' ? name === 'glob' ? '查找文件' : '搜索内容'
     : category === 'web' ? name === 'web_search' ? '搜索网页' : '读取网页'
+    : category === 'question' ? '提问'
+    : category === 'todo' ? '待办'
+    : category === 'delivery' ? '交付文件'
     : name;
   return { name, raw, args, category, title, target: target ?? command ?? stringValue(args, 'query', 'pattern', 'url'), command,
     cwd: stringValue(args, 'workdir', 'cwd'), content: stringValue(args, 'content', 'new_string', 'newText', 'file_text') };

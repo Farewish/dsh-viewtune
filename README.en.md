@@ -130,7 +130,7 @@ Change `src/`, then `npm run build`. Two identity markers in the artifact must m
 Two layers, because they answer different questions:
 
 ```sh
-npm test        # source level: 12 test files through Node's test runner
+npm test        # source level: 14 test files through Node's test runner
 npm run guard   # artifact level: 19 assertions, all against the built lib/client.js
 ```
 

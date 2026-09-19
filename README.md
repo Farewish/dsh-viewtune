@@ -122,7 +122,7 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
 分两层，因为它们回答的是不同的问题：
 
 ```sh
-npm test     # 源码层：Node 自带测试跑 12 个测试文件
+npm test     # 源码层：Node 自带测试跑 14 个测试文件
 npm run guard   # 产物层：19 条断言，全部针对构建出来的 lib/client.js
 ```
 
