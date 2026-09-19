@@ -77,13 +77,14 @@ const add = (name, pass, detail = "") => checks.push({ name, pass, detail });
   // single-use constant into the branch, so the expression — not the statement — is the anchor.
   const guard = text.includes("answer !== null && total !== null && answer > total");
   add("truncation is detected", guard);
-  const windowMarker = text.includes('"data-ud-check": "steps-window"') && text.includes("步骤记录 · 窗口外");
+  const windowMarker = text.includes('"data-ud-check": "steps-window"') && text.includes("步骤记录");
   add("an out-of-window turn is marked, not silent", windowMarker);
   add("no cross-scope subtraction", !text.includes("${total - answerStep}"));
   // The ratio is built from the turn's own total, after the branch for an out-of-window turn has
   // already returned — and no partial number reaches the marker.
   add("ratio uses the turn's own total", text.includes("`${answer}/${total} 个步骤`"));
-  add("the marker carries no number", !/步骤记录 · 窗口外[\s\S]{0,40}?\$\{/.test(text));
+  add("the marker carries no number", !/步骤记录[\s\S]{0,40}?\$\{/.test(text));
+  add("the marker's explanation stays short", /该轮未加载完全/.test(text));
   add("no dead partial-count branch", !text.includes('truncated ? "已加载步骤"') && !text.includes("const loaded = truncated"));
   add("the caveat line is gone", !text.includes("这里只有事件序号与计数"));
 }

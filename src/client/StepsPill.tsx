@@ -76,16 +76,12 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   if (truncated) {
     return (
       <span className={css.container}>
-        <span
-          className={css.pillMuted}
-          data-ud-check="steps-window"
-          title="这一轮的开头在已加载的历史窗口之外：步骤数是局部和，与回答所在的绝对步数不可比，所以不显示数字。用「加载更早记录」把它载入后即可看到。"
-        >
+        <span className={css.pillMuted} data-ud-check="steps-window" title="该轮未加载完全">
           <svg className={css.pillIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
             <path d="M3 3.4h10M3 8h10M3 12.6h6.4" strokeWidth="1.2" strokeLinecap="round" />
             <circle cx="12.4" cy="12.6" r="1.5" strokeWidth="1.2" />
           </svg>
-          <span>步骤记录 · 窗口外</span>
+          <span>步骤记录</span>
         </span>
       </span>
     );

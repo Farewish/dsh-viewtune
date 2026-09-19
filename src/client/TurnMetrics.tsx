@@ -81,7 +81,7 @@ export const TurnMetrics = memo(function TurnMetrics({
         <span
           className={css.pillMuted}
           data-ud-check="usage-unavailable"
-          title="宿主未提供该轮可证明的 Token 用量（例如某次尝试缺少用量样本，或该轮落在压缩上下文里）。本插件不估算，所以这里不显示数字。"
+          title="宿主未提供该轮用量，未估算"
         >
           用量 —
         </span>
@@ -135,14 +135,9 @@ export const TurnMetrics = memo(function TurnMetrics({
           )}
 
           {hasTiming && !hasTokens && (
-            // Explains the muted pill rather than leaving the reader to wonder why there is no
-            // number here. Same wording as the tooltip, so the two cannot drift.
             <div className={css.popSection}>
               <div className={css.popSectionTitle}>Token 消耗</div>
-              <p className={css.popNote}>
-                宿主未提供该轮可证明的用量（例如某次尝试缺少用量样本，或该轮落在压缩上下文里）。
-                本插件不估算，所以这里不显示数字。
-              </p>
+              <p className={css.popNote}>宿主未提供该轮用量，未估算。</p>
             </div>
           )}
 
