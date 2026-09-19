@@ -34,6 +34,8 @@ Busy labels use a 2-second glyph-only shimmer and a short state swap. Initial, b
 
 Manual reading, selection and keyboard access take precedence over automatic following. Reduced-motion preferences, disabled motion and background views settle to the received content. Errors stay local to their block. Do not turn user interaction into a permanent lock that prevents successful-turn folding.
 
+Information the data cannot supply is stated in text rather than left absent, and its reason is part of the accessible name — hidden text inside the marker, never a tooltip alone. An action with a keyboard shortcut advertises it through `aria-keyshortcuts`, and an action that hides its own control hands focus to a control that is still visible instead of dropping the reader to the document body.
+
 ## Extensions and safety
 
 Trusted plugins may register `dsh-better-display.block`. Native content remains the fallback. Generative MCP Apps (SEP-1865 / `io.modelcontextprotocol/ui`) are supported via an isolated, sandboxed iframe (`sandbox="allow-scripts allow-forms"`, strictly without `allow-same-origin`) communicating via bidirectional JSON-RPC `postMessage` (`ui/initialize`, `ui/resize`, `ui/update-model-context`, `ui/submit`).

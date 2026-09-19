@@ -39,6 +39,15 @@
 - 两处快捷键只有在"确实有可收的东西"时才 `preventDefault`，否则浏览器自己的绑定不受影响；
   `Alt` 修饰键是为了不和输入框抢按键（裸字母会被正在打字的人吃掉）。
 
+**B3（可访问性部分）：标记的理由要能被读屏读到，快捷键要能被念出来。**
+- 两枚灰标记原本把理由只写在 `title` 里——而 `title` **不是可靠的 accessible name**，很多读屏器直接忽略。
+  理由现在同时作为**隐藏文本**（`.srOnly`）放进标记内部，于是它进入控件名：读屏会念
+  「步骤记录 该轮未加载完全」「用量 — 宿主未提供该轮用量，未估算」，与鼠标悬停看到的一致。
+- 收起与全部收起用 **`aria-keyshortcuts`** 声明各自的快捷键（`Alt+C` / `Alt+Shift+C`），
+  而不是只写在 tooltip 里。装饰性图标补了 `aria-hidden="true"`。
+- DESIGN.md 的「Reading and accessibility」补了一句契约：数据给不出的信息用文字说明、理由进入
+  accessible name；有快捷键的动作声明它；**动作把自己藏起来时，焦点交给仍然可见的控件**。
+
 ## 0.3.0-relayout.13
 
 - **GitHub 仓库也改名为 `dsh-viewtune`**（原来叫 `dsh-better-display-reforged`）。包名与仓库名现在**同名**，从 GitHub 安装的写法随之回到最简形式：`dsh plugin --profile web add github:Farewish/dsh-viewtune`。

@@ -67,6 +67,10 @@ want('motion toggle kept', '"aria-pressed": motionPreference', 1);
 want('alt+c shortcut', 'event.code !== "KeyC"', 1);
 want('shortcut requires alt', 'if (!event.altKey', 1);
 want('focus handoff', 'focusWasInCollapseWrap', 4);
+// The shortcut is advertised to assistive tech, not only written into a tooltip. JSX compiles a
+// hyphenated attribute to a quoted key, so the assertion spells it that way.
+want('shortcut advertised via aria-keyshortcuts', '"aria-keyshortcuts": "Alt+C"', 1);
+want('the advertised collapse-all shortcut', '"aria-keyshortcuts": "Alt+Shift+C"', 1);
 present('collapse-all label', '全部收起');
 present('shortcut is documented in a tooltip', 'Alt+Shift+C');
 

@@ -818,8 +818,8 @@ export function Reader(props: ReaderProps) {
     <div className={css.column} data-chat-flow="">
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <div className={css.collapseWrap} ref={collapseWrapRef} data-ud-check="collapse-wrap">
-          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title="收起当前这一轮的过程（Alt+C）">收起 <span aria-hidden="true">˄</span></button>
-          <button type="button" className={css.textButton} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title="收起所有已展开的过程（Alt+Shift+C）">全部收起</button>
+          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} aria-keyshortcuts="Alt+C" onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title="收起当前这一轮的过程（Alt+C）">收起 <span aria-hidden="true">˄</span></button>
+          <button type="button" className={css.textButton} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} aria-keyshortcuts="Alt+Shift+C" onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title="收起所有已展开的过程（Alt+Shift+C）">全部收起</button>
         </div>
         <button ref={motionRef} type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
       </div>

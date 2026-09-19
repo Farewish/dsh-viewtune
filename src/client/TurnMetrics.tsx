@@ -84,6 +84,8 @@ export const TurnMetrics = memo(function TurnMetrics({
           title="宿主未提供该轮用量，未估算"
         >
           用量 —
+          {/* The reason as hidden text, not only a title: a title is not a reliable accessible name. */}
+          <span className={css.srOnly}>宿主未提供该轮用量，未估算</span>
         </span>
       )}
       {hasTiming && typeof runMs === 'number' && (

@@ -13,7 +13,7 @@
  * Usage: node verify-session-changes.mjs [bundlePath]
  */
 import { readFileSync } from "node:fs";
-import { classSel, hasDecls, moduleCssLiteral, ruleDecls } from "./bundle-anchors.mjs";
+import { classSel, hasDecls, moduleCssLiteral, ruleDecls, sourceRegion } from "./bundle-anchors.mjs";
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -85,6 +85,9 @@ const add = (name, pass, detail = "") => checks.push({ name, pass, detail });
   add("ratio uses the turn's own total", text.includes("`${answer}/${total} 个步骤`"));
   add("the marker carries no number", !/步骤记录[\s\S]{0,40}?\$\{/.test(text));
   add("the marker's explanation stays short", /该轮未加载完全/.test(text));
+  // The reason is also present as hidden text inside the pill module: a `title` alone is not a
+  // reliable accessible name, so a screen reader must be able to read it from the content.
+  add("the marker's reason is readable, not title-only", (sourceRegion(text, "StepsPill.tsx") ?? "").includes("srOnly"));
   add("no dead partial-count branch", !text.includes('truncated ? "已加载步骤"') && !text.includes("const loaded = truncated"));
   add("the caveat line is gone", !text.includes("这里只有事件序号与计数"));
 }

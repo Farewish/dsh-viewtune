@@ -77,11 +77,13 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
     return (
       <span className={css.container}>
         <span className={css.pillMuted} data-ud-check="steps-window" title="该轮未加载完全">
-          <svg className={css.pillIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+          <svg className={css.pillIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
             <path d="M3 3.4h10M3 8h10M3 12.6h6.4" strokeWidth="1.2" strokeLinecap="round" />
             <circle cx="12.4" cy="12.6" r="1.5" strokeWidth="1.2" />
           </svg>
           <span>步骤记录</span>
+          {/* The reason as hidden text, not only a title: a title is not a reliable accessible name. */}
+          <span className={css.srOnly}>该轮未加载完全</span>
         </span>
       </span>
     );
