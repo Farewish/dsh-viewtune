@@ -40,8 +40,8 @@ function extractFn(name) {
 
 const context = createContext({ console });
 runInContext(
-  `${extractFn('isNearTail')}\n${extractFn('wheelClaimsScroll')}\n${extractFn('atScrollEdge')}\n`
-  + 'this.isNearTail = isNearTail; this.wheelClaimsScroll = wheelClaimsScroll; this.atScrollEdge = atScrollEdge;',
+  `${extractFn('isNearTail')}\n${extractFn('wheelClaimsScroll')}\n${extractFn('splitNotch')}\n`
+  + 'this.isNearTail = isNearTail; this.wheelClaimsScroll = wheelClaimsScroll; this.splitNotch = splitNotch;',
   context,
 );
 
@@ -76,41 +76,70 @@ check('beyond the tail window does not count', context.isNearTail(CONTENT - VIEW
 // --- a card that does not overflow at all is always at its tail.
 check('a non-overflowing card is at its tail', context.isNearTail(0, VIEW, VIEW) === true);
 
-// --- the edge tolerance: this is what decides where the gesture stops being the card's
+// --- how one notch is split between the card and the conversation
+//
+// This is the rule that made a long transcript need an extra notch. The wheel event is dispatched
+// BEFORE the browser applies the scroll, so "is the card on its edge right now" sees the pixels
+// still left, releases the notch to the card, and only the next notch hands over. Projecting the
+// notch answers it in the same event.
 const MAX = CONTENT - VIEW;   // the largest scrollTop the card can reach
 const NOTCH = 120;
 
-// Mid-transcript: the notch moves the card, so the card keeps it.
-check('mid-card is not at an edge', context.atScrollEdge(100, NOTCH, MAX) === false);
+// Mid-transcript: the notch fits, so the card keeps all of it and the browser scrolls natively.
+{
+  const { consumed, remainder } = context.splitNotch(100, NOTCH, MAX);
+  check('mid-card: the card consumes the whole notch', consumed === NOTCH, `consumed ${String(consumed)}`);
+  check('mid-card: nothing is left over', remainder === 0, `remainder ${String(remainder)}`);
+}
 
-// Sitting exactly on the bottom: the conversation takes this notch.
-check('exactly on the bottom edge counts', context.atScrollEdge(MAX, NOTCH, MAX) === true);
+// Five pixels short of the bottom: the card takes those five and the rest goes over, in THIS
+// event. This is the case the old "already at the edge" test got wrong.
+{
+  const { consumed, remainder } = context.splitNotch(MAX - 5, NOTCH, MAX);
+  check('near the bottom: the card takes only what is left', consumed === 5, `consumed ${String(consumed)}`);
+  check('near the bottom: the rest is the conversation’s', remainder === NOTCH - 5, `remainder ${String(remainder)}`);
+  check('near the bottom: the amounts add up', consumed + remainder === NOTCH);
+}
 
-// The subpixel case the slack exists for: a fraction short of the limit still counts as there,
-// so the notch that reaches the edge is not wasted on a card that cannot move.
-check('a subpixel short of the edge counts', context.atScrollEdge(MAX - 0.4, NOTCH, MAX) === true);
-check('one pixel short still counts', context.atScrollEdge(MAX - 1, NOTCH, MAX) === true);
+// A sub-pixel gap is closed rather than left behind.
+{
+  const { consumed, remainder } = context.splitNotch(MAX - 0.5, NOTCH, MAX);
+  check('sub-pixel gap: the fraction goes to the card', consumed === 0.5, `consumed ${String(consumed)}`);
+  check('sub-pixel gap: the rest goes over', remainder === NOTCH - 0.5, `remainder ${String(remainder)}`);
+}
 
-// Past the slack it must NOT count, or the card would hand off before it has scrolled — that is
-// the opposite failure, and the reason the number has to stay small.
-check('two pixels short does not count', context.atScrollEdge(MAX - 2, NOTCH, MAX) === false);
-check('half a notch short does not count', context.atScrollEdge(MAX - NOTCH / 2, NOTCH, MAX) === false);
-
-// The top edge works through the same expression.
-check('exactly on the top edge counts', context.atScrollEdge(0, -NOTCH, MAX) === true);
-check('a pixel below the top counts', context.atScrollEdge(1, -NOTCH, MAX) === true);
-check('mid-card upward is not at an edge', context.atScrollEdge(MAX, -NOTCH, MAX) === false);
+// Already on the edge: the card consumes nothing at all and the whole notch is the conversation's.
+{
+  const { consumed, remainder } = context.splitNotch(MAX, NOTCH, MAX);
+  check('on the edge: the card consumes nothing', consumed === 0, `consumed ${String(consumed)}`);
+  check('on the edge: the whole notch goes over', remainder === NOTCH, `remainder ${String(remainder)}`);
+}
 
 // A short card can scroll nowhere, so every notch belongs to the conversation.
-check('a non-scrollable card is always at its edge', context.atScrollEdge(0, NOTCH, 0) === true);
-
-// Prove this check can see the shape that caused the bug: zero slack. A card a fraction short of
-// the limit would then be judged "not at the edge" and swallow the notch.
 {
-  const zeroSlack = createContext({ console });
-  runInContext('this.atScrollEdge = (scrollTop, delta, maxOffset) => Math.min(maxOffset, Math.max(0, scrollTop + delta)) === scrollTop;', zeroSlack);
-  check('the check can see a zero-slack rule', zeroSlack.atScrollEdge(MAX - 0.4, NOTCH, MAX) === false);
-  check('the real rule differs from zero slack', context.atScrollEdge(MAX - 0.4, NOTCH, MAX) !== zeroSlack.atScrollEdge(MAX - 0.4, NOTCH, MAX));
+  const { consumed, remainder } = context.splitNotch(0, NOTCH, 0);
+  check('a non-scrollable card consumes nothing', consumed === 0, `consumed ${String(consumed)}`);
+  check('a non-scrollable card passes the notch on', remainder === NOTCH, `remainder ${String(remainder)}`);
+}
+
+// Upward from the top works through the same expression.
+{
+  const { consumed, remainder } = context.splitNotch(1, -NOTCH, MAX);
+  check('a pixel below the top consumes that pixel', Math.abs(consumed) === 1, `consumed ${String(consumed)}`);
+  check('a pixel below the top passes the rest up', Math.abs(remainder) === NOTCH - 1, `remainder ${String(remainder)}`);
+}
+
+// The card must never be told to scroll further than it can: the projection is clamped.
+check('the card is never over-consumed', context.splitNotch(MAX - 1, NOTCH, MAX).consumed <= 1);
+check('the card is never pushed past the top', context.splitNotch(2, -NOTCH, MAX).consumed >= -2);
+
+// Prove this test can see the shape that caused the bug: asking whether the card is ALREADY on its
+// edge, which is what the wheel event's early dispatch defeats. Under that rule a card 5px short
+// consumes nothing and the notch is spent on the card instead of being handed over.
+{
+  const alreadyAtEdge = (scrollTop, delta, maxOffset) => (delta > 0 ? scrollTop >= maxOffset - 1 : scrollTop <= 1);
+  check('the already-at-edge shape swallows the overshooting notch', alreadyAtEdge(MAX - 5, NOTCH, MAX) === false);
+  check('the projection rule does not', context.splitNotch(MAX - 5, NOTCH, MAX).remainder > 0.5);
 }
 
 let ok = true;

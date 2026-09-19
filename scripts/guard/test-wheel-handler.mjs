@@ -65,7 +65,7 @@ const sandbox = {
   console,
 };
 const context = createContext(sandbox);
-runInContext(`${extractHelper('atScrollEdge')}\n${extractWheelSection()}\nthis.onWheel = onWheel;`, context);
+runInContext(`${extractHelper('splitNotch')}\n${extractWheelSection()}\nthis.onWheel = onWheel;`, context);
 
 const clampIn = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -167,37 +167,35 @@ const check = (name, pass, detail = '') => tests.push([name, pass, detail]);
   check('short card: card stays put', result.cardMoved === 0, `moved ${String(result.cardMoved)}`);
 }
 
-// 4b. A notch that would overshoot is left to the browser: the card glides the last few pixels
-// itself and the conversation waits for the next notch. The old design clamped the card to its
-// edge and forwarded the remainder in the same event — but clamping means writing the card's
-// scroll position, which replaces a composited subpixel scroll with an integer jump. That trade
-// is the stutter this design exists to remove, so the handoff is all-or-nothing instead.
+// 4b. The notch that would overshoot hands off IN THAT SAME EVENT. This is the case that made a
+// long transcript need an extra notch: the wheel event is dispatched before the browser applies
+// the scroll, so asking "is the card on its edge right now" sees 5px left, releases the notch to
+// the card, and only the next notch hands over. The projection answers it correctly: the card
+// takes the 5px it can still consume, is placed on its edge, and the remaining 115 goes over.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 - 5 });
   const result = wheel({ port, talk, deltaY: 120 });
-  check('near the bottom: the card scrolls the last pixels natively', result.cardMoved === 5,
-    `card moved ${String(result.cardMoved)}`);
-  check('near the bottom: the conversation waits for the next notch', result.talkMoved === 0,
+  check('near the bottom: the overshooting notch hands off at once', result.talkMoved === 115,
     `talk moved ${String(result.talkMoved)}`);
-  check('near the bottom: nothing is prevented', result.prevented === false, `prevented ${String(result.prevented)}`);
+  check('near the bottom: the card lands exactly on the edge', port.scrollTop === 1200 - 224,
+    `card at ${String(port.scrollTop)}`);
+  check('near the bottom: nothing is lost', result.cardMoved + result.talkMoved === 120,
+    `card ${String(result.cardMoved)} + talk ${String(result.talkMoved)}`);
 }
 
-// 4c. A sub-pixel gap counts as being on the edge. This is exactly what the slack is for: native
-// scrolling leaves subpixel offsets, so a card that looks like it is sitting on its bottom is
-// usually a fraction away from the exact limit. Without the slack the notch that first reaches
-// the edge is spent on a card that cannot move, and the handoff only happens on the next notch —
-// the scroll sticks and then steps right where the gesture crosses into the page.
+// 4c. A sub-pixel gap is closed the same way rather than left for a later notch.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 - 0.5 });
   const result = wheel({ port, talk, deltaY: 120 });
-  check('sub-pixel gap: treated as being on the edge', result.talkMoved === 120,
+  check('sub-pixel gap: hands off at once', result.talkMoved === 119.5,
     `talk moved ${String(result.talkMoved)}`);
-  check('sub-pixel gap: the card is not written', port.writes === 0, `${String(port.writes)} writes`);
+  check('sub-pixel gap: the card lands on the edge', port.scrollTop === 1200 - 224,
+    `card at ${String(port.scrollTop)}`);
 }
 
-// 4d. Already on the edge: that is the notch the conversation takes.
+// 4d. Already on the edge: the whole notch belongs to the conversation.
 {
   const talk = makeConversation();
   const port = makePort({ ...longCard, scrollTop: 1200 - 224 });

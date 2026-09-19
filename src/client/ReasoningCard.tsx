@@ -9,34 +9,35 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 const WHEEL_IDLE_MS = 140;
 
 /**
- * How close to a limit still counts as being on it, in CSS pixels.
+ * Split one notch between the card and the conversation.
  *
- * Native scrolling accumulates subpixel offsets, so a card that looks like it sits on its edge is
- * usually a fraction away from the exact limit. Demanding exact equality spends the notch that
- * first reaches the edge on a card that cannot move, and the handoff only happens on the *next*
- * notch — which reads as the scroll sticking and then stepping, right where the gesture crosses
- * from the card into the page. One pixel absorbs the fraction and stays far below what a reader
- * could notice as "it stopped a little short".
- */
-export const EDGE_SLACK_PX = 1;
-
-/**
- * Is the card already sitting on the edge this gesture pushes against?
+ * The wheel event is dispatched BEFORE the browser applies the scroll, so asking "is the card on
+ * its edge right now" answers the wrong question: with 5px left, the notch looks like the card's
+ * to take, the card is released to scroll them, and only the NEXT notch sees an edge and hands
+ * over — the gesture sticks, then jumps. Ask instead what this notch would do: the card may keep
+ * the part it can actually consume, and the remainder belongs to the conversation in the same
+ * event.
  *
- * Asked as "would this notch move the card at all": clamping the projection is what the browser
- * itself does, so a notch landing on or past a limit consumes nothing — and one expression covers
- * both directions (up at the top, down at the bottom). Pure and exported so the tolerance is
- * testable instead of tuned by eye, which is how it got missed the first time.
+ * @returns `consumed` for the card (never more than the notch, never past a limit) and
+ *          `remainder` for the conversation.
  */
-export function atScrollEdge(
+export function splitNotch(
   scrollTop: number,
   delta: number,
   maxOffset: number,
-  slack = EDGE_SLACK_PX,
-): boolean {
+): { consumed: number; remainder: number } {
   const projected = Math.min(maxOffset, Math.max(0, scrollTop + delta));
-  return Math.abs(projected - scrollTop) <= slack;
+  const consumed = projected - scrollTop;
+  return { consumed, remainder: delta - consumed };
 }
+
+/**
+ * How much of the remainder still counts as "the card took this notch".
+ *
+ * Subpixel offsets mean a notch that lands exactly on the edge can leave a fraction behind; the
+ * card must still be placed on its edge for a fraction that small, or it stops a hair short.
+ */
+export const REMAINDER_EPSILON_PX = 0.5;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
 export function ReasoningCard({ children, step, active, motion, selected, onRead }: {
@@ -213,18 +214,21 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // instead of glide. So this handler never writes the card's position.
       if (!overflow) return;
       const maxOffset = Math.max(0, port.scrollHeight - port.clientHeight);
-      // Hand off only when the card already sits on the edge this gesture pushes against: the
-      // browser has nothing left to give there, so the conversation should take the notch.
-      // Mid-transcript this is false and the browser scrolls the card natively, untouched.
-      if (!atScrollEdge(port.scrollTop, delta, maxOffset) || !event.cancelable) return;
-      // The conversation scroller is the nearest marked ancestor. The card must never carry that
-      // marker itself, or the reader's scroll hooks adopt the card as the reading container and
-      // its height accounting breaks.
+      const { consumed, remainder } = splitNotch(port.scrollTop, delta, maxOffset);
+      // The notch fits inside the card: the browser scrolls it natively and this returns without
+      // touching anything. This is the common case and the reason the card feels native.
+      if (Math.abs(remainder) < REMAINDER_EPSILON_PX || !event.cancelable) return;
+      // The notch runs past the edge this gesture pushes against, so it is consumed whole and
+      // finished here rather than being spread over two notches: the card is placed exactly on
+      // its edge (the browser will not scroll it now that the event is prevented, so this is the
+      // only thing that can land it there) and the remainder walks up to the conversation. One
+      // write per handoff, not per notch — a write on every notch is what made the card step.
       let host = port.parentElement;
       while (host && !host.hasAttribute('data-conversation-scroll')) host = host.parentElement;
       if (!host) return;
       event.preventDefault();
-      host.scrollBy(0, delta);
+      if (Math.abs(consumed) >= REMAINDER_EPSILON_PX) port.scrollTop += consumed;
+      host.scrollBy(0, remainder);
     };
     const onSelection = () => { if (hasSelection()) pause(); };
     const onVisibility = () => {

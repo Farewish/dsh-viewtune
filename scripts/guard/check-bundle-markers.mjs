@@ -56,35 +56,41 @@ const markers = [
   ['short-thinking-heading-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
   ['short-thinking-text-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
   // The wheel implementation is verified behaviourally by test-wheel-handler.mjs (it extracts
-  // the compiled handler and runs 23 cases); these markers only assert it is still there, so
-  // they match the expressions rather than the minifier's choice of local name and spacing.
+  // the compiled handler and runs 22 cases) and test-follow-rules.mjs (27 cases, including how
+  // one notch is split); these markers only assert the shape is still there, so they match
+  // expressions rather than the minifier's choice of local name and spacing.
   ['wheel-native-scroll', () => /Math\.min\(maxOffset[^;]*scrollTop \+ delta/.test(bundle)],
-  // Handoff is gated on the card already sitting on the edge this gesture pushes against, and
-  // that test is a named helper carrying a tolerance: exact equality spent the notch that first
-  // reached the edge on a card that could not move, so the handoff happened one notch late and
-  // the gesture stuck then stepped. Assert the helper is called and that the tolerance is
-  // non-zero, rather than any particular spelling of the comparison.
-  ['wheel-edge-handoff', () => {
+  // Handoff must be decided by PROJECTING the notch, not by asking whether the card is already on
+  // its edge: the wheel event is dispatched before the browser applies the scroll, so an
+  // already-at-edge test sees the pixels still left, spends the notch on the card, and only hands
+  // over on the next one — the gesture sticks and then jumps.
+  ['wheel-projects-the-notch', () => /splitNotch\(port\.scrollTop, delta, maxOffset\)/.test(bundle)],
+  ['wheel-handoff-on-overshoot', () => {
     const start = bundle.indexOf('const onWheel = (event) => {');
     if (start === -1) return false;
     const end = bundle.indexOf('const onSelection', start);
     const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
-    return /atScrollEdge\(port\.scrollTop, delta, maxOffset\)/.test(handler);
+    // Hands over when the notch leaves something, and walks only that remainder up.
+    return /Math\.abs\(remainder\) < \.5/.test(handler) && /host\.scrollBy\(0, remainder\)/.test(handler);
   }],
-  // The bundler inlines the constant into the default parameter, so the tolerance is asserted
-  // where it actually lands: `slack = <n>`, with n non-zero.
-  ['wheel-edge-tolerance-is-not-zero', () => /function atScrollEdge\([^)]*slack = [1-9]/.test(bundle)],
-  // The wheel path must not write the card's position: doing so replaces a composited subpixel
-  // scroll with an integer jump, which is the stutter the rework removed. `manual()` may still
-  // write once when it converts transform-following back to a native scrollable viewport, so
-  // this asserts the write is absent from the handler itself rather than from the whole bundle.
-  ['wheel-never-writes-the-card', () => {
+  // The card is placed exactly on its edge at the handoff (one write, at the handoff only — a
+  // write on every notch is what made the card step), and never scrolls past a limit.
+  ['wheel-cards-the-remainder', () => {
+    const start = bundle.indexOf('const onWheel = (event) => {');
+    const end = bundle.indexOf('const onSelection', start);
+    const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
+    return /port\.scrollTop \+= consumed/.test(handler);
+  }],
+  // The card keeps the notch natively whenever it fits, and is written ONLY on the handoff, to
+  // land it on its edge. A write on every notch is what made the card step instead of glide, so
+  // this pins the count: exactly one write in the handler, and it uses the consumed amount.
+  ['wheel-writes-the-card-once-at-handoff', () => {
     const start = bundle.indexOf('const onWheel = (event) => {');
     if (start === -1) return false;
     const end = bundle.indexOf('const onSelection', start);
     const handler = bundle.slice(start, end === -1 ? start + 2000 : end);
-    return !/port\.scrollTop \+=/.test(handler) && !/port\.scrollTop =/.test(handler)
-      && /host\.scrollBy\(0, delta\)/.test(handler);
+    const writes = handler.match(/port\.scrollTop\s*(\+=|=)/g) ?? [];
+    return writes.length === 1 && /port\.scrollTop \+= consumed/.test(handler);
   }],
   ['wheel-gesture-guard', 'if (Date.now() < wheelUntil) return;'],
   // `overflow` decides whether this card can scroll at all, so the handler reads it; a stale
