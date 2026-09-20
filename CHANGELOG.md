@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (command-input kept)
+
+**上游 0.2.0 删掉了 `command-input` 渲染分支，理由是「那个字符串在任何已发布的宿主里都不是 chat node kind」——这条前提在本机不成立，所以本 fork 继续留着它。**
+
+查了两处，都指向同一个结论：
+
+- **宿主自己的 key 表**（产物里那句报错文案把已占用的 kind 全列了出来）：`assistant-step, command, command-input, compaction, context, manual-compaction, model-retry, steering, system-prompt, tool-call, turn-error, turn-max-tokens, turn-process, turn-tail, unknown, user, workflow-run` —— `command-input` 就在里面。
+- **注册它的渲染器**：产物里另有一行 `"client-ui-goal GoalCommandInputView key 'command-input'"`，即这个 kind 由 `client-ui-goal` 注册。
+
+所以 `Reader.tsx` 那个分支（渲染成「命令输入」气泡 + 原文）处理的是**真的会出现的节点**，不是"看起来处理了一个不可能的 case"；`check-bundle-markers.mjs` 里那条 marker 也因此保留。分支里的 `(node.kind as string)` 强转不是坏味道：注册这个 kind 的渲染器**不在本仓库的类型依赖里**（那是运行时装的），联合类型里自然没有它——这正是要按字符串兜底的原因。
+
+（上游这个删除对他们的组合大概是对的：本机装着 `client-ui-goal`，结论就不同。记在这里，免得下次有人照着上游 changelog 再删一次。）
+
 ## Unreleased (compaction arrival)
 
 **压缩分隔条不再"直接出现"，而是到位：横线从中心扫出、胶囊落位、表盘转一次。**
