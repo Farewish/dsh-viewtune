@@ -12,6 +12,8 @@
 
 顺带删掉「改键后立即生效并保存下来；清除后该项没有快捷键，不影响按钮本身。」这句：设置页的形状已经足够直观，不需要操作说明。它用的 `.settingsEmpty` 样式也随之删掉，不留死代码。
 
+另外把「Upstream releases」那一段的两处错记改了：`0.2.0` 底下原本记的是上游**没发布的开发笔记**（上游把它并进了 0.1.1），`0.2.1` 底下原本记的是一次没成为发布的提交。两处都按上游 tag 上的 `CHANGELOG.md` 重写，并给每个上游发布补了日期和层级（此前 `0.2.0` / `0.1.0` 与本文档自己的版本同级，读起来像是本 fork 发的）。
+
 ## 0.3.0-relayout.14
 
 本次发布的条目按主题倒序列在下面。旧主题的标题只降了一级、去掉了 `Unreleased` 字样，正文一个字
@@ -418,11 +420,31 @@ Relayout fork of [`aa2246740/dsh-better-display`](https://github.com/aa2246740/d
 
 Stock DeepSeek Harness install: `dsh plugin --profile web add github:aa2246740/dsh-better-display`, then restart that Host and reload. Ships `dsh.bundle.patch` → `cordis.patch.yml` and committed `lib/`. No `prepare`.
 
-### 0.2.1
+The headings below are **upstream's** releases, kept so this fork can say what it took from where; they are not versions of this fork. Two of them were recorded wrong here and are corrected in this pass. What stood under `0.2.0` was upstream's **unpublished development notes** — upstream says so itself: "Earlier `0.2.0` / `0.2.1` headings were unpublished development notes; those changes ship in this release [0.1.1], not as separate published versions." What stood under `0.2.1` described a commit that never became a release. The entries below are read from upstream's own `CHANGELOG.md` **at the tags**, not from its working tree.
 
-- **Rail jump no longer lifts the composer**: the right-hand turn rail lands on `[data-conversation-scroll]` the same way official ChatView does. `scrollIntoView` was also scrolling ancestor boxes, so jumping to the top of history and then back to the latest turn left the sticky input card stranded up the column.
+### 0.2.1 — 2026-09-20
 
-## 0.2.0
+- **Pinned reader lanes stop painting over the composer**: the live status row (`执行过程` / `正在使用工具`) pinned at the scrollport top with `z-index: 8`, while the host's sticky composer seat owns `z-index: 7` and nothing between the reader and `<body>` creates a stacking context. A scrolling reader clamps every turn-level sticky lane down into the footer band — the lane stops at its containing block's bottom, which passes behind the input card — so the reader painted its own opaque plate over the composer.
+  - The live status lane now owns the measured lane under the toolbar, like the closed summary rows, instead of sharing the toolbar's lane.
+  - Lanes a scroll can clamp into the footer band stay below the composer seat (`z-index` 6); only the top toolbar lane keeps 7, which also keeps it above the host's code-block banners.
+  - Skin mode no longer carries a second lane ladder of its own.
+  - `tests/footer-precedence.test.ts` guards the ladder in the source sheet and in the committed bundle.
+
+### 0.2.0 — 2026-09-18
+
+The release this fork has **not** followed as a release. One item in it — the `data-chat-flow` hook — is already here, taken from the commit before it shipped. Grouped as upstream grouped it:
+
+- **Diff review**: `+N -M` for `write` / `edit`, read from the tool result the host already attaches (`meta.diffs`, `{ path, oldText, newText }`) and falling back to the call's own arguments only for a whitelist of names, because several unrelated tools take a field called `content` and counting those invented additions for calls that changed no file. A parent call folds its children's counts in, so a `run_code` whose edits live one level down does not report what its own arguments contain. The counts sit at the end of the row in green/red and open an **in-flow** panel — one tab per changed file, removed lines on a red wash, added lines on a green one, through the same `DiffBlock` primitive the official tool row renders — never a floating popup, because the flow cell's `overflow: clip` would cut it off.
+- **Translucent frosted glass**: an opt-in setting that makes card backgrounds, tool detail frames and code blocks translucent with backdrop blur, and gives sticky lanes the liquid glass of the dsh-auto-memory pane (translucent `bg-layer-2`, `blur(28px)`, hairline border, 16px radius).
+- **Folding, back to one switch**: a single 自动折叠 开/关 on the toolbar and in Settings, reasoning and tools completely unfolded when it is off, and multi-level rules removed. A later reasoning step folds only the finished run it follows, so the run that is still streaming stays expanded. Every animated disclosure gets a **wall-clock deadline**, because `fill: 'both'` pins the opening keyframe and a Web Animation that never reaches `onfinish` (cancelled, unmounted, or skipped by the compositor) left the row in the DOM at zero height and zero opacity — clicking it looked like nothing happened. The fold choreography gets the same treatment (a cancelled animation or a hidden tab could hold a phase forever), and the stream buffer keeps absorbing while the reveal is held.
+- **Settings**: glass, auto-fold and deliverable open-mode share the root `dsh.reader.v1` store; deliverables open in the system app by default with an optional right-Sidebar preview (folder/reveal stay OS); the generative-mcpapps skill root is detected and reported.
+- **Waiting and timing**: a clock showing how long the model has been given the turn, anchored to the last event that handed control to it — a returned tool, an injected context, a run command, the user's message — never to the start of the turn; a 暂未响应 badge past ten seconds, withdrawn the moment the model produces its first block; a tool that is still running is not a wait. The anchor bug behind it was a kind read from the wrong layer (`tool-result` in the conversation contract, `tool-call` in the chat layer the reader sees), which made the branch dead; the kinds are now typed against the host's own union so a wrong name fails `tsc`.
+- **Scroll and streaming**: tail-follow detaches only on a real upward move by the reader (content growth and the follow easing also move `scrollTop`, and reading that as "the user left the bottom" froze following mid-turn); browser scroll anchoring is disabled on the conversation scroller while the reader is mounted; only a focused text field suspends following. The reveal gains a **feed-forward** term estimated from the arrival rate on top of the proportional controller — a proportional one drains exactly one window per window and trails live output by a constant `catchUpMs` forever — and a batch of words now lands inside one short window instead of one word per fixed gap, which had capped the reveal at roughly 16 words/second however fast the model wrote. The reasoning pane's own follow steps with the backlog instead of two lines every ~1.3 seconds.
+- **Also**: how many sub-agents the turn dispatched, read from the host's own turn-process row rather than counted again; the `command-input` render branch dropped as unreachable (that string is not a chat node kind in any released host); pending-submission image echoes guarded, because `images` / `attachments` may be missing and a text-only send must not crash `conversation.view`; a compaction divider that arrives — rule sweeps out from its centre, pill settles, dial turns once — instead of simply appearing; install guidance naming only conventional relative roots.
+
+### 0.1.1 — 2026-09-16
+
+This is what this changelog used to file under `0.2.0`. It is the release that actually carried those changes (upstream consolidated PRs #2, #5 and #8 into it), so the wording below is unchanged.
 
 Adds native generative MCP Apps (SEP-1865) support and rich interactive rendering.
 
@@ -437,7 +459,7 @@ Adds native generative MCP Apps (SEP-1865) support and rich interactive renderin
 - **Docs**: bilingual `README.md` / `README.en.md`; DESIGN.md contract updated.
 - 49 regression tests.
 
-## 0.1.0
+### 0.1.0
 
 First public release of the accepted reading-view plugin, published as `dsh-better-display`.
 
