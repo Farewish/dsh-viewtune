@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { STREAM_TIMING, StreamBuffer } from './stream-buffer.js';
+import { StreamBuffer } from './stream-buffer.js';
 import { WORD_MOTION } from './word-timeline.js';
 
 export const StreamMotionContext = createContext({ enabled: false, activatedAt: 0 });

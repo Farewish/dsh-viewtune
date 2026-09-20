@@ -26,7 +26,7 @@ Expanding changes viewport size and preserves position and follow state. Wheel, 
 
 ## Text and status motion
 
-Assign reveal times from source positions before rendering Markdown. Only newly appended text receives opacity/blur motion; existing paragraphs, page surfaces and text color do not animate. Unicode graphemes and punctuation keep their source order. Media and custom blocks do not enter the text queue.
+Assign reveal times from source positions before rendering Markdown. Only newly appended text receives opacity/blur motion; existing paragraphs, page surfaces and text color do not animate. Unicode graphemes and punctuation keep their source order. Media and custom blocks do not enter the text queue. The reveal's pace follows the rate the source is actually producing — a feed-forward term from the smoothed arrival rate, plus a proportional term that drains whatever backlog jitter left — so lag decays instead of settling at one window; a batch of words lands inside one short window rather than one word per fixed gap, and the batch clock is capped so a queue cannot form.
 
 Busy labels use a 2-second glyph-only shimmer and a short state swap. Initial, busy and elapsed labels all use the native font at 14px/24px, weight 400. The disclosure arrow sits 6px from the current label; no longest-state spacer. Elapsed time and attention states do not shimmer.
 

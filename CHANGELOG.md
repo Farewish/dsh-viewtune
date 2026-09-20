@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (streaming pace)
+
+**文字显现的节奏改成跟着源的速率走；一次到达的一批词在同一个短窗口里落下。**
+
+这两处来自上游 0.2.0，而且是**逐字节照搬**：`src/client/stream-buffer.ts` 与 `src/client/word-timeline.ts` 现在和上游 tag `v0.2.0` 上的同名文件完全相同，两个单测文件（`tests/stream-buffer.test.ts`、`tests/word-timeline.test.ts`）也是。
+
+- **feed-forward**：原来只有比例项 `rate = max(minimumRate, remaining * 1000 / windowMs)`，而比例控制器**每个窗口正好排空一个窗口**，于是显示恒定落后 `catchUpMs`——75 字符/秒时"顺滑但永远读不到最新"，1000 字符/秒时永远追不上。现在加了到达速率的 EWMA（`rateWeight: 0.35`；间隔超过 `rateGapMs: 250` 视为两次运行之间的停顿，不污染估计），`rate = rateEwma + remaining * 1000 / windowMs`：前馈负责跟上源，比例项负责把抖动留下的积压排掉，延迟于是**衰减**而不是停在某个常数上。配套调参：窗口 180→520ms、`minimumRate` 100→260、`maxQueuedMs` 240→600——最后这个必须大于窗口，否则决定节奏的就变成队列上限那个兜底了。
+- **批量节奏**：逐词固定间隔（`WORD_MOTION.gap`）把显现速度钉在约 16 词/秒，模型再快也是一颗一颗滴。现在先数这批到了几个词，`gap = clamp(batchMs / arriving, minGap, gap)`，并把出生时间**上限钉在 `now + batchMs`**：时钟永远不会比最新文字超前超过一个窗口，队列也就无法形成。单独到达的一个词仍走原来的打字节奏。
+
+两个单测随之更新，而且断言从"被调参钉死的数字"换成了**不变量**，因为节奏本来就是会被调的：批量那条改成「一批词按同一时钟、顺序、且全部落在 `batchMs` 窗口内」，另加「单独到达的一个词不能被排到过去」；缓冲那条不再写死 256ms，改用 `STREAM_TIMING.catchUpMs * 2`，并新增「第一帧必须立即出现」（`firstFrameAt <= 32`）。
+
+上游 `streaming.tsx` 里同时改动的 `paused` / `resumed` handoff（折叠编排期间继续吸收源、只在交接时限制追赶）**没有一起搬**：那属于折叠编排那套，本 fork 没有 `ChoreographedFlow`，也就没有那个 `paused` 状态。那个文件里属于本次改动的另一处只有一行：`STREAM_TIMING` 是它导入却没用到的名字，一并删掉（`WORD_MOTION` 仍在用，`maxDelay` 也仍由 `streaming.tsx` 的收尾计时器读着，没变成死常量）。
+
 ## Unreleased (settings hints)
 
 **设置面板里的「说明」改成挂在该行 `title` 上的原生悬停框；末尾那句操作提示删掉了。**
