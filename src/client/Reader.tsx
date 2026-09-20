@@ -1,6 +1,7 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
+import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } from './Blocks.js';
@@ -14,6 +15,7 @@ import { basename, createProducedFileMentions, dirname, getTurnDeliverables, sho
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
+import { glassProperties, glassValues } from './glass.js';
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
@@ -626,6 +628,14 @@ export function Reader(props: ReaderProps) {
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion);
+  // Read defensively, like `shortcuts` below: persistence replaces the whole record, so a record
+  // written before this preference existed comes back with no `glass` key at all.
+  const glassPreference = props.useStore(state => state.glass) === true;
+  // The skin's per-surface opacities: stored as the parts the reader moved, resolved against each
+  // part's initial here, and handed to the stylesheet as custom properties on the root.
+  const glassStored = props.useStore(state => state.glassParts);
+  const glassValuesResolved = useMemo(() => glassValues(glassStored), [glassStored]);
+  const glassVars = useMemo(() => glassProperties(glassValuesResolved), [glassValuesResolved]);
   const motion = useMotionAllowed(motionPreference);
   // The two collapse verbs and the bindings they answer to. A record written before the field
   // existed has no `shortcuts` at all, so the defaults are resolved here rather than assumed; a
@@ -864,7 +874,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={glassVars as CSSProperties} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
@@ -875,6 +885,8 @@ export function Reader(props: ReaderProps) {
           <button type="button" className={`${css.textButton} ${css.collapseAll}`} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} aria-keyshortcuts={collapseAllKey || undefined} onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title={`收起所有已展开的过程${keyHint(collapseAllKey)}`}>全部收起</button>
         </div>
         <SettingsMenu motion={motion} preference={motionPreference} onChange={props.actions.setMotion}
+          glass={glassPreference} onGlass={props.actions.setGlass}
+          glassParts={glassValuesResolved} onGlassPart={props.actions.setGlassPart}
           shortcuts={{ collapseTurn: collapseTurnKey, collapseAll: collapseAllKey }} onShortcut={props.actions.setShortcut} buttonRef={settingsRef} />
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {

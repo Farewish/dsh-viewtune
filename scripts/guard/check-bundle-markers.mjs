@@ -167,6 +167,27 @@ const markers = [
     /DIFF_MUTATION_TOOLS = \/\* @__PURE__ \*\/ new Set\(\[\s*"write",\s*"edit",\s*"str_replace_editor"/.test(bundle)],
   ['a parent call folds its children’s changed files in', 'callDiffHunks(child, identity.name, inputFields(identity.raw))'],
   ['the counts open a per-file diff surface', () => /"diffScrollArea"/.test(bundle) && /"diffTab"/.test(bundle)],
+  // The frosted-glass skin: a root attribute the settings panel sets, and the two declarations that
+  // make it a skin rather than a recolour — the sticky lane paints no plate of its own, and the
+  // reader's own bubble becomes translucent with a real blur behind it. A "glass mode" that only
+  // changed colours would pass a screenshot and fail these.
+  ['the glass skin is a root attribute', '"data-reader-glass": glassPreference'],
+  ['the settings panel offers the skin', '"data-ud-check": "reader-settings-glass"'],
+  ['the skin takes the chrome away instead of recolouring it', () =>
+    // The lane mixes its own colour against transparency through the reader's dial — not a recolour,
+    // and not the minifier's `background:0 0` either, now that the opacity is a variable.
+    /\[data-reader-glass\][^{]*_toolbar\{[^}]*background:color-mix\(in srgb,\s*var\(--dsw-alias-bg-base\)\s*var\(--glass-lane/.test(readerCss)
+    && /\[data-reader-glass\][^{]*_user\{[^}]*backdrop-filter/.test(readerCss)],
+  // Every surface the skin touches reads its own dial, and every dial is one the settings panel can
+  // move: the property names in the stylesheet and in the part table are the same six strings, so a
+  // surface wired to a property no row writes (or a row writing one no surface reads) fails here.
+  ['every adjustable surface reads its own dial', () => {
+    const props = [...readerCss.matchAll(/var\((--glass-[a-z]+)/g)].map(match => match[1]);
+    return new Set(props).size === 6
+      && ['--glass-lane', '--glass-user', '--glass-card', '--glass-code', '--glass-diff', '--glass-chip']
+        .every(name => props.includes(name) && bundle.includes(`"${name}"`));
+  }],
+  ['the skin has a settings row per dial', '"data-ud-check": `reader-settings-glass-${part.id}`'],
   // The chip's height is expressed on the row's own font axis, not as a fixed pixel value: the row is
   // `24px + delta` tall and clips its overflow, so a fixed height is what loses its bottom the moment
   // the reading font is set smaller — which is what it did until this was pinned.

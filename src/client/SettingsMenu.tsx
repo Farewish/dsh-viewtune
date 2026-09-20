@@ -5,6 +5,7 @@ import {
   bindingFromEvent, parseShortcut, shortcutLabel, shortcutProblem,
 } from './shortcuts.js';
 import type { ShortcutAction, ShortcutProblem } from './shortcuts.js';
+import { GLASS_PARTS } from './glass.js';
 import css from './Reader.module.css';
 
 /** The panel's pages, in the order they are offered. */
@@ -37,6 +38,8 @@ const MOTION_OVERRIDE = '已按系统的「减少动态效果」关闭';
 /** The button's accessible name and its hover box: the toolbar's other buttons carry a `title` too,
  * so this one keeps the browser's own box rather than growing a second kind of hover language. */
 const BUTTON_HINT = 'viewtune 设置';
+/** What the frosted-glass skin does, as the row's `title` box. */
+const GLASS_HINT = '默认关闭。打开后卡片、工具框与代码块透出宿主壁纸与皮肤，吸顶栏用同一套液体玻璃；路径、行数这类标签静止时透明，悬停或聚焦才显出轮廓。';
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
@@ -75,12 +78,19 @@ const BUTTON_HINT = 'viewtune 设置';
  * tabs. A settings panel with two pages should not be the one place in this view where a keyboard
  * reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassParts, onGlassPart, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
   preference: boolean;
   onChange: (next: boolean) => void;
+  /** Whether the frosted-glass skin is on. */
+  glass: boolean;
+  onGlass: (next: boolean) => void;
+  /** The skin's opacities, every part already resolved against its initial by the caller. */
+  glassParts: Readonly<Record<string, number>>;
+  /** Move one surface's opacity. */
+  onGlassPart: (id: string, value: number) => void;
   /** The bindings in force, defaults already resolved by the caller. */
   shortcuts: Readonly<Record<ShortcutAction, string>>;
   /** Record a new binding, or clear one with an empty string. */
@@ -179,15 +189,44 @@ export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortc
       </div>
       <div id={`${panelId}-page`} role="tabpanel" aria-labelledby={`${panelId}-${page}`}>
         {page === 'visual'
-          ? <div className={css.settingsRow} title={overridden ? undefined : MOTION_HINT}>
-            <span className={css.settingsCopy}>
-              <span className={css.settingsLabel}>动效</span>
-              {overridden && <span className={css.settingsNote}>{MOTION_OVERRIDE}</span>}
-            </span>
-            {/* The preference is what the switch shows; `motion` above is what the reader actually
-                gets, which the note explains when the system overrides it. */}
-            <Switch checked={preference} onChange={onChange} label="动效" />
-          </div>
+          ? <>
+            <div className={css.settingsRow} title={overridden ? undefined : MOTION_HINT}>
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>动效</span>
+                {overridden && <span className={css.settingsNote}>{MOTION_OVERRIDE}</span>}
+              </span>
+              {/* The preference is what the switch shows; `motion` above is what the reader actually
+                  gets, which the note explains when the system overrides it. */}
+              <Switch checked={preference} onChange={onChange} label="动效" />
+            </div>
+            <div className={css.settingsRow} title={GLASS_HINT} data-ud-check="reader-settings-glass">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>磨砂玻璃</span>
+              </span>
+              {/* A skin, not a behaviour: it changes what the reader's surfaces are made of, so it
+                  has nothing to report and no state line — the description is the row's `title`. */}
+              <Switch checked={glass} onChange={onGlass} label="磨砂玻璃" />
+            </div>
+            {/* The skin's own dials, shown only while it is on: a surface's opacity means nothing
+                with the skin off, and six dead rows would push everything below the fold. Each dial
+                is one custom property on the root (see glass.ts), so the stylesheet stays
+                declarative — and 0 is "the reader paints nothing here", which is where the skin
+                starts for the surfaces that have no plate of their own anyway. */}
+            {glass && GLASS_PARTS.map(part => (
+              <div key={part.id} className={`${css.settingsRow} ${css.settingsSubRow}`} title={part.hint}
+                data-ud-check={`reader-settings-glass-${part.id}`}>
+                <span className={css.settingsCopy}>
+                  <span className={css.settingsLabel}>{part.label}</span>
+                </span>
+                <span className={css.settingsRange}>
+                  <input type="range" min={0} max={100} step={5} value={glassParts[part.id] ?? part.initial}
+                    aria-label={`${part.label}的不透明度`}
+                    onChange={event => { onGlassPart(part.id, Number(event.currentTarget.value)); }} />
+                  <span className={css.settingsRangeValue}>{glassParts[part.id] ?? part.initial}%</span>
+                </span>
+              </div>
+            ))}
+          </>
           : <div className={css.settingsShortcuts} data-ud-check="reader-settings-shortcuts">
             {SHORTCUT_ROWS.map(({ action, label, note, other }) => {
               const binding = shortcuts[action] ?? '';

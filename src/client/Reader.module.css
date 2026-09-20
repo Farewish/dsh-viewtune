@@ -426,7 +426,7 @@
 .settingsButton { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 /* Anchored to the wrap rather than to the toolbar: the lane wears no inline padding (asserted), so
    `right: 0` lines the panel up with the button's own right edge. */
-.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 280px; display: flex; flex-direction: column; padding: 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
+.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 280px; max-height: min(70vh, 520px); overflow-y: auto; display: flex; flex-direction: column; padding: 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
 /* The entrance lives on its own class, applied only for an opening that should animate
    (SettingsMenu decides). It must NOT be gated by `[data-motion=off]`: lifting such a gate
    re-applies the animation, so turning 动效 on from inside this panel replayed its entrance. */
@@ -474,4 +474,100 @@
 .shortcutClear:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 /* Touch keeps the 44px target; the label rides the bottom of the box so the bar stays on the rule. */
 @media (pointer: coarse) { .settingsTab { min-height: 44px; display: inline-flex; align-items: flex-end; justify-content: center; } }
+/* The skin's own rows: indented under the switch they belong to, so the panel reads as one switch
+   with its dials rather than seven equal preferences. The value is printed because a slider with no
+   number on it is a guess. */
+.settingsSubRow { margin-left: 10px; }
+.settingsRange { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.settingsRangeValue { min-width: 34px; text-align: right; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.settingsRange input[type=range] { width: 96px; height: 16px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
+.settingsRange input[type=range]:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+/* Frosted glass: an opt-in skin, ported from upstream 0.2.0's `data-reader-glass` block and mapped
+   onto this fork's surfaces. The rule is the same in both — the reader paints no plates of its own,
+   so a host wallpaper or skin stays visible behind the reading view, and the labels that are
+   furniture (paths, counts, states) go transparent at rest, showing their outline only when hovered
+   or focused.
+
+   Two deliberate differences from upstream. Theirs drops the sticky toolbar to `z-index: 6` in this
+   mode; ours keeps the 9 it wears everywhere, because that is asserted and this fork's status row
+   does not stick at all — so the lane can never clamp into the composer band the way theirs could.
+   And their block names classes this fork does not have (`flowCell`, `closedProcessSummary`,
+   `foldControl`, `liveFoldContainer`); the equivalents here are the ones listed. */
+.root[data-reader-glass] .toolbar {
+  /* Every surface below is a mix of its own colour against transparency, driven by a custom property
+     the reader owns (see glass.ts): 0% is "paint nothing here", 100% is the opaque plate this view
+     wears with the skin off. The fallbacks are the values the skin shipped with. */
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) var(--glass-lane, 25%), transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 0;
+  box-shadow: none;
+}
+/* The user's own bubble becomes a translucent pill rather than a solid one. */
+.root[data-reader-glass] .user {
+  background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0,0,0,.08)) var(--glass-user, 25%), transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.3)) 30%, transparent);
+}
+.root[data-reader-glass] .reasonCard {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.35)) 65%, transparent);
+}
+.root[data-reader-glass] .toolDetails,
+.root[data-reader-glass] .notice,
+.root[data-reader-glass] .unknown,
+.root[data-reader-glass] .toolRaw,
+.root[data-reader-glass] .systemPrompt,
+.root[data-reader-glass] .compactionSummaryBox,
+.root[data-reader-glass] .attention,
+.root[data-reader-glass] .imageFrame,
+.root[data-reader-glass] .imageDialog {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
+}
+.root[data-reader-glass] :global(.md-code-block) {
+  background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+/* A diff block is the diff's own paper wherever it is drawn, so it follows the DIFF dial rather
+   than the code one. It shows up twice: inside the panel, where the scroll area strips its plate to
+   transparent (the rule below this one) so the reader sees the panel's own plate, and inline in a
+   tool's 结果 tab, where this rule is what it wears. One dial therefore governs every piece of diff
+   paper; grouping it under "code" split the same thing by where it sat. */
+.root[data-reader-glass] :global([data-diff]) {
+  background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-diff, 20%), transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.root[data-reader-glass] .diffOverlay {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-diff, 20%), transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.root[data-reader-glass] .diffScrollArea { background: transparent; }
+.root[data-reader-glass] .diffTab { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,.8)) var(--glass-diff, 25%), transparent); }
+/* The selected tab sits a step above the others on the same dial, so one control moves both. */
+.root[data-reader-glass] .diffTab[data-active] { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,1)) calc(var(--glass-diff, 20%) + 25%), transparent); }
+/* Furniture chips: their wash is the reader's dial too, so at 0 they are transparent until the
+   pointer or the keyboard says otherwise. */
+.root[data-reader-glass] .compactionPill,
+.root[data-reader-glass] .deliverableChip,
+.root[data-reader-glass] .toolState,
+.root[data-reader-glass] .diffStatButton {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
+  border-color: transparent;
+}
+.root[data-reader-glass] .compactionPill:hover,
+.root[data-reader-glass] .compactionPill:focus-visible,
+.root[data-reader-glass] .deliverableChip:hover,
+.root[data-reader-glass] .deliverableChip:focus-within,
+.root[data-reader-glass] .diffStatButton:hover,
+.root[data-reader-glass] .diffStatButton:focus-visible,
+.root[data-reader-glass] .diffStatButton[aria-expanded="true"] {
+  background: var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1));
+  border-color: var(--dsw-alias-border-l2, rgba(127,127,127,.28));
+}
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
