@@ -34,7 +34,7 @@ export const GLASS_PARTS: readonly GlassPart[] = [
   },
   {
     id: 'card', label: '卡片与面板', property: '--glass-card', initial: 0,
-    hint: '推理卡、工具框、系统提示词、备忘框、图片框这一类的底板。出厂是 0：完全透明，只留边框。',
+    hint: '推理卡、工具框、系统提示词、备忘框与它的压缩胶囊、图片框、注意条这一类的底板。出厂是 0：完全透明，只留边框。',
   },
   {
     id: 'code', label: '代码块', property: '--glass-code', initial: 25,
@@ -46,7 +46,7 @@ export const GLASS_PARTS: readonly GlassPart[] = [
   },
   {
     id: 'chip', label: '产物标签', property: '--glass-chip', initial: 0,
-    hint: '压缩胶囊、交付文件、工具状态、行数计数这类行内小标签。出厂是 0：静止时透明，悬停或聚焦才显出轮廓。',
+    hint: '一轮末尾那一栏产物文件（交付 chip）的底色。它是唯一一个常驻、且静止时就自带底板的小标签；工具状态与行数计数在基础样式里本来没有底，所以不归任何旋钮。',
   },
 ];
 

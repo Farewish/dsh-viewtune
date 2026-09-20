@@ -551,15 +551,22 @@
 .root[data-reader-glass] .diffTab { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,.8)) var(--glass-diff, 25%), transparent); }
 /* The selected tab sits a step above the others on the same dial, so one control moves both. */
 .root[data-reader-glass] .diffTab[data-active] { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,1)) calc(var(--glass-diff, 20%) + 25%), transparent); }
-/* Furniture chips: their wash is the reader's dial too, so at 0 they are transparent until the
-   pointer or the keyboard says otherwise. */
-.root[data-reader-glass] .compactionPill,
-.root[data-reader-glass] .deliverableChip,
-.root[data-reader-glass] .toolState,
-.root[data-reader-glass] .diffStatButton {
-  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
-  border-color: transparent;
+/* One chip carries a plate of its own in the base look — the deliverable chip in a turn's product
+   row — so it is the one the 产物标签 dial owns, and the only chip that is always on screen. The
+   compaction pill has a plate too, so it rides with the cards.
+   Two chips are deliberately absent: the tool-state label (「执行中」 and friends) and the `+N -M`
+   count have NO resting background in the base look — they are text, and the count only shows a wash
+   while hovered or focused. A "transparency" dial that gave either of them one would be inventing a
+   surface rather than letting one show through, which is why they are not wired to any dial at all. */
+.root[data-reader-glass] .deliverableChip {
+  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l2, rgba(128,128,128,.22)) var(--glass-chip, 0%), transparent);
 }
+.root[data-reader-glass] .compactionPill {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) var(--glass-card, 0%), transparent);
+}
+/* Whatever the dial says, the pointer and the keyboard still get their outline. */
 .root[data-reader-glass] .compactionPill:hover,
 .root[data-reader-glass] .compactionPill:focus-visible,
 .root[data-reader-glass] .deliverableChip:hover,
