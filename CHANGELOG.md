@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased (deliverable open mode)
+
+**设置「视效」页多了一行「产物用右侧栏打开」：默认仍用系统程序，打开后改用右侧栏的内置预览。**
+
+上游 0.2.0 这条我一度以为"本机接不上"——**那是我查错了地方**（只翻了一个包就下结论）。查全之后事实是：接得上，而且上游的写法对本机是对的。
+
+- 上游调的是 Cordis **运行时服务** `ctx.sidebarRight.openResource(address, { params: { line } })`，地址是 `dsh-resource://file/session/<id>/<path>`。**这台宿主确实注册了它**：右侧栏那个包在实现 `openResource`（内部走 `navigator.openResourceIn(sessionId, address, …)`），另一个包在调用它，而产品自己的 tab 动作也是先用 `fileAddressFor(sessionId, root, path)` 造地址再交给它——所以本 fork 直接沿用**官方服务名与官方地址格式**，不另造一套。
+- `src/client/open-file.ts`：上游那 94 行**逐字照搬**（`DeliverableOpenMode`、`deliverableOpenModeOf`、`modeFromSnapshot`、`isFolderOpenPath`、`fileAddressFor`、`resolveOpenWorkspacePath`、`openDeliverableFile`），包括它的两条规则：**工作区文件夹永远走系统程序**（侧栏预览的是文件，不是目录），以及**服务缺席或抛错就回落系统程序并警告**——不是"点了没反应"。
+- 接线沿用我们已有的路径解析：`openFile` 现在走 `openDeliverableFile`，`openExternal` 就是原来那段 `ctx.remote.session.openWorkspacePath`；侧栏那条从 `ctx.get('sidebarRight')` **取一次**（可选服务，不写进 `inject`，缺席也不影响启动），`mode` 从我们的 root store 读。
+- 设置项排在「视效」页最后一行（`data-ud-check="reader-settings-openmode"`），默认关闭；存储新增 `deliverableOpenMode`（默认 `'external'`），读取端走 `deliverableOpenModeOf`——除了 `'sidebar'` 一切都是系统程序（持久化整体替换，老记录没有这个键）。
+
+新增单测 `tests/open-file.test.ts`（4 条，测试文件 17 → 18）：地址与官方格式一致且剥掉 cwd 前缀、存储值防御性读取（含快照抛错）、文件夹永远走系统程序、侧栏优先／缺席回落／抛错回落／默认模式根本不碰侧栏。四条 marker 进 `check-bundle-markers.mjs`：设置行存在、**服务是"查"不是"依赖"**（`get?.("sidebarRight")`）、地址是官方 session-file 方案、以及**缺服务时带警告回落**；后两条做过阴性测试（改掉地址方案、改掉警告文案各报一次 `MISS`，还原后 sha256 一致）。
+
+三条踩坑记给未来的自己：① 我上一轮判定"服务不存在"是因为只在一个包里 grep，**结论要按整棵树下**；② `fileAddressFor` 对**工作区之外**的绝对路径会产出带双斜杠的地址（`…/s-1//elsewhere/c.md`）——那是**官方实现的行为**，本 fork 照搬而不美化，测试里把它钉住并写明原因；③ 本仓库的测试运行器会把测试文件里的 `.ts` 字面量当 import 说明符一起改写成 `.js`，夹具文件名别用 `.ts`（第一版测试就是这么挂的）。
+
 ## Unreleased (frosted glass)
 
 **设置「视效」页多了「磨砂玻璃」开关：打开后阅读视图不再自带不透明底板，透出宿主壁纸与皮肤；开关下面还有六个滑块，分别调各面的不透明度。**

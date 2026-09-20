@@ -16,6 +16,7 @@ import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
 import { glassProperties, glassValues } from './glass.js';
+import { deliverableOpenModeOf } from './open-file.js';
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
@@ -635,6 +636,9 @@ export function Reader(props: ReaderProps) {
   // part's initial here, and handed to the stylesheet as custom properties on the root.
   const glassStored = props.useStore(state => state.glassParts);
   const glassValuesResolved = useMemo(() => glassValues(glassStored), [glassStored]);
+  // Where a delivered file opens. Read through the same fallback the skin uses: a record written
+  // before this preference existed, or anything that is not `'sidebar'`, means the system app.
+  const openInSidebar = props.useStore(state => deliverableOpenModeOf(state.deliverableOpenMode)) === 'sidebar';
   const glassVars = useMemo(() => glassProperties(glassValuesResolved), [glassValuesResolved]);
   const motion = useMotionAllowed(motionPreference);
   // The two collapse verbs and the bindings they answer to. A record written before the field
@@ -887,6 +891,7 @@ export function Reader(props: ReaderProps) {
         <SettingsMenu motion={motion} preference={motionPreference} onChange={props.actions.setMotion}
           glass={glassPreference} onGlass={props.actions.setGlass}
           glassParts={glassValuesResolved} onGlassPart={props.actions.setGlassPart}
+          openInSidebar={openInSidebar} onOpenInSidebar={on => { props.actions.setDeliverableOpenMode(on ? 'sidebar' : 'external'); }}
           shortcuts={{ collapseTurn: collapseTurnKey, collapseAll: collapseAllKey }} onShortcut={props.actions.setShortcut} buttonRef={settingsRef} />
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {

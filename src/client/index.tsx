@@ -9,6 +9,8 @@ import { Reader } from './Reader.js';
 import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { fillComposerDom } from './mcp-app.js';
+import { modeFromSnapshot, openDeliverableFile } from './open-file.js';
+import type { OpenModeSnapshot } from './open-file.js';
 import type { ReaderInjected } from './types.js';
 
 /** Structural face of the sanctioned per-session composer writer. */
@@ -18,6 +20,20 @@ interface ComposerShell {
 interface ConversationFace {
   input?: { shell?: (id: SessionId) => ComposerShell };
 }
+/**
+ * The right sidebar's resource opener.
+ *
+ * A runtime service, not a published type: this deployment DOES register it (and the product's own
+ * tab actions call it with an address built by the same `fileAddressFor` this fork ports), but no
+ * installed package declares it, so it is read defensively and a host without it falls back to the
+ * system opener with a warning.
+ */
+interface SidebarRightFace {
+  openResource?: (address: string, options?: { params?: { line?: number } }) => void;
+}
+interface RemoteSessionFace {
+  openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>;
+}
 
 export type { ReaderBlockOwner } from './types.js';
 export { McpAppFrame } from './McpAppFrame.js';
@@ -26,6 +42,12 @@ export const inject = ['slots', 'sessions', 'conversation', 'remote', 'remote.se
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
+  /** One lookup per activation, so a host without the service pays nothing per click. */
+  const sidebar = (ctx.get?.('sidebarRight')
+    ?? (ctx as unknown as { sidebarRight?: SidebarRightFace }).sidebarRight) as SidebarRightFace | undefined;
+  const openSidebar = typeof sidebar?.openResource === 'function'
+    ? (address: string) => { sidebar.openResource!(address); }
+    : undefined;
   ctx.slots.inject('conversation.view', function* () {
     yield ctx.slots.register({
     name: 'conversation.view',
@@ -51,21 +73,33 @@ export function apply(ctx: Context): void {
         openFile: async (path: string) => {
           try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
-            const targetPath = path === '.' || path === ''
-              ? (cwd ?? '.')
-              : resolveWorkspacePath(cwd, path);
-            const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
-            const remoteSession = remote?.session
-              ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined)
-              ?? ((ctx.get?.('remote') as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } })?.session);
-            if (remoteSession?.openWorkspacePath) {
-              const result = await remoteSession.openWorkspacePath({ path: targetPath });
-              if (!result?.ok) {
-                console.warn('[dsh-better-display] openWorkspacePath failed:', result?.error?.message);
+            // The system opener is the default and the fallback; the sidebar is opt-in per reader
+            // (`store.ts`), and `open-file.ts` owns the rules — folders always go to the OS, a
+            // missing or throwing sidebar opener falls back with a warning.
+            const openExternal = async (absolutePath: string) => {
+              const remote = ctx.remote as unknown as { session?: RemoteSessionFace } | undefined;
+              const remoteSession = remote?.session
+                ?? (ctx.get?.('remote.session') as unknown as RemoteSessionFace | undefined)
+                ?? ((ctx.get?.('remote') as unknown as { session?: RemoteSessionFace } | undefined)?.session);
+              if (remoteSession?.openWorkspacePath) {
+                const result = await remoteSession.openWorkspacePath({ path: absolutePath });
+                if (!result?.ok) {
+                  console.warn('[dsh-better-display] openWorkspacePath failed:', result?.error?.message);
+                }
+              } else {
+                console.warn('[dsh-better-display] remote.session is not available');
               }
-            } else {
-              console.warn('[dsh-better-display] remote.session is not available');
-            }
+            };
+            await openDeliverableFile({
+              path,
+              mode: modeFromSnapshot(store as unknown as OpenModeSnapshot),
+              sessionId,
+              cwd,
+              resolveWorkspacePath,
+              openExternal,
+              openSidebar,
+              warn: (message, extra) => { console.warn(message, extra); },
+            });
           } catch (error) {
             console.warn('[dsh-better-display] openFile error:', error);
           }

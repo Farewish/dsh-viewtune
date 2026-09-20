@@ -156,7 +156,15 @@ const markers = [
     /if \(waited < 3e3\) return null;/.test(bundle)
     && /min-width:calc\(2ch \+ 1em\)/.test(bundle)],
   ['the wait is anchored to the last handover', () => /waitingAnchor\(\s*group\.keys/.test(bundle)],
-  // The changed-line counts a tool row carries, and the two rules that keep them honest: only a tool
+  // Where a delivered file opens. Four claims: the settings row exists; the sidebar opener is LOOKED
+  // UP on the Cordis context rather than required (a host without it must still boot); the address a
+  // file is opened by is the official session-file scheme the product's own tab actions build; and a
+  // missing opener falls back to the system app with a warning rather than doing nothing at all.
+  ['the settings panel offers the sidebar preview', '"data-ud-check": "reader-settings-openmode"'],
+  ['the sidebar opener is looked up, not required', 'get?.("sidebarRight")'],
+  ['deliverable addresses use the official session-file scheme', 'dsh-resource://file/session/'],
+  ['a missing sidebar opener falls back with a warning', 'sidebarRight.openResource is not available; falling back to system app'],
+  // The com  // The changed-line counts a tool row carries, and the two rules that keep them honest: only a tool
   // that mutates a file may read its own arguments as a diff (several unrelated tools carry a field
   // named `content`, and counting those would invent additions for calls that changed nothing), and a
   // parent call reports what its children changed rather than what its own arguments contain. The

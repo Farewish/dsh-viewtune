@@ -40,6 +40,8 @@ const MOTION_OVERRIDE = '已按系统的「减少动态效果」关闭';
 const BUTTON_HINT = 'viewtune 设置';
 /** What the frosted-glass skin does, as the row's `title` box. */
 const GLASS_HINT = '默认关闭。打开后卡片、工具框与代码块透出宿主壁纸与皮肤，吸顶栏用同一套液体玻璃；路径、行数这类标签静止时透明，悬停或聚焦才显出轮廓。';
+/** Where a delivered file opens, as the row's `title` box. */
+const OPEN_MODE_HINT = '默认关闭：点产物文件用系统程序打开。打开后改用右侧栏的内置预览（文件夹、「在文件夹中显示」仍然走系统程序）；宿主没有这个服务时会自动回落到系统程序，并在控制台说明原因。';
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
@@ -78,7 +80,7 @@ const GLASS_HINT = '默认关闭。打开后卡片、工具框与代码块透出
  * tabs. A settings panel with two pages should not be the one place in this view where a keyboard
  * reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassParts, onGlassPart, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -91,6 +93,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   glassParts: Readonly<Record<string, number>>;
   /** Move one surface's opacity. */
   onGlassPart: (id: string, value: number) => void;
+  /** Whether a delivered file opens in the right sidebar rather than the system app. */
+  openInSidebar: boolean;
+  onOpenInSidebar: (next: boolean) => void;
   /** The bindings in force, defaults already resolved by the caller. */
   shortcuts: Readonly<Record<ShortcutAction, string>>;
   /** Record a new binding, or clear one with an empty string. */
@@ -226,6 +231,14 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 </span>
               </div>
             ))}
+            {/* Where a delivered file opens. Independent of the skin, so it sits after the dials
+                rather than inside them; the row's `title` carries the fallback story. */}
+            <div className={css.settingsRow} title={OPEN_MODE_HINT} data-ud-check="reader-settings-openmode">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>产物用右侧栏打开</span>
+              </span>
+              <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
+            </div>
           </>
           : <div className={css.settingsShortcuts} data-ud-check="reader-settings-shortcuts">
             {SHORTCUT_ROWS.map(({ action, label, note, other }) => {
