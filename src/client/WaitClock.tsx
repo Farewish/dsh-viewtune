@@ -35,14 +35,16 @@ export function WaitClock({ startTime }: { startTime: number | null }) {
   }, []);
   const waited = Math.max(0, now - anchor);
   const overtime = waited >= WAIT_OVERTIME_MS;
-  const counting = waited >= WAIT_COUNT_FROM_MS;
+  // Nothing at all renders before the wait is worth a number. Keeping the readout mounted and merely
+  // invisible held a blank slot open between the status text and the chevron for the whole first
+  // three seconds — the quiet clutter this view is supposed to avoid, and worse than the movement it
+  // was there to prevent. The cost is that the chevron moves once, when the readout arrives, which
+  // is the same movement the status text itself makes whenever it changes; the width floor on the
+  // readout keeps the counting from moving anything after that.
+  if (waited < WAIT_COUNT_FROM_MS) return null;
   return <span className={css.waitClock} data-reader-wait-clock
     {...(overtime ? { 'data-overtime': '' } : {})}>
-    {/* Mounted from the first frame so its width is already reserved — the readout appearing must
-        not shift the chevron that sits right after the label — but held invisible until the wait is
-        worth a number. `visibility` keeps it out of the accessibility tree as well as out of the
-        eye's way, so nothing announces a zero. */}
-    <span className={css.waitSeconds} data-pending={counting ? undefined : ''}>{formatRunDuration(waited)}</span>
+    <span className={css.waitSeconds}>{formatRunDuration(waited)}</span>
     {overtime && <span className={css.waitOvertime} data-reader-wait-badge>暂未响应</span>}
   </span>;
 }

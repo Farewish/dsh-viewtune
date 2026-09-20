@@ -7,7 +7,9 @@
 上游 0.2.0 的这条功能，模型部分照搬、接线按本 fork 的版面重做：
 
 - `src/client/waiting-clock.ts` —— **逐字照搬**上游的纯模型。`handsBackToModel` 判定「这个节点是否把球交回给模型」，`waitingAnchor` 从后往前找**最后一次交棒**的时间（工具返回、上下文注入、命令结束、用户发言），而不是轮次开始——否则一个刚开始的等待会继承工具已经花掉的分钟数。`HANDOVER_KINDS` 用 `satisfies readonly ChatNodeKind[]` 对着宿主的 kind 联合类型做检查：写错一个名字是 `tsc` 失败，而不是运行时静默失效。
-- `src/client/WaitClock.tsx` —— 主体照搬（每 250ms 刷新、显示 `formatRunDuration` 的秒数、`WAIT_OVERTIME_MS` 10 秒后追加「暂未响应」徽标、数字走 `tabular-nums`），**一处本 fork 的改动**：`WAIT_COUNT_FROM_MS = 3_000`，前 3 秒不显示秒数。理由：等待通常比 3 秒短，数字一出现就把眼睛拉到一个还没来得及读就已经结束的东西上；3 秒大致是「一拍」变成「有点久」的地方，也是读数第一次真的带来新信息的时候。实现上用挂载 + `visibility: hidden`（不是不渲染），宽度因此**从一开始就占住**，数字出现时不会推动标签后面的箭头；淡入 160ms 同样受 `[data-motion=off]` 管。
+- `src/client/WaitClock.tsx` —— 主体照搬（每 250ms 刷新、显示 `formatRunDuration` 的秒数、`WAIT_OVERTIME_MS` 10 秒后追加「暂未响应」徽标、数字走 `tabular-nums`），**一处本 fork 的改动**：`WAIT_COUNT_FROM_MS = 3_000`，前 3 秒什么都不渲染。理由：等待通常比 3 秒短，数字一出现就把眼睛拉到一个还没来得及读就已经结束的东西上；3 秒大致是「一拍」变成「有点久」的地方，也是读数第一次真的带来新信息的时候。
+
+  第一版把读数**挂载着但设为 `visibility: hidden`**，想的是"宽度先占住、出现时不推动箭头"。实际效果是在标签和箭头之间留了三秒**空槽**——比它要防的那一次位移更糟，所以改掉了。现在前 3 秒完全不渲染（连 8px 外边距都没有），代价是读数出现时箭头动一次，而这正是状态文案本身变化时也会发生的同一种移动；读数随后带上宽度下限 `min-width: calc(2ch + 1em)`（两个数字 + 秒，覆盖第 3 秒到第 59 秒），所以计数本身不再推动任何东西，过一分钟数字真的变宽、那一行才真的变长。
 - **接线不同**：上游把它做成整条 transcript 下面独立的一行 `WaitingStatus`（「深度求索中…」）；本 fork 的状态行本来就属于**每一轮**（disclosure 按钮里那一行），所以时钟挂进 `GroupStatus`，跟在「正在思考 / 正在输出 / 正在准备回复 / 正在处理」后面。
 
 **什么时候计时**（判据来自上游的 `isAwaitingModel`，按"一组"改写）：
@@ -19,9 +21,9 @@
 
 时钟按 `key={anchor.key}` 重挂，所以一次新的交棒拿到自己的新时钟，而不是继承上一个等待已经走过的秒数。
 
-样式取上游那三条选择器的原样（`.waitClock` / `.waitSeconds` / `.waitOvertime`，含 `--dsw-alias-label-caption`、`--dsw-alias-state-warning-primary` 的兜底值），外面套一个 `.statusLine` 让时钟与标签同行。四条 guard 加进 `check-bundle-markers.mjs`：时钟的 `data-reader-wait-clock`、超时的 `data-reader-wait-badge`、**前 3 秒不计数的两半**（阈值 `WAIT_COUNT_FROM_MS = 3e3` 与那条比较，加上样式里的 `[data-pending]{visibility:hidden}`），以及**锚点必须走 `group.keys`**（按形状断言；锚点算法换了它仍成立，而"从轮次开始计时"这个 bug 会让它失败）。
+样式取上游那三条选择器的原样（`.waitClock` / `.waitSeconds` / `.waitOvertime`，含 `--dsw-alias-label-caption`、`--dsw-alias-state-warning-primary` 的兜底值），外面套一个 `.statusLine` 让时钟与标签同行。四条 guard 加进 `check-bundle-markers.mjs`：时钟的 `data-reader-wait-clock`、超时的 `data-reader-wait-badge`、**前 3 秒不计数**（内联后的 `if (waited < 3e3) return null;` 与宽度下限 `min-width:calc(2ch + 1em)`），以及**锚点必须走 `group.keys`**（按形状断言；锚点算法换了它仍成立，而"从轮次开始计时"这个 bug 会让它失败）。
 
-那条 3 秒的 marker 钉的是**数值与关系**而不是常量名——第一版写成 `/WAIT_COUNT_FROM_MS/`，阴性测试当场发现它对本该失败的样本照样通过（子串匹配，而且只替换了第一处出现），也就是它根本没在保护这条规则。现在它「能失败」是实测的：把产物里的 `WAIT_COUNT_FROM_MS = 3e3` 改成 `0`，报 `MISS`；把 `[data-pending]{visibility:hidden;opacity:0}` 去掉，同样报 `MISS`；两次还原后 sha256 一致、`BUNDLE STATE OK`。
+那条 3 秒的 marker 被阴性测试逼着改了两次，两次都是"它根本没在保护规则"：第一版写成 `/WAIT_COUNT_FROM_MS/`，对一个本该失败的样本照样通过（子串匹配，而且测试脚本只替换了第一处出现）；第二版钉的 `WAIT_COUNT_FROM_MS = 3e3` 在这版实现里也失效了——它只被读一处，构建会**内联**它，常量根本不进产物（也就是说同一条 marker 上一版通过、这一版失败，而源码语义没变）。现在它钉的是**产物的行为**：`if (waited < 3e3) return null;` 与 `min-width:calc(2ch + 1em)`。两半都实测能失败：把阈值改成 `0`、或把宽度下限去掉，各报一次 `MISS`；两次还原后 sha256 一致、`BUNDLE STATE OK`。
 
 ## Unreleased (animation deadlines)
 

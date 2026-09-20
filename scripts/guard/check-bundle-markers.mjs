@@ -146,17 +146,14 @@ const markers = [
   // the minutes the tools already spent, which is the bug this replaced.
   ['the status line carries a wait clock', '"data-reader-wait-clock"'],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
-  // The readout is mounted from the first frame but held invisible until the wait is worth a
-  // number, so its width is already reserved and the chevron after the label does not move. The
-  // threshold and the relation are pinned rather than the constant's name alone: a marker that
-  // survived the number being retuned to zero would not be protecting the rule at all. Retuning it
-  // is meant to fail here, and to be paid for by updating this line — the same deal the stylesheet
-  // guard makes.
+  // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
+  // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
+  // BEHAVIOUR rather than by a name: `WAIT_COUNT_FROM_MS` is read in exactly one place, so the build
+  // inlines it and the constant never reaches the artifact — a marker looking for that name would
+  // have passed on the previous build and failed on this one with nothing having changed.
   ['the readout waits three seconds before it counts', () =>
-    /WAIT_COUNT_FROM_MS = 3e3/.test(bundle)
-    && /counting = waited >= WAIT_COUNT_FROM_MS/.test(bundle)
-    && /\[data-pending\]\{visibility:hidden/.test(bundle)
-    && /"data-pending"/.test(bundle)],
+    /if \(waited < 3e3\) return null;/.test(bundle)
+    && /min-width:calc\(2ch \+ 1em\)/.test(bundle)],
   ['the wait is anchored to the last handover', () => /waitingAnchor\(\s*group\.keys/.test(bundle)],
   // Two calls the product renders with its own keyed cards are rendered here instead of collapsing
   // into a generic row: a question set (what was asked, what was answered) and a delivery (which

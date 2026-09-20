@@ -63,14 +63,14 @@
    the overtime badge is the warning colour on its own wash rather than a second font weight: past
    ten seconds the point is that the wait changed character, not that it got louder. */
 .waitClock { display: inline-flex; align-items: center; flex: none; margin-left: 8px; }
+/* A floor on the readout's width, so the seconds counting up cannot push the chevron that sits right
+   after the label: room for two digits and 秒, which covers every value from the third second to the
+   fifty-ninth. Past a minute the number is genuinely wider than its floor and the line grows.
+   Nothing is rendered before the third second at all — a reserved-but-empty slot held a blank gap
+   open between the status text and the chevron, which is worse than the one movement this avoids. */
 .waitSeconds { font-size: 13px; font-weight: 400; font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum"; color: var(--dsw-alias-label-caption, #86909c);
-  transition: opacity 160ms ease; }
-/* Before the third second the readout is mounted but not shown: `visibility` rather than
-   `display` keeps the width reserved, so the number arriving does not shift the chevron after the
-   label. Same gate as every other fade in this view. */
-.waitSeconds[data-pending] { visibility: hidden; opacity: 0; }
-[data-motion=off] .waitSeconds { transition: none; }
+  min-width: calc(2ch + 1em); }
 .waitOvertime { margin-left: 8px; padding: 0 6px; font-size: 11px; line-height: 16px; border-radius: 5px;
   color: var(--dsw-alias-state-warning-primary, #d8862c);
   background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #d8862c) 16%, transparent); }
