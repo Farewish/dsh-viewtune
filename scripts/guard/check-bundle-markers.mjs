@@ -188,6 +188,12 @@ const markers = [
         .every(name => props.includes(name) && bundle.includes(`"${name}"`));
   }],
   ['the skin has a settings row per dial', '"data-ud-check": `reader-settings-glass-${part.id}`'],
+  // The 「回到最新」 pill floats over the transcript, so it rides the toolbar dial with the blur — but
+  // it carries a floor the dial cannot go under. An affordance that can be dialled out of sight is a
+  // trap, and this one appears only once the reader has scrolled away from the latest message, which
+  // is exactly when they need to find it.
+  ['the jump pill rides the toolbar dial, with a floor', () =>
+    /\[data-reader-glass\][^{]*_jump\{[^}]*max\(var\(--glass-lane/.test(readerCss)],
   // The chip's height is expressed on the row's own font axis, not as a fixed pixel value: the row is
   // `24px + delta` tall and clips its overflow, so a fixed height is what loses its bottom the moment
   // the reading font is set smaller — which is what it did until this was pinned.

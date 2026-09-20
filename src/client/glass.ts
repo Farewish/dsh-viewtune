@@ -26,7 +26,7 @@ export interface GlassPart {
 export const GLASS_PARTS: readonly GlassPart[] = [
   {
     id: 'lane', label: '工具栏', property: '--glass-lane', initial: 25,
-    hint: '阅读列顶部那条「收起 / viewtune」的底板。调低它，滚过来的正文就从下面透出来。',
+    hint: '阅读列顶部那条「收起 / viewtune」的底板，以及浮动在正文上的「回到最新」胶囊（后者有个下限，不会被调没）。调低它，滚过来的正文就从下面透出来。',
   },
   {
     id: 'user', label: '用户气泡', property: '--glass-user', initial: 25,

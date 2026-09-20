@@ -503,6 +503,17 @@
   border: 0;
   box-shadow: none;
 }
+/* The 「回到最新」 pill floats over the transcript, so it is chrome again: it rides the toolbar dial
+   and blurs what is behind it. It carries a FLOOR the dial cannot go under — an affordance that can
+   be dialled out of sight is a trap, and this one only appears once the reader has scrolled away
+   from the latest message, which is exactly when they may need to find it. The dial moves its tint,
+   not its legibility. */
+.root[data-reader-glass] .jump {
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) max(var(--glass-lane, 25%), 20%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l2, rgba(128,128,128,.22)) 70%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
 /* The user's own bubble becomes a translucent pill rather than a solid one. */
 .root[data-reader-glass] .user {
   background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0,0,0,.08)) var(--glass-user, 25%), transparent);
@@ -547,8 +558,7 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
-.root[data-reader-glass] .diffScrollArea { background: transparent; }
-.root[data-reader-glass] .diffTab { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,.8)) var(--glass-diff, 25%), transparent); }
+.root[data-reader-glass] .diffScrollArea { background: transparent; }.root[data-reader-glass] .diffTab { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,.8)) var(--glass-diff, 25%), transparent); }
 /* The selected tab sits a step above the others on the same dial, so one control moves both. */
 .root[data-reader-glass] .diffTab[data-active] { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,1)) calc(var(--glass-diff, 20%) + 25%), transparent); }
 /* One chip carries a plate of its own in the base look — the deliverable chip in a turn's product
