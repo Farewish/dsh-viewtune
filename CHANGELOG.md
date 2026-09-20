@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased (wait clock)
+
+**状态行右边多了一个等待时钟：模型拿到这一轮多久了，前 3 秒不显示秒数，过十秒挂「暂未响应」。**
+
+上游 0.2.0 的这条功能，模型部分照搬、接线按本 fork 的版面重做：
+
+- `src/client/waiting-clock.ts` —— **逐字照搬**上游的纯模型。`handsBackToModel` 判定「这个节点是否把球交回给模型」，`waitingAnchor` 从后往前找**最后一次交棒**的时间（工具返回、上下文注入、命令结束、用户发言），而不是轮次开始——否则一个刚开始的等待会继承工具已经花掉的分钟数。`HANDOVER_KINDS` 用 `satisfies readonly ChatNodeKind[]` 对着宿主的 kind 联合类型做检查：写错一个名字是 `tsc` 失败，而不是运行时静默失效。
+- `src/client/WaitClock.tsx` —— 主体照搬（每 250ms 刷新、显示 `formatRunDuration` 的秒数、`WAIT_OVERTIME_MS` 10 秒后追加「暂未响应」徽标、数字走 `tabular-nums`），**一处本 fork 的改动**：`WAIT_COUNT_FROM_MS = 3_000`，前 3 秒不显示秒数。理由：等待通常比 3 秒短，数字一出现就把眼睛拉到一个还没来得及读就已经结束的东西上；3 秒大致是「一拍」变成「有点久」的地方，也是读数第一次真的带来新信息的时候。实现上用挂载 + `visibility: hidden`（不是不渲染），宽度因此**从一开始就占住**，数字出现时不会推动标签后面的箭头；淡入 160ms 同样受 `[data-motion=off]` 管。
+- **接线不同**：上游把它做成整条 transcript 下面独立的一行 `WaitingStatus`（「深度求索中…」）；本 fork 的状态行本来就属于**每一轮**（disclosure 按钮里那一行），所以时钟挂进 `GroupStatus`，跟在「正在思考 / 正在输出 / 正在准备回复 / 正在处理」后面。
+
+**什么时候计时**（判据来自上游的 `isAwaitingModel`，按"一组"改写）：
+
+- 轮次已闭合 → 不计时；
+- 有 pending interaction（该你回答或确认）→ 不计时，那时行里写的是「等待你的操作」；
+- 末尾节点是 assistant-step：**产出过 block 就不计时**（等待已经结束），只有「还在跑且一个 block 都没有」才计时——请求已发出、模型还没吐字，正是该计时的那一刻；
+- 其余看最后那个节点是否 `handsBackToModel`。**工具还在跑就不算等待**（忙的是工具，不是模型），这一点靠「已返回的调用带 `kind: 'tool-result'`」区分。
+
+时钟按 `key={anchor.key}` 重挂，所以一次新的交棒拿到自己的新时钟，而不是继承上一个等待已经走过的秒数。
+
+样式取上游那三条选择器的原样（`.waitClock` / `.waitSeconds` / `.waitOvertime`，含 `--dsw-alias-label-caption`、`--dsw-alias-state-warning-primary` 的兜底值），外面套一个 `.statusLine` 让时钟与标签同行。四条 guard 加进 `check-bundle-markers.mjs`：时钟的 `data-reader-wait-clock`、超时的 `data-reader-wait-badge`、**前 3 秒不计数的两半**（阈值 `WAIT_COUNT_FROM_MS = 3e3` 与那条比较，加上样式里的 `[data-pending]{visibility:hidden}`），以及**锚点必须走 `group.keys`**（按形状断言；锚点算法换了它仍成立，而"从轮次开始计时"这个 bug 会让它失败）。
+
+那条 3 秒的 marker 钉的是**数值与关系**而不是常量名——第一版写成 `/WAIT_COUNT_FROM_MS/`，阴性测试当场发现它对本该失败的样本照样通过（子串匹配，而且只替换了第一处出现），也就是它根本没在保护这条规则。现在它「能失败」是实测的：把产物里的 `WAIT_COUNT_FROM_MS = 3e3` 改成 `0`，报 `MISS`；把 `[data-pending]{visibility:hidden;opacity:0}` 去掉，同样报 `MISS`；两次还原后 sha256 一致、`BUNDLE STATE OK`。
+
 ## Unreleased (animation deadlines)
 
 **每个 `fill: 'both'` 的 Web Animation 都配了一条墙上时钟兜底。**

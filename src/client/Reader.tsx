@@ -14,6 +14,8 @@ import { basename, createProducedFileMentions, dirname, getTurnDeliverables, sho
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
+import { WaitClock } from './WaitClock.js';
+import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
@@ -238,7 +240,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   </div>;
 });
 
-function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSessionPendingInteraction'> & { group: ReaderGroup; motion: boolean }) {
+function GroupStatus({ group, sessionId, useChat, useSession, useSessionPendingInteraction, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSession' | 'useSessionPendingInteraction'> & { group: ReaderGroup; motion: boolean }) {
   const pending = useSessionPendingInteraction(snapshot => snapshot.get(sessionId));
   const text = useChat(snapshot => {
     const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
@@ -264,7 +266,43 @@ function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, 
     return '正在处理';
   });
   const busy = useChat(snapshot => group.turn !== null && snapshot.timeline.turns.get(group.turn)?.status === 'open' && pending === undefined);
-  return <StatusText text={text} motion={motion} shimmer={busy} />;
+  const nodes = useChat(snapshot => snapshot.nodes);
+  const pendingSubmissions = useSession(snapshot => snapshot.pendingSubmissions);
+  /**
+   * Is the MODEL the one being waited on right now? Upstream 0.2.0's state machine, scoped to this
+   * group, because this view's status is per turn rather than one line for the whole transcript:
+   *
+   *   - a closed turn has nothing to wait for;
+   *   - a pending interaction is the reader's move, not the model's — that is 「等待你的操作」;
+   *   - an assistant step that has produced nothing while still running is precisely the wait (the
+   *     request is out and nothing has come back), while one that has produced a block ends it;
+   *   - otherwise the ball is with the model when the newest node handed it back: the reader spoke,
+   *     or a tool RETURNED, a context was injected, a command finished. A tool that is still running
+   *     is not a wait — the tool is the one working — and `handsBackToModel` is what tells those two
+   *     apart, by the settled `tool-result` a returned call carries.
+   */
+  const awaitingModel = useChat(snapshot => {
+    const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
+    if (turn?.status !== 'open') return false;
+    if (pending !== undefined) return false;
+    const lastKey = group.keys.at(-1);
+    const last = lastKey === undefined ? undefined : snapshot.nodes.get(lastKey);
+    if (last === undefined) return false;
+    if (isNode(last, 'assistant-step')) return last.data.blocks.length === 0 && last.data.status === 'running';
+    return handsBackToModel(last);
+  });
+  // The anchor is the moment the current wait began — the last handover, never the start of the
+  // turn — so a wait that has just begun does not inherit the minutes the tools already spent.
+  const wait = useMemo(
+    () => awaitingModel ? waitingAnchor(group.keys, key => nodes.get(key), pendingSubmissions ?? []) : null,
+    [awaitingModel, group.keys, nodes, pendingSubmissions],
+  );
+  return <span className={css.statusLine}>
+    <StatusText text={text} motion={motion} shimmer={busy} />
+    {/* Keyed by the handover, so a new one gets a fresh clock rather than inheriting the elapsed
+        time of the wait it replaced. */}
+    {wait !== null && <WaitClock key={wait.key} startTime={wait.time} />}
+  </span>;
 }
 
 const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFile }: {
@@ -523,9 +561,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {turnUserKeys.map(userKey => <BlockBoundary key={userKey}><MainNode {...shared} boundary={boundary} nodeKey={userKey} /></BlockBoundary>)}
     {hasProcess && <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
-      label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
+      label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
     {!hasProcess && boundary.status === 'open' && <div className={css.disclosure} data-reader-status-only>
-      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
+      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>

@@ -140,6 +140,24 @@ const markers = [
   // The selected page's bar is ONE element on the row, translated between equal-width tabs — a bar
   // per tab can only appear and disappear, never slide.
   ['the page indicator is one sliding bar', 'data-settings-page=shortcuts'],
+  // The wait clock: the readout itself, the badge a long wait earns, and the fact that its anchor
+  // is the last HANDOVER rather than the start of the turn. The third is checked by shape because
+  // the anchor walks the group's own keys — a wake-up that counted from the turn start would show
+  // the minutes the tools already spent, which is the bug this replaced.
+  ['the status line carries a wait clock', '"data-reader-wait-clock"'],
+  ['a long wait earns its badge', '"data-reader-wait-badge"'],
+  // The readout is mounted from the first frame but held invisible until the wait is worth a
+  // number, so its width is already reserved and the chevron after the label does not move. The
+  // threshold and the relation are pinned rather than the constant's name alone: a marker that
+  // survived the number being retuned to zero would not be protecting the rule at all. Retuning it
+  // is meant to fail here, and to be paid for by updating this line — the same deal the stylesheet
+  // guard makes.
+  ['the readout waits three seconds before it counts', () =>
+    /WAIT_COUNT_FROM_MS = 3e3/.test(bundle)
+    && /counting = waited >= WAIT_COUNT_FROM_MS/.test(bundle)
+    && /\[data-pending\]\{visibility:hidden/.test(bundle)
+    && /"data-pending"/.test(bundle)],
+  ['the wait is anchored to the last handover', () => /waitingAnchor\(\s*group\.keys/.test(bundle)],
   // Two calls the product renders with its own keyed cards are rendered here instead of collapsing
   // into a generic row: a question set (what was asked, what was answered) and a delivery (which
   // files were handed over). Asserted by the data attribute they render with, matched with either
