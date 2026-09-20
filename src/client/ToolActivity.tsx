@@ -7,7 +7,8 @@ import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlo
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
-import { activityPhase, activitySummary, executionFacts, objectValue, toolIdentity } from './tool-activity.js';
+import { DiffPanel, DiffStatButton } from './DiffPanel.js';
+import { activityPhase, activitySummary, callDiffHunks, executionFacts, objectValue, toolIdentity } from './tool-activity.js';
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
@@ -184,6 +185,13 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'result' | 'input' | 'raw'>('result');
+  /**
+   * The diff surface's own state, kept here rather than inside `DiffPanel` because its two halves
+   * live in different places: the counts go in the row (one clipped line), the panel beside it.
+   */
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffVisible, setDiffVisible] = useState(false);
+  const [diffActive, setDiffActive] = useState(0);
   const control = useRef<HTMLElement | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState(false);
@@ -205,6 +213,9 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const facts = executionFacts(entry.block);
   const Icon = model.name === 'skill' ? IconSkillOutline16 : model.category === 'delivery' ? null : ICONS[model.category];
   const block = entry.block;
+  // What this call — and anything it ran underneath it — changed on disk. Empty for the calls that
+  // changed nothing, which is most of them, so the counts leave an ordinary row alone.
+  const diffHunks = useMemo(() => callDiffHunks(block, model.name, model.args), [block, model.name, model.args]);
   const native = block ? toolRowModel(model.name, block) : null;
   const skillName = typeof model.args?.name === 'string' ? model.args.name.split('\n')[0] : model.raw.split('\n')[0];
   const rowTitle = model.name === 'skill' ? 'Skill' : native?.title ?? VARIANT_TITLES[classifyTool(model.name)];
@@ -223,7 +234,17 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
     <DisclosureRow icon={Icon === null ? <StateDot state={DOT_STATE[phase]} /> : <Icon size={14} />} title={rowTitle} open={open} expandable expandOnRowClick keepContentWhenOpen
       onToggle={() => { onRead(); setOpen(value => !value); }} rowClassName={css.nativeToolRow}
       collapsedContent={<><span className={css.rowSeparator} aria-hidden /><span className={css.nativeToolSummary} title={rowSummary} data-reader-tool-summary>{rowSummary}</span>
-        {showState && <span className={css.toolState} data-phase={phase}>{LABEL[phase]}</span>}</>} />
+        {showState && <span className={css.toolState} data-phase={phase}>{LABEL[phase]}</span>}
+        {diffHunks.length > 0 && <DiffStatButton hunks={diffHunks} label={rowTitle} open={diffOpen}
+          onToggle={() => {
+            if (diffOpen) { setDiffOpen(false); return; }
+            onRead();
+            setDiffVisible(true);
+            setDiffOpen(true);
+          }} />}</>} />
+    {/* A sibling of the row, never inside it: the row is one clipped 24px line. */}
+    {diffVisible && <DiffPanel hunks={diffHunks} open={diffOpen} active={diffActive} motion={motion}
+      onActive={setDiffActive} onClosed={() => setDiffVisible(false)} />}
     <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={control} nodeKey={`${entry.key}:detail`} framed>
       <div id={detailId} className={css.toolDetails}>
         <div className={css.toolLedger} aria-live="off">

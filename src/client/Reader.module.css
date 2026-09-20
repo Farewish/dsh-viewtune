@@ -159,6 +159,55 @@
 .toolState[data-phase=preparing], .toolState[data-phase=running] { color: var(--dsw-alias-state-business-primary); }
 .toolState[data-phase=failed] { color: var(--dsw-alias-state-error-primary); }
 .toolState[data-phase=interrupted] { color: inherit; opacity: .7; }
+/* The changed-line counts at the end of a tool row, and the diff surface they open (DiffPanel).
+   `margin-left: auto` pushes them to the right edge of the row so the numbers line up in one column
+   instead of drifting with the summary's length; the button is transparent at rest — text until the
+   pointer or the keyboard says otherwise — and additions read as growth, deletions as loss, with a
+   side that is zero staying hidden. The panel itself is in flow: the detail cell clips its overflow,
+   which would cut a floating popup off. */
+.diffStatRoot { position: relative; flex: none; margin-left: auto;
+  /* A FLEX box, and that is the whole point: as a plain `span` the inline-flex chip inside it sits on
+     a line box whose height comes from the inherited `line-height` (28px here), so the chip's
+     effective box was ~30px tall inside a 24px row — centred, it overflowed the row top and bottom
+     and the row's `overflow: hidden` cut the bottom off the hover fill. A flex container blockifies
+     the chip, so the container's height IS the chip's height at every reading font size. */
+  display: flex; align-items: center; }
+.diffStatButton { display: inline-flex; gap: 6px; align-items: center;
+  /* The row this chip sits in is `24px + delta` tall and clips its overflow, so the chip's height is
+     expressed on the same axis the row uses instead of as a fixed pixel value: with the reading font
+     set smaller the row shrinks, and a fixed height is exactly what gets its bottom cut off. Four
+     pixels of clearance at every size. `line-height: 1` keeps the text centred by the flex box
+     rather than by a line box that would overflow a smaller chip. */
+  height: calc(20px + var(--dsh-content-font-delta, 0px)); padding: 0 8px; cursor: pointer;
+  font: inherit; font-size: 11px; line-height: 1; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum"; color: var(--dsw-alias-label-secondary);
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  transition: background 120ms ease, border-color 120ms ease; }
+.diffStatButton:hover, .diffStatButton:focus-visible,
+.diffStatButton[aria-expanded="true"] { background: var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1));
+  border-color: var(--dsw-alias-border-l2, rgba(127,127,127,.28)); }
+.diffStatButton:focus-visible { outline: none; }
+.diffStatButton[aria-expanded="true"] .diffCaret { opacity: 1; }
+.diffCaret { flex: none; width: 10px; opacity: .6; font-size: 10px; }
+.diffAdded { color: var(--dsw-alias-state-success-primary, #2f9e63); }
+.diffRemoved { color: var(--dsw-alias-state-error-primary, #d1483c); }
+/* A sibling of the tool row in the caller's block flow — NOT a flex item inside the row, whose own
+   container is a fixed 24px line with `overflow: hidden` and would clip this to a sliver. */
+.diffOverlayRow { width: 100%; max-width: 100%; min-width: 0; margin-top: 6px; box-sizing: border-box; }
+.diffOverlay { display: flex; flex-direction: column; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; overflow: hidden;
+  border-radius: 10px; background: var(--dsw-alias-bg-module-platform, rgba(127,127,127,.08));
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.22)); padding: 8px; }
+.diffTabs { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-bottom: 6px; margin-bottom: 4px; max-width: 100%; scrollbar-width: thin; }
+.diffTab { flex: none; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 10px; cursor: pointer;
+  font: inherit; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-base, rgba(255,255,255,.8)); border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.2));
+  border-radius: 6px; transition: all 120ms ease; }
+.diffTab:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.diffTab[data-active] { color: var(--dsw-alias-label-primary); border-color: var(--dsw-alias-state-business-primary, #1e90ff);
+  background: var(--dsw-alias-bg-base); font-weight: 500; }
+.diffScrollArea { max-height: 420px; overflow-y: auto; overflow-x: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.15)); background: var(--dsw-alias-markdown-code-block, rgba(0,0,0,.04)); }
+.diffScrollArea :global([data-diff]) { margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
 .toolLedger { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 10px 14px 0; color: var(--dsw-alias-label-secondary); font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; }
 .toolEngine { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .toolDetails { margin: 6px 0 0 22px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; min-width: 0; overflow: hidden; }

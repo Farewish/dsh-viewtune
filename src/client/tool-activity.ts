@@ -1,5 +1,6 @@
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
+import type { DiffHunk } from '@deepseek-ai/dsh-client-ui-primitives';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { ReaderGroup } from './projection.js';
 
@@ -159,4 +160,75 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
 
 export function preparingLabel(name: string): string {
   return /^(write|edit|apply_patch)$/.test(name) ? '正在生成文件内容' : /^(bash|shell|exec_command|pwsh)$/.test(name) ? '正在准备命令' : '正在准备工具输入';
+}
+
+/** Line counts of one text side; a trailing newline does not start a line. */
+function lineCount(text: string | null): number {
+  if (text === null) return 0;
+  const body = text.endsWith('\n') ? text.slice(0, -1) : text;
+  return body === '' ? 0 : body.split('\n').length;
+}
+
+/** Argument fields that name the file a mutation targets, and the texts it replaces and writes. */
+const DIFF_PATH_FIELDS = ['file_path', 'path', 'filePath'] as const;
+const DIFF_OLD_FIELDS = ['old_string', 'old_str', 'oldText'] as const;
+const DIFF_NEW_FIELDS = ['content', 'new_string', 'new_str', 'newText', 'file_text'] as const;
+/**
+ * Only these tools change a file, so only these may fall back to reading their own arguments as a
+ * diff. Several unrelated tools take a field named `content` — a memory note, a typed message — and
+ * reading that as a file body invents additions for calls that changed no file at all.
+ */
+export const DIFF_FALLBACK_TOOLS = ['write', 'edit', 'str_replace_editor'] as const;
+const DIFF_MUTATION_TOOLS = new Set<string>(DIFF_FALLBACK_TOOLS);
+
+function firstString(source: Record<string, unknown> | undefined, fields: readonly string[]): string | null {
+  if (!source) return null;
+  for (const field of fields) {
+    const value = source[field];
+    if (typeof value === 'string' && value !== '') return value;
+  }
+  return null;
+}
+
+/**
+ * Every changed file this call is responsible for, in the order they ran.
+ *
+ * Three sources, in the order the reader would trust them:
+ *
+ *   - the host's own result metadata (`meta.diffs`), which is what the official row renders;
+ *   - the call's own arguments, for `write` / `edit` / `str_replace_editor` only — the same source
+ *     the official row reads while a write is still pending, and the reason the tool-name whitelist
+ *     exists at all;
+ *   - whatever the call's children changed. A script that writes files reports those writes rather
+ *     than what its own arguments contain, so a run whose edits live one level down does not lose
+ *     its counts.
+ */
+export function callDiffHunks(block: ToolCallBlock | undefined, name?: string, args?: Record<string, unknown>): DiffHunk[] {
+  const nested: DiffHunk[] = [];
+  for (const child of block?.subCalls ?? []) {
+    const identity = toolIdentity({ block: child });
+    nested.push(...callDiffHunks(child, identity.name, inputFields(identity.raw)));
+  }
+  if (block && 'kind' in block) {
+    const diffs = objectValue(block.meta)?.diffs;
+    if (Array.isArray(diffs) && diffs.length > 0) {
+      const hunks: DiffHunk[] = [];
+      for (const raw of diffs) {
+        const row = objectValue(raw);
+        if (!row) continue;
+        const oldText = typeof row.oldText === 'string' ? row.oldText : null;
+        const newText = typeof row.newText === 'string' ? row.newText : '';
+        if (!lineCount(newText) && !lineCount(oldText)) continue;
+        hunks.push({ path: firstString(row, DIFF_PATH_FIELDS) ?? '', oldText, newText });
+      }
+      if (hunks.length > 0) return [...hunks, ...nested];
+    }
+  }
+  if (!name || !DIFF_MUTATION_TOOLS.has(name)) return nested;
+  const path = firstString(args, DIFF_PATH_FIELDS);
+  if (!path) return nested;
+  const oldText = firstString(args, DIFF_OLD_FIELDS);
+  const newText = firstString(args, DIFF_NEW_FIELDS) ?? '';
+  if (!lineCount(newText) && !lineCount(oldText)) return nested;
+  return [{ path, oldText, newText }, ...nested];
 }

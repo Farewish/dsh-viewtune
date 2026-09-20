@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased (diff review)
+
+**改了文件的工具行尾部多出 `+N -M`，点开是就地展开的差异面板。**
+
+上游 0.2.0 的这条把计数挂在**折叠后的步骤摘要**上（他们的 `foldDiffHunks(steps)`）；本 fork 没有那层摘要，所以按先前的形态落在**工具行本身**：行尾计数 + 点开的就地面板。
+
+- **计数从哪来**（`src/client/tool-activity.ts` 的 `callDiffHunks`，上游同款的三级来源，按优先级）：先读宿主已附在结果里的 `meta.diffs`；没有则退回**调用自己的参数**，但只对 `write` / `edit` / `str_replace_editor` 这三个会改文件的工具——好几个不相干的工具都有名为 `content` 的字段（一条备忘、一段输入的消息），把它们当文件正文读，会给「根本没改文件」的调用**凭空造出增删行**；最后把**子调用**改的文件并进来：一段写文件的脚本，改动在下一层，不能因此丢掉计数。
+- **面板**（`src/client/DiffPanel.tsx`）：`+N -M` 只在非零时显示（增绿、删红），点开按文件分页，每页用产品自己的 `DiffBlock` —— 和官方工具行渲染的是同一个东西，不是另起一套差异视图。面板**在流内**而不是浮层：详情单元的 `overflow: clip` 会把浮层切掉。开合动画动的是真高度（面板把 transcript 往下推，阅读滚动要测量这次增长），并且和本视图其它动画一样守住两件事：受**动效开关**管（关掉时一帧到位），以及有**墙上时钟兜底**（动画走不到 `onfinish` 时，收起的面板会永远挂着、展开的会卡在第一帧）。
+- 与上游的两处刻意差异：他们的面板还会派发 `reader-layout-start` / `reader-layout-end` 供折叠编排读取，本 fork 没有编排也没有监听者，所以不发（不朝空气喊）；面板动效受开关管，理由同上。
+- 行尾计数与详情页里原有的 `DiffBlock`（我们自己那个 `write` 分支）**并存**：一个是随手一瞥，一个是随卡片展开的完整记录。
+
+新增单测 `tests/tool-diff.test.ts`（4 条，测试文件 15 → 16）：宿主元数据优先于调用参数且不被重复计一遍、参数回退只对会改文件的工具生效（`read` 带 `content` 必须什么都不产出）、空的一侧不算差异（纯新增仍算）、父调用报告子调用改了什么。四条 guard 加进 `check-bundle-markers.mjs`：行尾计数存在、**白名单就是那条规则**（按产物里的 set 字面量钉住——从名单里删掉一个名字会静默恢复"凭空计数"）、子调用被折进来、面板确实按文件分页。
+
+顺带一件事值得记：加了面板这条动画之后，原来那条 deadline 不变量**当场失败**——新站点有 `clearTimeout(deadline)` 却没有 `fill: 'both'`（计数 4≠3）。那正是它该做的事。现在它写成「每个以 settle 提交状态的动画都要有墙上时钟兜底」：`fill: "both"` 三处、settle 四处、deadline 四处，三个数各有明确含义并被钉住；两半都实测能失败（改掉任一侧的 `clearTimeout(deadline)` 或 `let settled = false;` 都报 `MISS`，还原后 sha256 一致、`BUNDLE STATE OK`）。
+
+**第一版把两半（计数按钮与面板）放在同一个组件里、都由行的 `collapsedContent` 渲染，结果是面板被压成一条窄缝、上下还被裁断。**原因在结构不在样式：原语包的 disclosure 行是**固定 24px 高、`overflow: hidden`、不换行**的 flex 行，面板作为其中一个 `flex: 1 1 100%` 的项被挤窄，再被行高与溢出裁掉。现在拆成 `DiffStatButton`（在行里——那行只放得下一行内容）与 `DiffPanel`（行的**兄弟节点**，渲染在行之后、和详情面板同级）。CSS 里也把 `.diffOverlayRow` 的 `flex: 1 1 100%` 去掉并写明原因，免得下一个人再把它塞回行内。
+
+配套加了一条 guard，专门钉这个位置：**用花括号配对取出 `collapsedContent` 那段对象字面量**，要求该区域内出现 `DiffStatButton`、**不**出现 `DiffPanel`。之所以不能只查「产物里有没有 `DiffPanel`」——面板是同一个 JSX 数组里更靠后的兄弟节点，两种位置在纯文本上无法区分。这条 marker 实测能失败：把产物里 collapsedContent 区域内任一处的 `className:` 换成 `DiffPanel.` 前缀（模拟"面板又回到行里"）即报 `MISS`，还原后 sha256 一致、`BUNDLE STATE OK`。
+
+**同一处还有一个更顽固的截断：hover 填充的底边。**第一轮把计数块改成挂在行的字号轴上（`height: calc(20px + var(--dsh-content-font-delta, 0px))`）——那确实是它该有的形状，但**没有解决问题**。真正的裁剪源是**行盒**：`collapsedContent` 是原语行（固定 24px、`overflow: hidden`）的**直接 flex 子项**，而计数块外层 `.diffStatRoot` 原本只是个 `span`，里面的 `inline-flex` 按钮于是落在行盒上；行盒高度取继承来的 `line-height`（本视图 `.root` 是 28px），算下来约 30px，被 `align-items: center` 居中塞进 24px 的行里，上下各溢出约 3px——**底部那 3px 连同 hover 填充一起被行裁掉**，点击热区也就看着比填充还多一截。把容器改成 flex 盒（`display: flex; align-items: center`）后行盒消失、容器高度就等于按钮高度，任何阅读字号下都不再溢出。
+
+两条 guard 各钉一半，都实测能失败、还原后 sha256 一致、`BUNDLE STATE OK`：容器**必须是 flex 盒**（`_diffStatRoot{…display:flex`，改回 `display:inline` 即报 `MISS the counts chip sits in a flex box, not a line box`），计数块**必须挂在行的字号轴上**（换回固定像素即报 `MISS the counts chip is sized on the row axis, not a fixed height`）。
+
 ## Unreleased (wait clock)
 
 **状态行右边多了一个等待时钟：模型拿到这一轮多久了，前 3 秒不显示秒数，过十秒挂「暂未响应」。**

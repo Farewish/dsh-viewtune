@@ -116,17 +116,18 @@ const markers = [
   ['collapse control is scoped to one turn', 'if (group.turn === null || group.turn !== currentTurn) continue;'],
   ['collapse exit is delayed past its animation', () => cssDecls(`${sel('collapseControl')}[hidden]`, ['display:inline-flex'])],
   ['collapse exit waits for the animation to finish', () => /transition:[^;}]*visibility\s+0s[^;}]*[\d.]+m?s/.test(readerCss)],
-  // An animation with `fill: 'both'` keeps the pose it started from until something cancels it, so
-  // one that never reaches `onfinish` strands the row on its opening keyframe — the reported
-  // symptom being a disclosure that looks like it refused to open. Every such site therefore also
-  // arms a wall-clock deadline. The two counts are compared rather than each deadline pinned: a new
-  // `fill: 'both'` animation that forgets one fails here, while retuning an animation's duration
-  // (which the build folds into the number, so a pinned value would be lying about the source) does
-  // not.
-  ['every fill:both animation arms a wall-clock deadline', () => {
+  // Every animation whose settle commits state also arms a wall-clock deadline, because one that
+  // never reaches `onfinish` strands the pose it was holding — a disclosure pinned to its opening
+  // keyframe by `fill: 'both'`, or a closing diff panel left mounted forever. Three of those sites
+  // pin a pose with `fill: 'both'` (the disclosures); the diff panel's reveal has no fill but commits
+  // state the same way, which is why the counts differ by design. Both numbers are pinned so that a
+  // new animated surface is a conscious edit to this line rather than a silent omission — and the
+  // equality is what fails when a deadline is dropped from an existing one.
+  ['every state-committing animation arms a wall-clock deadline', () => {
     const filled = (bundle.match(/fill: "both"/g) ?? []).length;
-    const armed = (bundle.match(/clearTimeout\(deadline\)/g) ?? []).length;
-    return filled > 0 && filled === armed;
+    const settles = (bundle.match(/let settled = false;/g) ?? []).length;
+    const deadlines = (bundle.match(/clearTimeout\(deadline\)/g) ?? []).length;
+    return filled === 3 && settles === deadlines && deadlines === 4;
   }],
   // The toolbar is the one lane that pins, so both switches stay reachable.
   ['toolbar pins to the top', () => cssDecls(sel('toolbar'), ['position:sticky', 'top:0', 'z-index:9'])],
@@ -155,6 +156,49 @@ const markers = [
     /if \(waited < 3e3\) return null;/.test(bundle)
     && /min-width:calc\(2ch \+ 1em\)/.test(bundle)],
   ['the wait is anchored to the last handover', () => /waitingAnchor\(\s*group\.keys/.test(bundle)],
+  // The changed-line counts a tool row carries, and the two rules that keep them honest: only a tool
+  // that mutates a file may read its own arguments as a diff (several unrelated tools carry a field
+  // named `content`, and counting those would invent additions for calls that changed nothing), and a
+  // parent call reports what its children changed rather than what its own arguments contain. The
+  // whitelist is pinned as the emitted set literal because it IS the rule — a name dropped from it
+  // silently re-enables the invented counts.
+  ['a changed call carries its line counts', '"diffStatButton"'],
+  ['only file-mutating tools may count their own arguments', () =>
+    /DIFF_MUTATION_TOOLS = \/\* @__PURE__ \*\/ new Set\(\[\s*"write",\s*"edit",\s*"str_replace_editor"/.test(bundle)],
+  ['a parent call folds its children’s changed files in', 'callDiffHunks(child, identity.name, inputFields(identity.raw))'],
+  ['the counts open a per-file diff surface', () => /"diffScrollArea"/.test(bundle) && /"diffTab"/.test(bundle)],
+  // The chip's height is expressed on the row's own font axis, not as a fixed pixel value: the row is
+  // `24px + delta` tall and clips its overflow, so a fixed height is what loses its bottom the moment
+  // the reading font is set smaller — which is what it did until this was pinned.
+  ['the counts chip is sized on the row axis, not a fixed height', () =>
+    /_diffStatButton\{height:calc\(20px \+ var\(--dsh-content-font-delta/.test(bundle)],
+  // …and its container must be a flex box. As a plain inline container the chip sits on a line box
+  // whose height comes from the inherited `line-height` (28px in this view), which is taller than the
+  // 24px row: centred, the chip overflowed the row and the row's `overflow: hidden` cut the bottom off
+  // its hover fill. Sizing the chip itself was not enough — the line box was the clipper.
+  ['the counts chip sits in a flex box, not a line box', () => /_diffStatRoot\{[^}]*display:flex/.test(bundle)],
+  // The two halves live in different places, and that is load-bearing: the primitives' disclosure row
+  // is a fixed 24px line with `overflow: hidden`, so a panel rendered inside its `collapsedContent`
+  // is laid out as a flex item on that one line and clipped to a sliver. The counts may appear inside
+  // the row; the panel may not. Checked by brace-matching the collapsed content's own object literal,
+  // because the panel is a sibling later in the same JSX array and "does the artifact contain
+  // DiffPanel" cannot tell the two positions apart.
+  ['the diff panel sits beside the row, not inside it', () => {
+    const at = bundle.indexOf('collapsedContent:');
+    if (at === -1) return false;
+    let depth = 0;
+    for (let index = bundle.indexOf('{', at); index < bundle.length; index++) {
+      if (bundle[index] === '{') depth++;
+      else if (bundle[index] === '}') {
+        depth--;
+        if (depth === 0) {
+          const inside = bundle.slice(at, index);
+          return inside.includes('DiffStatButton') && !inside.includes('DiffPanel');
+        }
+      }
+    }
+    return false;
+  }],
   // Two calls the product renders with its own keyed cards are rendered here instead of collapsing
   // into a generic row: a question set (what was asked, what was answered) and a delivery (which
   // files were handed over). Asserted by the data attribute they render with, matched with either
