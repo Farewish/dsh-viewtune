@@ -501,9 +501,22 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
   const deliverables = useMemo(() => getTurnDeliverables(turn, flow), [turn, flow]);
+  // The open mode is read HERE, through the subscriber, and handed to the opener as an argument.
+  // The injected `openFile` cannot read it: `createReaderStore()` returns a handle (spec + create)
+  // and the live snapshot belongs to the framework's own instance, which only this hook sees.
+  const openInSidebar = props.useStore(state => deliverableOpenModeOf(state.deliverableOpenMode)) === 'sidebar';
+  const openFile = useCallback(
+    (path: string) => { props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' }); },
+    [props.openFile, openInSidebar],
+  );
   const fileMentions = useMemo(
-    () => deliverables.length > 0 && props.openFile ? createProducedFileMentions(deliverables, props.openFile) : undefined,
-    [deliverables, props.openFile],
+    // `typeof` rather than a truthiness test: `openFile` is a required injected prop, so a bare
+    // `&& props.openFile` is a check tsc rejects as always-true (TS2774) — but a host that injected
+    // nothing still should not make inline paths throw when they are clicked.
+    () => (deliverables.length > 0 && typeof props.openFile === 'function'
+      ? createProducedFileMentions(deliverables, openFile)
+      : undefined),
+    [deliverables, props.openFile, openFile],
   );
   const tailData = useMemo(() => {
     for (const key of group.keys) {
@@ -549,7 +562,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     renderSlotChain: props.renderSlotChain,
     loadImage: props.loadImage,
     fillComposer: props.fillComposer,
-    openFile: props.openFile,
+    openFile,
     revealFile: props.revealFile,
     forkAt: props.forkAt,
     forkSeq,
@@ -580,7 +593,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });

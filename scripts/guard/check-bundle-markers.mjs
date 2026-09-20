@@ -49,6 +49,32 @@ const wheelHandler = (() => {
   return '';
 })();
 
+/**
+ * The body of one property, claimed by brace matching from `<needle>` to its closing brace.
+ *
+ * Needed wherever a claim is about WHERE a statement sits rather than whether it exists at all. The
+ * bundle contains every one of these strings somewhere, so "the sidebar is looked up inside the
+ * click" cannot be asked of the file as a whole: the previous, broken version had the same lookup
+ * text sitting at activation instead. Returns '' when the needle is absent, which fails the marker
+ * loudly rather than asserting against a slice of something else.
+ */
+function handlerBody(needle) {
+  const at = bundle.indexOf(needle);
+  if (at === -1) return '';
+  const open = bundle.indexOf('{', at);
+  if (open === -1) return '';
+  let depth = 0;
+  for (let i = open; i < bundle.length; i++) {
+    const ch = bundle[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return bundle.slice(open, i);
+    }
+  }
+  return '';
+}
+
 // The Host derives the client row id from the installed manifest's package name,
 // and the browser loader refuses a bundle that registers anything else — the
 // failure mode is the whole page reporting "Failed to load plugins", so assert
@@ -164,6 +190,19 @@ const markers = [
   ['the sidebar opener is looked up, not required', 'get?.("sidebarRight")'],
   ['deliverable addresses use the official session-file scheme', 'dsh-resource://file/session/'],
   ['a missing sidebar opener falls back with a warning', 'sidebarRight.openResource is not available; falling back to system app'],
+  // The two halves of the bug that made that switch a no-op, both pinned where nothing else looks.
+  // `open-file.test.ts` starts after the decision has been made, so it can only prove that a given
+  // mode is obeyed; the layer that decides the mode is this bundle, and it compiled happily while
+  // being wrong (an `as unknown as` cast hid that the store handle carries no snapshot, so the mode
+  // was `undefined` on every click and every click went to the system app).
+  ['the click hands the subscribed preference down as the mode', () => /mode: openInSidebar \? "sidebar" : "external"/.test(bundle)],
+  // And the lookup has to be INSIDE the click. Service resolution only answers for a provider whose
+  // fiber is already active, so the hoisted version answers "no sidebar" for the whole session when
+  // this plugin happens to mount first — the same symptom from the other end.
+  ['the sidebar opener is looked up inside the click, not once at activation', () => {
+    const body = handlerBody('openFile: async (path');
+    return body.includes('sidebarRightFace()') && body.includes('deliverableOpenModeOf(options');
+  }],
   // The compaction divider arrives rather than appearing: three animations, on the line (whose rules
   // sweep with it), the pill and the dial. Names go through the keyframe helper because lightningcss
   // re-hashes them; the selectors go through the class helper for the same reason.
@@ -291,8 +330,21 @@ const forbidden = [
 ];
 
 let ok = true;
-/** A marker is a fixed string, or a predicate for anything the build may re-spell. */
-const matches = (needle) => (typeof needle === 'function' ? needle() === true : bundle.includes(needle));
+/**
+ * A marker is a fixed string, or a predicate for anything the build may re-spell.
+ *
+ * Anything else is refused rather than coerced. A boolean needle — which is what an unwrapped
+ * `/…/.test(bundle)` produces — used to fall through to `bundle.includes(true)`, i.e. a search for
+ * the literal text "true", which this bundle always contains: the marker reported `ok` forever, and
+ * only a negative test showed it was decoration rather than a check. Loud is the whole point here.
+ */
+const matches = (needle) => {
+  if (typeof needle === 'function') return needle() === true;
+  if (typeof needle !== 'string') {
+    throw new TypeError(`marker needle must be a string or a predicate, got ${typeof needle}`);
+  }
+  return bundle.includes(needle);
+};
 for (const [name, needle] of markers) {
   const present = matches(needle);
   if (!present) ok = false;

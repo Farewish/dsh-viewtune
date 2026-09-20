@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  deliverableOpenModeOf, fileAddressFor, isFolderOpenPath, modeFromSnapshot, openDeliverableFile,
+  deliverableOpenModeOf, fileAddressFor, isFolderOpenPath, openDeliverableFile,
 } from '../src/client/open-file.ts';
 
 // Fixture file names deliberately avoid a `.ts` extension: this repository's test runner rewrites
@@ -32,15 +32,16 @@ test('the session address matches the official scheme, and a cwd prefix is strip
 });
 
 test('the stored mode is read defensively, and anything unknown means the system app', () => {
+  // The value arrives from the React side's `useStore` subscription, and a record written before the
+  // preference existed simply has no such key — so `undefined` has to mean the system app rather than
+  // throwing. There is deliberately no `modeFromSnapshot` helper left to test here: the handle
+  // `createReaderStore()` returns carries no snapshot, and a helper that read one off it is exactly
+  // what made this switch a no-op (every click resolved to `undefined` → the system app).
   assert.equal(deliverableOpenModeOf('sidebar'), 'sidebar');
   assert.equal(deliverableOpenModeOf('external'), 'external');
   assert.equal(deliverableOpenModeOf(undefined), 'external');
   assert.equal(deliverableOpenModeOf('nonsense'), 'external');
-  // A record written before the preference existed, or a snapshot that throws, must not break a click.
-  assert.equal(modeFromSnapshot({ getSnapshot: () => ({}) }), 'external');
-  assert.equal(modeFromSnapshot({ getSnapshot: () => { throw new Error('gone'); } }), 'external');
-  assert.equal(modeFromSnapshot(undefined), 'external');
-  assert.equal(modeFromSnapshot({ getSnapshot: () => ({ deliverableOpenMode: 'sidebar' }) }), 'sidebar');
+  assert.equal(deliverableOpenModeOf({ deliverableOpenMode: 'sidebar' }), 'external');
 });
 
 test('a workspace folder always goes to the system opener, whatever the mode says', async () => {

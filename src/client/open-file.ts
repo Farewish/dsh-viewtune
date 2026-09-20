@@ -1,20 +1,18 @@
 export type DeliverableOpenMode = 'external' | 'sidebar';
 
-export interface OpenModeSnapshot {
-  getSnapshot: () => { deliverableOpenMode?: DeliverableOpenMode };
-  subscribe?: (fn: () => void) => () => void;
-}
-
+/**
+ * The stored value, read defensively: only the exact string asks for the sidebar.
+ *
+ * There is deliberately no "read the mode off the store handle" helper here. `defineStore` returns a
+ * `StoreHandle` — a spec plus `create(scopeKey)` — and the live snapshot belongs to the instance the
+ * framework mints and hands to components as `useStore`; the handle has no `getSnapshot()`. An
+ * earlier version of this module offered `modeFromSnapshot(store)` for that job, and the one caller
+ * that had a handle to pass it read `undefined` on every click, which silently meant "the system
+ * app" (see the changelog's「sidebar open fixed」entry). The mode is an argument now: whoever renders
+ * the click subscribes to the preference and hands the answer down.
+ */
 export function deliverableOpenModeOf(value: unknown): DeliverableOpenMode {
   return value === 'sidebar' ? 'sidebar' : 'external';
-}
-
-export function modeFromSnapshot(store: OpenModeSnapshot | undefined): DeliverableOpenMode {
-  try {
-    return deliverableOpenModeOf(store?.getSnapshot()?.deliverableOpenMode);
-  } catch {
-    return 'external';
-  }
 }
 
 /** Workspace-folder affordances stay on the OS opener, not the Sidebar switch. */

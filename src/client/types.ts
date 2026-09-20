@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type {} from '@deepseek-ai/dsh-client-ui-session/client';
 import type { createReaderStore } from './store.js';
+import type { DeliverableOpenMode } from './open-file.js';
 
 /**
  * The host's turn-process record, as published on the `turn-process` node.
@@ -49,8 +50,12 @@ export interface ReaderInjected {
    * composer accepted the text.
    */
   fillComposer: (text: string) => boolean;
-  /** Open a workspace file or directory in the native host editor / file viewer. */
-  openFile: (path: string) => Promise<void> | void;
+  /**
+   * Open a workspace file or directory: the system app, or the right sidebar when `options.mode`
+   * asks for it (the default is the system app). The mode is an argument because this face has no
+   * live store to read — see `open-file.ts` on why `createReaderStore()` cannot answer that question.
+   */
+  openFile: (path: string, options?: { mode?: DeliverableOpenMode }) => Promise<void> | void;
   /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
   revealFile?: (path: string) => Promise<void> | void;
   /** Fork the conversation at a specific message sequence into a new branch session. */

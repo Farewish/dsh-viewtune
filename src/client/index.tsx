@@ -9,8 +9,8 @@ import { Reader } from './Reader.js';
 import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { fillComposerDom } from './mcp-app.js';
-import { modeFromSnapshot, openDeliverableFile } from './open-file.js';
-import type { OpenModeSnapshot } from './open-file.js';
+import { deliverableOpenModeOf, openDeliverableFile } from './open-file.js';
+import type { DeliverableOpenMode } from './open-file.js';
 import type { ReaderInjected } from './types.js';
 
 /** Structural face of the sanctioned per-session composer writer. */
@@ -42,12 +42,31 @@ export const inject = ['slots', 'sessions', 'conversation', 'remote', 'remote.se
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
-  /** One lookup per activation, so a host without the service pays nothing per click. */
-  const sidebar = (ctx.get?.('sidebarRight')
-    ?? (ctx as unknown as { sidebarRight?: SidebarRightFace }).sidebarRight) as SidebarRightFace | undefined;
-  const openSidebar = typeof sidebar?.openResource === 'function'
-    ? (address: string) => { sidebar.openResource!(address); }
-    : undefined;
+  /**
+   * The right sidebar's resource opener, looked up per click rather than once at activation.
+   *
+   * Service resolution only answers for a provider whose fiber is already active, and this plugin can
+   * well be mounted before the sidebar package's own is — a lookup captured during `apply()` would
+   * answer "no sidebar" for the rest of the session, which is precisely the bug this replaces. A
+   * registry read per click costs nothing worth hoisting for.
+   *
+   * It stays optional (never added to `inject`) so a host without it still boots, and `open-file.ts`
+   * turns its absence into the system opener plus a warning rather than a click that does nothing.
+   * Called from inside the handler — the guard pins that — so a late-mounted provider is found.
+   */
+  const sidebarRightFace = (): SidebarRightFace | undefined => {
+    try {
+      const face = ctx.get?.('sidebarRight') as SidebarRightFace | undefined;
+      if (face !== undefined) return face;
+    } catch {
+      // A host that never provided it must not break the click.
+    }
+    try {
+      return (ctx as unknown as { sidebarRight?: SidebarRightFace }).sidebarRight;
+    } catch {
+      return undefined;
+    }
+  };
   ctx.slots.inject('conversation.view', function* () {
     yield ctx.slots.register({
     name: 'conversation.view',
@@ -70,12 +89,16 @@ export function apply(ctx: Context): void {
           if (!receipt.ok) throw new Error(receipt.error.message);
           return { data: Uint8Array.from(receipt.value.data), mediaType: receipt.value.attachment.mediaType };
         },
-        openFile: async (path: string) => {
+        openFile: async (path: string, options?: { mode?: DeliverableOpenMode }) => {
           try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
-            // The system opener is the default and the fallback; the sidebar is opt-in per reader
-            // (`store.ts`), and `open-file.ts` owns the rules — folders always go to the OS, a
-            // missing or throwing sidebar opener falls back with a warning.
+            // The system opener is the default and the fallback; the sidebar is opt-in per reader, and
+            // the reader's own subscription hands the choice down as `options.mode` — this face cannot
+            // read it for itself (`createReaderStore()` is a handle, not a live instance).
+            const sidebar = sidebarRightFace();
+            const openSidebar = typeof sidebar?.openResource === 'function'
+              ? (address: string) => { sidebar.openResource!(address); }
+              : undefined;
             const openExternal = async (absolutePath: string) => {
               const remote = ctx.remote as unknown as { session?: RemoteSessionFace } | undefined;
               const remoteSession = remote?.session
@@ -92,7 +115,7 @@ export function apply(ctx: Context): void {
             };
             await openDeliverableFile({
               path,
-              mode: modeFromSnapshot(store as unknown as OpenModeSnapshot),
+              mode: deliverableOpenModeOf(options?.mode),
               sessionId,
               cwd,
               resolveWorkspacePath,

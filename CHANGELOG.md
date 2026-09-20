@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased (sidebar open fixed)
+
+**「产物用右侧栏打开」以前是个接错了的开关：把它打开，点产物文件仍然进记事本。**
+
+两个错都在我这边，而且都落在**唯一没有测试覆盖的那一层**——插件入口 `index.tsx`。`open-file.ts` 本身测得很全，但它只保证"给它 mode，它照做"；mode 正是在入口决定并接错的：
+
+- **mode 根本没传到点击处。** `createReaderStore()` 返回的是 `defineStore` 的 `EngineStoreHandle`，按 `StoreHandle` 的契约它只有 `spec` 与 `create(scopeKey)`——**快照在实例上**（组件通过框架绑定的 `useStore` 拿），handle 上**没有 `getSnapshot()`**。而入口写的是 `modeFromSnapshot(store as unknown as OpenModeSnapshot)`：`store.getSnapshot` 是 `undefined`，于是每次点击都得到 `'external'`——永远走系统程序。那个 `as unknown as` 强转正是把 `tsc` 本该报的错压掉的那一下；单测里传的是手写的 `{ getSnapshot }` 假对象，所以测试也看不见。开关显示正常，因为面板读的是 `useStore` 那条路，跟点击走的不是同一条。
+- **侧栏服务只在激活时查了一次。** 服务解析只返回**已激活** fiber 的实现（`ReflectService.get` 的 `strict` 语义），而本插件完全可能比侧栏那个包先挂载——那样整个会话都认定"本机没有侧栏"。同一个症状，从另一头来。
+
+修法是把决定权交回 React 那一侧：`TurnGroup` 本来就用 `props.useStore` 订阅了这个偏好（产物那一栏就是它渲染的），现在由它把 mode 作为参数交给 `openFile(path, { mode })`，inject 那一侧只负责执行。既然不再需要读快照，`modeFromSnapshot` 与 `OpenModeSnapshot` 一起删掉，`open-file.ts` 里留下一段注释说明**为什么不能**再从 handle 上读状态——留一个只能读到 `undefined` 的 helper，下一个人还会再踩一次。侧栏服务改成**每次点击查一次**（一次注册表读取，不值得为它做缓存），与加载顺序无关。
+
+两条 marker 进 `check-bundle-markers.mjs`，都对着这次的真实错法：一条钉「点击把订阅到的偏好当作 mode 传下去」，一条用花括号配对取出 inject 面里那段 `openFile` 处理器、要求**查询就写在处理器里**（旧写法把查询提到激活期，会让它 `MISS`）。两条都做了阴性测试：扰动产物各报一次 `MISS`，还原后 sha256 一致。
+
+**顺带抓出一个更值得记的错**：第一条 marker 我一开始写成 `/…/.test(bundle)`——那是个**布尔值**，不是谓词函数，而判分逻辑是 `typeof needle === 'function' ? … : bundle.includes(needle)`，布尔于是落进 `includes(true)`，等于在产物里搜字符串 `"true"`，而这个产物里到处都是 `true`。结果是这条 marker **永远报 ok**：阴性测试第一次跑出"标记没有失败"，才把它揪出来。现在 `matches()` 对非字符串、非函数的 needle **直接抛错**，不留静默通过的余地。教训是那一条本身：**没跑过阴性测试的 marker 不算 marker**。
+
+（这也解释了先前那个错误结论的形成方式：我查到"这台宿主确实注册了 `sidebarRight`"就收工了，没有验证**值有没有真的流到点击处**。查到一处存在，不等于查到一条链路通。）
+
 ## Unreleased (command-input kept)
 
 **上游 0.2.0 删掉了 `command-input` 渲染分支，理由是「那个字符串在任何已发布的宿主里都不是 chat node kind」——这条前提在本机不成立，所以本 fork 继续留着它。**
@@ -32,7 +49,7 @@
 上游 0.2.0 这条我一度以为"本机接不上"——**那是我查错了地方**（只翻了一个包就下结论）。查全之后事实是：接得上，而且上游的写法对本机是对的。
 
 - 上游调的是 Cordis **运行时服务** `ctx.sidebarRight.openResource(address, { params: { line } })`，地址是 `dsh-resource://file/session/<id>/<path>`。**这台宿主确实注册了它**：右侧栏那个包在实现 `openResource`（内部走 `navigator.openResourceIn(sessionId, address, …)`），另一个包在调用它，而产品自己的 tab 动作也是先用 `fileAddressFor(sessionId, root, path)` 造地址再交给它——所以本 fork 直接沿用**官方服务名与官方地址格式**，不另造一套。
-- `src/client/open-file.ts`：上游那 94 行**逐字照搬**（`DeliverableOpenMode`、`deliverableOpenModeOf`、`modeFromSnapshot`、`isFolderOpenPath`、`fileAddressFor`、`resolveOpenWorkspacePath`、`openDeliverableFile`），包括它的两条规则：**工作区文件夹永远走系统程序**（侧栏预览的是文件，不是目录），以及**服务缺席或抛错就回落系统程序并警告**——不是"点了没反应"。
+- `src/client/open-file.ts`：上游那 94 行**逐字照搬**（`DeliverableOpenMode`、`deliverableOpenModeOf`、`modeFromSnapshot`、`isFolderOpenPath`、`fileAddressFor`、`resolveOpenWorkspacePath`、`openDeliverableFile`），包括它的两条规则：**工作区文件夹永远走系统程序**（侧栏预览的是文件，不是目录），以及**服务缺席或抛错就回落系统程序并警告**——不是"点了没反应"。（其中 `modeFromSnapshot` 后来删掉了：这个 handle 上没有快照可读，详见上面「sidebar open fixed」。）
 - 接线沿用我们已有的路径解析：`openFile` 现在走 `openDeliverableFile`，`openExternal` 就是原来那段 `ctx.remote.session.openWorkspacePath`；侧栏那条从 `ctx.get('sidebarRight')` **取一次**（可选服务，不写进 `inject`，缺席也不影响启动），`mode` 从我们的 root store 读。
 - 设置项排在「视效」页最后一行（`data-ud-check="reader-settings-openmode"`），默认关闭；存储新增 `deliverableOpenMode`（默认 `'external'`），读取端走 `deliverableOpenModeOf`——除了 `'sidebar'` 一切都是系统程序（持久化整体替换，老记录没有这个键）。
 
