@@ -367,6 +367,9 @@
 .settingsRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .settingsCopy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .settingsLabel { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+/* A line the row has to say for itself: state the reader is acting on — the switch being overridden
+   by the system, what to press while recording, why a combination was refused. Descriptions are the
+   row's `title` instead, so this only ever renders when there is something to say. */
 .settingsNote { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
 /* The panel's pages keep the shape and type they already had — two full-width tabs, 2px apart,
    13px/20px, the label where it was — and take the product's skin: the selected page turns
@@ -387,7 +390,10 @@
    through `data-motion` (the root attribute folds it in), and unlike an `animation`, a transition
    cannot replay when the gate lifts — so this one needs no separate media query. */
 [data-motion=off] .settingsTabs::after, [data-motion=off] .settingsTab { transition: none; }
-.settingsEmpty { margin: 0; padding: 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+/* A row's description is the browser's own `title` box (SettingsMenu puts the string on the row),
+   the same mechanism the toolbar's buttons use — so there is nothing to draw here, and nothing to
+   bring under the 动效 switch: the browser owns both the box and its timing. State lines are the
+   `.settingsNote` above, and a row showing one carries no `title`. */
 /* The shortcut rows: the saved combination reads as a key, and recording turns that key blue so
    the row says which one is listening. The chip is `flex: none`, so a long action name wraps
    instead of squeezing the key. */

@@ -11,7 +11,10 @@ import css from './Reader.module.css';
 const PAGES = [['visual', '视效'], ['shortcuts', '快捷键']] as const;
 type SettingsPage = (typeof PAGES)[number][0];
 
-/** One row per bindable action. `other` is the binding a new combination must not collide with. */
+/**
+ * One row per bindable action. `other` is the binding a new combination must not collide with, and
+ * `note` is what the row carries as its `title`, so it describes the action rather than the keys.
+ */
 const SHORTCUT_ROWS: readonly { action: ShortcutAction; label: string; note: string; other: ShortcutAction }[] = [
   { action: 'collapseTurn', label: '收起本轮的过程', note: '折起你正在看的那一轮', other: 'collapseAll' },
   { action: 'collapseAll', label: '收起全部过程', note: '把所有展开的轮次一起折起', other: 'collapseTurn' },
@@ -27,6 +30,14 @@ const PROBLEM_COPY: Record<ShortcutProblem, string> = {
 /** A binding shown after the action it runs, or nothing when the slot is cleared. */
 const keyHint = (binding: string): string => parseShortcut(binding) === null ? '' : `（${shortcutLabel(binding)}）`;
 
+/** What 动效 does, carried as the row's own `title` rather than a line under the label. */
+const MOTION_HINT = '新到文字柔和显现，过程平滑展开';
+/** …unless the system's request is what is deciding, which is state and stays in line. */
+const MOTION_OVERRIDE = '已按系统的「减少动态效果」关闭';
+/** The button's accessible name and its hover box: the toolbar's other buttons carry a `title` too,
+ * so this one keeps the browser's own box rather than growing a second kind of hover language. */
+const BUTTON_HINT = 'viewtune 设置';
+
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
  *
@@ -39,6 +50,25 @@ const keyHint = (binding: string): string => parseShortcut(binding) === null ? '
  * behind it still readable and nothing trapped. The button carries `aria-expanded`/`aria-controls`,
  * the panel follows DOM order so Tab reaches it right after the button, Escape closes it and hands
  * focus back to the button, and a pointer down anywhere else closes it.
+ *
+ * Every row carries a one-line description, and that description rides on the row's own `title` —
+ * the browser's box, the same mechanism the button and 「收起」 use, so the whole view has ONE hover
+ * language and there is no second box to draw, position, theme or animate. A row is a control, not
+ * an explanation: the label says what the row is, the explaining copy takes no line of its own, and
+ * a row is one line tall whether or not it has a description. It is the ROW that carries it rather
+ * than its label, so the pointer anywhere on the row raises it.
+ *
+ * What that trades away, since it is a choice rather than a free lunch: the browser's box arrives on
+ * its own delay, wears the browser's style rather than the theme's, appears reliably only for a
+ * pointer (whether keyboard focus shows it is the browser's call, and touch has no hover), and does
+ * not reach assistive technology — a row is not a focusable element, so a screen reader has nothing
+ * to describe.
+ *
+ * Lines that are NOT descriptions stay in line: the switch being overridden by the system, what to
+ * press while recording, why a combination was refused. Those are states the reader is acting on,
+ * and a hover box is the wrong place for them. Such a row carries no `title` at all while its state
+ * line is showing: the sentence is already on screen, and a tooltip repeating it would only cover
+ * what the reader is answering.
  *
  * The pages are a real tablist — `role="tab"` with a roving tabindex, the arrows and Home/End
  * moving focus and selection together — which is the same shape the tool ledger uses for its own
@@ -109,6 +139,9 @@ export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortc
 
   const stopRecording = () => { setRecording(null); setProblem(null); };
 
+  /** Whether the system's request, not this preference, is what decides the motion. */
+  const overridden = preference && !motion;
+
   /**
    * The recording owns the keyboard while it runs: the combination being typed must not also fire
    * the combination already in force, and Escape here means "cancel" rather than "close the panel".
@@ -129,7 +162,7 @@ export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortc
 
   return <div className={css.settingsWrap} ref={wrap}>
     <button ref={buttonRef} type="button" className={`${css.textButton} ${css.settingsButton}`}
-      aria-expanded={open} aria-controls={panelId} aria-label="viewtune 设置" title="viewtune 设置"
+      aria-expanded={open} aria-controls={panelId} aria-label={BUTTON_HINT} title={BUTTON_HINT}
       onClick={toggle}>
       viewtune<IconSettingsOutline14 size={12} />
     </button>
@@ -146,12 +179,10 @@ export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortc
       </div>
       <div id={`${panelId}-page`} role="tabpanel" aria-labelledby={`${panelId}-${page}`}>
         {page === 'visual'
-          ? <div className={css.settingsRow}>
+          ? <div className={css.settingsRow} title={overridden ? undefined : MOTION_HINT}>
             <span className={css.settingsCopy}>
               <span className={css.settingsLabel}>动效</span>
-              <span className={css.settingsNote}>{preference && !motion
-                ? '已按系统的「减少动态效果」关闭'
-                : '新到文字柔和显现，过程平滑展开'}</span>
+              {overridden && <span className={css.settingsNote}>{MOTION_OVERRIDE}</span>}
             </span>
             {/* The preference is what the switch shows; `motion` above is what the reader actually
                 gets, which the note explains when the system overrides it. */}
@@ -162,12 +193,14 @@ export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortc
               const binding = shortcuts[action] ?? '';
               const refusal = problem?.action === action ? problem.code : null;
               const isRecording = recording === action;
-              return <div key={action} className={css.settingsRow}>
+              /** The state line this row is showing, if it has one. */
+              const state = isRecording
+                ? '按下新的组合…（Esc 取消，Backspace 清除）'
+                : refusal === null ? null : PROBLEM_COPY[refusal];
+              return <div key={action} className={css.settingsRow} title={state === null ? note : undefined}>
                 <span className={css.settingsCopy}>
                   <span className={css.settingsLabel}>{label}</span>
-                  <span className={css.settingsNote}>{isRecording
-                    ? '按下新的组合…（Esc 取消，Backspace 清除）'
-                    : refusal !== null ? PROBLEM_COPY[refusal] : note}</span>
+                  {state !== null && <span className={css.settingsNote}>{state}</span>}
                 </span>
                 <span className={css.settingsKeys}>
                   <button type="button" className={css.shortcutKey} data-recording={isRecording || undefined}
@@ -182,7 +215,6 @@ export function SettingsMenu({ motion, preference, onChange, shortcuts, onShortc
                 </span>
               </div>;
             })}
-            <p className={css.settingsEmpty}>改键后立即生效并保存下来；清除后该项没有快捷键，不影响按钮本身。</p>
           </div>}
       </div>
     </div>}
