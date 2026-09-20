@@ -306,6 +306,27 @@
 .compactionButton { cursor: pointer; transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease; }
 .compactionButton:hover { color: var(--dsw-alias-label-primary); border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-interactive-bg-hover); }
 .compactionIcon { width: 12px; height: 12px; flex: none; opacity: .7; }
+/* The divider ARRIVES rather than appearing: the rules extend out from the centre, the pill settles
+   in behind them, and the dial turns once. Each phase animates a transform on the element that
+   moves — the line carries the rules, so scaling it sweeps both — which is what keeps this cheap.
+   The motion switch uses this view's same-name zero-duration shorthand rather than `animation: none`:
+   with `none`, lifting the gate STARTS the arrival at that moment, so a divider that had been on
+   screen for a minute would replay it the instant the reader turned 动效 on. The system's
+   reduced-motion request is a media query and cannot lift mid-arrival, so it uses `none`. */
+.compactionRow > .compactionLine { animation: compactionLineIn 520ms cubic-bezier(.4,0,.2,1) both; }
+.compactionRow > .compactionLine > .compactionPill { animation: compactionPillIn 420ms 120ms cubic-bezier(.34,1.4,.64,1) both; }
+.compactionRow > .compactionLine .compactionIcon { animation: compactionDial 900ms 200ms cubic-bezier(.4,0,.2,1) both; }
+[data-motion=off] .compactionRow > .compactionLine { animation: compactionLineIn 0s cubic-bezier(.4,0,.2,1) both; }
+[data-motion=off] .compactionRow > .compactionLine > .compactionPill { animation: compactionPillIn 0s cubic-bezier(.34,1.4,.64,1) both; }
+[data-motion=off] .compactionRow > .compactionLine .compactionIcon { animation: compactionDial 0s cubic-bezier(.4,0,.2,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .compactionRow > .compactionLine,
+  .compactionRow > .compactionLine > .compactionPill,
+  .compactionRow > .compactionLine .compactionIcon { animation: none !important; }
+}
+@keyframes compactionLineIn { from { opacity: 0; transform: scaleX(.6); } to { opacity: 1; transform: scaleX(1); } }
+@keyframes compactionPillIn { from { opacity: 0; transform: translateY(-6px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes compactionDial { from { transform: rotate(-140deg); opacity: 0; } to { transform: rotate(0deg); opacity: .7; } }
 .compactionToggle { font-size: 10px; opacity: .8; margin-left: 2px; }
 .compactionSummaryBox { margin-top: 10px; width: 100%; max-width: 680px; padding: 12px 16px; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); border: 1px solid var(--dsw-alias-border-l2); font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-secondary); box-sizing: border-box; }
 .compactionSummaryHeader { font-size: 11px; font-weight: 500; color: var(--dsw-alias-label-tertiary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px dashed var(--dsw-alias-border-l1); }

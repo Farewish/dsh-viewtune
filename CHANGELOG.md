@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (compaction arrival)
+
+**压缩分隔条不再"直接出现"，而是到位：横线从中心扫出、胶囊落位、表盘转一次。**
+
+上游 0.2.0 的三段手势照搬（`.compactionRow > .compactionLine` 520ms `scaleX(.6→1)` + 淡入；`.compactionRow > .compactionLine > .compactionPill` 420ms、延迟 120ms、`translateY(-6px) scale(.94)` 落位；`.compactionRow > .compactionLine .compactionIcon` 900ms、延迟 200ms、`rotate(-140deg→0)` 转一次），三段都只动 `transform`（横线承载左右两条规则，缩放它就等于把两条一起扫出），子选择器照抄是为了不误伤其它地方的同一类名。
+
+**唯一按本 fork 惯例改的是闸门**：上游用 `animation: none !important` 挡「动效」开关，而本视图的规矩是**同名零时长**——`animation: none` 会在门抬起的那一刻**开始**播放到达动画，于是一条已经挂了半分钟的分隔条会在读者打开「动效」的瞬间重放一次；同名零时长（`animation: <name> 0s <其余>`）则永远不重放。系统那条 `prefers-reduced-motion` 是媒体查询、不会中途抬起，所以照旧 `none !important`。
+
+一条 marker 进 `check-bundle-markers.mjs`（名字与选择器都走 hash-无关的 `keyframeOf` / `classSel`，因为 lightningcss 会把关键帧名一起重哈希），它同时钉三件事：三段到达动画都在、**门控是"零时长"而不是"cancel"**（产物里 `0s` 被最小化器省掉——那是 `animation` 的默认值，所以"被清零"长得就是"没有时长"，而 `none` 是绝不能出现的那个字符串）、系统闸门仍是 `none !important`。
+
+这条 marker 自己被阴性测试抓过一次**真实的松**：第一版的"到达"检查写成 `${selector}{animation:…${name}`，而**门控规则里同样带着那个类名与关键帧名**，于是把无门控的到达规则删掉它照样通过。"到达"现在要求该选择器出现在**没有 `[data-motion=off]` 前缀**的那条规则里（正则中禁掉方括号即可）。两半都实测能失败：门控改成 `none` → `MISS`；删掉表盘那条到达规则 → `MISS`；两次还原后 sha256 一致。
+
 ## Unreleased (deliverable open mode)
 
 **设置「视效」页多了一行「产物用右侧栏打开」：默认仍用系统程序，打开后改用右侧栏的内置预览。**

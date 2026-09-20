@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { classSel, hasDecls, moduleCssLiteral, pillBoundaryClass } from './bundle-anchors.mjs';
+import { classSel, hasDecls, keyframeOf, moduleCssLiteral, pillBoundaryClass } from './bundle-anchors.mjs';
 import { fileURLToPath } from 'node:url';
 
 /** The checkout this guard lives in (see the note in run.mjs). */
@@ -164,7 +164,32 @@ const markers = [
   ['the sidebar opener is looked up, not required', 'get?.("sidebarRight")'],
   ['deliverable addresses use the official session-file scheme', 'dsh-resource://file/session/'],
   ['a missing sidebar opener falls back with a warning', 'sidebarRight.openResource is not available; falling back to system app'],
-  // The com  // The changed-line counts a tool row carries, and the two rules that keep them honest: only a tool
+  // The compaction divider arrives rather than appearing: three animations, on the line (whose rules
+  // sweep with it), the pill and the dial. Names go through the keyframe helper because lightningcss
+  // re-hashes them; the selectors go through the class helper for the same reason.
+  //
+  // The gate is the part worth pinning. It must keep the SAME animation and shorten it to nothing —
+  // `animation: none` would start the arrival the moment the gate lifted, replaying a divider that
+  // had been on screen for a minute. The emitted shorthand drops the `0s` (it is the default), so
+  // "zeroed" looks like an animation shorthand with no duration, and `none` is what must not appear.
+  ['the compaction divider arrives, and the motion switch zeroes it rather than canceling it', () => {
+    const line = classSel(readerCss, 'compactionLine');
+    const pill = classSel(readerCss, 'compactionPill');
+    const dial = classSel(readerCss, 'compactionIcon');
+    const names = ['compactionLineIn', 'compactionPillIn', 'compactionDial'].map(name => keyframeOf(readerCss, name));
+    if (names.some(name => name === '')) return false;
+    // The arrival rule itself, not the gated copy of it: the gate carries the same class and keyframe
+    // name, so a looser match would be satisfied by the gate alone — which is how a first cut of this
+    // marker passed with the arrival deleted. Between the previous rule's `}` and the selector there
+    // must be no brackets, which is exactly what the `[data-motion=off]` prefix is made of.
+    const arrives = (selector, name) =>
+      new RegExp(`(?:^|[;}])[^{}\\[\\]]*${selector}\\{animation:[^}]*${name}`).test(readerCss);
+    const arrivals = arrives(line, names[0]) && arrives(pill, names[1]) && arrives(dial, names[2]);
+    const zeroed = new RegExp(`\\[data-motion=off\\][^{}]*${line}\\{animation:(?!none)[^}]*${names[0]}`).test(readerCss);
+    const system = new RegExp(`@media \\(prefers-reduced-motion:reduce\\)\\{[^@]*${line}[^@]*\\{animation:none`).test(readerCss);
+    return arrivals && zeroed && system;
+  }],
+  // The changed-line counts a tool row carries, and the two rules that keep them honest: only a tool
   // that mutates a file may read its own arguments as a diff (several unrelated tools carry a field
   // named `content`, and counting those would invent additions for calls that changed nothing), and a
   // parent call reports what its children changed rather than what its own arguments contain. The
