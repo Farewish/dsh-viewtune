@@ -218,14 +218,27 @@ export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, 
         watcher.current = observer;
       }
     }
-    animation.onfinish = () => {
-      if (running.current !== animation) return;
+    // `fill: 'both'` pins the opening keyframe — height 0, and the margin compensation with it —
+    // so while this animation runs the body is invisible no matter what its own style says. An
+    // animation that never reaches `onfinish` (cancelled by a re-run, skipped by the compositor,
+    // never started because the view was hidden) would leave the row looking like it refused to
+    // open; that is the symptom upstream reported as "clicking it looked like nothing happened".
+    // Cancelling is only safe once the state change has been committed, so the deadline does both:
+    // it sets `present` and takes the fill away. The 240ms of slack past the animation's own
+    // duration is upstream 0.2.0's.
+    let settled = false;
+    const settle = () => {
+      if (settled || running.current !== animation) return;
+      settled = true;
       watcher.current?.disconnect();
       watcher.current = null;
       running.current = null;
       animation.cancel();
       setPresent(open);
     };
+    animation.onfinish = settle;
+    const deadline = window.setTimeout(settle, 260 + 240);
+    return () => { window.clearTimeout(deadline); };
   }, [open, motion, returnFocusTo]);
   useEffect(() => () => {
     watcher.current?.disconnect();
@@ -261,7 +274,21 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
     if (!enabled || from < 1) { setPresent(false); return; }
     const next = element.animate([{ height: `${from}px`, opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 220, easing: EASING, fill: 'both' });
     animation.current = next;
-    next.onfinish = () => { if (animation.current === next) { animation.current = null; next.cancel(); setPresent(false); } };
+    // The same hazard as the disclosure above, at the one site upstream did not cover: `fill:
+    // 'both'` holds this collapse's endpoint, so an animation that never finishes leaves retired
+    // narration on screen at full height with `present` still true — it never retires. The
+    // deadline retires it either way.
+    let settled = false;
+    const settle = () => {
+      if (settled || animation.current !== next) return;
+      settled = true;
+      animation.current = null;
+      next.cancel();
+      setPresent(false);
+    };
+    next.onfinish = settle;
+    const deadline = window.setTimeout(settle, 220 + 240);
+    return () => { window.clearTimeout(deadline); };
   }, [visible, enabled, focusHeld]);
   useEffect(() => () => animation.current?.cancel(), []);
   if (!visible && !present) return null;

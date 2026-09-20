@@ -223,12 +223,22 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     port.style.maxHeight = 'none';
     const animation = port.animate([{ height: `${from}px` }, { height: `${target}px` }], { duration: 300, easing: EASING, fill: 'both' });
     resize.current = animation;
-    animation.onfinish = () => {
-      if (resize.current !== animation) return;
+    // `fill: 'both'` holds the height this animation started from, and the `max-height: none`
+    // above is what lets the first frame collapse at all. An animation that never reaches
+    // `onfinish` leaves the card pinned at its old height with that override still in place — the
+    // size toggle looks dead — so the deadline commits the resize and clears the override. The
+    // 240ms of slack past the animation's own duration is upstream 0.2.0's.
+    let settled = false;
+    const settle = () => {
+      if (settled || resize.current !== animation) return;
+      settled = true;
       resize.current = null; animation.cancel();
       port.style.maxHeight = ''; port.style.height = '';
       lastHeight.current = port.clientHeight;
     };
+    animation.onfinish = settle;
+    const deadline = window.setTimeout(settle, 300 + 240);
+    return () => { window.clearTimeout(deadline); };
   }, [expanded, motion, selected]);
   useEffect(() => () => resize.current?.cancel(), []);
 

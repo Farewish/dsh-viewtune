@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (animation deadlines)
+
+**每个 `fill: 'both'` 的 Web Animation 都配了一条墙上时钟兜底。**
+
+`fill: 'both'` 会把动画的起始姿态一直钉住，直到有人取消它。于是**永远走不到 `onfinish` 的动画会把行固定在开帧上**——在阅读视图里就是「点了展开，什么都没发生」（上游 0.2.0 记的正是这个症状：被重跑取消、被卸载、或者合成器直接跳过）。上游的修法是给每个这样的动画配 `setTimeout(settle, 时长 + 240ms)`，并让 `settle` 同时干两件事：提交状态、撤掉 fill；duration 之后那 240ms 余量是上游给的。
+
+本 fork 有三处，**上游只覆盖了其中两处**：
+
+- `motion.tsx` 的 `ProcessFragment`（展开与收起共用一条，260ms）——上游同款；
+- `ReasoningCard.tsx` 的尺寸动画（300ms）——上游同款。它卡住的样子是：`fill:'both'` 钉住起始高度，而为了让第一帧能收起临时设的 `max-height: none` 还留在身上，于是「可滚动阅读 / 展开阅读」这个开关看着像坏了；
+- `motion.tsx` 的 `RetiringContent`（旧旁白退场，220ms）——**上游没加**。它的失败形态正好相反：`fill:'both'` 钉住收起帧，动画卡住时 `present` 永远为 true，已经退场的旁白就留在屏幕上不消失。按同一条规则补上，注释里写明这是上游没覆盖的那一处。
+
+`settle` 保留了本 fork 原本更强的守卫（`running.current !== animation` 时什么都不做），所以一次 effect 重跑不会让旧动画提交过期状态；layout effect 的 cleanup 负责清掉那条计时器，onfinish 与计时器之间靠 `settled` 去重。
+
+配套加了一条 guard（`check-bundle-markers.mjs`）：**产物里 `fill: "both"` 的处数必须等于 `clearTimeout(deadline)` 的处数**。比计数而不是钉死三个数字，是因为 duration 会被构建折成常量（源码里的 `260 + 240` 在产物里是 `500`），钉数字等于在断言一个源码里根本看不到的值；而计数是语义不变量——新加一个 `fill:'both'` 动画却忘了兜底，这里就会 MISS。这条 marker「能失败」是实测的：把产物里一个 `clearTimeout(deadline)` 改名后它报 `MISS every fill:both animation arms a wall-clock deadline`，还原后 `BUNDLE STATE OK`，且还原前后产物 sha256 一致。
+
 ## Unreleased (streaming pace)
 
 **文字显现的节奏改成跟着源的速率走；一次到达的一批词在同一个短窗口里落下。**

@@ -116,6 +116,18 @@ const markers = [
   ['collapse control is scoped to one turn', 'if (group.turn === null || group.turn !== currentTurn) continue;'],
   ['collapse exit is delayed past its animation', () => cssDecls(`${sel('collapseControl')}[hidden]`, ['display:inline-flex'])],
   ['collapse exit waits for the animation to finish', () => /transition:[^;}]*visibility\s+0s[^;}]*[\d.]+m?s/.test(readerCss)],
+  // An animation with `fill: 'both'` keeps the pose it started from until something cancels it, so
+  // one that never reaches `onfinish` strands the row on its opening keyframe — the reported
+  // symptom being a disclosure that looks like it refused to open. Every such site therefore also
+  // arms a wall-clock deadline. The two counts are compared rather than each deadline pinned: a new
+  // `fill: 'both'` animation that forgets one fails here, while retuning an animation's duration
+  // (which the build folds into the number, so a pinned value would be lying about the source) does
+  // not.
+  ['every fill:both animation arms a wall-clock deadline', () => {
+    const filled = (bundle.match(/fill: "both"/g) ?? []).length;
+    const armed = (bundle.match(/clearTimeout\(deadline\)/g) ?? []).length;
+    return filled > 0 && filled === armed;
+  }],
   // The toolbar is the one lane that pins, so both switches stay reachable.
   ['toolbar pins to the top', () => cssDecls(sel('toolbar'), ['position:sticky', 'top:0', 'z-index:9'])],
   // The reading view's preferences live behind one toolbar button: the lane keeps its geometry and
