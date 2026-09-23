@@ -102,6 +102,15 @@ export interface ReaderState {
   /** The reading pace in lines per second, from `REASONING_RATES`; only 自动滚动 reads it. */
   reasoningRate: number;
   /**
+   * Whether the reasoning card that is currently being written into grows to show its content — 「焦点思考展开」.
+   *
+   * OFF by default: with it off the card behaves exactly as it always has (a fixed 224px window whose content follows
+   * by the mode above), so this is the one switch that changes the SHAPE of what a reader sees rather than how it
+   * moves. Independent of `reasoningFollow`: the three modes act on the card as it is, grown or not. Read defensively
+   * (`=== true`), so a record written before it existed keeps the preview card.
+   */
+  focusExpand: boolean;
+  /**
    * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
    *
    * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
@@ -142,6 +151,7 @@ type ReaderActions = {
   setAutoCollapseEarlier: (draft: ReaderState, value: boolean) => void;
   setReasoningFollow: (draft: ReaderState, value: ReasoningFollowMode) => void;
   setReasoningRate: (draft: ReaderState, value: number) => void;
+  setFocusExpand: (draft: ReaderState, value: boolean) => void;
   /** Drop every stored expansion choice, so each turn falls back to its default. */
   clearExpanded: (draft: ReaderState) => void;
   setStripWheel: (draft: ReaderState, value: boolean) => void;
@@ -189,6 +199,8 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       autoCollapseEarlier: false,
       // The reasoning card's own movement: the reading pace it has always used, at the step it has always taken.
       reasoningFollow: 'auto', reasoningRate: 2,
+      // …and it stays the same SIZE until a reader asks for the focused card to grow.
+      focusExpand: false,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
@@ -214,6 +226,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setAutoCollapseEarlier: (draft, value: boolean) => { draft.autoCollapseEarlier = value; },
       setReasoningFollow: (draft, value: ReasoningFollowMode) => { draft.reasoningFollow = value; },
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
+      setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },
       clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },

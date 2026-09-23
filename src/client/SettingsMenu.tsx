@@ -65,6 +65,20 @@ const FOLLOW_MODE_HINT = '直接贴底：不再逐帧滑动，画面更省';
 const REASONING_FOLLOW_HINT = '自动滚动按阅读速度走；跟随最新停在最新一行';
 /** What the pace governs, as that row's `title` box. */
 const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
+/** What the focused expansion does, as that row's `title` box. */
+const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到展开阅读那么高';
+
+/**
+ * A settings page grouped by subject: a hairline above the group, and a caption when the group's subject is not
+ * already the label of the row that opens it.
+ *
+ * The 功能 page names its groups (a reader arrives there with a question, and the caption answers it), while 视效 is
+ * divided by the surface each block is about — 磨砂玻璃 and 壁纸 both open with the switch that names them, so a
+ * caption there would only repeat the row below it. Same rule, same hairline, caption optional.
+ */
+function Group({ caption }: { caption?: string }) {
+  return <div className={css.settingsGroup} data-ud-check={caption === undefined ? 'reader-settings-divider' : 'reader-settings-group'}>{caption}</div>;
+}
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
@@ -103,7 +117,7 @@ const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -145,6 +159,8 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onReasoningFollow: (next: ReasoningFollowMode) => void;
   reasoningRate: number;
   onReasoningRate: (next: number) => void;
+  focusExpand: boolean;
+  onFocusExpand: (next: boolean) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background. */
@@ -265,6 +281,7 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                   gets, which the note explains when the system overrides it. */}
               <Switch checked={preference} onChange={onChange} label="动效" />
             </div>
+            <Group />
             <div className={css.settingsRow} title={GLASS_HINT} data-ud-check="reader-settings-glass">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>磨砂玻璃</span>
@@ -304,6 +321,7 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 </span>
               </div>
             ))}
+            <Group />
             {/* The wallpaper: the folder's own images, then the scrim that keeps prose readable on
                 one. It reads its list from the host half, so the row owns that fetch rather than
                 taking a list through props nobody else needs. */}
@@ -313,9 +331,12 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
           </>
           : page === 'features'
           ? <>
-            {/* What this plugin does to the app rather than how any of it looks: two switches, one for each piece of
-                behaviour it adds on top of the host. They live together because that is the question a reader asks
-                here — "what is this thing changing?" — and neither is a matter of taste about pixels. */}
+            {/* This page is grouped by WHAT A SETTING AFFECTS, not by what it costs. A reader arrives with a question
+                ("why does the card move?", "why does the text appear like that?") and finds the row under that
+                heading; a 功能/性能 split would file the wallpaper and the reasoning card together and separate the two
+                halves of one behaviour. A heading is a divider plus a caption, and a setting that only means something
+                under another one is indented under it and greyed out while it does not apply. */}
+            <Group caption="小功能" />
             <div className={css.settingsRow} title={STRIP_WHEEL_HINT} data-ud-check="reader-settings-strip-wheel">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>竖条滚轮</span>
@@ -328,9 +349,31 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
               </span>
               <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
             </div>
-            {/* How often a streaming message updates. It sits with the behaving switches because that is what it is:
-                the theme of the page above is pixels, this page is what the plugin DOES — and this one is the only
-                choice here that trades a little smoothness of the reveal for a lot less work per second. */}
+            {/* No description on purpose: the label is the whole of it. */}
+            <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>自动收起更早流程</span>
+              </span>
+              <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
+            </div>
+            <Group caption="正文显示" />
+            <div className={css.settingsRow} title={REVEAL_WORDS_HINT} data-ud-check="reader-settings-reveal-words">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>逐词显现</span>
+              </span>
+              <Switch checked={revealWords} onChange={onRevealWords} label="逐词显现" />
+            </div>
+            {/* A sub-setting in the literal sense: the blur is part of the per-word reveal, so it is indented under it
+                and greyed out while there is no per-word reveal to blur. */}
+            <div className={`${css.settingsRow} ${css.settingsSubRow}`} title={REVEAL_BLUR_HINT} data-ud-check="reader-settings-reveal-blur"
+              data-inactive={!revealWords}>
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>逐词显现的模糊</span>
+              </span>
+              <Switch checked={revealBlur} disabled={!revealWords} onChange={onRevealBlur} label="逐词显现的模糊" />
+            </div>
+            {/* How often a streaming message updates. It is about how the text is written out, which is why it sits in
+                this group rather than with the behaving switches above. */}
             <div className={css.settingsRow} title={CADENCE_HINT} data-ud-check="reader-settings-cadence">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>正文更新节奏</span>
@@ -340,18 +383,7 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 {TEXT_CADENCES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
               </select>
             </div>
-            <div className={css.settingsRow} title={REVEAL_BLUR_HINT} data-ud-check="reader-settings-reveal-blur">
-              <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>逐词显现的模糊</span>
-              </span>
-              <Switch checked={revealBlur} onChange={onRevealBlur} label="逐词显现的模糊" />
-            </div>
-            <div className={css.settingsRow} title={REVEAL_WORDS_HINT} data-ud-check="reader-settings-reveal-words">
-              <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>逐词显现</span>
-              </span>
-              <Switch checked={revealWords} onChange={onRevealWords} label="逐词显现" />
-            </div>
+            <Group caption="流程展示设置" />
             <div className={css.settingsRow} title={FOLLOW_MODE_HINT} data-ud-check="reader-settings-follow-mode">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>跟随到最新</span>
@@ -360,13 +392,6 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 onChange={event => { onFollowMode(followModeOf(event.currentTarget.value)); }}>
                 {FOLLOW_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
               </select>
-            </div>
-            {/* No description on purpose: the label is the whole of it. */}
-            <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">
-              <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>自动收起更早流程</span>
-              </span>
-              <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
             </div>
             {/* How the reasoning card moves. Independent of the focus expansion: both act on the card as it is now. */}
             <div className={css.settingsRow} title={REASONING_FOLLOW_HINT} data-ud-check="reader-settings-reasoning-follow">
@@ -378,14 +403,23 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 {REASONING_FOLLOW_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
               </select>
             </div>
-            <div className={css.settingsRow} title={REASONING_RATE_HINT} data-ud-check="reader-settings-reasoning-rate">
+            {/* The other literal sub-setting: a pace only exists for the mode that follows a pace. */}
+            <div className={`${css.settingsRow} ${css.settingsSubRow}`} title={REASONING_RATE_HINT} data-ud-check="reader-settings-reasoning-rate"
+              data-inactive={reasoningFollow !== 'auto'}>
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>自动滚动速度</span>
               </span>
-              <select className={css.settingsSelect} value={reasoningRate} aria-label="自动滚动的速度"
+              <select className={css.settingsSelect} value={reasoningRate} aria-label="自动滚动的速度" disabled={reasoningFollow !== 'auto'}
                 onChange={event => { onReasoningRate(reasoningRateOf(Number(event.currentTarget.value))); }}>
                 {REASONING_RATES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
               </select>
+            </div>
+            {/* The one switch here that changes the SHAPE of the reading view rather than how something moves. */}
+            <div className={css.settingsRow} title={FOCUS_EXPAND_HINT} data-ud-check="reader-settings-focus-expand">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>焦点思考展开</span>
+              </span>
+              <Switch checked={focusExpand} onChange={onFocusExpand} label="焦点思考展开" />
             </div>
           </>
           : <>

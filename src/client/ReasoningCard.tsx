@@ -1,7 +1,9 @@
-﻿import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { REASON_HOLD, REASON_STEP, reasoningTarget, stepLines } from './reasoning-follow.js';
+import { REASON_HOLD, REASON_LATEST_STEP, REASON_STEP, reasoningTarget, stepLines } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
+import { focusedHeight } from './focus-expand.js';
+import { isNearTail } from './reading-scroll.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -10,9 +12,10 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 const WHEEL_IDLE_MS = 140;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, focusKey, focused, onFocusChange }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
   reasoningMode: ReasoningFollowMode; rate: number;
+  focusExpand: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -26,7 +29,58 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const resize = useRef<Animation | null>(null);
   const previousExpanded = useRef(expanded);
   const stopFollow = useRef<() => void>(() => {});
+  /** The focus, readable from the frame loop's closure without putting it in that effect's dependencies. */
+  const focusedRef = useRef(false);
+  /** The ceiling the focus has published, so a growth can be compensated by EXACTLY its own delta. */
+  const focusHeight = useRef(0);
   const allowed = following && active && motion && !selected && reasoningMode !== 'manual';
+
+  /**
+   * The focus is REQUESTED here and granted above.
+   *
+   * Only one card can hold it, and the newest request wins — which is what the reader asked for: the card that is
+   * being written into, or one that has just started, supersedes whatever held the focus before. A card asks when it
+   * is the one being written into AND the reader is sitting at the bottom of the transcript, the moment
+   * 「焦点思考展开」 specifies for a new determination. Losing the tail does NOT release it (a reader who scrolls up to
+   * re-read must not watch the card shrink under them); what releases it is the reader taking the card over, the
+   * reader asking for the full height with 展开阅读, or — in 跟随最新 only — the thinking ending, which is the one mode
+   * specified to fold back to the small card.
+   */
+  useEffect(() => {
+    if (expanded || !focusExpand) return;
+    if (focused) {
+      // The focus ends when this card is no longer the one being written into — in EVERY mode. It is the focus, not the
+      // height, that suspends the page's tail-follow, and a card that has finished thinking must not keep the page
+      // pinned off the bottom until it unmounts: that is what made a reader who was plainly at the bottom see no
+      // following at all, with 「回到最新」 as the only way back (it writes one scroll position; the suspension stayed).
+      if (!following || !active) onFocusChange(focusKey, false);
+      return;
+    }
+    if (!active || !following) return;
+    const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
+    if (!scroller) return;
+    const atTail = () => isNearTail(scroller.scrollTop, scroller.scrollHeight, scroller.clientHeight);
+    /**
+     * The determination is "the page is at the bottom", so it has to be re-asked whenever the page ARRIVES there —
+     * not only when this card's own state changed.
+     *
+     * Sending a message is what made that plain: a new turn's header and the reader's own bubble are laid out before
+     * the card has any text, so at the instant this card became the one being written the viewport was still catching
+     * up and the question had a false answer — and since nothing about the CARD changed afterwards, it was never asked
+     * again. That is exactly the shape of the report: the first thinking card of a turn never expanded while every
+     * later one did. Watching the scroller is also what the rule says in as many words.
+     */
+    const request = () => { if (atTail()) onFocusChange(focusKey, true); };
+    request();
+    scroller.addEventListener('scroll', request, { passive: true });
+    return () => scroller.removeEventListener('scroll', request);
+  }, [expanded, focusExpand, focused, following, active, reasoningMode, focusKey, onFocusChange]);
+  useEffect(() => {
+    focusedRef.current = focused;
+    if (!focused) { focusHeight.current = 0; viewport.current?.style.removeProperty('height'); }
+  }, [focused]);
+  // A card that unmounts while focused must hand the focus back, or the follower below would stay suspended forever.
+  useEffect(() => () => { onFocusChange(focusKey, false); }, [focusKey, onFocusChange]);
 
   const pause = useCallback(() => {
     stopFollow.current();
@@ -131,8 +185,56 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      */
     let lastOverflow = false;
     let lastEdges = 'none';
+    /** The line box, cached with the preview height and for the same reason: a focused card grows in whole lines. */
+    let lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
     const measure = (recordHeight = true) => {
-      if (recordHeight) previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
+      if (recordHeight) {
+        previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
+        lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
+      }
+      /**
+       * 「焦点思考展开」 asks the stylesheet for a taller ceiling, in whole lines, while this card holds the focus.
+       *
+       * Only the CONTENT-side number is published here: the ceiling itself (`min(60vh, 560px)`) stays in the
+       * stylesheet, where the viewport is known, so this loop needs no viewport arithmetic. Dropping the property is
+       * what returns the card to its preview height — see the focus effect.
+       */
+      /**
+       * 「焦点思考展开」 asks for a taller card while this one holds the focus — and asks for it from the space ABOVE.
+       *
+       * The card sits in the flow, so height added at the bottom pushes everything below it down: the line the reader
+       * is watching, and the end of the transcript out of the viewport. That is not a cosmetic problem — it forces the
+       * very scroll that breaks the next focus determination, which only starts while the page sits at the bottom.
+       * Moving the conversation's own scroll by exactly the growth keeps the card's BOTTOM edge where it was and takes
+       * the new height out of the space above it. This is safe only because the page's tail-follow is suspended while
+       * a card holds the focus: nothing else is writing that scroll position. Where there is no room above, the
+       * clamp leaves the write short and the card grows downward as it always did.
+       *
+       * The height is whole lines and INTENTIONAL rather than content-driven, which is what makes the delta exact:
+       * a card that followed its content between two line boundaries would grow on every publication, and its real
+       * delta could not be known without measuring the layout after the write. It also keeps the layout below this
+       * card changing once per line instead of once per publication. The ceiling itself (min(60vh, 560px)) stays in
+       * the stylesheet, so nothing here needs the viewport.
+       */
+      if (focusedRef.current) {
+        const wanted = focusedHeight(text.offsetHeight, previewHeight, lineHeight);
+        if (wanted !== focusHeight.current) {
+          const grew = wanted - focusHeight.current;
+          focusHeight.current = wanted;
+          port.style.height = `${String(wanted)}px`;
+          if (grew > 0) {
+            const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
+            if (scroller !== null) scroller.scrollTop += grew;
+          }
+        }
+      } else if (focusHeight.current !== 0 && !active && reasoningMode === 'latest') {
+        // 跟随最新 is the one mode specified to fold back to the small card once the thinking ends. The other two KEEP the
+        // height they grew to, and so does a card whose focus ended for any other reason — losing the tail, or the
+        // reader taking it over — because shrinking a card under someone who is reading it is exactly what the
+        // reader's rule 5 forbids. Dropping the property is what returns it, through the declared transition.
+        focusHeight.current = 0;
+        port.style.height = '';
+      }
       const overflowing = text.offsetHeight > previewHeight + 1;
       if (overflowing !== lastOverflow) { lastOverflow = overflowing; setOverflow(overflowing); }
       lastPainted = paintedOffset();
@@ -163,7 +265,11 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         : reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight, stepLines(rate));
       if (target - from < 1) return;
       const began = performance.now();
-      nextAt = began + REASON_HOLD;
+      // 跟随最新 is a continuous follow, the reading pace is a step every 840ms: see REASON_LATEST_STEP for why one
+      // cadence cannot serve both. Everything else about a step — the pose commit, the tick, the fades, the handoff —
+      // is the same either way.
+      const step = reasoningMode === 'latest' ? REASON_LATEST_STEP : REASON_STEP;
+      nextAt = began + (reasoningMode === 'latest' ? REASON_LATEST_STEP : REASON_HOLD);
       targetOffset = target;
       /**
        * Can this step still change either fade?
@@ -185,7 +291,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       scrollTrack.style.transition = 'none';
       scrollTrack.style.transform = `translateY(-${from}px)`;
       void scrollTrack.offsetHeight;
-      scrollTrack.style.transition = 'transform var(--reason-step) var(--reason-ease)';
+      scrollTrack.style.transition = reasoningMode === 'latest' ? 'transform 180ms var(--reason-ease)' : 'transform var(--reason-step) var(--reason-ease)';
       scrollTrack.style.transform = `translateY(-${target}px)`;
       port.dataset.reasoningMoving = 'true';
       port.dataset.reasoningFrom = String(from);
@@ -194,7 +300,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const tick = (now: number) => {
         frame = 0;
         if (!canFollow()) { cancel(); manual(); return; }
-        const done = now - began >= REASON_STEP;
+        const done = now - began >= step;
         // Observe the browser's actual CSS interpolation for masks and handoff. The last frame always measures, which
         // is what leaves the recorded painted offset on the step's target; the frames in between skip it when the
         // answer cannot differ (see `edgesMayMove`).
@@ -312,7 +418,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     setExpanded(value => !value);
   };
 
-  return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-following={allowed} data-overflow={overflow} data-ud-motion="reader-reasoning-size">
+  return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-ud-motion="reader-reasoning-size">
     <div className={css.reasonHeading} data-reader-reasoning-heading data-ud-check="reasoning-identity">
       <span className={css.reasonLabel} data-reader-reasoning-label>思考</span>
       <span>步骤 {step}</span>

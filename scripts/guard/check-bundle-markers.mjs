@@ -465,7 +465,43 @@ const markers = [
   // modes, the pace realised as a whole-line step on the fixed cadence, the standard pace coming out as exactly the
   // two lines this card has always taken, 手动滚动 never moving on its own, 跟随最新 aiming at the newest line, both
   // values read defensively, and a change to either reaching the follower that is already running.
+  // The 功能 page is grouped by what a setting AFFECTS, and the two settings that only mean something under another one
+  // are gated by it. Pinned as a shape rather than as a row count: the three captions in this order (a heading is a
+  // divider plus a caption, and the order is the claim), the two sub-rows carrying the gate they belong to, and the
+  // hairline that makes the grouping visible at all.
+  ['the features page is grouped by subject, in this order', () => {
+    let at = -1;
+    for (const caption of ['小功能', '正文显示', '流程展示设置']) {
+      const next = bundle.indexOf(`caption: "${caption}"`, at + 1);
+      if (next <= at) return false;
+      at = next;
+    }
+    return true;
+  }],
+  ['…and a setting that only applies under another one is gated by it', () =>
+    bundle.includes('"data-inactive": !revealWords') && bundle.includes('"data-inactive": reasoningFollow !== "auto"')],
+  ['…with the hairline that makes the grouping visible', () =>
+    /\.WGoHxG_settingsGroup\{[^}]*border-top:\.5px solid var\(--dsw-alias-border-l2\)/.test(bundle)],
+  // The 视效 page is divided the same way but WITHOUT captions: 磨砂玻璃 and 壁纸 each open with the switch that names them,
+  // so the two hairlines are the whole of it — and there are exactly two, before the skin and before the wallpaper.
+  ['the visual page is divided by the same hairline, without captions', () =>
+    (bundle.match(/react_jsx_runtime\.jsx\)\(Group, \{\}\)/g) ?? []).length === 2],
   ['the reasoning card’s follow mode offers three, and only the two exact strings leave the reading pace', 'const REASONING_FOLLOW_MODES = [\n\t\t\t{\n\t\t\t\tid: "auto",\n\t\t\t\tlabel: "自动滚动"\n\t\t\t},\n\t\t\t{\n\t\t\t\tid: "latest",\n\t\t\t\tlabel: "跟随最新"\n\t\t\t},\n\t\t\t{\n\t\t\t\tid: "manual",\n\t\t\t\tlabel: "手动滚动"\n\t\t\t}\n\t\t];'],
+  // 「焦点思考展开」, pinned at each end: the height is quantised to whole lines in script, the CEILING stays in the
+  // stylesheet (where the viewport is known) and is excluded while the reader has asked for 展开阅读 themselves, the card
+  // publishes only the content-side number, the focus is requested by the card and granted by the reader (newest
+  // request wins, which is what makes it singular), and — rule 1 — the page stops following the tail while a card
+  // holds it, so two auto-scrollers never pull at once. The motion switch and reduced motion both drop the transition.
+  ['a focused card grows in whole lines', 'const lines = Math.max(1, Math.ceil(content / line));'],
+  ['…asking for a whole-line height, and taking the growth out of the space ABOVE the card', () => bundle.includes('port.style.height = `${String(wanted)}px`') && bundle.includes('scroller.scrollTop += grew')],
+  ['…under a ceiling that stays in the stylesheet, with the growth instant and only the return animated', '.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}.WGoHxG_reasonCard:not([data-focus=true]) .WGoHxG_reasonViewport{transition:max-height .3s var(--reason-ease,ease-out)}'],
+  ['…with the motion switch dropping those transitions', () => bundle.includes('[data-motion=off] .WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport,') && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(bundle)],
+  ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
+  ['…and hands it back on takeover, on 展开阅读 and at the end of a 跟随最新 stream', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 2],
+  ['…with the newest request winning, so exactly one card can hold it', 'focused ? key : current === key ? null : current'],
+  ['…and the page stops following the tail while a card holds it', 'useReadingScroll(root, motion, live && focusedCard === null, followMode)'],
+  ['…with the expansion off unless a record says otherwise', 'focusExpand: false'],
+  ['…and that record read the defensive way', 'state.focusExpand) === true'],
   ['手动滚动 never lets the card move on its own', 'reasoningMode !== "manual"'],
   ['跟随最新 aims at the newest line rather than at a step', 'reasoningMode === "latest"'],
   ['and 自动滚动 realises the pace as a whole-line step', 'reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight, stepLines(rate))'],

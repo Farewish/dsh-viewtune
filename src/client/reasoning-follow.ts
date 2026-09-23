@@ -1,6 +1,15 @@
 /** Transitions.dev Reasoning stream, adapted to appended content, never a loop. */
 export const REASON_HOLD = 840;
 export const REASON_STEP = 500;
+/**
+ * The step 「跟随最新」 uses instead: short, and with no rest after it.
+ *
+ * The reading pace is deliberately a step every 840ms — two lines, then a pause to read them. Aiming at the newest
+ * LINE cannot inherit that cadence: the target is recomputed only when a step begins, so with a long hold the content
+ * that arrived in between is taken up in one motion, which is what "follow the newest" is supposed to avoid. Short
+ * steps back to back make it continuous, with a latency of one step instead of one step plus a pause.
+ */
+export const REASON_LATEST_STEP = 180;
 /** Lines advanced per follow step; only {@link reasoningTarget} reads it. */
 const REASON_LINES = 2;
 

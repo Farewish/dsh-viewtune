@@ -97,9 +97,10 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, ...render }: SeatProps & {
+const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, focused, onFocusChange, ...render }: SeatProps & {
   motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
   reasoningFollow: ReasoningFollowMode; reasoningRate: number;
+  focusExpand: boolean; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
 }) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
@@ -111,7 +112,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
   return <>{parts.map((part, index) => part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
-      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate}>
+      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} focusKey={nodeKey} focused={focused} onFocusChange={onFocusChange}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && index === parts.length - 1 && data.blocks.at(-1)?.kind === 'reasoning'}
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
@@ -508,7 +509,7 @@ function DeliverablesRow({ deliverables, openFile, revealFile }: {
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -629,7 +630,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} /></BlockBoundary>
+        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focused={focusedCard === item.nodeKey} onFocusChange={onFocusChange} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
       </Fragment> : <Fragment key={item.key}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
@@ -895,6 +896,22 @@ export function Reader(props: ReaderProps) {
   // They are handed down as primitives so the memoized seats below only re-render when a value actually changes.
   const reasoningFollow = props.useStore(state => reasoningFollowModeOf(state.reasoningFollow));
   const reasoningRate = props.useStore(state => reasoningRateOf(state.reasoningRate));
+  // 「焦点思考展开」: whether the card being written into grows to show its content. Read defensively (`=== true`), so a
+  // record written before the switch existed keeps the fixed preview card.
+  const focusExpand = props.useStore(state => state.focusExpand) === true;
+  /**
+   * The card that holds the focus, by node key, and the grants it hands out.
+   *
+   * The focus is singular and the NEWEST request wins: that is the reader's rule — the card being written into, or one
+   * that has just started, supersedes whatever held it. Deciding it here rather than inside a card is what makes the
+   * singleton true by construction, and it is also what the follower below reads: while a card holds the focus the
+   * PAGE stops following the tail, because the card is growing in place and two auto-scrollers pulling at the same
+   * time is exactly the fight the reader's rule 1 forbids.
+   */
+  const [focusedCard, setFocusedCard] = useState<string | null>(null);
+  const onFocusChange = useCallback((key: string, focused: boolean) => {
+    setFocusedCard(current => focused ? key : (current === key ? null : current));
+  }, []);
   //
   // And a NEW turn puts the earlier ones away by clearing their stored choices rather than overriding them: the
   // running turn then falls back to its own default (open) and every other turn to `foldEarlier`'s (folded), while a
@@ -1044,7 +1061,7 @@ export function Reader(props: ReaderProps) {
       observer?.disconnect();
     };
   }, [turnSignature]);
-  const scroll = useReadingScroll(root, motion, live, followMode);
+  const scroll = useReadingScroll(root, motion, live && focusedCard === null, followMode);
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
@@ -1162,6 +1179,7 @@ export function Reader(props: ReaderProps) {
           autoCollapseEarlier={autoCollapseEarlier} onAutoCollapseEarlier={props.actions.setAutoCollapseEarlier}
           reasoningFollow={reasoningFollow} onReasoningFollow={props.actions.setReasoningFollow}
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
+          focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope} wallpaperChrome={wallpaperChrome}
@@ -1175,7 +1193,7 @@ export function Reader(props: ReaderProps) {
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} />)}
+      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (

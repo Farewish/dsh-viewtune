@@ -220,8 +220,11 @@ want('cleans up its listeners', 'scroller.removeEventListener("scroll", schedule
 console.log('\n--- one scroll spy, not two (the handoff stutter regression)');
 // Both readings need the same measurement, and every getBoundingClientRect() flushes layout.
 // Two listeners meant walking every turn row twice per scroll, which is what made a wheel
-// handoff stutter while the pointer stayed over the transcript. Pin the single-spy shape.
-want('exactly one scroll listener on the scroller', 'scroller.addEventListener("scroll",', 1);
+// handoff stutter while the pointer stayed over the transcript. Pin the single-spy shape — and pin it to the MEASURING
+// listener, the one whose handler is `schedule`: the reasoning card asks the same scroller a second question (has the
+// page arrived at the bottom, for 「焦点思考展开」) and only reads the scroll position doing it. What this guards is that
+// the rows are queried and read exactly ONCE per scroll, which is still true with that listener present.
+want('exactly one measuring scroll listener on the scroller', 'scroller.addEventListener("scroll", schedule, { passive: true });', 1);
 absent('no second spy walking the rows again', 'updateActive');
 want('one query feeds both readings', 'const rows = content.querySelectorAll("[data-reader-turn]");', 1);
 want('the current turn reuses that query', 'let firstVisible = currentTurnOf(content, viewportTop, rows);', 1);
