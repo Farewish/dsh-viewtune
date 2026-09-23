@@ -500,7 +500,8 @@ const markers = [
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
   ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
   ['…with the newest request winning, so exactly one card can hold it', 'focused ? key : current === key ? null : current'],
-  ['…and the page stops following the tail while a card holds it, and for a short grace after a turn closes', 'useReadingScroll(root, motion, (live || liveGrace) && focusedCard === null, followMode)'],
+  ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live || liveGrace, followMode, focusedCard !== null)'],
+  ['…because a suspension only yields to a scroll that moved BACKWARDS, which is what a reader taking over does', 'if (suspendedRef.current && scroll.scrollTop >= lastSuspendedTop) {'],
   ['…with the expansion off unless a record says otherwise', 'focusExpand: false'],
   ['…and that record read the defensive way', 'state.focusExpand) === true'],
   ['手动滚动 never lets the card move on its own', 'reasoningMode !== "manual"'],
@@ -587,9 +588,9 @@ const markers = [
   // tested directly there. Two things are load-bearing: the follower consults `liveRef` in the FRAME LOOP and in the
   // RESIZE OBSERVER (gating one leaves the other path still following), and the wheel handler asks `wheelAtBottom`
   // before it treats the gesture as a takeover.
-  ['the tail-follow runs only while a turn is live, and a wheel at the bottom is not a takeover', () =>
-    bundle.includes('!liveRef.current ||')
-    && bundle.includes('liveRef.current && following.current')
+  ['the tail-follow runs only while a turn is live and nothing has it suspended, and a wheel at the bottom is not a takeover', () =>
+    bundle.includes('!liveRef.current || suspendedRef.current ||')
+    && bundle.includes('liveRef.current && !suspendedRef.current && following.current')
     && bundle.includes('motion, live')
     && bundle.includes('function wheelAtBottom(deltaY, gap)')
     && bundle.includes('if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY))')],

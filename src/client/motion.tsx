@@ -295,7 +295,7 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
  * per growth instead, so those paths go quiet. It IS in the dependency list, unlike `live`: it changes when a reader
  * changes a setting, not on every stream tick, and re-registering then is exactly what should happen.
  */
-export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true, followMode: FollowMode = 'glide'): {
+export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true, followMode: FollowMode = 'glide', suspended = false): {
   detached: boolean;
   jump: () => void;
   /** Stop tail-follow so a rail landing is not pulled back to the live bottom. */
@@ -313,10 +313,22 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
   const port = useRef<HTMLElement | null>(null);
   const following = useRef(true);
   const liveRef = useRef(live);
+  /**
+   * Is the follow suspended by the CALLER — not by the reader?
+   *
+   * A suspension is not a takeover, and the difference is the whole of this ref. While a card holds the focus the page
+   * deliberately does not follow, and content that arrives BESIDE that card — a narration below it, or the answer —
+   * keeps growing the transcript, so the distance to the tail opens with nobody closing it. Judged by the ordinary
+   * rule that gap reads as "the reader scrolled away": the follow was switched off, the 「回到最新」 pill went up, and
+   * nothing ever switched it back — the only thing that re-arms the follow is a scroll event, and a follower that is
+   * off writes none. Reported as "a card with a scrollbar stops following when it folds", with no reader input at all.
+   */
+  const suspendedRef = useRef(suspended);
   const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
   const cancelFollow = useRef<() => void>(() => {});
   const [detached, setDetached] = useState(false);
   useEffect(() => { liveRef.current = live; }, [live]);
+  useEffect(() => { suspendedRef.current = suspended; }, [suspended]);
   useLayoutEffect(() => {
     const content = root.current;
     if (!content) return;
@@ -325,6 +337,8 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     let followFrame = 0;
     let lastFrameAt = 0;
     let lastWrittenTop: number | null = null;
+    /** The last position seen while suspended, so a scroll that did not move BACKWARDS can be told from a takeover. */
+    let lastSuspendedTop = 0;
     cancelFollow.current = () => {
       cancelAnimationFrame(followFrame);
       followFrame = 0;
@@ -349,6 +363,17 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       if (followFrame !== 0) return;
       // Our easing frames must not be mistaken for a user leaving the bottom.
       if (lastWrittenTop !== null && Math.abs(scroll.scrollTop - lastWrittenTop) < 1) return;
+      /**
+       * A suspension is not a takeover: while the caller has the follow suspended, what opens the gap is content
+       * arriving below the reader — not the reader leaving. Only a scroll that moves UP can be the reader, and
+       * everything this hook or a focused card writes moves DOWN. So while suspended, a position that did not move
+       * backwards leaves `following` alone, and the suspension's end resumes the follow on its own.
+       */
+      if (suspendedRef.current && scroll.scrollTop >= lastSuspendedTop) {
+        lastSuspendedTop = scroll.scrollTop;
+        return;
+      }
+      lastSuspendedTop = scroll.scrollTop;
       const atBottom = isNearTail(scroll.scrollTop, scroll.scrollHeight, scroll.clientHeight);
       following.current = atBottom;
       setDetached(!atBottom);
@@ -392,10 +417,24 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       scroll.scrollTop = value;
       lastWrittenTop = value;
     };
+    /**
+     * Is the reader typing, or driving the page with the keyboard, INSIDE this view?
+     *
+     * The follower must not move the page under someone who is doing either — but the test used to be "is anything in
+     * the view focused", and a reasoning card that has a scrollbar is focusable (`tabIndex` for the overflow case), so
+     * simply clicking the card to read it left the focus in the view and the tail-follow never came back: reported as
+     * "a card with a scrollbar stops the following when it folds". Naming the targets that actually take keys is the
+     * same test the key handler below uses, and it leaves a focused button, link or card alone.
+     */
+    const typingInside = () => {
+      const active = document.activeElement;
+      return active instanceof HTMLElement && content.contains(active)
+        && active.closest('textarea,input,[contenteditable=true]') !== null;
+    };
     const follow = (now: number) => {
       followFrame = 0;
       // A follower with nothing to follow: see the `live` note on this hook.
-      if (!liveRef.current || !following.current || selected() || content.contains(document.activeElement)) return;
+      if (!liveRef.current || suspendedRef.current || !following.current || selected() || typingInside()) return;
       const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
       const limit = scroll.scrollTop + gap;
       const delta = Math.min(48, Math.max(1, now - lastFrameAt));
@@ -419,7 +458,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       if (selected()) return;
       // Following needs a turn to be running; otherwise the anchor below does the work, which keeps the reader's place
       // instead of dragging them back to the bottom (see the `live` note on this hook).
-      if (liveRef.current && following.current && !content.contains(document.activeElement)) {
+      if (liveRef.current && !suspendedRef.current && following.current && !typingInside()) {
         if (!motion || followMode === 'snap') writeTop(scroll.scrollHeight);
         else if (!followFrame) { lastFrameAt = performance.now(); followFrame = requestAnimationFrame(follow); }
       } else if (!following.current && anchor.current?.element.isConnected) {
@@ -465,20 +504,18 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
   const resume = useCallback(() => {
     const scroll = port.current;
     if (scroll === null) return;
-    if (!isNearTail(scroll.scrollTop, scroll.scrollHeight, scroll.clientHeight)) return;
+    /**
+     * Only for a reader who never took over.
+     *
+     * `following` is the reader's own intent, and a suspension no longer clears it (see `suspendedRef`), so this is
+     * exactly the test for "the follow was handed back because the suspension ended" rather than "the reader scrolled
+     * away earlier". That is also why the old tail-margin requirement is gone: a suspension is what opens a large gap
+     * (content kept arriving beside the focused card), and refusing to close it was the reported dead end.
+     */
+    if (!following.current) return;
     cancelFollow.current();
     anchor.current = null;
-    following.current = true;
     setDetached(false);
-    /**
-     * …and take up what arrived while the follow was suspended.
-     *
-     * Re-arming alone is not enough: anything that grew during the suspension is sitting below the viewport, and the
-     * follower only resumes when content GROWS. If nothing grows afterwards — and the moment this is called is exactly
-     * the moment a card stopped being written, which is often the end of the output — nobody ever takes it up, and the
-     * reader is left above the bottom with room to scroll down. Bounded by the tail margin, because this only runs
-     * while the reader is at the tail.
-     */
     scroll.scrollTop = scroll.scrollHeight;
   }, []);
   return { detached, jump, release, resume };

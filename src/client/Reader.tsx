@@ -1095,7 +1095,7 @@ export function Reader(props: ReaderProps) {
     const timer = setTimeout(() => setLiveGrace(false), 1500);
     return () => clearTimeout(timer);
   }, [live]);
-  const scroll = useReadingScroll(root, motion, (live || liveGrace) && focusedCard === null, followMode);
+  const scroll = useReadingScroll(root, motion, live || liveGrace, followMode, focusedCard !== null);
   /**
    * Hand the follow back the moment a focus ends.
    *
