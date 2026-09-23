@@ -2,159 +2,170 @@
 
 [中文](./README.md)
 
-A **reading** tab for DeepSeek Harness: while a turn runs you can see the process — thinking as it is written, tools as they run, which step it is on. When a turn finishes successfully the process folds away and the final answer stays.
+A **reading** tab for DeepSeek Harness: while a turn runs you can see the process — thinking as it is written, tools as they run, which step it is on. When a turn finishes successfully the process folds away and the final answer stays. Over that sits an adjustable skin: a wallpaper, a frosted-glass layer, and a panel that keeps its settings inside the reading tab.
 
 Upstream's Chat / Trajectory tabs, the composer, the model picker, tools and approvals are all untouched; this plugin adds a reading view alongside them.
 
 Targets DeepSeek Harness **0.1.5-rc.2**. Display only — it does not change agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`.
 
-## Features
-
-- **The process is visible**: reasoning, tool calls, subagents and progress render live, so a long turn is never just a spinner.
-- **Folds itself away when done**: a turn that ends successfully collapses its process and leaves the answer; running or unfinished turns stay open.
-- **Short reasoning is framed like long reasoning**: the rule that dropped the border when a transcript did not overflow is gone, and short reasoning now shares the long form's heading and body padding.
-- **The reasoning area's wheel belongs to the browser**: the card scrolls natively, and once it is on its edge the whole notch chains up to the conversation, natively. Whatever part of an overshooting notch the card cannot take is dropped (at most one notch, once per gesture) — the price of never taking a notch away from the browser. A short transcript that does not overflow never intercepts the wheel at all.
-- **Every user message renders first**: a turn may open with a system prompt and carry several user/steering messages (the system prompt, your message, injected context). All of them render, in source order, above the process disclosure — so turns read the same with or without a system prompt:
-
-  ```
-  the user's message → disclosure (用时 X 秒, clickable) → process (system prompt / reasoning / tools / answer)
-  ```
-
-- **Wait clock**: while the model is thinking or writing, the status line shows how long this turn has been in its hands — nothing at all for the first three seconds, not even a reserved slot, since a blank gap is worse than the one movement withholding it saves — and past ten seconds a 「暂未响应」 badge. The anchor is the **last handover** — a returned tool, an injected context, a finished command, your own message — never the start of the turn, so a wait that has just begun does not inherit the minutes the tools already spent; a tool that is still running is not a wait, because then the tool is the one working.
-
-- **Toolbar**: 「收起」 and the viewtune settings button sit in one lane at the top of the reading view, spanning it edge to edge like the shell's own header rule while both controls stay at the text's left edge. It **pins directly under the shell's top bar** — part of the outer band rather than something floating over the conversation — so it stays reachable at any scroll depth, and the shortcuts (**Alt+C**, **Alt+Shift+C**) still work.
-- **Wallpaper**: the 视效 page's 壁纸 row puts one of your own images behind the reading view. Images live in the plugin's own folder (「打开文件夹」 creates and opens it — drop files in, then 「刷新」 turns them into a thumbnail list); click one to use it, 清除 to go back to none. **The browser is never told where that folder is**: it asks for a name, and the host half answers only for image extensions inside that one folder (no svg). A 压暗 dial beside it mixes the image toward the theme's own background so prose stays readable on top — and with 磨砂玻璃 on, the cards blur exactly this image. The wallpaper covers the **whole window** by default — the transcript, the space beneath it, the scrollbar gutter, and the composer's **fade band** (whose host gradient becomes a mask over the same backdrop, so content still fades out smoothly, just into your picture instead of into a colour), so none of those are left as black blocks. In the reading-column-only scope the image FILLS the reading page: the MAX ratio of image ÷ target — the smallest scale that leaves no unfilled area — centred on the page, with the overflow cropped; a small image is scaled up to fill it, with no cap. **「铺满整个窗口」 is ON by default**: it is what spreads the image to the **left column and the top bar** (whose own plates step aside), switching to `cover` to fill the window — the switch decides whether the image spreads to the other columns and fills, not whether it is painted at all. A **界面遮罩** dial then appears, setting how opaque those two columns stay over their copy of the image — they carry nothing but text, so `0%` is prose straight on a photograph. The image is painted once and the scrim is counted once for the window, so the reading area is never darker than the columns beside it.
-- **Settings panel**: the viewtune gear opens a small panel with three pages, 视效 / 功能 / 快捷键 (the arrows, Home and End move between them). 视效 holds one row per preference — 动效, which also reports when the system's reduced-motion setting overrides it, and 磨砂玻璃 (ON by default — these defaults ARE the reader's own settings; the toolbar, cards, tool frames and code blocks stop painting plates of their own so a host wallpaper or skin shows through, and labels like paths and counts stay transparent until hovered or focused — **nine sliders under the switch** set each surface's opacity: toolbar / user bubble / cards and panels / code blocks / diff panel / scrollbar gutter / product chips / usage-and-steps pills / input box — the scrollbar-gutter one gives the rightmost scrollbar a track of its own, where 0% is the host's original transparent track, where `0%` paints nothing at all and `100%` is the opaque plate of the skin-off look, with the reader's own values as the initials. They are grouped by what a surface IS rather than where it sits (diff paper follows the diff-panel slider whether it is drawn in the panel or inline in a tool's result tab), and only surfaces that HAVE a plate are dialled: 「产物标签」 covers the product-file chips at the end of a turn — the one chip that is always present and has a resting plate — the compaction pill rides with the cards, and the usage/steps counters have a dial of their own, and the tool-state label and the `+N -M` count are wired to no dial at all, since neither has a resting background for a transparency control to let through), ; the 功能 page holds **「竖条滚轮」** (on by default: a wheel over the two strips beside the reading column is forwarded to the transcript) and 产物用右侧栏打开 (off by default: delivered files open in the system app; turning it on previews them in the right sidebar through the official `dsh-resource://file/session/<id>/<path>` address and its sidebar service, while folders and reveal-in-folder stay on the OS opener — a host without that service falls back to the system app with a note in the console); 快捷键 records new bindings for this plugin's own two shortcuts (click the key to record, Escape cancels, clearing drops it), refusing combinations without a modifier or ones the browser already owns. A preference is a row, so the lane never grows a control wider. A row whose label does not say it all carries a one-line description on the row's `title` — the browser's own hover box, the same mechanism the button and 收起 use — while genuine state (a system override, a recording in progress, a refused combination) stays written in the row.
-- **收起 acts on one turn**: a "conversation" here is one turn (a question and its answer). The button folds the turn the reader is looking at rather than every open turn on the page, and it decides which turn that is with the same predicate the reading scroll uses for its anchor — so a viewport straddling two turns resolves to the upper one.
-  **Alt+C** is the keyboard equivalent. If other turns are expanded too, a **「全部收起」** control appears in the toolbar (**Alt+Shift+C**, only while there really is another expanded turn), so you need not scroll back to each one.
-  When collapsing makes the button itself disappear, focus moves to **the toolbar's other control** rather than to `<body>`: a keyboard reader is not dropped back to the top of the document for pressing it.
-- **Steps pill**: the answer's action row shows which step the answer landed on out of the turn's total, and opens a readable process record rather than raw JSON.
-- **Changed-line counts**: a row whose call changed files shows `+N -M` (green added, red removed) at its end, and clicking it opens an in-flow panel with one tab per file, each rendered by the same `DiffBlock` the official tool row uses. The counts prefer the host's own `meta.diffs`, falling back to the call's arguments only for the three tools that actually mutate a file — several unrelated tools carry a field named `content`, and reading that as a file body would invent additions for calls that changed nothing. Files changed by a call's children count toward its row too.
-- **Interactive mcp-app cards**: an ````mcp-app` fence in the answer mounts as an interactive card inside `<iframe sandbox="allow-scripts allow-forms">` — **without** `allow-same-origin`. A card can fill the next prompt over JSON-RPC. Skill pack: [`skills/generative-mcpapps/`](skills/generative-mcpapps/).
-
 ## Install
 
-You need official `dsh` on PATH (otherwise `npx @deepseek-ai/dsh`) and **pnpm** — `dsh plugin add` runs pnpm inside `$DSH_HOME/profiles/web`.
+Needs the official `dsh` on PATH (or `npx @deepseek-ai/dsh`) and **pnpm** — `dsh plugin add` runs pnpm inside `$DSH_HOME/profiles/web`.
 
 ```sh
 # from GitHub
 dsh plugin --profile web add github:Farewish/dsh-viewtune
 
-# or from a local checkout / tarball
+# or from a local directory / tarball
 dsh plugin --profile web add ./dsh-viewtune
 dsh plugin --profile web add ./dsh-viewtune-0.4.0.tgz
 ```
 
-Then **restart the Host** and reload the page: `dsh plugin add` only writes the profile, it does not hot-load a running process.
+**Restart the Host** and reload the page afterwards: `dsh plugin add` only writes the profile, it does not hot-mount a running process.
 
-Remove:
+Remove it with:
 
 ```sh
 dsh plugin --profile web remove dsh-viewtune
 ```
 
-Three things worth knowing:
+Three things that are easy to get wrong:
 
-- `dsh.bundle` is captured at boot. Do not also insert the same row by hand in the profile's `cordis.patch.yml`, or it mounts twice.
-- This repo **commits its compiled `lib/`**, so an install needs no `prepare` step and no `allowBuilds` entry.
-- Do not run this plugin and upstream `dsh-better-display` at the same time: both bundle patches insert the same entry id, so the two would mount twice. Removing this one with the command above first is what makes going back to upstream clean.
+- `dsh.bundle` is captured **at boot**; do not hand-write the same insert into the profile's `cordis.patch.yml`, or it mounts twice.
+- The compiled `lib/` is **committed**, so installing needs no `prepare` and no `allowBuilds` in the profile.
+- Do not install this alongside upstream `dsh-better-display`: both bundle patches insert the same entry id, and mounting both duplicates it. `remove` this one first.
 
-## Known limitations (and what it shows instead)
+## What a turn looks like
 
-- **Turns truncated by the history window** show no step *number*. Harness pages by message count, so
-  the topmost turn may be only partly loaded; its step count is then a partial sum that cannot be
-  compared with the absolute step in the process record, and a misleadingly small denominator is
-  worse than none. What appears instead is a **「步骤记录」** marker whose tooltip reads
-  **请完全加载该轮次记录后查看** ("load this turn's record fully to see it").
-- **Usage is sometimes unavailable, by design**, and it is left absent. The Host reports usage only
-  when it can *prove* the turn's accounting exactly (one attempt of that turn carrying no usable
-  sample, or the turn sitting in a compacted context, makes it answer "not determinable"). This
-  plugin does not guess — and deliberately adds no marker for it: a missing number is a missing
-  number, and a second 「用量 —」 marker was judged to be noise rather than information. The
-  truncation marker earns its place because it explains *why no number can exist here*; an
-  unavailable usage figure has no such position to explain.
+A conversation is a sequence of **turns** (a prompt plus its answer), and the reading view is organised by that unit:
 
-The 「步骤记录」 marker is an explanation, not a control: no click target, no hover highlight, and
-never an estimated number.
+- **The process is visible**: thinking, tool calls, subagents and progress are rendered live, so a long turn is more than a spinner; a turn that **finished successfully** folds its process away and keeps the answer, while a running or unfinished one stays open.
+- **Every user message comes first**: a turn may open with a system prompt and carry several user / steering messages. They are all rendered, in source order, above the process disclosure — with or without a system prompt, the order is the same:
 
-One more thing, **by decision rather than by omission**: **the interface strings are Chinese only.**
-The Host offers a locale seat, and this plugin already borrows it to translate two strings the Host
-owns (`message.contextRecall` / `message.contextInjection`), but the plugin's *own* strings are not
-localized — a full zh/en pass would first need a locale provider edge (and a Host restart). It was
-weighed and left out.
+  ```
+  your messages → the disclosure (用时 X 秒, clickable) → the process (system prompt / thinking cards / tools / answer)
+  ```
+
+- **Short and long thinking share one frame**: a short thinking card no longer loses its border just because nothing overflowed; heading and body padding match the long one.
+- **A wait clock**: while the model is thinking or streaming, the status row shows how long *this turn* has been with the model. It shows **nothing for the first 3 seconds** (most waits are shorter, and a number appearing immediately only pulls the eye), and adds a 「暂未响应」 badge past ten. It is anchored to the **last handover** — a tool returning, context injected, a command finishing, your own message — not to the start of the turn, so a fresh wait does not inherit the minutes the tools already spent; and it does not tick while a tool is running, because then the tool is busy, not the model.
+- **A steps pill**: the action row under an answer says which step this answer landed on and how many the turn has, and opens the turn's process record in Chinese prose rather than raw JSON.
+- **Changed-line counts**: a tool row that changed files ends with `+N -M` (additions green, deletions red) and opens a per-file diff panel. The counts prefer the host's own `meta.diffs` and only fall back to the call's arguments — and only for the **three tools that actually mutate files**, because several unrelated tools carry a field named `content`; files changed by a child call count towards the row too.
+- **Interactive mcp-app cards**: an ````mcp-app```` code block in an answer becomes a live card inside `<iframe sandbox="allow-scripts allow-forms">` — deliberately **without** `allow-same-origin`; the card can fill the composer with the next prompt over JSON-RPC. See [`skills/generative-mcpapps/`](skills/generative-mcpapps/).
+- **The wheel over a thinking card belongs to the browser**: the card scrolls natively and chains to the transcript natively at its edge. The one notch that crosses the bottom edge and does not fit is dropped (at most one, once per gesture) — that is the price of never taking a notch away from the browser; a short card with no overflow intercepts nothing at all.
+
+## Toolbar and the collapse control
+
+- **One pinned lane**: 「收起」 and 「viewtune ⚙」 sit in a strip across the top of the reading view, spanning it edge to edge — the divider reaches as far as the host's top bar does, while both controls stay at the text's left edge. It is **pinned under the top bar** as part of the chrome rather than floating over the prose, so it is reachable at any scroll depth.
+- **One control, three modes**: 收起 and 全部收起 are merged into one button, because the reading column's left edge has room for exactly one control. When both actions apply, the main button folds **the turn you are reading** and the double chevron beside it folds everything at once (its tooltip and accessible name are 「全部收起」, word for word); when only one applies the button **is** that action, with no chevron. The settings can pin it to a single action.
+- **Its scope is the current turn**: the same predicate the reading scroll uses to pick an anchor, and when the viewport straddles two turns it takes **the upper one**.
+- Shortcuts **Alt+C / Alt+Shift+C**, rebindable in the settings. If the button disappears because it collapsed itself, focus goes to **the toolbar's other control** rather than the document body.
+
+## The settings panel
+
+Opened by 「viewtune ⚙」, with **three pages** (arrows, Home and End move between them):
+
+- **视效** (look): motion, the frosted glass, its nine dials, and the wallpaper.
+- **功能** (behaviour): what this plugin does to the app — the **strip wheel**, and **产物用右侧栏打开**.
+- **快捷键**: what the collapse button does, plus recording for this plugin's two bindings (click a key to record, Escape cancels, clearing drops it; combinations without a modifier, or ones the browser already owns, are refused).
+
+One layout rule: a preference is a row and a new subject is a page, so the lane never grows a control wider; and **only an option whose label does not say it all carries a description**, which rides the row's `title` — the browser's own hover box, the same mechanism the button and 收起 use — so it takes no space. Genuine **state** (a system override, a recording in progress, a refused combination) is written in the row instead.
+
+**The defaults are this plugin's shipped ones** (see below: the skin on, the wallpaper shipped with it, the window scope). A stored record only carries the keys a reader **changed**; anything missing falls back to those defaults.
+
+### Frosted glass
+
+With it on, the toolbar, cards, tool frames and code blocks stop painting plates of their own and let the wallpaper and the host's skin through; labels like paths and counts stay transparent until hovered or focused. **Nine dials under the switch** set each surface's opacity:
+
+| Dial | What it moves |
+| --- | --- |
+| 工具栏 | the top lane's plate, and the 「回到最新」 pill floating over the prose |
+| 用户气泡 | your own message's background |
+| 卡片与面板 | reasoning cards, tool frames, the system prompt, note boxes |
+| 代码块 | fenced code blocks |
+| 差异面板 | the diff panel, its file tabs, and inline diffs in a tool's result |
+| 滚动条槽位 | the rightmost scrollbar's track |
+| 产物标签 | the product-file chips at the end of a turn |
+| 用量与步骤胶囊 | the two counters, 「用量 … tok」 and 「… 个步骤」 |
+| 输入框 | the host composer's plate (both the reading page and the conversation page) |
+
+`0%` paints nothing at all there; `100%` is the opaque plate of the skin-off look. Surfaces are grouped by what they **are** rather than where they sit (diff paper follows the diff dial wherever it is drawn), and **only surfaces that already have a plate get a dial** — the tool-state label and the `+N -M` count have no resting background, so they are wired to none.
+
+The same skin can reach the **conversation page** (its own switch): the code blocks and user bubbles there follow these dials. A third, independent switch makes the **conversation page a solid page** (the theme's base colour plus a fade above the composer).
+
+### Wallpaper
+
+The plugin **ships a default wallpaper** (`assets/sample-gradient.png`), which the host puts into the reader's folder on first activation — a fresh install opens looking like this, with no picture to find first.
+
+- **Images live in the plugin's own folder**: 「打开文件夹」 creates and opens it (drop files in, then 「刷新」 turns them into a thumbnail list); click one to use it, 「清除」 to go back to **none** — which is a different thing from *no record at all*: the first means you want no wallpaper, the second falls back to the shipped one. Replacing a file under the same name updates both the thumbnail and the backdrop.
+- **The browser is never told where that folder is**: it asks for a name, and the host half answers only for image extensions inside that one folder (no svg).
+- A **压暗** dial mixes the image toward the theme's background so prose stays readable on top; with the skin on, the cards blur exactly this image.
+- The **scope** defaults to the **whole window**: the left column and the top bar show it too (their own plates step aside), and the colours around the composer follow. Turning 「铺满整个窗口」 off restricts it to the reading column, where the image **fills the reading page** (the MAX ratio of image ÷ target, centred, overflow cropped, small images scaled up). The window scope fills with `cover`.
+- A **界面遮罩** dial, in the window scope, sets how opaque those two columns stay over their copy of the image — they carry nothing but text, so `0%` is prose straight on a photograph. The image is painted once and the scrim counted once for the window, so the reading area is never darker than the columns beside it.
+- The **fade band above the composer** turns the host's opaque gradient into a mask over the same backdrop, so content still fades out smoothly — just into your picture instead of into a colour. All three pages (reading, conversation, trajectory) use the same lift.
+
+### The strip wheel
+
+The two handles that set the reading column's width belong to the **shell** and sit **beside** the scroller rather than inside it, so a wheel over them used to do nothing at all. With this switch on (the default) the gesture is forwarded to the transcript:
+
+- **Notch by notch**, a critically damped spring carries the scroller — for a lone notch and for every landing — and its two ends (a flick, a single notch) are the feel to tune.
+- **A continuous roll** (intervals of 0.06–0.20 s, about 5–16 notches a second) is carried at the **wheel's own pace** instead: the current notch over the average of the last three intervals. That is what the browser does at a steady hand speed; slower and faster rolls stay notch by notch, because at those speeds ordinary scrolling is not even either.
+- A roll needs **two intervals** before it counts as one, and a **pause past 0.2 s** ends it. With the switch off, the event is left exactly as it was found — the behaviour of not having the feature.
+
+## Where the settings live
+
+- One copy in the **browser** (`localStorage`) and one on the **host** (`<instance home>/viewtune-settings.json`). The host's is the one that survives a restart: the GUI is served on an ephemeral port, `localStorage` is keyed by **origin** (scheme + host + port), and a browser-only copy is therefore a new, empty one on every launch — reported as "every time I quit DSH, all of viewtune's settings are reset".
+- Changes are written to the host **debounced**, flushed on the way out, and only an **accepted** write is broadcast to the app-wide surfaces (the wallpaper, the scrollbar gutter's dial).
+
+## Known limits (and what it shows when it cannot say)
+
+- **A turn truncated by the history window** shows no step **number**. The host pages by message count, so the topmost turn may be partially loaded and its step count is a local sum, incomparable with the absolute steps in the process record; a too-small denominator misleads, so nothing is shown — a **「步骤记录」** badge appears instead, whose tooltip says 「请完全加载该轮次记录后查看」. It is an **explanation**, not a control: no click, no hover highlight, and no estimated number anywhere.
+- **The usage pill occasionally does not appear**, deliberately: the host only reports usage when it can **prove** the turn's accounting. This plugin follows that rather than guessing, and **adds no badge of its own** for it — a missing number is a missing number.
+- **The interface copy is Chinese only.** The host offers a locale seat, and this plugin already borrows it to translate two host strings (`message.contextRecall` / `message.contextInjection`), but the plugin's **own** copy is not localised: a full zh/en split needs a locale provider edge in the plugin, which needs a Host restart. That is a trade-off, not an oversight.
 
 ## Development
 
-### Building
+### Build
 
-The browser half is the prebuilt `lib/client.js`, which the Host loads directly. The compiled output is committed, so **installing and sharing need no build** — but **building from source does work**:
+The browser half is the pre-built `lib/client.js`, which the Host loads directly, and the repository commits it — so **installing and sharing need no build**:
 
 ```sh
-npm ci                # install from the checked-in package-lock.json
+npm ci                # install from the committed package-lock.json
 npm run build         # src/ -> lib/client.js and lib/dsh-viewtune.js
-```
-
-Use `npm ci` rather than `npm install`: `tsdown`, `lightningcss` and `typescript` are all declared in `^`
-ranges, so only the lockfile guarantees that another machine installs the same toolchain that
-**reproduces the committed `lib/`** — which is exactly what `npm run guard`'s `verify-build` does: it
-rebuilds for real and reports `REBUILD REPRODUCES THE SHIPPED SHAPE`. Reach for `npm install` only when
-you change a dependency in `package.json`, to write the lockfile back.
-
-Upstream's `tsdown.config.ts` imported `externalClientBundle` from a Harness adapter
-(`<harness>/tools/dshx/src/client-build.js`) that is published nowhere, which is why its build could
-not run from a clone. This repo vendors that adapter's real body — the official preset
-`packages/client/tsdown.client.ts` → `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2` — as
-[`scripts/client-bundle.mjs`](scripts/client-bundle.mjs), with its three Harness-internal imports
-inlined. The artifact contract is unchanged, so the artifact-level guards below still apply.
-
-Commit `lib/` together with the source: an installer receives the committed artifact and is not asked
-to build.
-
-**Type checking does not need that monorepo.** The client UI packages are published standalone on npm, and installing dependencies pulls them in through `peerDependencies` — including `dsh-client-store`, `dsh-client-ui-primitives` and `dsh-client-ui-slots`, which the launcher itself does not carry:
-
-```sh
 npm run typecheck     # tsc -p tsconfig.json --noEmit, against the real declarations
 ```
 
-`lib/` holds only compiled output and the Host entry; this repo **does not publish type declarations** and `package.json` has no `types` field.
+Use `npm ci` rather than `npm install`: `tsdown`, `lightningcss` and `typescript` are all on `^` ranges, and only the lockfile guarantees that another machine installs the toolchain that **reproduces the committed `lib/`** — which is exactly what `verify-build` does inside `npm run guard`. Reach for `npm install` only when a dependency changed, to rewrite the lockfile.
+
+Upstream's `tsdown.config.ts` takes `externalClientBundle` from a Harness adapter that is not published, so it cannot run in a clone. This repository ports its real implementation (the official preset's `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2`) into [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs). The artifact contract is unchanged, so every assertion about the artifact still holds.
+
+Remember to **commit `lib/` with the source**: what other people install is that artifact, not a local build.
 
 ### Changing the code
 
-Change `src/`, then `npm run build`. Two identity markers in the artifact must match `package.json`'s `name` exactly, or the whole page fails with
-`loaded without registering "<id>" via __ModuleLoader__.load`:
+Change `src/`, then `npm run build`. Two identity markers in the artifact must match `package.json`'s `name` exactly, or the whole page fails with `loaded without registering "<id>" via __ModuleLoader__.load`:
 
 - the row id in `window.__ModuleLoader__.load({ id })` (the Host derives it from the installed manifest's package name);
-- each CSS module's `tagId` prefix and its `data-plugin` on the injected `<style>` (HMR removes this plugin's styles by that id).
+- each CSS module's `tagId` prefix and the `data-plugin` of its `document.createElement("style")` (HMR removes this plugin's styles by plugin id).
 
-`tests/stock-install.test.ts` guards both, and also checks that this document's install commands name the package correctly. (`tsdown.config.ts` reads the name from `package.json`, so a rename cannot drift again.)
+`tests/stock-install.test.ts` guards both, and checks that this file and `README.md` install the same package by name.
 
-> **Keep the checkout outside `node_modules`.** `dsh plugin add` runs pnpm inside the profile directory, and pnpm prunes directories under `node_modules` that `package.json` does not declare — the checkout, `.git` included, could be deleted with them.
+> **Keep a cloned checkout outside `node_modules`.** `dsh plugin add` runs pnpm in the profile directory, and pnpm prunes directories under `node_modules` that `package.json` does not declare — the checkout, `.git` included, can be deleted with them.
 
-### Verifying
+### Verification
 
 Two layers, because they answer different questions:
 
 ```sh
-npm test        # source level: 15 test files through Node's test runner
-npm run guard   # artifact level: 19 assertions, all against the built lib/client.js
+npm test        # source layer: Node's own test runner, every test file (31 today)
+npm run guard   # artifact layer: 19 invariants, all against the built lib/client.js
 ```
 
-`npm run guard` asserts the **artifact**: the module-table registration id and the `require()` set, that
-each injected CSS literal is whole, turn render order, the collapse control's scope and fade, the
-toolbar lane shape, that the steps pill declares every identifier it uses — plus the correspondence
-between `src/` and the artifact (`compare-source-and-bundle`, `audit-source-edits`) and **"a fresh
-build still reproduces the committed shape"** (`verify-build`). That last one is the only form of
-source/artifact agreement available here: byte equality is not (the compiler's output is not stable),
-so it compares the contract-bearing parts and the stylesheet's rules.
+`npm run guard` inspects the **artifact**: the module table's registered id and `require()` set, the injected CSS literal, turn render order, the collapse control's shape and fade, the toolbar geometry, the settings panel's three pages and the width of its sliding bar, the shipped wallpaper's three spellings and the file itself, the correspondence between `src/` and the artifact, and **"a rebuild still reproduces the committed shape"**. That last one is the only proof of source/artifact agreement available here — byte equality is not (a minifier's output is not stable), so it compares the contract surface and the stylesheet rules.
 
-One premise behind all of it is worth stating: **parsing is not correctness.** Much of this repo's
-history was editing minified output directly, which produced changes that were syntactically perfect
-and still threw at runtime, because a declaration was removed while a use of it stayed. Only a check of
-the "is this name declared" kind catches that (`check-pill-scope`) — or building once, which exposes
-drift between the sources and the artifact. Both run under `npm run guard`.
+One premise is worth stating: **parsing (`node --check` passing) is not correctness**. This repository's history is largely direct edits of a minified artifact, which produced syntax that was perfectly legal and still threw at runtime because a reference had been deleted — a class of error only a "is this name declared" check catches, or a rebuild exposes. Both are in `npm run guard`, and every new assertion has been **negative-tested** (fed a doctored artifact to prove it really fails).
 
 ## License
 
 MIT, see [LICENSE](LICENSE).
 
-It started from [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT), which is where the reading tab, the streaming motion and the Markdown rendering come from. Parts of the display and Markdown layers come from DeepSeek Harness (MIT). Motion is inspired by [Transitions.dev](https://transitions.dev/).
+It started from [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT): the reading tab, the streaming motion and the Markdown rendering come from there. The presentation and Markdown parts derive from DeepSeek Harness (MIT). Motion references [Transitions.dev](https://transitions.dev/). The default wallpaper shipped with the package is `assets/sample-gradient.png`, made for this repository, and released under the same MIT as the code.
