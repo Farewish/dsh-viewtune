@@ -502,13 +502,13 @@ const markers = [
   ['…with the newest request winning, so exactly one card can hold it', 'focused ? key : current === key ? null : current'],
   ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live || liveGrace, followMode, focusedCard !== null)'],
   ['…because a suspension only yields to a scroll that moved BACKWARDS, which is what a reader taking over does', 'if (suspendedRef.current && scroll.scrollTop >= lastSuspendedTop) {'],
-  ['…with the expansion off unless a record says otherwise', 'focusExpand: false'],
-  ['…and that record read the defensive way', 'state.focusExpand) === true'],
+  ['…with the expansion ON unless a record says otherwise', 'focusExpand: true'],
+  ['…and that record read the defensive way', 'state.focusExpand) !== false'],
   ['手动滚动 never lets the card move on its own', 'reasoningMode !== "manual"'],
   ['跟随最新 aims at the newest line rather than at a step', 'reasoningMode === "latest"'],
   ['and 自动滚动 realises the pace as a whole-line step', 'reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight, stepLines(rate))'],
   ['a pace is rounded to whole lines and never to zero', 'return Math.max(1, Math.round(rate * holdMs / 1e3));'],
-  ['…with the defaults reproducing the two-line step this card always took', () => bundle.includes('reasoningFollow: "auto"') && bundle.includes('reasoningRate: 2')],
+  ['…with the defaults being the reader’s own mode at the standard pace', () => bundle.includes('reasoningFollow: "latest"') && bundle.includes('reasoningRate: 2')],
   ['…both read defensively', () => bundle.includes('reasoningFollowModeOf(state.reasoningFollow)') && bundle.includes('reasoningRateOf(state.reasoningRate)')],
   ['…and a change to either reaches the follower that is already running', () => /reasoningMode,\s*rate\s*\]\)/.test(bundle)],
   // 自动收起更早流程, pinned at every end that has to agree. The fold itself (only a turn with `status === "open"` stays
@@ -547,8 +547,8 @@ const markers = [
   // the blur every card showed before the switch existed.
   ['the reveal\'s blur can be turned off, and then no keyframe names a filter', 'if (!blur) return [{ opacity: 0 }, { opacity: 1 }];'],
   ['…and the word animation is what asks for it', 'target.animate(revealFrames(blur), {'],
-  ['…with the blur on unless a record says otherwise', 'revealBlur: true'],
-  ['…and that record read the defensive way', 'state.revealBlur) !== false'],
+  ['…with the blur OFF unless a record says otherwise', 'revealBlur: false'],
+  ['…and that record read the defensive way', 'state.revealBlur) === true'],
   // The cadence itself, pinned at all three ends: the two options the panel offers (as the array, so one cannot be
   // dropped or renamed out from under the stored values), the defensive read that makes an older record mean the
   // per-frame cadence, and the gate in the publish loop — where a hidden page still flushes rather than pacing, which

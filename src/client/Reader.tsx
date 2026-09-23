@@ -735,9 +735,9 @@ export function Reader(props: ReaderProps) {
   // How often a streaming message publishes its revealed text. Read through its own fallback reader, so a record
   // written before this preference existed keeps the per-frame cadence it was written with.
   const textCadence = props.useStore(state => textCadenceOf(state.textCadence));
-  // Whether a revealed word also resolves from a blur. Default ON and read defensively (`!== false`): a record written
-  // before the switch existed keeps the blur every card showed before it.
-  const revealBlur = props.useStore(state => state.revealBlur) !== false;
+  // Whether a revealed word also resolves from a blur. Default OFF and read defensively (`=== true`): a record written
+  // before the switch existed takes the reader's own setting, which is the blur off.
+  const revealBlur = props.useStore(state => state.revealBlur) === true;
   // Whether each word gets an identity and its own fade at all. Default ON and read defensively: a record written
   // before the switch existed keeps the per-word reveal every card showed before it.
   const revealWords = props.useStore(state => state.revealWords) !== false;
@@ -913,9 +913,10 @@ export function Reader(props: ReaderProps) {
   // They are handed down as primitives so the memoized seats below only re-render when a value actually changes.
   const reasoningFollow = props.useStore(state => reasoningFollowModeOf(state.reasoningFollow));
   const reasoningRate = props.useStore(state => reasoningRateOf(state.reasoningRate));
-  // 「焦点思考展开」: whether the card being written into grows to show its content. Read defensively (`=== true`), so a
-  // record written before the switch existed keeps the fixed preview card.
-  const focusExpand = props.useStore(state => state.focusExpand) === true;
+  // 「焦点思考展开」: whether the card being written into grows to show its content. Default ON — the reader's own
+  // setting, adopted like the rest of these defaults — and read defensively (`!== false`), so a record written before
+  // the switch existed gets it.
+  const focusExpand = props.useStore(state => state.focusExpand) !== false;
   /**
    * The card that holds the focus, by node key, and the grants it hands out.
    *

@@ -60,8 +60,8 @@ test('the follow mode and the pace are read defensively', () => {
   assert.equal(reasoningFollowModeOf('latest'), 'latest');
   assert.equal(reasoningFollowModeOf('manual'), 'manual');
   assert.equal(reasoningFollowModeOf('auto'), 'auto');
-  for (const value of [undefined, null, '', 'LATEST', 'scroll', 1, {}, []]) {
-    assert.equal(reasoningFollowModeOf(value), 'auto', `unrecognised ${JSON.stringify(value)} is the reading pace`);
+  for (const value of [undefined, null, '', 'AUTO', 'scroll', 1, {}, []]) {
+    assert.equal(reasoningFollowModeOf(value), 'latest', `unrecognised ${JSON.stringify(value)} is the default mode`);
   }
   assert.equal(reasoningRateOf(1), 1);
   assert.equal(reasoningRateOf(3), 3);

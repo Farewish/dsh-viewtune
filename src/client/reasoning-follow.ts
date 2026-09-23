@@ -24,13 +24,14 @@ export const REASONING_FOLLOW_MODES: readonly { id: ReasoningFollowMode; label: 
 ];
 
 /**
- * The stored mode, read defensively: only the two exact strings leave the reading pace behind.
+ * The stored mode, read defensively: only the exact string `auto` asks for the reading pace.
  *
- * `auto` is the pace every reader has had so far (two lines per step), so anything unrecognised — a record written
- * before this choice existed — keeps it.
+ * `latest` is the DEFAULT — the reader's own setting, adopted like the rest of this plugin's defaults — so a record
+ * written before the choice existed resolves to the mode a fresh install opens with, and following the newest line is
+ * what the panel offers first.
  */
 export function reasoningFollowModeOf(value: unknown): ReasoningFollowMode {
-  return value === 'latest' || value === 'manual' ? value : 'auto';
+  return value === 'auto' || value === 'manual' ? value : 'latest';
 }
 
 /**

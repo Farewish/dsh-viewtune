@@ -189,18 +189,20 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // The reveal's cadence: the steady one, which is what this plugin now opens with — per-frame publication makes
       // the reveal's work follow the display's refresh rate, so it is the explicit choice rather than the default.
       textCadence: 'steady',
-      // …and its blur, kept by default for the same reason: it is what every card showed before the switch existed.
-      revealBlur: true,
+      // …and its blur, OFF by default: the reader's own setting, adopted like the rest of this file's defaults, and
+      // the one they settled on after measuring what the per-frame repaint it causes was worth.
+      revealBlur: false,
       // …and the per-word reveal itself, which is what a fresh install (and an older record) opens with.
       revealWords: true,
       // …and the follower's glide, for the same reason: it is how the reading view has always caught up with the tail.
       followMode: 'glide',
       // …and the earlier turns' processes stay as they are until a reader asks for them to be put away.
       autoCollapseEarlier: false,
-      // The reasoning card's own movement: the reading pace it has always used, at the step it has always taken.
-      reasoningFollow: 'auto', reasoningRate: 2,
-      // …and it stays the same SIZE until a reader asks for the focused card to grow.
-      focusExpand: false,
+      // The reasoning card's own movement: the reader's setting — 跟随最新, i.e. stay on the newest line rather than
+      // walk down at a reading pace — at the standard pace for the mode that uses one.
+      reasoningFollow: 'latest', reasoningRate: 2,
+      // …and the focused card grows, which is what the reader who asked for all of these opens with.
+      focusExpand: true,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
