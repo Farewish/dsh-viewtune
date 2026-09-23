@@ -39,8 +39,19 @@ export function isEarlierNarration(data: AssistantChatData, boundary: TurnBounda
   return boundary.closingStep !== null && data.step < boundary.closingStep;
 }
 
-export function processExpanded(choice: boolean | undefined, boundary: TurnBoundary): boolean {
-  return choice ?? !(boundary.status === 'closed' && boundary.reason === 'completed');
+/**
+ * Is this turn's process open?
+ *
+ * `foldEarlier` is the reader's 「自动收起更早流程」: while a turn is running, ANY turn that is not the running one starts
+ * folded — including one that ended without completing, which the rule below keeps open on purpose, and including the
+ * turns the reader had opened (their stored choice is cleared when a new turn starts streaming). The reader's own
+ * choice still WINS when one exists, which is what keeps the disclosure control answering a click while this is on:
+ * a default that overrode it would look like a dead button.
+ */
+export function processExpanded(choice: boolean | undefined, boundary: TurnBoundary, foldEarlier = false): boolean {
+  if (choice !== undefined) return choice;
+  if (foldEarlier && boundary.status !== 'open') return false;
+  return !(boundary.status === 'closed' && boundary.reason === 'completed');
 }
 
 /** Reading while running must not pin the process open after completion. */

@@ -9,8 +9,9 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
  * The follower's policy lives in its own module (see `reading-scroll.ts`), imported here because the follower uses it
  * and re-exported because this is where every reader of these names looks for them.
  */
-import { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
-export { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll };
+import { firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+import type { FollowMode } from './reading-scroll.js';
+export { FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
 export function useMotionAllowed(enabled: boolean): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -287,8 +288,14 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
  *
  * The frame loop and the observer read it through a ref: putting it in the effect's dependency list would tear down and
  * re-register every listener on each stream tick.
+ *
+ * `followMode` is the reader's choice between the glide and writing the tail directly. The direct one is not merely a
+ * different look: the glide writes `scrollTop` on every frame, and every one of those writes fires a scroll event —
+ * which is what wakes the scroll spy, the anchor compensation and every measurement in this file. Snapping writes once
+ * per growth instead, so those paths go quiet. It IS in the dependency list, unlike `live`: it changes when a reader
+ * changes a setting, not on every stream tick, and re-registering then is exactly what should happen.
  */
-export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true): {
+export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true, followMode: FollowMode = 'glide'): {
   detached: boolean;
   jump: () => void;
   /** Stop tail-follow so a rail landing is not pulled back to the live bottom. */
@@ -389,7 +396,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // on every frame of a follower that had already caught up, which is the branch that becomes common as
       // soon as the frames stop being starved. The capture was pure cost, and an expensive one: a
       // querySelectorAll over every anchor plus a rect for each, per frame, for a value nothing looked at.
-      if (!motion || Math.abs(gap) < 1.5) { writeTop(scroll.scrollHeight, limit); return; }
+      if (!motion || followMode === 'snap' || Math.abs(gap) < 1.5) { writeTop(scroll.scrollHeight, limit); return; }
       writeTop(scroll.scrollTop + gap * (1 - Math.exp(-delta / 52)), limit);
       followFrame = requestAnimationFrame(follow);
     };
@@ -404,7 +411,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // Following needs a turn to be running; otherwise the anchor below does the work, which keeps the reader's place
       // instead of dragging them back to the bottom (see the `live` note on this hook).
       if (liveRef.current && following.current && !content.contains(document.activeElement)) {
-        if (!motion) writeTop(scroll.scrollHeight);
+        if (!motion || followMode === 'snap') writeTop(scroll.scrollHeight);
         else if (!followFrame) { lastFrameAt = performance.now(); followFrame = requestAnimationFrame(follow); }
       } else if (!following.current && anchor.current?.element.isConnected) {
         const delta = anchor.current.element.getBoundingClientRect().top - anchor.current.top;
@@ -430,7 +437,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       scroll.removeEventListener('touchstart', onTouch); scroll.removeEventListener('touchmove', onTouch);
       scroll.removeEventListener('keydown', onKey);
     };
-  }, [root, motion]);
+  }, [root, motion, followMode]);
   const jump = useCallback(() => {
     cancelFollow.current();
     anchor.current = null;

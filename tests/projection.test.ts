@@ -60,6 +60,19 @@ test('deliberate process expansion or collapse overrides the automatic lifecycle
   assert.equal(processExpanded(false, { ...completed, reason: 'error' }), false);
 });
 
+test('自动收起更早流程 folds every turn except the one that is growing', () => {
+  // Only the RUNNING turn stays open — that is the whole of the switch — and "earlier" is asked of the same status the
+  // default rule already uses, so a turn that ended without completing folds too (which the default rule keeps open).
+  assert.equal(processExpanded(undefined, active, true), true, 'the turn that is growing stays open');
+  assert.equal(processExpanded(undefined, completed, true), false, 'a finished turn stays folded');
+  assert.equal(processExpanded(undefined, { ...completed, reason: 'error' }, true), false, 'and so does an unfinished one');
+  assert.equal(processExpanded(undefined, { ...active, status: 'unknown' }, true), false, 'an unresolved turn is not the growing one');
+  // The reader's own click still wins, which is what keeps the disclosure control alive while the switch is on.
+  assert.equal(processExpanded(true, completed, true), true);
+  assert.equal(processExpanded(true, { ...completed, reason: 'interrupted' }, true), true);
+  assert.equal(processExpanded(false, active, true), false, 'and so does a deliberate collapse of the growing turn');
+});
+
 test('reading during a run does not keep the completed process open; reopening after completion is deliberate', () => {
   const choices: Record<string, boolean> = {};
   choices[processChoiceKey('turn:1', active)] = true;

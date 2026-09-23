@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { REASON_HOLD, REASON_STEP, reasoningTarget } from './reasoning-follow.js';
+import { REASON_HOLD, REASON_STEP, reasoningTarget, stepLines } from './reasoning-follow.js';
+import type { ReasoningFollowMode } from './reasoning-follow.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -9,8 +10,9 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 const WHEEL_IDLE_MS = 140;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
+  reasoningMode: ReasoningFollowMode; rate: number;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -24,7 +26,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const resize = useRef<Animation | null>(null);
   const previousExpanded = useRef(expanded);
   const stopFollow = useRef<() => void>(() => {});
-  const allowed = following && active && motion && !selected;
+  const allowed = following && active && motion && !selected && reasoningMode !== 'manual';
 
   const pause = useCallback(() => {
     stopFollow.current();
@@ -153,7 +155,12 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       if (!canFollow()) return;
       const from = paintedOffset();
       const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
-      const target = reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight);
+      // The mode only decides what this step aims at: the reading pace (so many whole lines), the newest line, or —
+      // never, because `allowed` is false for it — nothing at all. Nothing else about a step changes, so takeover,
+      // the fades and the handoff behave identically in all three.
+      const target = reasoningMode === 'latest'
+        ? Math.max(0, text.offsetHeight - port.clientHeight)
+        : reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight, stepLines(rate));
       if (target - from < 1) return;
       const began = performance.now();
       nextAt = began + REASON_HOLD;
@@ -260,7 +267,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       document.removeEventListener('visibilitychange', onVisibility);
       stopFollow.current = () => {};
     };
-  }, [allowed, pause]);
+  }, [allowed, pause, reasoningMode, rate]);
 
   useLayoutEffect(() => {
     const port = viewport.current;

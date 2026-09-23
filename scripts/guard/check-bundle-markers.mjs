@@ -451,12 +451,48 @@ const markers = [
   // The 功能 page's THREE rows now: the handles' wheel, which is one piece of BEHAVIOUR this plugin adds on top of
   // the host, the delivered file's destination, moved here from the visual page because it is not a matter of taste
   // about pixels either, and the reveal's cadence — the one row that trades a little smoothness for work.
-  ['the features page holds the strip wheel, the deliverable destination, the cadence, the blur and the per-word reveal', () =>
+  ['the features page holds the strip wheel, the deliverable destination, the cadence, the blur, the per-word reveal, the follow mode, the auto-collapse and the reasoning card’s own mode and pace', () =>
     bundle.includes('"data-ud-check": "reader-settings-strip-wheel"')
     && bundle.includes('"data-ud-check": "reader-settings-openmode"')
     && bundle.includes('"data-ud-check": "reader-settings-cadence"')
     && bundle.includes('"data-ud-check": "reader-settings-reveal-blur"')
-    && bundle.includes('"data-ud-check": "reader-settings-reveal-words"')],
+    && bundle.includes('"data-ud-check": "reader-settings-reveal-words"')
+    && bundle.includes('"data-ud-check": "reader-settings-follow-mode"')
+    && bundle.includes('"data-ud-check": "reader-settings-auto-collapse"')
+    && bundle.includes('"data-ud-check": "reader-settings-reasoning-follow"')
+    && bundle.includes('"data-ud-check": "reader-settings-reasoning-rate"')],
+  // The reasoning card's own movement, pinned at each end that could silently change the DEFAULT behaviour: the three
+  // modes, the pace realised as a whole-line step on the fixed cadence, the standard pace coming out as exactly the
+  // two lines this card has always taken, 手动滚动 never moving on its own, 跟随最新 aiming at the newest line, both
+  // values read defensively, and a change to either reaching the follower that is already running.
+  ['the reasoning card’s follow mode offers three, and only the two exact strings leave the reading pace', 'const REASONING_FOLLOW_MODES = [\n\t\t\t{\n\t\t\t\tid: "auto",\n\t\t\t\tlabel: "自动滚动"\n\t\t\t},\n\t\t\t{\n\t\t\t\tid: "latest",\n\t\t\t\tlabel: "跟随最新"\n\t\t\t},\n\t\t\t{\n\t\t\t\tid: "manual",\n\t\t\t\tlabel: "手动滚动"\n\t\t\t}\n\t\t];'],
+  ['手动滚动 never lets the card move on its own', 'reasoningMode !== "manual"'],
+  ['跟随最新 aims at the newest line rather than at a step', 'reasoningMode === "latest"'],
+  ['and 自动滚动 realises the pace as a whole-line step', 'reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight, stepLines(rate))'],
+  ['a pace is rounded to whole lines and never to zero', 'return Math.max(1, Math.round(rate * holdMs / 1e3));'],
+  ['…with the defaults reproducing the two-line step this card always took', () => bundle.includes('reasoningFollow: "auto"') && bundle.includes('reasoningRate: 2')],
+  ['…both read defensively', () => bundle.includes('reasoningFollowModeOf(state.reasoningFollow)') && bundle.includes('reasoningRateOf(state.reasoningRate)')],
+  ['…and a change to either reaches the follower that is already running', () => /reasoningMode,\s*rate\s*\]\)/.test(bundle)],
+  // 自动收起更早流程, pinned at every end that has to agree. The fold itself (only a turn with `status === "open"` stays
+  // open), the TWO places the rule is asked — the reader's rendering and the toolbar's own "what is open" pass, which
+  // would otherwise disagree with what is on screen — the default and the defensive read, and the clear that makes a
+  // new turn put the earlier processes away (gated by the same two conditions the fold uses).
+  ['自动收起更早流程 folds every turn but the growing one', 'if (foldEarlier && boundary.status !== "open") return false;'],
+  ['…and the toolbar asks the same rule, so it agrees with the screen', () => (bundle.match(/processExpanded\(choice, boundary, foldEarlier\)/g) ?? []).length === 2],
+  ['…with the switch off unless a record says otherwise', 'autoCollapseEarlier: false'],
+  ['…and that record read the defensive way', 'state.autoCollapseEarlier) === true'],
+  ['…and a new turn clearing the stored choices, so the earlier ones fold by themselves', () => {
+    const gated = (bundle.match(/autoCollapseEarlier && liveTurn !== null/g) ?? []).length;
+    return gated === 2 && bundle.includes('clearExpanded');
+  }],
+  // The follow mode, gated in BOTH places the follower can move the tail: the frame loop and the resize observer. One
+  // gate would leave the other path gliding, which is exactly the kind of half-fix this switch cannot afford — the
+  // whole point of the direct write is that it produces no scroll event for the spy and the anchor to react to.
+  ['the direct tail write is gated in the frame loop and in the resize observer', () =>
+    (bundle.match(/followMode === "snap"/g) ?? []).length === 2
+    && bundle.includes('const FOLLOW_MODES = [{\n\t\t\tid: "glide",\n\t\t\tlabel: "逐帧滑行"\n\t\t}, {\n\t\t\tid: "snap",\n\t\t\tlabel: "直接贴底"\n\t\t}];')],
+  ['…with the glide unless a record says otherwise', 'followMode: "glide"'],
+  ['…and that record read the defensive way', 'followModeOf(state.followMode)'],
   // The per-word reveal switch, pinned at the point where the work is: with it off the timeline is not STARTED in
   // either path (two `begin` calls become two gates), and the reasoning text renders as the plain string it is while
   // the markdown path drops the reveal hooks altogether. The default and the defensive read are the other two ends:

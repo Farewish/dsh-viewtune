@@ -6,7 +6,28 @@
  * through their effects rather than as rules, so they are worth stating where they can be read on their own.
  */
 
-/** How close to the tail counts as "the reader is at the bottom". */
+/** How the follower catches up with the tail. */
+export type FollowMode = 'glide' | 'snap';
+
+/** The two rows the settings panel offers, in the order it offers them. */
+export const FOLLOW_MODES: readonly { id: FollowMode; label: string }[] = [
+  { id: 'glide', label: '逐帧滑行' },
+  { id: 'snap', label: '直接贴底' },
+];
+
+/**
+ * The stored value, read defensively: only the exact string asks for the snap.
+ *
+ * `glide` is what every reader has had so far, so an unrecognised value — a record written before the choice
+ * existed — keeps it.
+ */
+export function followModeOf(value: unknown): FollowMode {
+  return value === 'snap' ? 'snap' : 'glide';
+}
+
+/**
+ * How close to the tail counts as "the reader is at the bottom".
+ */
 export const FOLLOW_TAIL_PX = 72;
 /** A wheel has to move something to count as the reader taking over. */
 export const WHEEL_EPSILON_PX = 0;

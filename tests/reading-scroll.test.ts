@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FOLLOW_TAIL_PX, firstRowPastIndex, firstRowWhere, isNearTail, wheelAtBottom, wheelClaimsScroll } from '../src/client/reading-scroll.ts';
+import { FOLLOW_MODES, FOLLOW_TAIL_PX, firstRowPastIndex, firstRowWhere, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from '../src/client/reading-scroll.ts';
 
 test('a wheel takes scroll control unless it has nowhere to go', () => {
   // ANY direction, any size. The listener also sees wheels that bubbled out of the reasoning card, and treating a
@@ -42,7 +42,6 @@ test('the tail is a distance from the bottom, and it is a real one', () => {
 });
 
 interface Row { getBoundingClientRect(): { bottom: number } }
-
 /** Rows in document order, with an optional counter so a test can see how many were actually measured. */
 function rowsOf(bottoms: readonly number[], measured?: { count: number }): Row[] {
   return bottoms.map(bottom => ({
@@ -107,4 +106,15 @@ test('and it measures a logarithmic number of rows, not all of them', () => {
   assert.equal(firstRowPastIndex(rows, 50, 0), 1);
   assert.ok(measured.count <= 10, `512 rows were measured ${String(measured.count)} times`);
   assert.equal(measured.count <= 10 && walked(rows, 50) === 1, true, 'and the walk agrees about the row');
+});
+
+test('the tail is caught up with the glide unless a record asks for the direct write', () => {
+  // The direct write is the cheap one — it produces no scroll event per frame — so it is the explicit choice, and the
+  // glide is what a record written before the choice existed resolves to.
+  assert.equal(followModeOf('snap'), 'snap');
+  assert.equal(followModeOf('glide'), 'glide');
+  for (const value of [undefined, null, '', 'SNAP', 'direct', 1, {}, []]) {
+    assert.equal(followModeOf(value), 'glide', `unrecognised ${JSON.stringify(value)} is the glide`);
+  }
+  assert.deepEqual(FOLLOW_MODES.map(entry => entry.id), ['glide', 'snap'], 'and the panel offers exactly these two');
 });

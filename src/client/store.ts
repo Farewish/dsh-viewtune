@@ -4,6 +4,8 @@ import type { ShortcutAction } from './shortcuts.js';
 import type { CollapseMode } from './collapse-mode.js';
 import type { DeliverableOpenMode } from './open-file.js';
 import type { TextCadence } from './text-cadence.js';
+import type { FollowMode } from './reading-scroll.js';
+import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { DEFAULT_WALLPAPER, WALLPAPER_DIM_INITIAL } from './wallpaper.js';
 import { WALLPAPER_CHROME_INITIAL } from './wallpaper-scope.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
@@ -70,6 +72,36 @@ export interface ReaderState {
    */
   revealWords: boolean;
   /**
+   * How the reading view catches up with the tail: the per-frame glide, or writing the bottom directly.
+   *
+   * Read through `followModeOf`, which answers `glide` for anything unrecognised — that is the behaviour every reader
+   * has had so far. It is a switch because the glide writes `scrollTop` on every frame and each write fires a scroll
+   * event, which is what keeps the scroll spy, the anchor compensation and the measurements busy while a message
+   * streams; a reader who would rather have that quiet can take the direct write.
+   */
+  followMode: FollowMode;
+  /**
+   * Whether a newly started turn folds the earlier processes away, leaving only the turn that is growing open.
+   *
+   * OFF by default: the reading view's own rule already folds a turn that finished cleanly, and this one goes further
+   * — while something streams, every other turn's process starts folded (a turn that ended without completing
+   * included), and a new turn CLEARS the stored expansion choices so the ones the reader had opened fold too. Their
+   * click still wins over that default, which is what keeps the disclosure control answering. Read defensively
+   * (`=== true`), so a record written before this switch existed keeps the behaviour it was written with.
+   */
+  autoCollapseEarlier: boolean;
+  /**
+   * How the reasoning card keeps up with what is being written into it: 自动滚动 (a reading pace), 跟随最新 (always
+   * the newest line), or 手动滚动 (never move on its own).
+   *
+   * Independent of 「焦点思考展开」: it governs the card as it is NOW, small card included, so a reader who never turns
+   * the expansion on still chooses how the text moves. Read through `reasoningFollowModeOf`, which answers `auto` for
+   * anything unrecognised — the pace this card has always followed.
+   */
+  reasoningFollow: ReasoningFollowMode;
+  /** The reading pace in lines per second, from `REASONING_RATES`; only 自动滚动 reads it. */
+  reasoningRate: number;
+  /**
    * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
    *
    * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
@@ -106,6 +138,12 @@ type ReaderActions = {
   setTextCadence: (draft: ReaderState, value: TextCadence) => void;
   setRevealBlur: (draft: ReaderState, value: boolean) => void;
   setRevealWords: (draft: ReaderState, value: boolean) => void;
+  setFollowMode: (draft: ReaderState, value: FollowMode) => void;
+  setAutoCollapseEarlier: (draft: ReaderState, value: boolean) => void;
+  setReasoningFollow: (draft: ReaderState, value: ReasoningFollowMode) => void;
+  setReasoningRate: (draft: ReaderState, value: number) => void;
+  /** Drop every stored expansion choice, so each turn falls back to its default. */
+  clearExpanded: (draft: ReaderState) => void;
   setStripWheel: (draft: ReaderState, value: boolean) => void;
   setWallpaper: (draft: ReaderState, value: string) => void;
   setWallpaperDim: (draft: ReaderState, value: number) => void;
@@ -145,6 +183,12 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       revealBlur: true,
       // …and the per-word reveal itself, which is what a fresh install (and an older record) opens with.
       revealWords: true,
+      // …and the follower's glide, for the same reason: it is how the reading view has always caught up with the tail.
+      followMode: 'glide',
+      // …and the earlier turns' processes stay as they are until a reader asks for them to be put away.
+      autoCollapseEarlier: false,
+      // The reasoning card's own movement: the reading pace it has always used, at the step it has always taken.
+      reasoningFollow: 'auto', reasoningRate: 2,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
@@ -166,6 +210,11 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setTextCadence: (draft, value: TextCadence) => { draft.textCadence = value; },
       setRevealBlur: (draft, value: boolean) => { draft.revealBlur = value; },
       setRevealWords: (draft, value: boolean) => { draft.revealWords = value; },
+      setFollowMode: (draft, value: FollowMode) => { draft.followMode = value; },
+      setAutoCollapseEarlier: (draft, value: boolean) => { draft.autoCollapseEarlier = value; },
+      setReasoningFollow: (draft, value: ReasoningFollowMode) => { draft.reasoningFollow = value; },
+      setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
+      clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },
       setWallpaperDim: (draft, value: number) => { draft.wallpaperDim = value; },

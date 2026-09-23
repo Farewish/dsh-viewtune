@@ -10,6 +10,10 @@ import { COLLAPSE_MODES, collapseModeOf } from './collapse-mode.js';
 import type { CollapseMode } from './collapse-mode.js';
 import { TEXT_CADENCES, textCadenceOf } from './text-cadence.js';
 import type { TextCadence } from './text-cadence.js';
+import { FOLLOW_MODES, followModeOf } from './reading-scroll.js';
+import type { FollowMode } from './reading-scroll.js';
+import { REASONING_FOLLOW_MODES, REASONING_RATES, reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
+import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { WallpaperSection } from './WallpaperSection.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 import css from './Reader.module.css';
@@ -52,9 +56,15 @@ const STRIP_WHEEL_HINT = '在阅读列两边的竖条上滚动，正文也会跟
 /** What the two reveal cadences cost and buy, as that row's `title` box. */
 const CADENCE_HINT = '跟随屏幕刷新可能严重影响性能';
 /** What turning the reveal's blur off changes, as that row's `title` box. */
-const REVEAL_BLUR_HINT = '关掉后逐字只剩淡入，画面更省';
+const REVEAL_BLUR_HINT = '开启会带来微小的视觉提升与性能影响';
 /** What turning the per-word reveal itself off changes, as that row's `title` box. */
 const REVEAL_WORDS_HINT = '关掉后文字直接出现，不再逐词淡入';
+/** What the direct tail write changes, as that row's `title` box. */
+const FOLLOW_MODE_HINT = '直接贴底：不再逐帧滑动，画面更省';
+/** How the reasoning card moves, as that row's `title` box. */
+const REASONING_FOLLOW_HINT = '自动滚动按阅读速度走；跟随最新停在最新一行';
+/** What the pace governs, as that row's `title` box. */
+const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
@@ -93,7 +103,7 @@ const REVEAL_WORDS_HINT = '关掉后文字直接出现，不再逐词淡入';
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -127,6 +137,14 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onRevealBlur: (next: boolean) => void;
   revealWords: boolean;
   onRevealWords: (next: boolean) => void;
+  followMode: FollowMode;
+  onFollowMode: (next: FollowMode) => void;
+  autoCollapseEarlier: boolean;
+  onAutoCollapseEarlier: (next: boolean) => void;
+  reasoningFollow: ReasoningFollowMode;
+  onReasoningFollow: (next: ReasoningFollowMode) => void;
+  reasoningRate: number;
+  onReasoningRate: (next: number) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background. */
@@ -333,6 +351,41 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>逐词显现</span>
               </span>
               <Switch checked={revealWords} onChange={onRevealWords} label="逐词显现" />
+            </div>
+            <div className={css.settingsRow} title={FOLLOW_MODE_HINT} data-ud-check="reader-settings-follow-mode">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>跟随到最新</span>
+              </span>
+              <select className={css.settingsSelect} value={followMode} aria-label="跟随到最新的方式"
+                onChange={event => { onFollowMode(followModeOf(event.currentTarget.value)); }}>
+                {FOLLOW_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
+            </div>
+            {/* No description on purpose: the label is the whole of it. */}
+            <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>自动收起更早流程</span>
+              </span>
+              <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
+            </div>
+            {/* How the reasoning card moves. Independent of the focus expansion: both act on the card as it is now. */}
+            <div className={css.settingsRow} title={REASONING_FOLLOW_HINT} data-ud-check="reader-settings-reasoning-follow">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>思考卡自动跟随</span>
+              </span>
+              <select className={css.settingsSelect} value={reasoningFollow} aria-label="思考卡的自动跟随方式"
+                onChange={event => { onReasoningFollow(reasoningFollowModeOf(event.currentTarget.value)); }}>
+                {REASONING_FOLLOW_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
+            </div>
+            <div className={css.settingsRow} title={REASONING_RATE_HINT} data-ud-check="reader-settings-reasoning-rate">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>自动滚动速度</span>
+              </span>
+              <select className={css.settingsSelect} value={reasoningRate} aria-label="自动滚动的速度"
+                onChange={event => { onReasoningRate(reasoningRateOf(Number(event.currentTarget.value))); }}>
+                {REASONING_RATES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
             </div>
           </>
           : <>
