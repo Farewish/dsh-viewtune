@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { classSel, hasDecls, keyframeOf, moduleCssLiteral, pillBoundaryClass } from './bundle-anchors.mjs';
+import { classSel, hasDecls, keyframeOf, moduleCssLiteral, pillBoundaryClass, ruleDecls } from './bundle-anchors.mjs';
 import { fileURLToPath } from 'node:url';
 
 /** The checkout this guard lives in (see the note in run.mjs). */
@@ -137,7 +137,202 @@ const markers = [
   ['steps pill is wrapped in an error boundary', () => pillBoundaryClass(bundle) !== undefined],
   // Collapse control. Its CSS lives inside the injected literal, so the check reads the
   // literal rather than the file: a rule outside it never reaches the page.
-  ['collapse control appears only while the turn in view is open', '"data-reader-collapse": currentTurnOpen ? "open" : "idle"'],
+  // The MERGED control (see CollapseControl.tsx) keeps the pair's conditions and the pair's animation
+  // contract: `open`/`idle` on `data-reader-collapse` is what the stylesheet animates, and WHICH action the
+  // button stands for rides a second attribute. The caret exists only when both actions apply, so a reader
+  // is never offered a menu with one item in it.
+  ['the collapse control appears while either action applies, and animates as it did', () =>
+    bundle.includes('"data-reader-collapse": on ? "open" : "idle"')
+    && bundle.includes('"data-reader-collapse-action": primary')
+    && bundle.includes('const on = showCurrent || showAll')
+    && bundle.includes('const both = on && primary === "current" && showAll')],
+  // Both optical shifts the reader tuned by eye are ONE NUMBER each in the stylesheet — the left half's
+  // centring and the appendage's chevrons — so either can be nudged again without touching the arithmetic
+  // around it. Both are whole pixels on purpose: a fractional translate leaves CJK glyphs on a half pixel.
+  ['the collapse control\'s two optical shifts are single numbers', () =>
+    bundle.includes('var(--reader-collapse-split-shift,5px)')
+    && bundle.includes('var(--reader-collapse-more-shift,-1px)')],
+  // …and the word 全部 is the LEFT HALF OF A RIGID PAIR with 收起, which is how the reader wanted it to move ("并排
+  // 移动"): the slots already differ by exactly 全部's own width, so giving both the same transform keeps them
+  // adjacent at every instant and makes the crossing structurally impossible. Its own timing is then only about
+  // the fade, which is quick. (Four earlier attempts gave 全部 a timing of its own to dodge an overlap that only
+  // existed because the two moved independently.) As emitted (`.16s`, and `.` prefixed class names).
+  ['the word 全部 rides 收起\'s transform instead of crossing it', () =>
+    bundle.includes('var(--reader-collapse-word-fade,.16s)')
+    && bundle.includes('transition:opacity 80ms linear')
+    && /_collapseAllWord\{[^}]*transform:translate\(-1em\)/.test(bundle)],
+  // Ending the split, the right half goes FIRST and upward — the reader asked for it (「叠˄先向上淡出一半再后续
+  // 动画」). The stack's exit is therefore an ANIMATION, not the entry reversed: a transition can only retrace its
+  // own path, and the entry comes from below. Changing the animation-name is what starts it (the pill's own exit
+  // uses the same contract) and the split state turns it off again. The appendage, its divider and the label's
+  // arrival are then tied to one number, `--reader-collapse-more-exit`: the first two leave in it, the label waits
+  // it. Patterns, not spellings, because the minifier reorders declarations and hashes the keyframe name.
+  ['the right half leaves first, upward, when the split ends', () =>
+    /_readerChevronsOut var\(--reader-collapse-more-exit/.test(bundle)
+    && /split=true\]\s*\.\w+_collapseChevrons\{[^}]*animation:none/.test(bundle)
+    && /transition-delay:0s,\s*var\(--reader-collapse-more-exit/.test(bundle)],
+  // The composer is the host's, so its wheel guard ships as an injected stylesheet rather than as one of our module
+  // classes. It has to cover EVERY name the host's composer is built from, because `overscroll-behavior` is a no-op
+  // on anything that is not a scroll container — and in particular the editor's name has a CAPITAL C
+  // (`_ComposerContentEditable`), which is why the first attempt, written with the lowercase substring the rest of
+  // the plugin uses, matched nothing and did nothing. Without the guard a notch over the input chains into the
+  // transcript, which is the reported bug.
+  // The composer is the host's, and the element that scrolls it carries a hash-only class name (`.uV2eYG_scroll`,
+  // measured out of the host's own stylesheet), so there is nothing stable to write a CSS selector against — the
+  // declarative `overscroll-behavior` attempt was shipped, did nothing, and was removed again. The guard is a
+  // capture-phase wheel listener on WINDOW instead: the outermost capture there is, non-passive so it can cancel the
+  // browser's own scroll, with `stopPropagation` for a host handler that scrolls in script, and gated on the geometry
+  // test so a field that still has somewhere to go keeps scrolling normally.
+  ['the composer wheel is judged in script, because no selector can name its scroller', () =>
+    !bundle.includes('overscroll-behavior: contain')
+    && bundle.includes('"wheel", onWheel')
+    && /capture: true,\s*passive: false/.test(bundle)
+    && bundle.includes('stopPropagation();')
+    && bundle.includes('canTakeNotch(')],
+  // …and the column handles FORWARD the wheel instead of guarding it: they sit beside the reading scroller, not inside
+  // it, so a notch over them had no scroll container to reach and the gesture died (「卡手」). The handle is identified
+  // by its own resize cursor rather than by its hashed class name, and the two refusals — a resize cursor elsewhere,
+  // an ordinary cursor here — are what keep the forwarding to the strip the reader actually pointed at.
+  // …and the step is integrated from the glide's OWN position, never read back from `scroller.scrollTop`: that read is
+  // rounded to whole pixels, so a glide moving a fraction of a pixel per frame loses its progress every frame — a 1px
+  // jitter invisible while scrolling fast and exactly the stutter the reader reported for one slow notch (softening
+  // the curve could not help, because the curve was never the problem). Position is seeded from the element only when
+  // no glide is running, and keeping the state also lets the velocity accumulate across notches.
+  ['the glide integrates its own position instead of reading it back', () =>
+    // The step is taken from OUR state by whichever law the frame calls for, so the claim is about what is passed TO
+    // it as much as about the call existing: both laws take `state`, and no step is ever built out of a fresh read of
+    // the element's rounded `scrollTop` (which is what the earlier `springStep({ at: scroller.scrollTop … })` did, and
+    // why this marker is no longer satisfied by a single `state = springStep(`).
+    bundle.includes('cruiseStep(state, target, dt, stream)')
+    && bundle.includes('springStep(state, target, dt, stiffness)')
+    && !bundle.includes('springStep({ at: scroller.scrollTop')
+    && !bundle.includes('cruiseStep({ at: scroller.scrollTop')],
+  // …and that seed has to run BEFORE the target is moved, which is a claim about ORDER and so cannot be made by
+  // asking whether the text exists: the first version of this seeding sat after the assignment, `target === null`
+  // was therefore never true, the seed never ran, and the first frame integrated from the state's initial zero —
+  // the scroller jumped to the very top and glided back down (reported as 「先瞬间到最顶上，再回来，上下抽动」).
+  // Each lookup is checked for absence explicitly: a missing needle would otherwise compare as `-1 < n` and pass
+  // exactly when the code is gone, which is the "check that cannot fail" this guard exists to refuse.
+  ['the glide is seeded from the element before the target moves, or it jumps to the top', () => {
+    const seed = /if \(target === null\) state = \{\s*at: scroller\.scrollTop/.exec(bundle);
+    const move = /target = \(target \?\? scroller\.scrollTop\) \+ pixels/.exec(bundle);
+    return seed !== null && move !== null && seed.index < move.index;
+  }],
+  // The forwarding is a SPRING, not one CSSOM call, for reasons that were each measured: a wheel's delta is in pixels,
+  // LINES or PAGES while every scroll call means pixels; `behavior: 'smooth'` restarts its easing per notch instead of
+  // accumulating; and an exponential approach starts at its top speed, which reads as a shove at every notch. So the
+  // notch is added to a target and a critically damped spring carries the scroller toward it, integrated by frame time
+  // so the feel does not follow the display's refresh rate. Its STIFFNESS follows the gesture — back-to-back notches
+  // get the snappy spring, a lone one the soft one — because one spring cannot serve both speeds, which is exactly the
+  // split the reader reported (fast right and slow jerky at one stiffness, the reverse at another). Damping is derived
+  // from whichever stiffness is in force, so neither end can bounce. The gesture is also announced to the scroller, so
+  // the reading view's auto-follow lets go of it, and the reader's own motion switch skips the glide entirely.
+  ['the column handles hand the wheel to the transcript', () =>
+    bundle.includes('handleTakesWheel(')
+    && bundle.includes('"col-resize"')
+    && bundle.includes('wheelPixels(')
+    && bundle.includes('springStep(')
+    && bundle.includes('stiffnessForGap(')
+    && bundle.includes('Math.sqrt(stiffness)')
+    && bundle.includes('requestAnimationFrame(')
+    && bundle.includes('dispatchEvent(new WheelEvent("wheel"')
+    && bundle.includes('data-motion')
+    && bundle.includes('"wheel", onWheel')],
+  // …and a SLOW RUN is carried at the wheel's own rate instead of being chased by the spring, which is the reader's
+  // 「均匀滚动」 report: a critically damped spring arrives at rest, so at a 0.3s interval it was finished in 0.24s and
+  // every notch became accelerate-then-wait — measured at 0 → 15px per frame on a simulated 300ms roll, against 5 → 6px
+  // once the ramp carries it. Four claims, because each is separately load-bearing: the rate is measured from the
+  // notch's pixels over its own gap, the speed is taken up with a time constant rather than at once (a step in speed
+  // is the shove that removed the earlier exponential glide), the ramp refuses to pass the target (the accumulated
+  // notches ARE the distance), and it only takes over from a live, slow stream — a first notch, a fast run and every
+  // landing stay on the spring the reader tuned by eye. The gate is asserted through the predicate it lives in rather
+  // than by a loosened copy of its arithmetic.
+  ['a slow run is carried at the wheel\'s own rate, not chased by the spring', () =>
+    bundle.includes('streamSpeed(')
+    && bundle.includes('streamHoldSeconds(')
+    && bundle.includes('cruiseStep(')
+    && bundle.includes('streamCarries(')
+    && bundle.includes('Math.exp(-dt / CRUISE_LAG_SECONDS)')
+    && bundle.includes('SLOW_STREAM_GAP_SECONDS')
+    && bundle.includes('BRAKE_LOOKAHEAD_SECONDS')
+    // The notch has to MEASURE the interval it arrived after, and the gap it gets is the one that preceded it — a rate
+    // taken from the time since the notch itself would always be zero.
+    && /const gap = now - lastNotch;/.test(bundle)
+    // …and a pause longer than that gap's own hold is a new gesture, which is what stops a stale rate from surviving it.
+    && bundle.includes('gap > streamHoldSeconds(gap)')
+    // …and TWO intervals are what make a stream: the second notch of a gesture is still the spring's, which is the
+    // reader's 「两次滚动间有明显间隔还会变成匀速」 — carrying it at the pace of the pause that happened to precede it
+    // turned a deliberate second turn of the wheel into a drift (measured: 26 frames to arrive against a lone notch's
+    // 14). Asserted as the arming itself — no pace below two intervals — plus the broken-run reset it depends on, since
+    // a pause that left the window behind would arm the notch after it anyway.
+    //
+    // …and the pace is the current notch over the AVERAGE OF THE INTERVALS, which is the tolerance a hand needs
+    // (「人滑动滚轮不可能完全匀速，所以要加一点容错」): averaging their RATES instead pulls the mean toward the short ones
+    // and carries the run faster than the hand is going, which drains the backlog until the motion stops. Measured on a
+    // 167ms/167ms/183ms roll — inside the hold ceiling, since past it the notches are two turns of the wheel by design —
+    // 2.0 → 7.0px per frame before, 8.0 → 12.0 after, where the hand's own pace is 9.7.
+    && bundle.includes('streamSpeed(pace, pixels)')
+    && bundle.includes('STREAM_WINDOW')
+    && bundle.includes('if (gaps.length < 2) return 0;')
+    && bundle.includes('pace.length = 0;')
+    && bundle.includes('pace.push(gap)')],
+  // The settings panel's TABS are pinned above its scroller: the panel hides its overflow, the page body below the tabs
+  // is the scroll container, and the tabs refuse to shrink. Either half alone leaves the tabs inside the scroller —
+  // which is what the reader saw, with the page's scrollbar running up past them. Asserted as the relation between the
+  // three rules, on the minified literal, because that is what the artifact contains.
+  ['the settings panel pins its tabs above its own scroller', () =>
+    /_settingsPanel\{[^}]*overflow:hidden/.test(bundle)
+    && /_settingsBody\{[^}]*overflow-y:auto/.test(bundle)
+    && /_settingsTabs\{[^}]*flex:none/.test(bundle)],
+  // The host's input box joins the skin. Three measured facts, each of which the rule would silently stop working
+  // without: the plate is a THEME TOKEN (so the override is a token redefinition), the override is inherited from the
+  // composer's seat (so no other user of that token changes), and the seat's own opaque lift band is withdrawn (a
+  // translucent plate over an opaque band shows the band, not the wallpaper). It follows the skin's master gate
+  // rather than the conversation page's, because the composer is on screen in both views.
+  ['the input box takes the skin, without leaking the token override', () =>
+    bundle.includes('--viewtune-input-plate: var(--dsw-specific-input-major)')
+    && bundle.includes('--dsw-specific-input-major: color-mix(in srgb,')
+    // Its two round buttons share one class and one token between them, and ride the input's dial so the card and the
+    // buttons are one surface (asked for by name: 「添加附件」 and 「指令」).
+    && bundle.includes('--viewtune-selector-plate: var(--dsw-specific-selector);')
+    && bundle.includes('--dsw-specific-selector: color-mix(in srgb, var(--viewtune-selector-plate) var(--glass-input, 25%), transparent);')
+    && bundle.includes('data-viewtune-glass')
+    && bundle.includes('composerGlassCss')
+    // The plate rule is gated on the skin alone; the LIFT BAND is withdrawn only under a SECOND attribute (the
+    // wallpaper's), because that is where our own band replaces it. Without that gate, the skin with no wallpaper
+    // dropped the host's band and left no fade at all — the one combination this used to break. Asserted as the
+    // two-attribute shape rather than by the alias's spelling, which the bundler is free to change.
+    && bundle.includes('[${GLASS_ATTRIBUTE}] ${COMPOSER}')
+    && bundle.includes('[${GLASS_ATTRIBUTE}][${WINDOW_SCOPE_ATTRIBUTE}]')
+    // …and the NO-WALLPAPER branch: with no wallpaper to reveal, the host's band is dropped too and a lifted
+    // stand-in is painted in the theme's base colour, because the host's ramp runs inside the seat's own box and left
+    // the transcript drawn right up against the input (reported). Spelled `WINDOW_SCOPE_ATTRIBUTE` because that is
+    // what the artifact says: the source aliases the import, and the bundler inlines the original name.
+    && bundle.includes('html[${GLASS_ATTRIBUTE}]:not([${WINDOW_SCOPE_ATTRIBUTE}]) ${COMPOSER}::before')
+    && bundle.includes('background-color: var(--dsw-alias-bg-base);')
+    // …but the trajectory page gets its OWN colour in that branch: its band paints `bg-layer-1`, the surface that page
+    // is made of, and a stand-in in the base colour would put a bar of another shade at the bottom of it.
+    && bundle.includes('[data-trajectory-scroll]) ${COMPOSER}::before')
+    && bundle.includes('background-color: var(--dsw-alias-bg-layer-1);')],
+  // The dial name has to be visible in the artifact for the cross-check above ("every adjustable surface reads its own
+  // dial") to be able to see it: that check collects `var(--glass-*)` out of the bundle and compares the set against
+  // the settings rows. Interpolating the name here — as the first version of this file did — hides it from that check
+  // and makes the surface invisible to the guard, which is how it was caught.
+  ['the input box spells its dial out, so the cross-check can see it', () =>
+    bundle.includes('var(--glass-input, 25%)')],
+  // …and the way back in is that SEQUENCE reversed: the label goes first (240ms), then the right half rises into
+  // place from BELOW over the same 120ms the exit used. Timing is mirrored, space is not — the exit goes up, the
+  // entry comes up. The exit animation carries no fill-forward so the property falls back to the resting `+.35em`
+  // below while the element is invisible, which is what lets the next entry start from underneath.
+  ['the right half arrives last, from below, when the split begins', () =>
+    /split=true\]\s*\.\w+_collapseChevrons\{[^}]*transform:translate\([^)]*\), 0\)/.test(bundle)
+    && /split=true\]\s*\.\w+_collapseChevrons\{[^}]*transition:opacity var\(--reader-collapse-more-exit[^}]*var\(--reader-collapse-anim/.test(bundle)
+    && /split=true\]\s*\.\w+_collapseMore:before\{[^}]*var\(--reader-collapse-anim/.test(bundle)
+    // The resting transform is BELOW, and the exit animation's own end is ABOVE: the two paths, stated separately.
+    // `0%` rather than `from`, because that is what the minifier leaves in the keyframes.
+    && /_collapseChevrons\{[^}]*transform:translate\([^)]*\), \.35em\)/.test(bundle)
+    && /_readerChevronsOut\{0%\{[^}]*\}[^}]*to\{[^}]*-\.5em/.test(bundle)
+    && !/animation:[^;}]*readerChevronsOut[^;}]*\bboth\b/.test(bundle)],
   ['collapse control folds the turn in view', 'for (const key of openTurnKeys) props.actions.setExpanded(key, false);'],
   ['collapse control is scoped to one turn', 'if (group.turn === null || group.turn !== currentTurn) continue;'],
   ['collapse exit is delayed past its animation', () => cssDecls(`${sel('collapseControl')}[hidden]`, ['display:inline-flex'])],
@@ -155,8 +350,54 @@ const markers = [
     const deadlines = (bundle.match(/clearTimeout\(deadline\)/g) ?? []).length;
     return filled === 3 && settles === deadlines && deadlines === 4;
   }],
-  // The toolbar is the one lane that pins, so both switches stay reachable.
-  ['toolbar pins to the top', () => cssDecls(sel('toolbar'), ['position:sticky', 'top:0', 'z-index:9'])],
+  // The toolbar pins UNDER THE TOP BAR and spans the view: it cancels the reading column's centring
+  // offset plus the view's inline padding and adds the same amount back as its own padding, so it reads
+  // as one band with the shell's header rule while 收起 and the gear stay exactly where the text
+  // starts. "Fixed under the top bar" is chrome; a lane that scrolls away is not what was asked.
+  ['the toolbar pins under the top bar', () =>
+    hasDecls(readerCss, sel('toolbar'), ['position:sticky', 'top:0'])],
+  ['the toolbar spans the view, pins both its controls and sits flush when pinned', () => {
+    const decls = [...ruleDecls(readerCss, sel('toolbar'))];
+    const margin = decls.find(decl => decl.startsWith('margin-inline:')) ?? '';
+    // Both halves of the relation are pinned, not just the variable: the escape IS the centring offset
+    // (`50%` is half the reading column, `50cqw` half the view's content box), so dropping either term
+    // would leave a lane that no longer reaches the edges. The first cut of this marker only asked for
+    // the variable and passed with the offset terms replaced by zero — a check that could not fail.
+    const terms = ['var(--reader-inline-pad)', '50cqw', '50%'];
+    // Flush at scroll-top too: a sticky lane rests at its natural position until the scroll passes its
+    // offset, so the view's top padding has to be cancelled or it shows as a gap until then.
+    const top = decls.find(decl => decl.startsWith('margin-top:')) ?? '';
+    // The outward shift is part of the shape, not a detail: without it the LEFT end sits at the reading
+    // column's edge again, which is what the reader asked to change. It lives on that side's padding
+    // (there is no `padding-inline` any more — that is the point of the shift). The RIGHT end is a
+    // different shape now and deliberately so: the viewtune button is pinned to the LANE's end less the
+    // gap, which the reader asked for after the outward shift had been pushed as far as it went.
+    const left = decls.find(decl => decl.startsWith('padding-left:')) ?? '';
+    const right = decls.find(decl => decl.startsWith('padding-right:')) ?? '';
+    return terms.every(term => margin.includes(term)) && terms.every(term => left.includes(term))
+      && top.includes('var(--reader-top-pad)')
+      && left.includes('var(--reader-toolbar-shift-left)')
+      && right.includes('var(--reader-toolbar-gap-right')
+      // And the lane's OWN right end: the margin comes in by this much, so the strip and its divider stop
+      // short of the window edge without moving the button inside it.
+      && (decls.find(decl => decl.startsWith('margin-right:')) ?? '').includes('var(--reader-toolbar-end-right)');
+  }],
+  // The settings panel hangs inside the TOOLBAR's stacking context, so its own z-index can only order it
+  // within that context: whether it covers the turn rail is decided by the toolbar's z-index against the
+  // rail's slot (10). At 9 the whole lane — panel included — painted under the rail, which is what the
+  // reader reported. Pinned as a RELATION between the two numbers, so neither can be retuned alone.
+  ['the toolbar outranks the turn rail, so its panel is not covered', () => {
+    const zIndexOf = (css, selector) => {
+      const at = css.indexOf(selector + '{');
+      if (at === -1) return Number.NaN;
+      const match = /z-index:(\d+)/.exec(css.slice(at, css.indexOf('}', at)));
+      return match === null ? Number.NaN : Number(match[1]);
+    };
+    const railCss = moduleCssLiteral(bundle, 'TimelineRail.module.css');
+    const toolbar = zIndexOf(readerCss, classSel(readerCss, 'toolbar'));
+    const rail = zIndexOf(railCss, classSel(railCss, 'slot'));
+    return Number.isFinite(toolbar) && Number.isFinite(rail) && toolbar > rail;
+  }],
   // The reading view's preferences live behind one toolbar button: the lane keeps its geometry and
   // a preference becomes a row in this panel instead of another control in the lane.
   ['settings panel holds the preferences', '"data-ud-check": "reader-settings"'],
@@ -203,6 +444,132 @@ const markers = [
     const body = handlerBody('openFile: async (path');
     return body.includes('sidebarRightFace()') && body.includes('deliverableOpenModeOf(options');
   }],
+  // The wallpaper. Four claims: the row exists; the backdrop is painted on the reading view's own
+  // root; it is a VIEWPORT-anchored backdrop whose scrim is mixed from the theme's own background —
+  // `cover` against this element's box would stretch one photograph over a whole long conversation,
+  // and a scrim hardcoded to black would be a legibility bug in the light theme; and the thumbnails
+  // come from the plugin's own route, keyed by the file's mtime so a re-dropped image is not served
+  // from the browser's cache. The folder itself never reaches the browser — see the forbidden list.
+  ['the settings panel offers a wallpaper', '"data-ud-check": "reader-settings-wallpaper"'],
+  ['the wallpaper is painted on the reading view root from the chosen name', () =>
+    /"data-reader-wallpaper"/.test(bundle) && bundle.includes('wallpaperProperties(')],
+  ['the wallpaper is a viewport-anchored backdrop with a theme-mixed scrim', () => {
+    const rule = new RegExp(`${classSel(readerCss, 'root')}\\[data-reader-wallpaper\\]\\{([^}]*)\\}`).exec(readerCss);
+    if (rule === null) return false;
+    const body = rule[1];
+    return body.includes('background-attachment:fixed')
+      && body.includes('var(--wallpaper-image)')
+      && body.includes('--wallpaper-dim')
+      && body.includes('color-mix(in srgb, var(--dsw-alias-bg-base');
+  }],
+  ['wallpaper thumbnails come from the plugin route, keyed by the file', () =>
+    bundle.includes('better-display/wallpaper/') && bundle.includes('?v=${')],
+  // The whole-window scope, whose mechanism the runtime probes established. Five claims: the two
+  // settings rows exist; the stylesheet is GATED on an attribute, so nothing applies until the reader
+  // opts in; every copy of the IMAGE rides a viewport-anchored rule (that is what lets several copies
+  // be safe — they line up as one image instead of layering scrims, which is what made one region
+  // visibly darker than its neighbour in the first probe); the chrome carries a scrim and no second
+  // copy; and the reading view steps aside while the scope is the window, for the same reason. The
+  // gate is pinned through the `SCOPED` interpolations rather than a spelled-out selector, because
+  // the selector is built from the attribute constant at runtime.
+  ['the settings panel offers the window-wide wallpaper', '"data-ud-check": "reader-settings-wallpaper-scope"'],
+  ['the window scope has its own chrome scrim dial', '"data-ud-check": "reader-settings-wallpaper-chrome"'],
+  ['the window backdrop is gated, and every copy of the IMAGE is viewport-anchored', () => {
+    const images = (bundle.match(/var\(--viewtune-wallpaper-image\)/g) ?? []).length;
+    const anchored = (bundle.match(/\$\{FIXED\}/g) ?? []).length;
+    return bundle.includes('"data-viewtune-wallpaper"')
+      && bundle.includes('="window"]')
+      // Every anchored rule carries a copy — and the chrome's scrim-only rule is deliberately NOT anchored:
+      // attachment:fixed only ever lines an image up with the viewport, and on a flat colour it buys nothing
+      // while putting the paint in the compositor, which is where the reader's missing-scrim bug lived. A
+      // relation, not a count: adding a carrier must not be able to pass by quietly adjusting two numbers.
+      && images === anchored
+      // The token's name lives in a constant and is interpolated into its rule, so the bundle has the
+      // declaration rather than a spelled-out declaration line.
+      && bundle.includes('const SIDEBAR_FILL = "--dsw-specific-sidebar-fill"')
+      && bundle.includes('[class*="_header"]:has(> [class*="_titleRow"])');
+  }],
+  // The conversation column BELOW the header belongs to the reading view in either scope. Gating the
+  // scroller, the gutter or the composer's fade band on the window scope is exactly what left two black
+  // blocks around the input box while the whole-window switch was off, so the gate they use is pinned.
+  ['the column below the header follows the wallpaper in either scope', () =>
+    // The declaration is pinned WITH its template opening, because `const SCOPED_ANY` is a substring of
+    // `const SCOPED_ANYX` — the first cut of this line passed after that rename, which is the same
+    // substring trap a marker of mine fell into once before.
+    bundle.includes('const SCOPED_ANY = `html[')
+    && bundle.includes('${SCOPED_ANY} [class*="_scrollBody"]')
+    && bundle.includes('${SCOPED_ANY} [class*="_composerSeat"]')
+    ],
+  // The image's size and place are MEASURED (view scope fits the reading page by the min ratio, never
+  // enlarging) and published, so every copy has to read the same conversion. A regression to a bare
+  // `cover` re-crops the picture on a page-shaped area — which the reader reported at once as "the
+  // wallpaper is not all there" — and a copy that stops reading the measured values stops lining up
+  // with the others.
+  ['the image copies read the measured size and place', () =>
+    bundle.includes('background-size: cover, var(--viewtune-wallpaper-size, cover) !important;')
+    && bundle.includes('background-position: center, var(--viewtune-wallpaper-position, center) !important;')
+    && bundle.includes('wallpaperGeometry(')
+    && bundle.includes('--viewtune-wallpaper-size')],
+  ['the trajectory page keeps its own single-number fade', () =>
+    bundle.includes(`[class*="_scrollBody"]:has([data-trajectory-scroll]) [class*="_composerSeat"]::before`)
+    && bundle.includes('mask-image: linear-gradient(180deg, transparent 0px, #000 var(--viewtune-trajectory-fade-lift, 36px)) !important;')],
+  // The composer's fade band: the host's opaque gradient is dropped, and the fade becomes a mask over a
+  // pseudo-element's copy of the backdrop — LIFTED over the seat's box by the same one number the conversation and
+  // trajectory bands use, so all three pages ramp over the same strip above the composer. Pinned because every part
+  // of it was wrong once on screen: a mask on the SEAT masks its subtree and hid the composer card inside it, a copy
+  // without `!important` geometry lost to the host's shorthand and tiled as small wallpapers, and this band alone
+  // started at `inset: 0`, which sat the reading view's fade a full lift lower than the other two pages' (reported).
+  ['the composer fade is a lifted mask on a pseudo-element, not a slab', () =>
+    bundle.includes('[class*="_composerSeat"] { background-image: none !important;')
+    && bundle.includes('--viewtune-wallpaper-fade-lift: 36px;')
+    && bundle.includes('--viewtune-wallpaper-fade-ramp: 20px;')
+    && bundle.includes('[class*="_composerSeat"]::before')
+    && bundle.includes('inset: calc(-1 * var(--viewtune-wallpaper-fade-lift, 36px)) 0 0 0 !important;')
+    // The ramp ENDS at the lift and its length is the second number, so "fade faster" is one value and the point
+    // where the text is gone cannot move with it.
+    && bundle.includes('mask-image: linear-gradient(180deg, transparent calc(var(--viewtune-wallpaper-fade-lift, 36px) - var(--viewtune-wallpaper-fade-ramp, 20px)), #000 var(--viewtune-wallpaper-fade-lift, 36px))')
+    && bundle.includes('background-repeat: no-repeat !important')],
+  // The token must be overridden on `body`, not only inherited from the root: the theme defines it in
+  // its own `body{…}` block, and a definition on an element beats an inherited value. Overriding only
+  // the root left the whole left column opaque — the first thing the reader reported.
+  ['the left column token is overridden on body too', () =>
+    bundle.includes('${SCOPED} body { ${SIDEBAR_FILL}: transparent !important; }')],
+  // The theme leaves the scrollbar track transparent, so over a wallpaper the gutter read as a hole of
+  // a different colour beside everything else. It now carries the same backdrop.
+  ['the scrollbar gutter carries the backdrop instead of a hole', () =>
+    bundle.includes('::-webkit-scrollbar-track') && bundle.includes('::-webkit-scrollbar-corner')],
+  // …and the composer's own slot is the one that gets ROUNDED ends: a short strip beside the field reads as another
+  // widget when it ends square next to the host's pill-shaped thumb. Scoped through the composer, so the transcript's
+  // lane keeps the square edges that let it meet the surfaces it sits between, and the thumb stays the host's own pill.
+  ['the composer\'s scroll slot has rounded ends, and only its', () =>
+    bundle.includes('[class*="composer" i] [class*="_scroll"]::-webkit-scrollbar-track { border-radius: 999px !important; }')],
+  // The tool cards' payload boxes — the 「输入」/「结构」/「原始数据」 panes under Edit, Pwsh, Search and Read — are OUR
+  // markup, and they were the one code-shaped surface the skin never reached (opaque `bg-module-platform`, no glass
+  // rule). They ride the CODE dial, like the fenced blocks, because that is what the reader calls them: 代码框.
+  ['the tool cards\' payload boxes take the skin too', () =>
+    /_toolRaw\{background:color-mix\(in srgb,\s*var\(--dsw-alias-bg-module-platform[^}]*var\(--glass-code/.test(bundle)],
+  // …and so do the HOST's primitive blocks, which is what the 「结构」/「Pwsh」/Edit's 「输入」 panes really are: five
+  // hashed classes that all paint `--dsw-alias-markdown-code-block` (header rows `…-banner`), plus JsonTree, which
+  // paints the core layer colour. Naming a class is impossible, so the dial goes on the TOKENS — scoped to this
+  // view's root, the same technique the conversation page uses on its own column. One probe per fact: the first fix
+  // here targeted `.toolRaw` alone, which is only the 「原始数据」 box, and the reader saw no change in the other five.
+  ['the host primitive code blocks take the code dial', () =>
+    /\[data-reader-glass\]\{--dsw-alias-markdown-code-block:color-mix\(in srgb,\s*var\(--viewtune-code-plate/.test(bundle)
+    && /--dsw-alias-markdown-code-block-banner:color-mix\(in srgb,\s*var\(--viewtune-code-banner/.test(bundle)],
+  ['…and the JSON pane\'s layer colour, scoped to the tool content', () =>
+    /body\{--viewtune-layer-plate:var\(--dsw-alias-bg-layer-1\)\}/.test(bundle)
+    && /--dsw-alias-bg-layer-1:color-mix\(in srgb,\s*var\(--viewtune-layer-plate/.test(bundle)],
+  // The transcript's own lane carries the same radius now, so the groove is one shape wherever it appears: with the
+  // host's 2px inset gone, the radius is what makes it a bar instead of a strip stopping dead at the surfaces above
+  // and below it. Its `margin: 0` is part of the same rule and asserted with it.
+  ['the transcript lane\'s scroll slot is rounded like the short ones', () =>
+    bundle.includes('[class*="_scrollBody"]::-webkit-scrollbar-track { margin: 0 !important; border-radius: 999px !important; }')],
+  // …and the settings panel's slot, which is the other short strip in the reader: same radius, same reason. It is the
+  // panel's BODY that scrolls (the tabs are pinned above it), so that is the element the rule names.
+  ['the settings panel\'s scroll slot has rounded ends too', () =>
+    /_settingsBody::-webkit-scrollbar-track\{border-radius:999px!important\}/.test(bundle)],
+  ['the reading view steps aside while the scope is the window', () =>
+    bundle.includes('"data-reader-wallpaper": wallpaperName === "" || windowScope')],
   // The compaction divider arrives rather than appearing: three animations, on the line (whose rules
   // sweep with it), the pill and the dial. Names go through the keyframe helper because lightningcss
   // re-hashes them; the selectors go through the class helper for the same reason.
@@ -254,12 +621,169 @@ const markers = [
   // move: the property names in the stylesheet and in the part table are the same six strings, so a
   // surface wired to a property no row writes (or a row writing one no surface reads) fails here.
   ['every adjustable surface reads its own dial', () => {
-    const props = [...readerCss.matchAll(/var\((--glass-[a-z]+)/g)].map(match => match[1]);
-    return new Set(props).size === 6
-      && ['--glass-lane', '--glass-user', '--glass-card', '--glass-code', '--glass-diff', '--glass-chip']
+    // Searched across the WHOLE bundle, not the reading view's literal: the gutter's groove lives in
+    // its own always-installed stylesheet, because the element it styles is not inside this view.
+    const props = [...bundle.matchAll(/var\((--glass-[a-z]+)/g)].map(match => match[1]);
+    return new Set(props).size === 9
+      && ['--glass-lane', '--glass-user', '--glass-card', '--glass-code', '--glass-diff', '--glass-chip', '--glass-scrollbar', '--glass-pill', '--glass-input']
         .every(name => props.includes(name) && bundle.includes(`"${name}"`));
   }],
+  // Three surfaces the skin shipped without, each on the dial it was decided to belong to. They are one
+  // marker because they are one mistake — a plate that kept its base look through the skin — and each
+  // half is asserted separately so a fix that covers two of them still fails here.
+  //   - the code block's HEADER ROW: the block was already on 代码块, but its banner is a plate of its
+  //     own, so a translucent block still wore an opaque bar across its top;
+  //   - the JSON record cards (see JsonRecord): the host primitive's plates wear hashed names, so the
+  //     wrapper this view adds is the ONLY handle, and it rides 卡片与面板;
+  //   - the two counting pills (用量 / … 个步骤): they carry a plate in the base look, and now carry a
+  //     dial of their own rather than sharing 产物标签 with the per-turn deliverable chips.
+  ['the skin reaches every code surface, the JSON cards and the counting pills', () =>
+    // The code block's header row, next to the block's own rule in the reading view's stylesheet. It is
+    // TWO plates there — an opaque sticky wrap and the banner inside it — so the assertion is on both:
+    // the wrap must stop painting the theme's background, and the banner's OWN token must be re-stated
+    // through the code dial. Painting only the wrap is the version that shipped and changed nothing.
+    // …and both spellings of a cleared background are accepted: lightningcss writes `transparent` as
+    // `#0000`, and pinning the minifier's choice here would fail on a version bump for no reason.
+    /\.md-code-block>:first-child\{background-color:(?:transparent|#0000)\}/.test(readerCss)
+    // The block's BODY plate too. A fence with no language renders its body as a `<pre>` that paints
+    // `--dsl-code-block-background` itself (`.shiki` does it with `!important`), so clearing only the
+    // outer div left that fence a solid slab with the dialled plate hidden behind it.
+    // Three spellings of the same clearing are accepted (`transparent`, `#0000`, and the `0 0` the
+    // minifier puts in a `background` shorthand): pinning one of them only makes a version bump look
+    // like a regression.
+    && /\.md-code-block pre\{background:(?:transparent|#0000|0 0)\s*!important\}/.test(readerCss)
+    && /--dsl-code-block-banner-background-color:color-mix\(in srgb,\s*var\(--dsw-alias-markdown-code-block-banner[^}]*var\(--glass-code/.test(readerCss)
+    // The JSON record cards: our wrapper, and both of the primitive's plates inside it.
+    && /_jsonCard (?:button|pre)\{background:color-mix\(in srgb,\s*var\(--dsw-alias-(?:bg-module-platform|markdown-code-block)/.test(readerCss)
+    && bundle.includes('"jsonCard"')
+    // The counting pills live in THEIR OWN module, so this one is asserted against the whole bundle.
+    && /_pillButton\{background:color-mix\(in srgb,\s*var\(--dsw-alias-bg-module-platform\)\s*var\(--glass-pill/.test(bundle)
+    // …and inline code, which is the same KIND of paper as a fenced block even though the theme gives it
+    // its own token and its own module. It rides the code dial for the reason the diff dial covers every
+    // piece of diff paper: one kind of surface, one control.
+    && /:not\(pre\)>code\{background-color:color-mix\(in srgb,\s*var\(--dsw-alias-markdown-inline-code\)\s*var\(--glass-code/.test(bundle)],
+  // The gutter's groove: it reads the dial, falls back to the host's own transparent track, and keeps
+  // the wallpaper's scrim and image in ONE stack with it — the gutter is the only surface where the
+  // groove and the wallpaper have to compose rather than sit in separate rules.
+  ['the scrollbar groove is dialled and still follows the wallpaper', () =>
+    // The groove layer reads the DIAL itself, with the host's transparent track as its floor, and the
+    // wallpaper's two layers ride in the same stack — the fallbacks (0% and none) are what keep a
+    // gutter with no wallpaper identical to the host's own.
+    bundle.includes('var(--glass-scrollbar, 0%)')
+    // The lane fills the host's whole column. The host insets this track by 2px on ALL FOUR sides, and
+    // that inset is exactly the gap a reader reported: 2px of backdrop above the groove (before the top
+    // bar's bottom border), beside it (before the toolbar's right edge) and inside the window's own right
+    // edge. Measured off a screenshot of the running app, then reproduced in a rendered fixture. The radius rides on
+    // the same rule, because the two are one decision about the lane's shape.
+    && bundle.includes('::-webkit-scrollbar-track { margin: 0 !important; border-radius: 999px !important; }')
+    && bundle.includes('var(--viewtune-wallpaper-image, none)')
+    && bundle.includes('var(--viewtune-wallpaper-dim, 0%)')
+    && bundle.includes('const SCROLLBAR_FILL_VARIABLE = "--glass-scrollbar"')],
+  // …and its own shape, restated here as the flat-colour floor: every track gets the groove as ONE colour, and only
+  // the lane composes the wallpaper into it. A card's inner scroller used to get the wallpaper as a `fixed` background
+  // too — and a card with a `backdrop-filter` (the skin's cards have one) becomes its containing block, so the copy
+  // sampled the wrong patch and showed as a slab of another colour down an opened tool card's edge until it repainted
+  // (reported). The lane keeps the stack, because that gutter really does sit on the wallpaper.
+  ['the groove is one flat colour everywhere except the lane', () =>
+    bundle.includes('background-color: color-mix(in srgb, var(--dsw-alias-bg-base, #000) var(--glass-scrollbar, 0%), transparent) !important;')
+    && bundle.includes('[class*="_scrollBody"]::-webkit-scrollbar-track,')
+    && bundle.includes('var(--viewtune-wallpaper-image, none)')
+    && bundle.includes('background-attachment: fixed !important;')],
+  // …and in the LANE the dial is a LAYER, the first of three: a `background-color` sits under every image, so leaving
+  // the groove's colour to the flat rule hid it behind the opaque wallpaper copy and the slot read as missing
+  // (reported). The three sizes are asserted as the shape that says "three layers", and the dial comes before the
+  // image in the one string the background-image is built from.
+  ['the lane stacks the dial over the wallpaper', () =>
+    bundle.includes('linear-gradient(color-mix(in srgb, var(--dsw-alias-bg-base, #000) var(--glass-scrollbar, 0%), transparent),')
+    && bundle.includes('background-size: cover, cover, var(--viewtune-wallpaper-size, cover) !important;')],
+  // The host's trajectory view is a SOLID page, and it shares the conversation column and the composer
+  // seat with every other view, so the wallpaper leaked beside its opaque table: a dimmed strip down the
+  // right edge (the scroller's stable gutter, which the gutter's groove paints) and the session-stats
+  // band under the composer. Measured off a screenshot of the running app first, then fixed in one rule:
+  // every surface under this column reads these names, and a pseudo-element inherits them from its
+  // originating element, so withdrawing them takes the image out of the column, the groove and the seat
+  // at once. Scoped by the page's own marker — every other view keeps its wallpaper.
+  ['the trajectory page sits on the base colour instead of the wallpaper', () =>
+    bundle.includes('[class*="_scrollBody"]:has([data-trajectory-scroll])')
+    && bundle.includes('background-color: var(--dsw-alias-bg-base) !important;')
+    && bundle.includes('--viewtune-wallpaper-image: none;')
+    && bundle.includes('--viewtune-wallpaper-dim: 0%;')
+    // …and the fade survives the swap. The band above the composer IS our masked pseudo-element, so
+    // withdrawing the image left it painting nothing and the page met the composer with a hard edge.
+    // Two things are this page's own, and both were measured off the running app:
+    //   - the COLOUR is the surface the page is made of (bg-layer-1), never a slab of another shade —
+    //     in the light theme bg-base and bg-layer-1 are the same colour, so only the dark theme showed
+    //     the band as a bar of its own colour;
+    //   - the band is LIFTED above the seat, so the ramp covers the last rows instead of beginning at
+    //     the composer's edge. The lift is one variable, so tuning it does not touch this marker.
+    // Scoped to THIS page: everywhere else the band fades in the wallpaper, which is the point of it.
+    && bundle.includes(':has([data-trajectory-scroll]) [class*="_composerSeat"]::before')
+    && bundle.includes('inset: calc(-1 * var(--viewtune-trajectory-fade-lift)) 0 0 0 !important;')
+    && bundle.includes('background-color: var(--dsw-alias-bg-layer-1) !important;')],
   ['the skin has a settings row per dial', '"data-ud-check": `reader-settings-glass-${part.id}`'],
+  // The reader's settings are copied to the HOST, because the browser's own copy cannot survive a
+  // restart: the store persists to localStorage, which is keyed by ORIGIN, and this GUI is served on an
+  // ephemeral port — so every launch was a new origin with an empty store. Reported as "every time I
+  // quit DSH, all of viewtune's settings are reset". What is pinned here is the CLIENT's end of it: it
+  // reads the record at startup, writes it back when changes settle, and flushes on the way out (a
+  // reader who closes the tab inside the debounce window must not lose the change they just made). The
+  // host's end lives in `lib/dsh-viewtune.js` and is covered by tests/viewtune-settings.test.ts.
+  ['the settings have a copy on the host, which is the one that survives a restart', () =>
+    bundle.includes('"/better-display/settings"')
+    && bundle.includes('method: "PUT"')
+    && bundle.includes('"pagehide"')],
+  // …and the app-wide half of the backdrop is published by the PLUGIN, not by the reading view. A new
+  // session opens on the host's conversation view, where the reading view is not mounted, so everything
+  // that view used to publish — the wallpaper on `<html>`, the groove's dial — was missing until an
+  // older conversation was opened: reported as "a new session does not apply the saved settings". The
+  // effect is installed from `apply`, which is exactly what makes it independent of the view.
+  ['the backdrop is published for the whole app, not by the reading view alone', () =>
+    bundle.includes('"dsh-viewtune: app-wide backdrop"')],
+  // The skin's reach into the HOST's conversation page: an always-installed stylesheet (the elements are
+  // outside this view, so nothing scoped to the view could match) switched on by an attribute on `<html>`,
+  // exactly like the wallpaper's own gate. Three things are pinned: the attribute, the effect that installs
+  // it, and that the page reads only the two dials it has any business painting — code paper and the user's
+  // bubble. A third would be this plugin repainting something nobody asked it to.
+  ['the skin reaches the conversation page only while both switches say so', () =>
+    bundle.includes('"data-viewtune-conversation-glass"')
+    && bundle.includes('"dsh-viewtune: conversation glass"')
+    && bundle.includes('["--glass-code", "code"]')
+    && bundle.includes('["--glass-diff", "diff"]')
+    && bundle.includes('["--glass-user", "user"]')
+    && bundle.includes('[class*="_bubble"]')
+    // The page is dialled through the TOKENS the host's components paint from, not through a list of
+    // their hashed classes — a fence in a message is `.md-code-block`, a tool's result card is not, and
+    // the tool cards are most of what a conversation shows. A cycle is what a token cannot be dialled
+    // with, so the value is snapshotted on `body` first.
+    && bundle.includes('--viewtune-code-plate: var(--dsw-alias-markdown-code-block)')
+    && bundle.includes('--viewtune-inline-code: var(--dsw-alias-markdown-inline-code)')
+    // …and the scope excludes the READING view, which publishes the same `data-chat-flow` on purpose.
+    && bundle.includes('data-dsh-better-display] *)')
+    // The banner row is two plates: the token override reaches the banner itself, and the sticky wrap over
+    // it paints the theme's own background — not a code token — so it is cleared by the same first-child
+    // handle the reading view needed for the same primitive. The spaced spelling is the SOURCE text: the
+    // built reading-view CSS is minified, so this can only be the conversation module's own line.
+    && bundle.includes('.md-code-block > :first-child {')
+    // …and the diff paper keeps the DIFF dial, not the code one, in both views.
+    && bundle.includes('var(--viewtune-code-plate, transparent) var(--glass-diff')
+    // Both switches, in one expression: see conversationGlassOf.
+    &&/record\?\.glass === true && record\?\.glassConversation === true/.test(bundle)],
+  // The conversation page can also be asked to be a SOLID page — the trajectory view's own recipe applied
+  // to the view that has none: the theme's base colour, the gutter's wallpaper names withdrawn (the groove
+  // lives on that same scroller, so leaving them would paint a strip of photograph down a one-colour page),
+  // and our masked band lifted over the last rows above the composer. Its own switch, its own attribute:
+  // a reader can have the solid page, the skin, both, or neither.
+  ['the conversation page can be made a solid page of its own', () =>
+    bundle.includes('"data-viewtune-conversation-solid"')
+    && bundle.includes('"dsh-viewtune: conversation solid page"')
+    && bundle.includes('"reader-settings-conversation-solid"')
+    && bundle.includes('record?.conversationSolid === true')
+    && bundle.includes('--viewtune-conversation-fade-lift')],
+  // The wallpaper's scrim DIAL is a row of its own, not just a value behind one. It went missing from the
+  // panel once — state, props and hint all still there, `dimValue` computed and never rendered — and
+  // nothing noticed, because every marker about the wallpaper was about the wallpaper itself. A control a
+  // reader has already moved must not be able to vanish again without failing here.
+  ['the wallpaper scrim keeps its row', '"reader-settings-wallpaper-dim"'],
   // The 「回到最新」 pill floats over the transcript, so it rides the toolbar dial with the blur — but
   // it carries a floor the dial cannot go under. An affordance that can be dialled out of sight is a
   // trap, and this one appears only once the reader has scrolled away from the latest message, which
@@ -327,6 +851,22 @@ const forbidden = [
   // the animation property: lifting such a gate re-applies the animation, so turning 动效 on from
   // inside that very panel replayed its entrance as a flash.
   ['no state gate on the settings panel entrance', () => /\[data-motion=off\][^{]*_settingsPanel\{/.test(readerCss)],
+  // The browser must never learn where the wallpapers live. It asks for a NAME; the host half decides
+  // whether that name may be served, from a folder the client is never told. If the instance home
+  // ever appears in the client bundle, that boundary has leaked.
+  ['no wallpaper folder in the client bundle', 'DSH_HOME'],
+  // The window scope must never find the layout frame by its class SUFFIX. "…_frame" is not unique:
+  // the reading view's own turn rail container is a NAV whose class is `mgCddq_frame`, so a suffix
+  // selector painted a second copy of the backdrop plus a second scrim onto that 26px strip and made
+  // it read as a band of a different colour beside everything else. The frame is the element that owns
+  // the sidebar column — a fact about the tree, not a name — and that is the selector to keep.
+  ['no frame suffix selector in the window scope', '[class*="_frame"]'],
+  // The host's scrollbar thumb is not ours to restyle, and insetting it is a measured dead end. The
+  // track's inset shrinks the LANE only — the pill is the full thickness of the scrollbar whatever the
+  // track's margin is — so a thumb rule buys the lane nothing and is exactly what made a reader report
+  // that the scrollbar itself had got thinner. Its return is this mistake coming back.
+  ['no rule for the host scrollbar thumb',
+    () => /\[class\*="_scrollBody"\]::-webkit-scrollbar-thumb/.test(bundle)],
 ];
 
 let ok = true;

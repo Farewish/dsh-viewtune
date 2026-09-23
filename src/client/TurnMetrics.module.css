@@ -31,6 +31,28 @@
 }
 
 /*
+ * The counting pills under the frosted-glass skin, on their own dial.
+ *
+ * These two (「用量 … tok」 and 「… 个步骤」) already carry a plate in the base look, so — unlike the
+ * tool-state and count labels, which have none and are wired to nothing — they are a surface that can
+ * simply be let through. They get a dial of their own rather than riding 产物标签: those chips are
+ * per-turn deliverables, while these are the two counters a reader looks at on EVERY turn.
+ *
+ * The ancestor is matched by its plain attribute, because the root that carries it belongs to another
+ * module — the property itself is inherited from that root, which is why nothing has to be passed here.
+ * Hover and the active state move with the rest of the pill: one dial, both states.
+ */
+[data-reader-glass] .pillButton {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) var(--glass-pill, 20%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l1) var(--glass-pill, 20%), transparent);
+}
+
+[data-reader-glass] .pillButton:hover, [data-reader-glass] .pillButton[data-active=true] {
+  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover) var(--glass-pill, 20%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l2) var(--glass-pill, 20%), transparent);
+}
+
+/*
  * Visually hidden, still read. The muted markers say their reason in a `title`, and a title is not
  * a reliable accessible name — many screen readers ignore it entirely. The reason is therefore
  * carried as hidden text inside the marker, which becomes part of its accessible name. (Reader's

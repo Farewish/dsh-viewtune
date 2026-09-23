@@ -29,6 +29,11 @@ test('the properties the stylesheet reads are one per part, in percent', () => {
   assert.equal(style['--glass-lane'], '40%');
   assert.equal(style['--glass-chip'], '15%');
   assert.equal(style['--glass-card'], '0%');
+  // The counting pills got a dial of their own rather than riding 产物标签: they are the two counters a
+  // reader sees on EVERY turn, while the chips are one turn's deliverables. Checked by name because the
+  // stylesheet in TurnMetrics.module.css is what reads it, and that module is not this one.
+  assert.ok(isGlassPart('pill'));
+  assert.equal(style['--glass-pill'], '20%');
 });
 
 test('the part ids are the closed set the settings rows and the store agree on', () => {

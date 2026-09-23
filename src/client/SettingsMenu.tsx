@@ -6,6 +6,10 @@ import {
 } from './shortcuts.js';
 import type { ShortcutAction, ShortcutProblem } from './shortcuts.js';
 import { GLASS_PARTS } from './glass.js';
+import { COLLAPSE_MODES, collapseModeOf } from './collapse-mode.js';
+import type { CollapseMode } from './collapse-mode.js';
+import { WallpaperSection } from './WallpaperSection.js';
+import type { WallpaperScope } from './wallpaper-scope.js';
 import css from './Reader.module.css';
 
 /** The panel's pages, in the order they are offered. */
@@ -39,14 +43,18 @@ const MOTION_OVERRIDE = '已按系统的「减少动态效果」关闭';
  * so this one keeps the browser's own box rather than growing a second kind of hover language. */
 const BUTTON_HINT = 'viewtune 设置';
 /** What the frosted-glass skin does, as the row's `title` box. */
-const GLASS_HINT = '默认关闭。打开后卡片、工具框与代码块透出宿主壁纸与皮肤，吸顶栏用同一套液体玻璃；路径、行数这类标签静止时透明，悬停或聚焦才显出轮廓。';
+const GLASS_HINT = '默认关闭。打开后卡片、工具框与代码块透出宿主壁纸与皮肤，工具栏用同一套液体玻璃；路径、行数这类标签静止时透明，悬停或聚焦才显出轮廓。';
+/** What the skin's reach into the conversation view means, as that row's `title` box. */
+const GLASS_CONVERSATION_HINT = '默认关闭。打开后「对话」页里那些同样由本皮肤管的表面（代码块——含顶栏与行内代码、用户气泡）跟着上面这几个旋钮一起变；关闭时对话页保持原样。它只影响这一页，不影响宿主其它面板。';
+/** What the merged collapse button's mode means, as that row's `title` box. */
+const COLLAPSE_MODE_HINT = '工具栏左端只有一个控件的位置：正文宽度调到最大时，两个按钮里的第二个会跑出边界，而第一个已经外移到手感极限。所以收起与全部收起合并成一个按钮，这里决定它怎么表现——「二选一」保留两者的可达性（主按钮 + 箭头），两个单动作模式把它钉成一个动作；无论选哪个，另一个动作的键盘绑定都还在（它绑的是动作，不是这个按钮）。';
 /** Where a delivered file opens, as the row's `title` box. */
 const OPEN_MODE_HINT = '默认关闭：点产物文件用系统程序打开。打开后改用右侧栏的内置预览（文件夹、「在文件夹中显示」仍然走系统程序）；宿主没有这个服务时会自动回落到系统程序，并在控制台说明原因。';
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
  *
- * The toolbar is a pinned lane with a stated geometry — its clearance above and below 收起, its
+ * The toolbar is a lane with a stated geometry — its clearance above and below 收起, its
  * divider and the pill's outline are all asserted — and every control added to it takes horizontal
  * room away from 「收起」. So a setting is a ROW in here rather than another control up there, and a
  * new subject is a PAGE rather than a longer scroll.
@@ -80,7 +88,7 @@ const OPEN_MODE_HINT = '默认关闭：点产物文件用系统程序打开。�
  * tabs. A settings panel with two pages should not be the one place in this view where a keyboard
  * reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -89,6 +97,15 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** Whether the frosted-glass skin is on. */
   glass: boolean;
   onGlass: (next: boolean) => void;
+  /** Whether that skin also reaches the host's conversation view. */
+  glassConversation: boolean;
+  onGlassConversation: (next: boolean) => void;
+  /** Whether the conversation page is painted as a solid page of its own. */
+  conversationSolid: boolean;
+  onConversationSolid: (next: boolean) => void;
+  /** What the merged collapse button does. */
+  collapseMode: CollapseMode;
+  onCollapseMode: (next: CollapseMode) => void;
   /** The skin's opacities, every part already resolved against its initial by the caller. */
   glassParts: Readonly<Record<string, number>>;
   /** Move one surface's opacity. */
@@ -96,6 +113,18 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** Whether a delivered file opens in the right sidebar rather than the system app. */
   openInSidebar: boolean;
   onOpenInSidebar: (next: boolean) => void;
+  /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
+  wallpaper: string;
+  /** How far the wallpaper is mixed toward the theme's background. */
+  wallpaperDim: number;
+  onWallpaper: (name: string) => void;
+  onWallpaperDim: (value: number) => void;
+  /** Whether the wallpaper carries the whole window, or only the reading view. */
+  wallpaperScope: WallpaperScope;
+  /** How opaque the sidebar and the top bar stay while the window scope is on. */
+  wallpaperChrome: number;
+  onWallpaperScope: (scope: WallpaperScope) => void;
+  onWallpaperChrome: (value: number) => void;
   /** The bindings in force, defaults already resolved by the caller. */
   shortcuts: Readonly<Record<ShortcutAction, string>>;
   /** Record a new binding, or clear one with an empty string. */
@@ -192,7 +221,7 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
           id={`${panelId}-${id}`} aria-selected={page === id} aria-controls={`${panelId}-page`} tabIndex={page === id ? 0 : -1}
           className={css.settingsTab} onClick={() => { stopRecording(); setPage(id); }}>{title}</button>)}
       </div>
-      <div id={`${panelId}-page`} role="tabpanel" aria-labelledby={`${panelId}-${page}`}>
+      <div id={`${panelId}-page`} role="tabpanel" aria-labelledby={`${panelId}-${page}`} className={css.settingsBody}>
         {page === 'visual'
           ? <>
             <div className={css.settingsRow} title={overridden ? undefined : MOTION_HINT}>
@@ -212,6 +241,18 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                   has nothing to report and no state line — the description is the row's `title`. */}
               <Switch checked={glass} onChange={onGlass} label="磨砂玻璃" />
             </div>
+            {/* Where the skin REACHES, before how much it paints: the reading view is this plugin's own
+                surface, the conversation page is the host's. Shown only while the skin is on, like the
+                dials below — with the skin off there is nothing for it to decide. */}
+            {glass && (
+              <div className={`${css.settingsRow} ${css.settingsSubRow}`} title={GLASS_CONVERSATION_HINT}
+                data-ud-check="reader-settings-glass-conversation">
+                <span className={css.settingsCopy}>
+                  <span className={css.settingsLabel}>为对话页启用</span>
+                </span>
+                <Switch checked={glassConversation} onChange={onGlassConversation} label="为对话页启用" />
+              </div>
+            )}
             {/* The skin's own dials, shown only while it is on: a surface's opacity means nothing
                 with the skin off, and six dead rows would push everything below the fold. Each dial
                 is one custom property on the root (see glass.ts), so the stylesheet stays
@@ -239,8 +280,28 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
               </span>
               <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
             </div>
+            {/* The wallpaper: the folder's own images, then the scrim that keeps prose readable on
+                one. It reads its list from the host half, so the row owns that fetch rather than
+                taking a list through props nobody else needs. */}
+            <WallpaperSection name={wallpaper} dim={wallpaperDim} onPick={onWallpaper} onDim={onWallpaperDim}
+              scope={wallpaperScope} chrome={wallpaperChrome} onScope={onWallpaperScope} onChrome={onWallpaperChrome}
+              solid={conversationSolid} onSolid={onConversationSolid} />
           </>
-          : <div className={css.settingsShortcuts} data-ud-check="reader-settings-shortcuts">
+          : <>
+            {/* The collapse button's mode lives on the SHORTCUTS page rather than with the visual settings:
+                it is about the control, and its two actions are the two bindings right below it. A native
+                select because the choice is three named states, not a degree — and the one control here that
+                is not a switch or a dial. */}
+            <div className={css.settingsRow} title={COLLAPSE_MODE_HINT} data-ud-check="reader-settings-collapse-mode">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>收起按钮</span>
+              </span>
+              <select className={css.settingsSelect} value={collapseMode} aria-label="收起按钮的行为"
+                onChange={event => { onCollapseMode(collapseModeOf(event.currentTarget.value)); }}>
+                {COLLAPSE_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
+            </div>
+            <div className={css.settingsShortcuts} data-ud-check="reader-settings-shortcuts">
             {SHORTCUT_ROWS.map(({ action, label, note, other }) => {
               const binding = shortcuts[action] ?? '';
               const refusal = problem?.action === action ? problem.code : null;
@@ -267,7 +328,8 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 </span>
               </div>;
             })}
-          </div>}
+          </div>
+          </>}
       </div>
     </div>}
   </div>;

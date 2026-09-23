@@ -45,11 +45,12 @@ function assert(label, pass, detail = '') {
   console.log(`${pass ? 'ok  ' : 'MISS'} ${label}${pass || detail === '' ? '' : ` — ${detail}`}`);
 }
 
-console.log('--- lane shape: toolbar pins, nothing else does');
-here('toolbar is a sticky lane', '.toolbar { position: sticky; top: 0; z-index: 9; background: var(--dsw-alias-bg-base); }', 'css');
+console.log('--- lane shape: the toolbar pins under the top bar, and spans the view');
+here('toolbar pins under the top bar', 'position: sticky; top: 0;', 'css');
+here('toolbar spans the view', 'margin-inline: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw);', 'css');
 assert(
   'bundle serves the same rule',
-  hasDecls(bundleCss, classSel(bundleCss, 'toolbar'), ['position:sticky', 'top:0', 'z-index:9', 'background:var(--dsw-alias-bg-base)']),
+  hasDecls(bundleCss, classSel(bundleCss, 'toolbar'), ['position:sticky', 'top:0', 'background:var(--dsw-alias-bg-base)', 'min-height:42px']),
   JSON.stringify([...ruleDecls(bundleCss, classSel(bundleCss, 'toolbar'))]),
 );
 assert(
@@ -69,7 +70,10 @@ console.log(`ok   pre-existing sticky kept: .jumpDock ${text.css.includes('.jump
 if (!text.css.includes('.jumpDock { position: sticky')) bad++;
 
 console.log('\n--- collapse control intact');
-here('control markup', '"data-reader-collapse": currentTurnOpen ? "open" : "idle"', 'bundle');
+here('control markup', '"data-reader-collapse": on ? "open" : "idle"', 'bundle');
+// The merged control also states WHICH action it is, on its own attribute: the animation reads the values
+// above, so the action must not be smuggled into them.
+here('control action', '"data-reader-collapse-action": primary', 'bundle');
 here('control folds the turn in view', 'for (const key of openTurnKeys) props.actions.setExpanded(key, false);', 'bundle');
 here('control is scoped to one turn', 'if (group.turn === null || group.turn !== currentTurn) continue;', 'bundle');
 assert('control styles', hasDecls(bundleCss, COLLAPSE, ['display:inline-flex']));

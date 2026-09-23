@@ -3,27 +3,62 @@
   font-family: inherit;
   font-size: 16px;
   line-height: 28px;
-  padding: 16px calc(var(--dsh-composer-side-clearance, 16px) + 16px) 24px;
+  /* Stated once because the toolbar cancels both: the inline pad to reach the view's edges, and the
+     top pad so the pinned lane sits FLUSH under the shell's header at scroll-top — a sticky element
+     rests at its natural position until the scroll carries it past its offset, so that padding used to
+     show up as a gap until the reader had scrolled exactly that far. */
+  --reader-top-pad: 16px;
+  --reader-inline-pad: calc(var(--dsh-composer-side-clearance, 16px) + 16px);
+  /* Each end's own outward distance from the reading column's edge — one control's width to begin with
+     (the 收起 pill ≈73px: label + gap + chevron + padding + border; the viewtune button ≈68px: the
+     label at 13px + the gear), plus the reader's nudges. Two variables because the two CONTROLS are
+     tuned independently; both ends start from the same one-control width. */
+  --reader-toolbar-shift-left: 79px;
+  /* The viewtune button does NOT get a shift of its own any more: it is pinned to the LANE's right end,
+     `--reader-toolbar-gap-right` short of it, and the padding below is that gap. The reader asked for
+     exactly that ("its right end fixed 1px before the toolbar's right end") after the outward shift had
+     been pushed as far as it went; the knob stays a variable so the last pixel is tunable without
+     touching any of the arithmetic the lane's own end uses. */
+  --reader-toolbar-gap-right: 1px;
+  /* The LANE's right end — not a control. The whole strip, divider included, stops this much further
+     in, while the right padding below hands the same amount back, so the viewtune button does not move
+     with it. Separate from the shifts above because they move a button and this moves the edge.
+     It is 2px to MATCH the 2px the scroll container leaves on the OUTER side of the scroll column, so
+     the groove sits in an equal gutter on both sides — measured: the inside band shows the scroller's
+     own backdrop and the outside one the same shade, so the two read as one margin. It went to 0 for a
+     while, back when the host's track inset (2px, vertical only — see scrollbar.ts) had already pulled
+     the groove away from the top bar: with that inset gone, the plate and the groove want their 2px. */
+  --reader-toolbar-end-right: 2px;
+  padding: var(--reader-top-pad) var(--reader-inline-pad) 24px;
   min-width: 0;
   flex: 0 0 auto;
   overflow-anchor: auto;
   container-type: inline-size;
 }
 .column { max-width: var(--dsh-chat-content-width, 748px); width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
-/* The lane's height is stated outright, and `align-items: center` is what centres both
-   switches in it — so the 收起 pill keeps real clearance above and below instead of the
-   container and the pill having to agree by coincidence. The padding is only a floor for
-   that height. The divider matches how the shell draws its own lines (.5px solid, tier l2);
-   1px solid l1 was both the faintest tier and heavier than the app's dividers. */
-.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 4px 0; border-bottom: .5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
-
-/* The toolbar is the one lane that pins: it carries 「收起」 and the settings button, so it has
-   to stay reachable while the transcript scrolls under it. The background is what keeps
-   the text from showing through. A turn's process status row deliberately does NOT pin —
-   its offset above would need the toolbar's measured height, and the lane itself read as
-   a second overlay over the content. No ancestor needs unclipping for this to work:
-   .root declares overflow-anchor (not a clipping box) and .jumpDock already sticks. */
-.toolbar { position: sticky; top: 0; z-index: 9; background: var(--dsw-alias-bg-base); }
+/* The lane states its height and its divider, it PINS, and it SPANS THE VIEW.
+   Pinning: it sticks to the top of the reading scrollport, which is directly under the shell's header
+   — the reader's "fixed under the top bar", i.e. part of the outer band rather than something that
+   floats over the conversation. (An intermediate version read "no need to pin" as "let it scroll
+   away"; that is not what was asked, and it is not what this does.)
+   Flush: it also cancels the view's top padding, so at scroll-top it sits against the header rather
+   than one padding below it — the gap the reader reported as "it stops being glued to the top bar".
+   Spanning: it cancels both the reading column's centring offset and the view's own inline padding,
+   then adds the same amount back as its own padding, so the divider runs edge to edge like the
+   shell's header rule while 收起 and the gear stay exactly where the text starts. The escape is
+   expressed in `cqw` because `.root` is the query container: `50%` is half the reading column and
+   `50cqw` half the view's content box, so their difference IS the centring offset, whatever the two
+   widths happen to be.
+   Ends: both controls then move OUTWARD from the reading column's edges by about one control's own
+   width (`--reader-toolbar-shift`) — the 收起 pill's left edge roughly where its right edge was, and
+   the viewtune button's right edge roughly where its left edge was. The divider is unaffected: it is
+   set by the margins, not by the padding.
+   Its z-index is a STACKING CONTEXT, which is why it is 11 rather than a number of its own choosing:
+   everything inside the lane — the 收起 pill, the gear, and the settings panel that hangs off it — is
+   painted as one item at this value. The turn rail's slot sits at 10, so at the 9 this lane used to
+   carry, the whole lane (panel included) painted UNDER the rail, and the panel's own z-index could not
+   lift it: that only orders it inside this context. A guard compares the two numbers. */
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 4px var(--reader-inline-pad); border-bottom: .5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; background: var(--dsw-alias-bg-base); position: sticky; top: 0; z-index: 11; margin-top: calc(-1 * var(--reader-top-pad)); margin-inline: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw); padding-left: max(0px, calc(var(--reader-inline-pad) + 50cqw - 50% - var(--reader-toolbar-shift-left)));  padding-right: var(--reader-toolbar-gap-right, 1px); margin-right: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw + var(--reader-toolbar-end-right)); }
 .textButton, .historyButton, .iconButton, .jump, .disclosureButton, .imageOpen, .dialogClose { font: inherit; cursor: pointer; }
 .textButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
 .textButton:hover, .iconButton:hover, .disclosureButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
@@ -389,18 +424,32 @@
 [data-motion=off] .chevron, [data-motion=off] .imageOpen img, [data-motion=off] .processMeta { transition: none; }
 @media (prefers-reduced-motion: reduce) { .chevron, .imageOpen img, .processMeta { transition: none; } }
 @media (pointer: coarse) { .disclosureButton { min-height: 44px; } }
-@media (max-width: 600px) { .root { padding-inline: 20px; } .column { gap: 18px; } .toolbar { font-size: 11px; } .user { max-width: 90%; } }
+@media (max-width: 600px) { .root { --reader-inline-pad: 20px; } .column { gap: 18px; } .toolbar { font-size: 11px; } .user { max-width: 90%; } }
 
 /* A "conversation" is one turn (question + answer), so the control is offered only while the
-   turn the reader is looking at has an open process: it stays in the pinned toolbar and fades
+   turn the reader is looking at has an open process: it stays in the toolbar and fades
    down into view, then fades up again once that turn is folded. Both halves are pure CSS on
    the same node, so they run even with the motion switch off — only the decorative transform
    is dropped there. */
 .collapseWrap { display: flex; align-items: center; gap: 6px; }
+/* The collapse control: ONE pill, two actions, and an interior that never changes size.
+   Why one control: the reading column's left edge is at most a control's width from the window edge, so
+   when the column is at its widest there is room for one — the second button used to run over the prose.
+   Why the interior is fixed: the reader asked for a button that does not change length when the actions
+   available change, because that is exactly when they are reading.
+   Why 12px: the same type as the 「回到最新」 pill, so the lane has ONE small size instead of two — and it
+   is what makes four glyphs fit where two used to. The choreography below is the arithmetic working out:
+   in 「全部收起」 the chevron fades away to free its slot for the fourth glyph, and in the split state the
+   label slides left to free the right end for the appendage. */
+.collapseGroup { position: relative; display: inline-flex; align-items: center; }
 /* The fill is the token the shell uses for resting fills (interactive-bg-hover), so hover
    has to step up to its solid sibling — otherwise the fill would erase the hover state. */
-.collapseControl { display: inline-flex; align-items: center; gap: 5px; padding: 5px 14px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font: inherit; font-size: 14px; line-height: 22px; cursor: pointer; }
-.collapseControl:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover-solid); }
+.collapseControl { position: relative; display: inline-flex; align-items: center; padding: 5px 7px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; line-height: 20px; cursor: pointer; }
+/* Hover highlights the TEXT and nothing else. It used to step the fill up to the solid sibling of the resting
+   token, which was the only way to show a hover at all while the resting fill IS `interactive-bg-hover`; the
+   reader asked for the other behaviour ("只需要字高亮即可，填充色不变"), so the fill stays exactly as it rests and
+   the label alone answers the pointer. The appendage beside it has no fill of its own and already worked this way. */
+.collapseControl:hover { color: var(--dsw-alias-label-primary); }
 /* While idle the control is `hidden`, which drops it from the accessibility tree and blocks
    focusing. `display` has to be forced on that rule, because the browser's own
    `[hidden] { display: none }` would otherwise leave the exit animation with nothing to run
@@ -420,34 +469,127 @@
 [data-motion=off] .collapseControl[data-reader-collapse=open] { animation: readerCollapseIn 0s ease-out; }
 [data-motion=off] .collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 0s ease-in both; transition: none; }
 @media (prefers-reduced-motion: reduce) { .collapseControl[data-reader-collapse=open] { animation: none; } }
-/* 「全部收起」: the same frame and the same enter/exit as 「收起」, one step quieter. It keeps the
-   text button's own type (no font-size here on purpose — it sits on `.textButton`, so the size is
-   whatever that rule and the toolbar hand down) and gets no fill at all: no resting fill, and the
-   hover cannot inherit `.textButton:hover`'s fill either, or the two controls would stop reading
-   as primary and secondary. The frame is what makes it look like a sibling rather than loose text.
-   Its own animation name is used as the state hook because the attribute differs
-   (`data-reader-collapse-all`), while the keyframes are shared. */
-.collapseAll { display: inline-flex; align-items: center; padding: 5px 14px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 999px; background: transparent; color: var(--dsw-alias-label-tertiary); }
-.collapseAll:hover { color: var(--dsw-alias-label-primary); background: transparent; border-color: var(--dsw-alias-border-l3); }
-.collapseAll[hidden] { display: inline-flex; }
-.collapseAll[data-reader-collapse-all=open] { animation: readerCollapseIn 180ms ease-out; }
-.collapseAll[data-reader-collapse-all=idle] { animation: readerCollapseOut 140ms ease-in both; pointer-events: none; visibility: hidden; transition: visibility 0s linear 140ms; }
-/* Same contract as 「收起」 above: the switch governs both halves, by duration rather than removal. */
-[data-motion=off] .collapseAll[data-reader-collapse-all=open] { animation: readerCollapseIn 0s ease-out; }
-[data-motion=off] .collapseAll[data-reader-collapse-all=idle] { animation: readerCollapseOut 0s ease-in both; transition: none; }
-@media (prefers-reduced-motion: reduce) { .collapseAll[data-reader-collapse-all=open] { animation: none; } }
+/* The stage: a FIXED interior — the two label slots plus the chevron's 8px, so 56px at 12px — with three
+   segments floating on it. Fixed because the pill's width is the sum of this and its padding, so scaling the
+   type scales the control and nothing else can move it. The slots are the layout, not the states: 全部 at
+   0..2em, 收起 at 2..4em, the chevron after it — and each state merely TRANSLATES what it shows into place,
+   which is why the label can grow to four glyphs without the box growing with it.
+   The chevron's slot is 8px rather than .6em (7.2px) ON PURPOSE: every offset below then lands on a whole
+   pixel. A fractional translate leaves CJK glyphs on a half pixel, which reads as blur — and the centring
+   correction in 「全部收起」 is exactly half this slot, so it has to be even to stay whole. */
+.collapseStage { position: relative; display: inline-block; width: calc(4em + 8px); height: 20px; }
+.collapseStage > span { position: absolute; top: 0; bottom: 0; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; transition: opacity var(--reader-collapse-anim, 240ms) ease, transform var(--reader-collapse-anim, 240ms) ease; }
+/* State 收起 ˄ (the resting shape, and therefore the base): both segments sit 1em left of their slots, which
+   centres the pair over the whole stage; 全部 waits off to the left, invisible. */
+/* 全部 is not an independent segment: it is the LEFT HALF OF A RIGID PAIR with 收起, so its transform is the SAME
+   as 收起's in every state. The slots already differ by exactly 2em — 全部's own width — so identical transforms
+   keep the two glyph-pairs permanently adjacent and the whole 48px label slides as one block. That is what the
+   reader asked for after watching it move word by word ("我更想让全部和收起并排移动"), and it is also what makes
+   the crossing structurally impossible: there is nothing to cross. The earlier versions gave 全部 a timing of its
+   own — a delayed fade, then `ease-in`, then a longer slide — and every one of them was a way of dodging an
+   overlap that only existed BECAUSE the two moved independently. With them locked together, the fade is free to
+   be quick (`--reader-collapse-word-fade`).
+   The base rule is state 收起 ˄ (and the "leaving" half: a short fade-out, so 全部 is gone before 收起 slides in). */
+.collapseAllWord { left: 0; width: 2em; opacity: 0; transform: translateX(-1em); transition: opacity 80ms linear, transform var(--reader-collapse-anim, 240ms) ease; }
+.collapseKeeping { left: 2em; width: 2em; transform: translateX(-1em); }
+.collapseOneChevron { left: 4em; width: 8px; transform: translateX(-1em); }
+/* State 全部收起: the chevron fades out to the RIGHT and the label slides back to its slot, while 全部 fades
+   in from the left — the reader's own choreography, and also the only way four glyphs fit. Both segments then
+   carry the chevron's empty slot's half (4px) so the four glyphs are centred rather than 4px left of centre;
+   the reader asked for exactly that, and 4px is why the slot above is a whole number of pixels. */
+.collapseGroup[data-reader-collapse-action=all] .collapseAllWord { opacity: 1; transform: translateX(4px); transition: opacity var(--reader-collapse-word-fade, 160ms) ease var(--reader-collapse-more-exit, 120ms), transform var(--reader-collapse-anim, 240ms) ease var(--reader-collapse-more-exit, 120ms); }
+/* 收起 and its chevron wait for the appendage's exit before sliding: their arrival rules live beside the exit
+   they wait on (see `--reader-collapse-more-exit`), which is why they are not here. */
+/* State 收起 ˄ + appendage: the label and the chevron slide left BY the appendage's width, and then back
+   right by `--reader-collapse-split-shift`. That variable is the knob the reader was offered, and it carries
+   BOTH answers: 2px is the geometric centre of the 36px left half (2px of margin on each side), and 5px is
+   the OPTICAL value they picked, moving right until the label reads as centred next to the rounded end.
+   It must stay a whole pixel — a fractional translate leaves CJK glyphs on a half pixel and reads as blur —
+   and it is BOUNDED: the left half is 36px and 收起 ˄ is 32px, so 4px is the last shift that keeps the content
+   box inside it. At 5px the box ends 1px past the divider; the chevron's ink is inset inside its 8px slot, so
+   it still clears the line. Wanting more than that is a request for a WIDER left half — a narrower chevron
+   slot or a narrower appendage — not for a bigger shift. */
+.collapseGroup[data-reader-collapse-split=true] .collapseKeeping { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 5px))); }
+.collapseGroup[data-reader-collapse-split=true] .collapseOneChevron { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 5px))); }
+/* …and 全部 rides the SAME transform here, because the pair is rigid: it is 收起's left neighbour at every instant,
+   in this state too. (Its own rule is only about opacity in the states where it appears.) */
+.collapseGroup[data-reader-collapse-split=true] .collapseAllWord { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 5px))); }
+/* The appendage: a DIRECT action, not a menu, laid OVER the right end of the stage so the pill stays one
+   width. Its divider is a pseudo-element rather than a border, because a border cannot fade in place and the
+   reader asked for the line to appear where it is.
+   Its width is 20px rather than 1.7em (20.4px) so that the left half it leaves behind is a whole number of
+   pixels too — which is what lets the centring shift above be 2px instead of 1.8px.
+   It carries NO opacity of its own, and that is load-bearing: the box is transparent, so the only things that
+   can be seen inside it are the divider and the stack, each of which fades on its own schedule. Fading the box
+   as well (as it first did) took the stack with it and made it vanish outright instead of rising — the reader
+   reported exactly that.
+   The two directions mirror each other, and both use the same two numbers: the half leaves in
+   `--reader-collapse-more-exit` (120ms) the moment the split ends, and it arrives in that same 120ms AFTER the
+   label's own `--reader-collapse-anim` (240ms) has played. So the order is right-half-then-label going out and
+   label-then-right-half coming in, which is what the reader asked for. */
+.collapseMore { position: absolute; right: 0; top: 0; bottom: 0; width: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; cursor: pointer; }
+.collapseMore::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: .5px; background: var(--dsw-alias-border-l2); opacity: 0; transition: opacity var(--reader-collapse-more-exit, 120ms) ease; }
+.collapseMore:hover { color: var(--dsw-alias-label-primary); }
+.collapseGroup[data-reader-collapse-split=true] .collapseMore::before { opacity: 1; transition: opacity var(--reader-collapse-more-exit, 120ms) ease var(--reader-collapse-anim, 240ms); }
+/* …and it keeps its place when there is only one action to take: with the pill's width fixed, the appendage's
+   arrival is a fade rather than a reflow.
+   `visibility` is DELAYED, not immediate, and that is load-bearing: hiding the box the moment the split ends took
+   the divider and the stack with it, so the stack's upward exit had nothing left to play on and the reader saw
+   it vanish outright. Same contract as the pill's own exit — a 0s transition with a delay, long enough for the
+   exit above to finish — and the outgoing half stops taking clicks at once. */
+.collapseMore[data-reader-collapse-more-active=false] { visibility: hidden; pointer-events: none; transition: visibility 0s linear var(--reader-collapse-more-exit, 120ms); }
+.collapseMore[data-reader-collapse-more-active=true] { visibility: visible; transition: visibility 0s; }
+/* Two chevrons share ONE fixed box: stacked, so the second costs height and never width.
+   The two directions share their two numbers but not their paths: LEAVING the split, the stack goes UP and out
+   (`readerChevronsOut`) in `--reader-collapse-more-exit` — 120ms, starting the moment the split ends. ARRIVING,
+   it rises from below over that same 120ms, delayed by the label's own `--reader-collapse-anim` (240ms), so the
+   order is right-half-then-label going out and label-then-right-half coming in — the reader asked for exactly
+   that sequence, with the entry still coming up from underneath.
+   The exit animation deliberately has NO fill-forward: it ends at `-.5em` (up) and the element is invisible by
+   then, so letting the property fall back to the resting `+.35em` below is free — and it is what lets the NEXT
+   entry start from below instead of from wherever the exit stopped.
+   Its own X shift is one whole-pixel number, like the left half's. */
+.collapseChevrons { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 10px; font-size: 13px; line-height: .58; opacity: 0; transform: translate(var(--reader-collapse-more-shift, -1px), .35em); transition: opacity var(--reader-collapse-anim, 240ms) ease, transform var(--reader-collapse-anim, 240ms) ease; animation: readerChevronsOut var(--reader-collapse-more-exit, 120ms) ease-out; }
+.collapseGroup[data-reader-collapse-split=true] .collapseChevrons { opacity: 1; transform: translate(var(--reader-collapse-more-shift, -1px), 0); animation: none; transition: opacity var(--reader-collapse-more-exit, 120ms) ease var(--reader-collapse-anim, 240ms), transform var(--reader-collapse-more-exit, 120ms) ease var(--reader-collapse-anim, 240ms); }
+/* The half the label waits for: same duration as the exit above, so "the right half goes first" is one number. */
+.collapseGroup[data-reader-collapse-action=all] .collapseKeeping { transform: translateX(4px); transition-delay: 0s, var(--reader-collapse-more-exit, 120ms); }
+.collapseGroup[data-reader-collapse-action=all] .collapseOneChevron { opacity: 0; transform: translateX(4px); transition-delay: 0s, var(--reader-collapse-more-exit, 120ms); }
+@keyframes readerChevronsOut { from { opacity: 1; transform: translate(var(--reader-collapse-more-shift, -1px), 0); } to { opacity: 0; transform: translate(var(--reader-collapse-more-shift, -1px), -.5em); } }
+/* The choreography above is decoration, so the motion switch ends it — unlike the pill's own enter/exit,
+   which is the control arriving and leaving and therefore runs either way. */
+[data-motion=off] .collapseStage > span,
+[data-motion=off] .collapseMore,
+[data-motion=off] .collapseMore::before,
+[data-motion=off] .collapseChevrons { transition: none; animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .collapseStage > span, .collapseMore, .collapseMore::before, .collapseChevrons { transition: none; animation: none; }
+}
 @keyframes readerCollapseIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes readerCollapseOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px); } }
 
-/* The settings lane: one button in the pinned toolbar, a small popover under it. Every preference
+/* The settings lane: one button in the toolbar, a small popover under it. Every preference
    is a row in there rather than another control in the lane, so the toolbar keeps the geometry
    test-toolbar-geometry.mjs asserts. The panel is a plain disclosure — no backdrop, nothing
    trapped — because the document behind it stays readable while it is open. */
 .settingsWrap { position: relative; display: flex; align-items: center; }
 .settingsButton { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
-/* Anchored to the wrap rather than to the toolbar: the lane wears no inline padding (asserted), so
-   `right: 0` lines the panel up with the button's own right edge. */
-.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 280px; max-height: min(70vh, 520px); overflow-y: auto; display: flex; flex-direction: column; padding: 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
+/* Anchored to the wrap rather than to the toolbar: the lane's own padding is the full-bleed escape (asserted), so
+   `right: 0` lines the panel up with the button's own right edge.
+   `overscroll-behavior: contain` keeps the WHEEL to the panel. Without it the gesture chains to the reading
+   scroller the moment the panel reaches its end — the reader reported exactly that ("滚轮接力") — and the same
+   guard is already on the diff area, the timeline rail and the Markdown tables; this panel was the one scroll
+   container that had been missed. The composer needed a different answer: the element that scrolls it is
+   `.uV2eYG_scroll`, a hashed class name with no "composer" in it, so nothing can name it from CSS — its guard is a
+   wheel listener instead (`composer-wheel.ts`). */
+.settingsPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 280px; max-height: min(70vh, 520px); overflow: hidden; overscroll-behavior: contain; display: flex; flex-direction: column; padding: 0; border: .5px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-base); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
+/* The page bodies scroll, the panel does NOT: the tabs stay where they are while a page moves under them, and the
+   scrollbar belongs to this box, so its track starts BELOW the tabs instead of running up past them (reported).
+   `min-height: 0` is what lets a flex child actually shrink far enough to scroll. */
+.settingsBody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 6px; }
+/* Its slot is a short strip too, so it gets the same rounded ends the composer's has (see scrollbar.ts): a square end
+   beside the host's pill-shaped thumb reads as a different widget. The painted groove itself is already on this track
+   — that rule is global — so only the radius is stated here. */
+.settingsBody::-webkit-scrollbar-track { border-radius: 999px !important; }
 /* The entrance lives on its own class, applied only for an opening that should animate
    (SettingsMenu decides). It must NOT be gated by `[data-motion=off]`: lifting such a gate
    re-applies the animation, so turning 动效 on from inside this panel replayed its entrance. */
@@ -470,7 +612,7 @@
    what makes switching pages read as one gesture. The tabs are equal width by construction
    (`flex: 1`), so the geometry needs no measurement: the bar is one tab wide, and the extra 2px in
    the second stop is the row's own gap. */
-.settingsTabs { position: relative; display: flex; gap: 2px; padding: 0; margin-bottom: 6px; border-bottom: .5px solid var(--dsw-alias-border-l1); }
+.settingsTabs { position: relative; flex: none; display: flex; gap: 2px; padding: 6px 6px 0; margin-bottom: 6px; border-bottom: .5px solid var(--dsw-alias-border-l1); }
 .settingsTabs::after { content: ""; position: absolute; left: 0; bottom: -1px; width: calc((100% - 2px) / 2); height: 2px; border-radius: 2px; background: var(--dsw-alias-state-business-primary); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
 .settingsTabs[data-settings-page=shortcuts]::after { transform: translateX(calc(100% + 2px)); }
 .settingsTab { flex: 1; padding: 5px 8px 11px; border: 0; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; transition: color 160ms ease; }
@@ -557,11 +699,66 @@
 .root[data-reader-glass] .imageDialog {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
 }
+/* The tool cards' own payload boxes — the 「输入」/「结构」/「原始数据」 panes under Edit, Pwsh, Search and Read — are
+   OUR markup (`ToolActivity` renders them with this class), and they were the one code-shaped surface the skin never
+   reached: opaque `bg-module-platform` in the base look, no glass rule anywhere. They ride the CODE dial rather than
+   the card one, because they are code plates like the fenced blocks below, and the reader's mental model is exactly
+   that ("代码框"). */
+/* The host's PRIMITIVE blocks — ReadBlock, TerminalBlock, SearchBlock, DiffBlock and WebBlock, which is what the
+   「结构」/「Pwsh」/Edit's 「输入」 panes actually are — are hashed classes we cannot name, and all five paint the same
+   two tokens: `--dsw-alias-markdown-code-block` for the plate and `…-banner` for the header row. So the dial is
+   applied to the TOKENS, scoped to this view's root: that is the same technique the conversation page uses on its own
+   column, and it is why `:global(.md-code-block)` alone left these boxes opaque — that rule reaches the host's
+   MARKDOWN blocks only. */
+.root[data-reader-glass] {
+  --dsw-alias-markdown-code-block: color-mix(in srgb, var(--viewtune-code-plate, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent);
+  --dsw-alias-markdown-code-block-banner: color-mix(in srgb, var(--viewtune-code-banner, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent);
+}
+/* …and the JSON pane (JsonTree, which is what a tool's 「工具输入」 is) paints the LAYER colour rather than a code
+   token. That one is a core theme token, so it cannot be redefined at the root: it is scoped to the two containers
+   the tool content lives in, where the only layer-coloured surface is the pane itself. */
+:global(body) { --viewtune-layer-plate: var(--dsw-alias-bg-layer-1); }
+.root[data-reader-glass] .toolDetails,
+.root[data-reader-glass] .toolPanel {
+  --dsw-alias-bg-layer-1: color-mix(in srgb, var(--viewtune-layer-plate, rgba(127,127,127,.1)) var(--glass-code, 25%), transparent);
+}
+.root[data-reader-glass] .toolRaw {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-code, 25%), transparent);
+}
 .root[data-reader-glass] :global(.md-code-block) {
   background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent) !important;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+/* The block's header row is TWO plates, not one, and both are opaque in the base look: an outer sticky
+   `.bannerWrap` strip painted with the theme's own background, and the `.banner` inside it, painted
+   from `--dsl-code-block-banner-background-color`. An earlier cut of this painted only the outer one —
+   which changed nothing a reader could see, because the banner still covered it. So the wrap goes
+   transparent, and the BANNER's own token is re-stated through the code dial: the second rule is on the
+   variable the banner reads, not on a selector for the bar, which is what makes it reach it at all. */
+.root[data-reader-glass] :global(.md-code-block) > :first-child {
+  background-color: transparent;
+}
+.root[data-reader-glass] :global(.md-code-block) {
+  --dsl-code-block-banner-background-color: color-mix(in srgb, var(--dsw-alias-markdown-code-block-banner, rgba(0,0,0,.04)) var(--glass-code, 25%), transparent);
+}
+/* …and the plate INSIDE the block. The block paints one plate, but its body element paints another of
+   its own — `background: var(--dsl-code-block-background)`, and `.shiki` with `!important` — so a fence
+   with no language (whose body IS that `<pre>`) stayed a solid slab with the dialled outer plate sitting
+   behind it, invisible. Two plates on ONE dial would also double the tint, so the inner one is simply
+   cleared: the block's own plate is the one the reader dials. */
+.root[data-reader-glass] :global(.md-code-block) :global(pre) {
+  background: transparent !important;
+}
+/* The JSON record cards (see JsonRecord in Reader.tsx). The card is the host primitive's and its plates
+   wear that package's hashed names, so our WRAPPER is what is selected on, and every plate inside it is
+   the card's. It rides 卡片与面板 rather than 代码块: it is a card whose body happens to be JSON. */
+.root[data-reader-glass] .jsonCard :global(button) {
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
+}
+.root[data-reader-glass] .jsonCard :global(pre) {
+  background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-card, 0%), transparent);
 }
 /* A diff block is the diff's own paper wherever it is drawn, so it follows the DIFF dial rather
    than the code one. It shows up twice: inside the panel, where the scroll area strips its plate to
@@ -608,4 +805,64 @@
   background: var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1));
   border-color: var(--dsw-alias-border-l2, rgba(127,127,127,.28));
 }
+/* The wallpaper, painted on the reading view's own root so it sits behind the transcript.
+   Two layers, in this order: a scrim mixed toward the THEME's own background (so it darkens a dark
+   theme and lightens a light one, exactly like the glass skin's `color-mix` idiom), then the image
+   the reader chose. The attachment is `fixed` — a conversation is far taller than the viewport, and
+   `cover` against that box would stretch one photograph over its whole height; anchoring both layers
+   to the viewport is what makes it a backdrop rather than a very tall, very blurry picture.
+   The image variable is only ever set by `wallpaperProperties` (see wallpaper.ts), which
+   percent-encodes the name, so the `url("…")` cannot be broken out of from a file name. */
+.root[data-reader-wallpaper] {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--dsw-alias-bg-base, #000) var(--wallpaper-dim, 45%), transparent),
+                    color-mix(in srgb, var(--dsw-alias-bg-base, #000) var(--wallpaper-dim, 45%), transparent)),
+    var(--wallpaper-image);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  /* Per layer: the scrim always covers its element, while the image takes the size and place the
+     reading view MEASURED (see `wallpaperGeometry`). This copy and the host column's own copies have
+     to read the same conversion or they stop being one picture — and in view scope that conversion is
+     "fit the reading page, min ratio, never enlarged", which is only expressible in viewport
+     coordinates. The fallbacks are what window scope wants and what a missing measurement gets. */
+  background-size: cover, var(--viewtune-wallpaper-size, cover);
+  background-position: center, var(--viewtune-wallpaper-position, center);
+}
+
+/* The wallpaper row's own controls: the three verbs on the row, and the thumbnails below it.
+   Named `miniButton`, NOT `settingsButton`: that local name already belongs to the toolbar's viewtune
+   trigger, and a CSS module resolves one local name to one hashed class — so this rule was silently
+   restyling that trigger into an 11px bordered chip. Two components in one view must not share a name. */
+.miniButtons { display: inline-flex; gap: 6px; flex: none; }
+.miniButton {
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: .5px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.miniButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.miniButton:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+.wallpaperGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; padding: 0 8px 8px; }
+.wallpaperThumb {
+  padding: 0;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 6px;
+  border: .5px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+.wallpaperThumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* The chosen one is marked on the element that was pressed, not by a class the render has to keep
+   in step with the store. */
+.wallpaperThumb[aria-pressed="true"] { border-color: var(--dsw-alias-state-business-primary); outline: 1px solid var(--dsw-alias-state-business-primary); }
+.wallpaperThumb:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+
+/* Kept last on purpose: the CSS-literal guard uses the final rule as its "the literal was not cut
+   short" sentinel, so new rules belong above this one rather than after it. */
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

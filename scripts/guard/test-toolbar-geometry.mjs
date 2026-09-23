@@ -58,24 +58,32 @@ function sides(value) {
 
 const px = (value) => Number.parseFloat(value ?? '');
 
-/** The declarations of one flat rule, as a property map plus resolved box sides. */
+/** The declarations of one flat rule, as a property map plus resolved box sides.
+ *
+ * Matched by an EXACT selector, not by the first rule that CONTAINS one: a compound (`…[data-x=true]
+ * .control`) or a state (`:hover`, `[hidden]`) is a different rule, and taking the first containing match
+ * measured whichever happened to be written first — a split-shape rule placed above the base one had no
+ * font-size at all, and the check read NaN for it.
+ */
 function rule(selector) {
-  const at = css.indexOf(`${selector}{`);
-  if (at === -1) throw new Error(`rule ${selector} not found in the literal`);
-  const end = css.indexOf('}', at);
-  const body = css.slice(at + selector.length + 1, end);
-  const out = { box: {} };
-  for (const part of body.split(';')) {
-    const colon = part.indexOf(':');
-    if (colon === -1) continue;
-    out[part.slice(0, colon).trim()] = part.slice(colon + 1).trim();
+  for (const chunk of css.split('}')) {
+    const brace = chunk.indexOf('{');
+    if (brace === -1 || chunk.slice(0, brace).trim() !== selector) continue;
+    const body = chunk.slice(brace + 1);
+    const out = { box: {} };
+    for (const part of body.split(';')) {
+      const colon = part.indexOf(':');
+      if (colon === -1) continue;
+      out[part.slice(0, colon).trim()] = part.slice(colon + 1).trim();
+    }
+    if (out.padding) out.box.padding = sides(out.padding);
+    // `border: 1px solid <colour>` / `border-bottom: …` — the first token is the width.
+    for (const [key, value] of Object.entries(out)) {
+      if (key.startsWith('border')) out.box[key] = px(value.split(/\s+/)[0]);
+    }
+    return out;
   }
-  if (out.padding) out.box.padding = sides(out.padding);
-  // `border: 1px solid <colour>` / `border-bottom: …` — the first token is the width.
-  for (const [key, value] of Object.entries(out)) {
-    if (key.startsWith('border')) out.box[key] = px(value.split(/\s+/)[0]);
-  }
-  return out;
+  throw new Error(`rule ${selector} not found in the literal`);
 }
 
 /**
@@ -95,9 +103,11 @@ function classOf(local) {
 
 const TOOLBAR = classOf('toolbar');
 const COLLAPSE = classOf('collapseControl');
+const JUMP = classOf('jump');
 
 const toolbar = rule(TOOLBAR);
 const control = rule(COLLAPSE);
+const jump = rule(JUMP);
 
 const failures = [];
 function check(name, pass, detail) {
@@ -105,11 +115,14 @@ function check(name, pass, detail) {
   console.log(`${pass ? 'ok  ' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`);
 }
 
-// --- the label is bigger than the version this replaced
+// --- the label carries the SAME type as the 「回到最新」 pill
+// What is pinned is the AGREEMENT, not a size in isolation: the reader asked for one small size in the lane
+// instead of two. (This check used to hold the label at 14px/22px, the size it had been moved up to after a
+// complaint about 12px — a decision the reader has since reversed, in favour of consistency.)
 const controlLine = px(control['line-height']);
 const controlFont = px(control['font-size']);
-check('label font grew past the cramped 12px', controlFont >= 14, `font-size ${controlFont}px`);
-check('label line-height grew past 18px', controlLine >= 22, `line-height ${controlLine}px`);
+check('label font is the 回到最新 pill\'s', controlFont === px(jump['font-size']), `font-size ${controlFont}px vs ${px(jump['font-size'])}px`);
+check('label line-height is the 回到最新 pill\'s', controlLine === px(jump['line-height']), `line-height ${controlLine}px vs ${px(jump['line-height'])}px`);
 
 // --- clearance and centring
 const toolbarLine = px(toolbar['line-height']);
@@ -149,17 +162,40 @@ check(
   `pill "${pillBorder}" vs divider "${toolbarDivider}"`,
 );
 check('pill has a resting fill', (control.background ?? '').includes('var('), control.background);
-// A fill equal to the hover colour would erase the hover state.
+// Hover must NOT touch the fill. It used to step up to the solid sibling of the resting token — which was the
+// only way to show a hover while the resting fill IS `interactive-bg-hover` — but the reader asked for the label
+// to be the only thing that answers the pointer, so what is asserted is the ABSENCE of a background here.
 const hoverFill = (() => {
   const at = css.indexOf(`${COLLAPSE}:hover{`);
+  if (at === -1) return undefined;
   const end = css.indexOf('}', at);
   const body = css.slice(at, end);
   return /background:([^;}]+)/.exec(body)?.[1];
 })();
-check('hover fill differs from the resting fill', hoverFill !== control.background, `hover ${hoverFill}`);
+check('hover leaves the fill alone', hoverFill === undefined, `hover background ${hoverFill ?? '(none)'}`);
+check('…and highlights the label instead', /color:var\(--dsw-alias-label-primary\)/.test(css.slice(css.indexOf(`${COLLAPSE}:hover{`), css.indexOf('}', css.indexOf(`${COLLAPSE}:hover{`)))));
 
 // --- horizontal position unchanged
-check('toolbar adds no inline padding, so 收起 stays put', px(toolbarPad.left) === 0, `inline padding ${toolbarPad.left}`);
+// The lane now spans the view, and it does so by cancelling its own inline padding with an equal
+// negative margin — so the divider reaches the edges while 收起 stays exactly where the text starts.
+// Stated as that relation rather than as "no padding", which was the shape this replaced.
+// A sticky lane rests at its natural position until the scroll passes its offset: without cancelling
+// the view's top padding the lane hangs one padding below the header until the reader scrolls that far.
+check(
+  'toolbar cancels the view\'s top padding, so it sits flush under the header',
+  String(toolbar['margin-top'] ?? '').includes('var(--reader-top-pad)'),
+  `margin-top ${toolbar['margin-top']}`,
+);
+check(
+  "toolbar spans the view, its right control pinned to the lane's end",
+  String(toolbar['margin-inline'] ?? '').includes('var(--reader-inline-pad)')
+    && String(toolbar['padding-left'] ?? '').includes('var(--reader-inline-pad)')
+    && String(toolbar['padding-left'] ?? '').includes('var(--reader-toolbar-shift-left)')
+    // The right end is a different shape on purpose: the viewtune button sits at the LANE's end less the
+    // gap, which is what the reader asked for after the outward shift had gone as far as it could.
+    && String(toolbar['padding-right'] ?? '').includes('var(--reader-toolbar-gap-right'),
+  `margin-inline ${toolbar['margin-inline']} / padding ${toolbar['padding-left']} · ${toolbar['padding-right']}`,
+);
 check('control keeps a pill shape', control['border-radius'] === '999px', control['border-radius']);
 check('control padding-right is the larger axis', px(controlPad.right) >= px(controlPad.top), `${controlPad.right} vs ${controlPad.top}`);
 

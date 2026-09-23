@@ -45,8 +45,20 @@ export const GLASS_PARTS: readonly GlassPart[] = [
     hint: '面板底板、它上面的文件标签，以及工具「结果」页里那份行内差异块——差异纸无论画在哪里都归这一个旋钮（面板内部那块会被刻意重置成透明，所以面板里看到的是面板这一层）。',
   },
   {
+    id: 'scrollbar', label: '滚动条槽位', property: '--glass-scrollbar', initial: 20,
+    hint: '最右侧那条滚动条的槽位。0% 就是宿主原本的透明轨道，100% 是一条实心的凹槽；它比别的面多一层：槽位也会跟着壁纸走，所以它同时受「壁纸」那组影响。',
+  },
+  {
     id: 'chip', label: '产物标签', property: '--glass-chip', initial: 0,
     hint: '一轮末尾那一栏产物文件（交付 chip）的底色。它是唯一一个常驻、且静止时就自带底板的小标签；工具状态与行数计数在基础样式里本来没有底，所以不归任何旋钮。',
+  },
+  {
+    id: 'pill', label: '用量与步骤胶囊', property: '--glass-pill', initial: 20,
+    hint: '一轮末尾那两枚计数胶囊——「用量 … tok」与「… 个步骤」——的底板，悬停态一起跟随。它们和「产物标签」不同：基础样式里本来就有底，所以是"让已有的面透出来"，不是凭空加一层。',
+  },
+  {
+    id: 'input', label: '输入框', property: '--glass-input', initial: 25,
+    hint: '宿主输入框（composer）那块底板的透明度。它用的是主题 token `--dsw-specific-input-major`，所以走的是"覆盖 token"这条路；同时会撤掉座位自带的那条不透明托底渐变，否则透出来的是底色而不是壁纸。它跟磨砂玻璃总开关走，在阅读页与对话页都生效。',
   },
 ];
 

@@ -53,7 +53,7 @@ check(`literal contains the collapse control rule (${COLLAPSE})`, value.includes
 check(`literal contains the intro keyframes (${INTRO})`, value.includes(`@keyframes ${INTRO}{`));
 check(`literal contains the exit keyframes (${EXIT})`, value.includes(`@keyframes ${EXIT}{`));
 check(
-  'lane shape in the literal: toolbar pins, status row does not, no height read',
+  'lane shape in the literal: toolbar pins under the top bar, status row does not, no height read',
   hasDecls(value, classSel(value, 'toolbar'), ['position:sticky', 'top:0'])
     && !hasDecls(value, classSel(value, 'disclosure'), ['position:sticky'])
     && !value.includes('reader-toolbar-height'),

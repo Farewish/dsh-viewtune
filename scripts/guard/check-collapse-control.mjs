@@ -50,16 +50,71 @@ absent('retired toolbar note', '阅读 · 原始记录完整保留');
 absent('retired note title', '基于真实消息类型和轮次边界整理');
 want('collapse wrapper', 'className: Reader_module_css_default.collapseWrap', 1);
 want('collapse control', 'className: Reader_module_css_default.collapseControl', 1);
-want('collapse state hook', '"data-reader-collapse": currentTurnOpen ? "open" : "idle"', 1);
-want('hidden gate', 'hidden: !currentTurnOpen', 1);
+// The MERGED control (see CollapseControl.tsx): one button for both actions, because the reading column's
+// left edge leaves room for exactly one. The animation's own contract is unchanged — `open`/`idle` on
+// `data-reader-collapse` — and WHICH action the button is rides a second attribute, so the stylesheet's
+// enter/exit animation cannot be broken by the merge.
+want('collapse state hook', '"data-reader-collapse": on ? "open" : "idle"', 1);
+want('the action it stands for rides its own attribute', '"data-reader-collapse-action": primary', 1);
+want('hidden gate', 'hidden: !on', 1);
+// Both of the pair's conditions, and nothing new: the turn in view, or other turns.
+want('the merged gate is the pair of conditions', 'const on = showCurrent || showAll', 1);
 // The handlers run through a wrapper that records where focus was before the button disappears.
-want('current-turn handler', 'collapseCurrentTurn();', 2);
-want('collapse-all state hook', '"data-reader-collapse-all": otherTurnsOpen ? "open" : "idle"', 1);
-want('collapse-all gate', 'hidden: !otherTurnsOpen', 1);
-want('collapse-all handler', 'collapseEveryTurn()', 2);
+want('focus is remembered before the action', 'remember();', 2);
+want('current-turn action', 'collapseCurrent()', 1);
+// Twice: the main action when it is the one that applies, and the caret's menu item.
+want('collapse-all action', 'collapseAll()', 2);
+want('the second control is offered only when both apply', 'const both = on && primary === "current" && showAll', 1);
+// A DIRECT action, not a menu: no `aria-haspopup`, no menu role, no dismissal watcher — the reader asked for
+// the double chevron to collapse everything on the first click, and for it to carry 收起全部's own tooltip.
+want('the second control is a plain button', '"data-reader-collapse-more": ""', 1);
+// JSX puts an arrow's body on its own lines, so the two statements are asserted one at a time.
+want('and it collapses everything itself', 'collapseAll();', 2);
+// JSX compiles a hyphenated attribute to a quoted key, and the tooltip and the accessible name are the SAME
+// string on purpose: the reader asked for the double chevron to say exactly what 全部收起 says.
+want('its tooltip is the collapse-all one, word for word', '"aria-label": allLabel,', 1);
+want('…and so is its title', 'title: allLabel,', 1);
+// TWO boxes: the single chevron in the stage and the pair stacked on the appendage.
+want('the stack of chevrons is drawn, not spelled', 'className: Reader_module_css_default.collapseChevrons', 1);
+// …and the appendage keeps its SLOT when only one action applies: a control that widens when a second turn is
+// expanded is a size change at exactly the moment the reader is reading.
+want('the appendage holds its slot instead of appearing', '"data-reader-collapse-more-active": both ? "true" : "false"', 1);
+want('…which the stylesheet reads as a reserved slot', 'data-reader-collapse-more-active=false', 1);
+// The appendage is laid OVER the right end of the fixed stage, which is what lets the pill stay one width while
+// a second half appears inside it. Its divider is a pseudo-element rather than a border, because a border
+// cannot fade in place — and the reader asked for the line to appear where it is.
+// Needles written the way the MINIFIER leaves the CSS (it reorders declarations and shortens `::before` to
+// `:before`), because these are asserted against the built artifact, not the source.
+want('the appendage keeps its place over the stage', '_collapseMore{width:20px', 1);
+// …and it is 20px rather than 1.7em (20.4px) for the same reason the chevron slot is 8px: it leaves a left half
+// of a whole 36px, so the shift inside it can be a whole number of pixels. That shift carries BOTH answers in
+// one number — 2px is the geometric centre (2px of margin each side), 5px is the optical value the reader
+// settled on — and it is bounded by the left half's slack (36px − 32px = 4px), which is why wanting more of it
+// means widening that half rather than raising this number.
+want('the split shift is a whole pixel and carries the optical value', 'var(--reader-collapse-split-shift,5px)', 1);
+// The divider PRIMITIVE plus the rule that fades it in: a pseudo-element is the whole reason it can appear in
+// place, since a border has no opacity of its own.
+want('the divider is a pseudo-element', '_collapseMore:before{content:', 1);
+want('…and it fades in with the split', '_collapseMore:before{opacity:1', 1);
+// Three rules mention the stage's segments: the base one, the motion-off gate and the reduced-motion gate —
+// which is what "the choreography ends with the switch" means.
+want('…and the choreography ends with the motion switch', '_collapseStage>span', 3);
+want('the handler reaches the control', 'collapseCurrent: collapseCurrentTurn', 1);
+want('and so does the other', 'collapseAll: collapseEveryTurn', 1);
 want('toolbar wrap hook', '"data-ud-check": "collapse-wrap"', 1);
-want('control label', '"收起 "', 1);
-want('chevron', 'children: "˄"', 1);
+// The label is a FIXED STAGE with three floating segments (see the CSS): that is what lets the pill keep one
+// width while the words change — 「全部」 fades in from the left, 「收起」 slides, the chevron fades out to the
+// right. All three are decoration and hidden from assistive tech; the button's own label carries the sentence,
+// because the segments are animated independently and their DOM order is not what a screen reader should hear.
+want('the label is a stage of three segments', 'className: Reader_module_css_default.collapseStage', 1);
+want('…with 全部 as its own segment', 'className: Reader_module_css_default.collapseAllWord', 1);
+want('…and 收起 as its own', 'className: Reader_module_css_default.collapseKeeping', 1);
+want('…and the chevron as its own', 'className: Reader_module_css_default.collapseOneChevron', 1);
+want('the words reach assistive tech through the button', '"aria-label": title', 1);
+// Three ˄ in the markup: the main button's single one and the pair stacked on the appendage. The count is what
+// says the chevrons are still DRAWN rather than spelled — and that the main button carries ONE, because in
+// 「全部收起」 it is the chevron that fades away to free the fourth glyph's slot.
+want('chevrons: drawn in a stack, never spelled', 'children: "˄"', 3);
 want('tooltip names the scope', '收起当前这一轮的过程', 1);
 // The motion preference moved into the settings panel: what has to hold now is that it still
 // reaches that panel and that the panel still writes the stored value.
@@ -75,10 +130,16 @@ want('the collapse shortcut matches the configured binding', 'matchesShortcut(ev
 want('and so does collapse-all', 'matchesShortcut(event, collapseAllKey)', 1);
 want('holding the key does not repeat the action', 'if (event.repeat) return;', 1);
 want('focus handoff', 'focusWasInCollapseWrap', 4);
-// JSX compiles a hyphenated attribute to a quoted key, so the assertion spells it that way.
-want('the advertised shortcut follows the binding', '"aria-keyshortcuts": collapseTurnKey || void 0', 1);
-want('and the collapse-all one follows its own', '"aria-keyshortcuts": collapseAllKey || void 0', 1);
-want('the tooltip names the binding in force', 'keyHint(collapseTurnKey)', 1);
+// JSX compiles a hyphenated attribute to a quoted key, so the assertion spells it that way — and the
+// binding the button advertises is the one for the action it will actually perform, which is why the
+// component names it `binding` rather than either key.
+want('the advertised shortcut follows the action it will take', '"aria-keyshortcuts": binding || void 0', 1);
+want('and that binding is chosen from the two', 'const binding = primary === "current" ? turnKey : allKey', 1);
+want('the tooltip names the binding in force', 'keyHint(turnKey)', 1);
+// The count is not the point here (the caret advertises it in four places: its label, its title, the menu
+// item and the primary's title when that action applies) — what matters is that the binding is READ rather
+// than spelled out, so rebinding cannot leave a stale literal in a tooltip.
+present('and the other action advertises its binding too', 'keyHint(allKey)');
 present('collapse-all label', '全部收起');
 // The two defaults, in the one table the resolver and the settings panel both read.
 want('the defaults live in one table', 'collapseAll: "Alt+Shift+C"', 1);
@@ -160,7 +221,12 @@ console.log('\n--- styles');
 // keyframe names are re-hashed per build and the minifier chooses its own property order, so a
 // verbatim rule string verifies one build's output rather than the control's behaviour.
 const collapse = classSel(bundleCss, 'collapseControl');
-const collapseAll = classSel(bundleCss, 'collapseAll');
+const collapseMore = classSel(bundleCss, 'collapseMore');
+const collapseGroup = classSel(bundleCss, 'collapseGroup');
+const collapseStage = classSel(bundleCss, 'collapseStage');
+const collapseKeeping = classSel(bundleCss, 'collapseKeeping');
+const collapseAllWord = classSel(bundleCss, 'collapseAllWord');
+const collapseChevron = classSel(bundleCss, 'collapseOneChevron');
 const wrap = classSel(bundleCss, 'collapseWrap');
 const intro = keyframeOf(bundleCss, 'readerCollapseIn');
 const exit = keyframeOf(bundleCss, 'readerCollapseOut');
@@ -177,6 +243,33 @@ const isUnfilled = (selector) => {
     .map((declaration) => declaration.slice('background:'.length).trim());
   return values.length > 0 && values.every((value) => value === 'transparent' || value === '0 0' || value === 'none');
 };
+/**
+ * The `transform` a rule declares, tolerating the minifier's MERGED selector lists (`a, b, c{…}`): it looks for
+ * the selector as one entry of a list rather than as a whole rule, because identical declarations in consecutive
+ * rules are merged and the segment's own selector may then never start a rule.
+ */
+const transformOf = (selector) => {
+  for (const chunk of bundleCss.split('}')) {
+    const brace = chunk.indexOf('{');
+    if (brace === -1) continue;
+    if (!chunk.slice(0, brace).split(',').some((part) => part.trim() === selector)) continue;
+    const found = chunk.slice(brace + 1).split(';').map((part) => part.trim()).find((part) => part.startsWith('transform:'));
+    if (found) return found;
+  }
+  return '';
+};
+/**
+ * Whether 全部 rides exactly 收起's transform in one state.
+ *
+ * An empty result on EITHER side fails: a missing declaration must not compare equal to another missing one, or
+ * the invariant would hold vacuously the day both rules stop carrying a transform.
+ */
+const ridesKeeping = (state) => {
+  // The resting state's rules are bare class selectors; a state's rules are compound, led by the group.
+  const prefix = state === '' ? '' : `${collapseGroup}${state} `;
+  const mine = transformOf(`${prefix}${collapseAllWord}`);
+  return mine !== '' && mine === transformOf(`${prefix}${collapseKeeping}`);
+};
 const styleChecks = [
   ['wrap lays the control out', ruleDecls(bundleCss, wrap).size > 0],
   ['control is a pill', hasDecls(bundleCss, collapse, ['display:inline-flex'])],
@@ -191,22 +284,52 @@ const styleChecks = [
       && new RegExp(`${escapeRegExp(collapse)}\\[data-reader-collapse=idle\\]\\{[^}]*animation:[^;}]*${escapeRegExp(exit)}`).test(bundleCss)
       && new RegExp(`${escapeRegExp(collapse)}\\[data-reader-collapse=idle\\]\\{[^}]*transition:[^;}]*visibility\\s+0s[^;}]*[\\d.]+m?s`).test(bundleCss),
   ],
-  // 「全部收起」 is meant to read as 「收起」's quieter sibling: the same frame, the same enter/exit
-  // motion, one visual step down. It was plain text, then briefly a bare (unframed) text button, so
-  // these four assertions pin what the difference is supposed to be — and, just as importantly, what
-  // it is NOT: no fill, and no font-size of its own (it rides on `.textButton`, keeping the size the
-  // toolbar hands down).
-  ['collapse-all is framed like the control', hasDecls(bundleCss, collapseAll, ['border:.5px solid var(--dsw-alias-border-l2)', 'border-radius:999px'])],
-  ['collapse-all has no fill', isUnfilled(collapseAll)],
-  ['collapse-all hover also stays unfilled', isUnfilled(`${collapseAll}:hover`)],
-  ['collapse-all leaves the font size alone', !new RegExp(`${escapeRegExp(collapseAll)}\\{[^}]*\\bfont(-size)?:`).test(bundleCss)],
-  ['collapse-all enters with the same motion', new RegExp(`${escapeRegExp(collapseAll)}\\[data-reader-collapse-all=open\\]\\{[^}]*animation:[^;}]*${escapeRegExp(intro)}`).test(bundleCss)],
-  ['collapse-all exits with the same motion, delayed visibility and all',
-    hasDecls(bundleCss, `${collapseAll}[data-reader-collapse-all=idle]`, ['pointer-events:none', 'visibility:hidden'])
-      && new RegExp(`${escapeRegExp(collapseAll)}\\[data-reader-collapse-all=idle\\]\\{[^}]*animation:[^;}]*${escapeRegExp(exit)}`).test(bundleCss)
-      && new RegExp(`${escapeRegExp(collapseAll)}\\[data-reader-collapse-all=idle\\]\\{[^}]*transition:[^;}]*visibility\\s+0s[^;}]*[\\d.]+m?s`).test(bundleCss)],
-  ['collapse-all still forces display while hidden', hasDecls(bundleCss, `${collapseAll}[hidden]`, ['display:inline-flex'])],
+  // The second control is part of the SAME pill — the reader asked for one control of one width — so it has no
+  // frame and no fill of its own, it TAKES its type from the pill instead of setting one, and it arrives by
+  // fading (with its divider, which is a pseudo-element for exactly that reason) rather than by animating in as
+  // a sibling box. What stays put is its slot: the pill's width does not change when it appears.
+  // (These replace four assertions about 「全部收起」's own framed, unfilled text button — that control was
+  // merged into this one, so what it was is no longer what the guarded file contains.)
+  ['the second control has no frame of its own', hasDecls(bundleCss, collapseMore, ['border:0'])],
+  ['…and no fill of its own', isUnfilled(collapseMore)],
+  ['…and takes its type from the pill', hasDecls(bundleCss, collapseMore, ['font:inherit'])],
+  // The DIVIDER is what fades in with the split. The box around it deliberately carries no opacity: it is
+  // transparent, so fading it as well would take the stack inside it along and the stack would vanish outright
+  // instead of rising — which is what the reader reported.
+  // The `[^{]*` after the class is load-bearing: the minifier MERGES this rule with the stack's/segment's into one
+  // selector list, so the class is followed by a comma rather than by the brace.
+  ['…it arrives by its divider fading in with the split',
+    new RegExp(`\\[data-reader-collapse-split=true\\][^{]*${escapeRegExp(collapseMore)}:before[^{]*\\{[^}]*opacity:1`).test(bundleCss)],
+  ['…and holds its place while only one action applies',
+    hasDecls(bundleCss, `${collapseMore}[data-reader-collapse-more-active=false]`, ['visibility:hidden'])
+      // …but only AFTER its exit has played: hiding the box at once is what made the stack vanish outright instead
+      // of rising, so the delayed visibility is asserted as part of the same invariant.
+      && /data-reader-collapse-more-active=false\][^{]*\{[^}]*transition:visibility 0s linear var\(--reader-collapse-more-exit/.test(bundleCss)],
+  // The second control is a plain button inside the pill's own stacking, so it has no `hidden` half of its own:
+  // what keeps it from being reached while it is invisible is the reserved-slot rule asserted above.
   ['intro keyframes shipped', bundleCss.includes(`@keyframes ${intro}{`)],
+  // The choreography's offsets must land on WHOLE pixels. The chevron's slot is 8px rather than .6em (7.2px)
+  // for that reason: a fractional translate leaves CJK glyphs on a half pixel, which reads as blur — and the
+  // centring correction below is exactly half that slot, so the slot has to be even for the correction to be
+  // whole. (The reader reported 「全部收起」 as off-centre; it was 4px left of centre, because the hidden
+  // chevron's slot still took room at the right end.)
+  ['the chevron slot is a whole number of pixels', hasDecls(bundleCss, collapseChevron, ['width:8px'])],
+  ['the stage is the two label slots plus that chevron', hasDecls(bundleCss, collapseStage, ['width:calc(4em + 8px)'])],
+  ['…and every resting offset is whole too',
+    hasDecls(bundleCss, collapseChevron, ['transform:translate(-1em)']) && hasDecls(bundleCss, collapseKeeping, ['transform:translate(-1em)'])],
+  ['「全部收起」 is centred by half the empty chevron slot',
+    hasDecls(bundleCss, `${collapseGroup}[data-reader-collapse-action=all] ${collapseKeeping}`, ['transform:translate(4px)'])],
+  // 全部 is the LEFT HALF OF A RIGID PAIR with 收起: the reader asked for the two words to move side by side ("我更
+  // 想让全部和收起并排移动"), and since the slots already differ by exactly 全部's own width, equal transforms keep
+  // them adjacent at every instant — which is also what makes the crossing structurally impossible. Asserted as an
+  // EQUALITY between the two segments per state, not as two hard-coded numbers: the relation is the invariant, and
+  // it survives re-tuning the shift. (This replaced four attempts to dodge the overlap with timing while the two
+  // moved independently — a delayed fade, `ease-in`, a longer slide, a slower fade.)
+  ['全部 rides 收起\'s transform at rest', ridesKeeping('')],
+  ['…and in the split state', ridesKeeping('[data-reader-collapse-split=true]')],
+  ['…and in 「全部收起」', ridesKeeping('[data-reader-collapse-action=all]')],
+  ['…so its own timing is only about the fade', hasDecls(bundleCss, `${collapseGroup}[data-reader-collapse-action=all] ${collapseAllWord}`,
+    ['opacity:1', 'transform:translate(4px)'])],
   ['exit keyframes shipped', bundleCss.includes(`@keyframes ${exit}{`)],
 ];
 for (const [label, pass] of styleChecks) {
@@ -226,11 +349,11 @@ if (hasDecls(bundleCss, classSel(bundleCss, 'disclosure'), ['position:sticky']))
   console.log('ok   no sticky status lane rule');
 }
 absent('no measured toolbar height', 'reader-toolbar-height');
-if (hasDecls(bundleCss, classSel(bundleCss, 'toolbar'), ['position:sticky', 'top:0', 'z-index:9'])) {
-  console.log('ok   toolbar lane rule present');
+if (hasDecls(bundleCss, classSel(bundleCss, 'toolbar'), ['position:sticky', 'top:0'])) {
+  console.log('ok   toolbar lane pins under the top bar');
 } else {
   bad++;
-  console.log('MISS toolbar lane rule present');
+  console.log('MISS toolbar lane does not pin');
 }
 
 console.log(`\n${bad === 0 ? 'BUNDLE COLLAPSE OK' : 'BUNDLE COLLAPSE FAILED: ' + bad}`);

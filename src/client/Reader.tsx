@@ -15,8 +15,14 @@ import { basename, createProducedFileMentions, dirname, getTurnDeliverables, sho
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
+import { CollapseControl } from './CollapseControl.js';
+import { collapseModeOf } from './collapse-mode.js';
 import { glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf } from './open-file.js';
+import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
+import { applyWindowScope, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
+import { applyScrollbarFill, scrollbarFillOf } from './scrollbar.js';
+import { createSettingsWriter, loadHostSettings } from './settings-sync.js';
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
@@ -51,6 +57,19 @@ type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
   nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
 };
 
+/**
+ * A JSON record card — 轮次过程记录 / 模型重试记录 / 命令记录 — with a handle the SKIN can reach.
+ *
+ * The card itself is the host primitive's, and its two plates (the toggle row and the body) wear that
+ * package's own hashed class names, so there is nothing stable to select on inside it. The wrapper this
+ * view puts around it is that handle: everything with a plate inside the wrapper is the card's. One
+ * wrapper for all three, because they ARE the same card — a reader who dials 卡片与面板 means these,
+ * and the model-retry one is simply the one that was open when it was noticed.
+ */
+const JsonRecord = memo(function JsonRecord({ label, payload }: { label: string; payload: unknown }) {
+  return <div className={css.jsonCard}><JsonBlock label={label} payload={payload} truncatedLabel={truncatedJsonLabel} /></div>;
+});
+
 const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motion, onRead, returnFocusTo }: Pick<ReaderProps, 'useChat' | 't'> & {
   nodeKey: string; open: boolean; motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
 }) {
@@ -59,9 +78,9 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   let content: ReactNode = null;
   if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
   else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={`${css.toolRaw} ${css.systemPrompt}`}>{node.data.text}</pre></details>;
-  else if (isNode(node, 'turn-process')) content = <JsonBlock label="轮次过程记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
-  else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} truncatedLabel={truncatedJsonLabel} />;
-  else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonBlock label="命令记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
+  else if (isNode(node, 'turn-process')) content = <JsonRecord label="轮次过程记录" payload={node.data} />;
+  else if (isNode(node, 'model-retry')) content = <JsonRecord label="模型重试记录" payload={node.data.attempts} />;
+  else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonRecord label="命令记录" payload={node.data} />;
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
@@ -645,6 +664,15 @@ export function Reader(props: ReaderProps) {
   // Read defensively, like `shortcuts` below: persistence replaces the whole record, so a record
   // written before this preference existed comes back with no `glass` key at all.
   const glassPreference = props.useStore(state => state.glass) === true;
+  // Whether the skin also reaches the host's conversation view. Read defensively like `glass` itself:
+  // a record written before this switch existed has no such key.
+  const glassConversation = props.useStore(state => state.glassConversation) === true;
+  // Whether the conversation page is painted as a solid page of its own — its own switch, independent of
+  // the skin, read the same defensive way.
+  const conversationSolid = props.useStore(state => state.conversationSolid) === true;
+  // What the single collapse button does; `collapseModeOf` answers `both` for anything unrecognised, which
+  // is the behaviour the pair of buttons had.
+  const collapseMode = props.useStore(state => collapseModeOf(state.collapseMode));
   // The skin's per-surface opacities: stored as the parts the reader moved, resolved against each
   // part's initial here, and handed to the stylesheet as custom properties on the root.
   const glassStored = props.useStore(state => state.glassParts);
@@ -653,6 +681,134 @@ export function Reader(props: ReaderProps) {
   // before this preference existed, or anything that is not `'sidebar'`, means the system app.
   const openInSidebar = props.useStore(state => deliverableOpenModeOf(state.deliverableOpenMode)) === 'sidebar';
   const glassVars = useMemo(() => glassProperties(glassValuesResolved), [glassValuesResolved]);
+  // The wallpaper, read the same defensive way and handed over the same way: two custom properties
+  // on the root, with the rest of the backdrop stated in the stylesheet. `wallpaperNameOf` is what
+  // makes a record written before this preference existed mean "no wallpaper" rather than a crash.
+  const wallpaperName = props.useStore(state => wallpaperNameOf(state.wallpaper));
+  const wallpaperDim = props.useStore(state => wallpaperDimOf(state.wallpaperDim));
+  const wallpaperScope = props.useStore(state => wallpaperScopeOf(state.wallpaperScope));
+  const wallpaperChrome = props.useStore(state => wallpaperChromeOf(state.wallpaperChrome));
+  // The whole-window scope is the frame's job (see wallpaper-scope.ts): the same image on the reading
+  // view's own root would be a SECOND copy under a second scrim, which is what makes one region
+  // visibly darker than the one beside it. So the view paints its own backdrop only in view scope.
+  const windowScope = wallpaperScope === 'window' && wallpaperName !== '';
+  const wallpaperVars = useMemo(
+    () => (windowScope ? {} : wallpaperProperties(wallpaperName, wallpaperDim)),
+    [windowScope, wallpaperName, wallpaperDim],
+  );
+  // The settings record, read WHOLE so it can be handed to the host. The browser's own copy lives in
+  // localStorage, and localStorage is keyed by origin — this GUI is served on an ephemeral port, so that
+  // copy is a new, empty one on every launch, which is exactly why the reader's settings kept vanishing.
+  // The host keeps the copy that survives (see settings-sync.ts): read once here, written back whenever
+  // anything settles.
+  const readerState = props.useStore(state => state);
+  const settingsWriter = useMemo(() => createSettingsWriter(), []);
+  // Nothing is sent before that read has ANSWERED. Pushing on mount would write this browser's (possibly
+  // empty) state over the record that outlived the last launch — the read has to win that race, and the
+  // ref is what keeps the debounced writer quiet until it does.
+  const settingsLoaded = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    void loadHostSettings().then(hostRecord => {
+      if (cancelled) return;
+      settingsLoaded.current = true;
+      if (hostRecord !== undefined) props.actions.hydrate(hostRecord);
+      // Nothing stored yet: THIS browser's copy becomes the record. That is also the migration for
+      // settings a reader made before the host kept any.
+      else settingsWriter.push(readerState);
+    });
+    return () => { cancelled = true; };
+    // Once per activation: the record is read on the way in, and every later change flows the other way.
+  }, []);
+  useEffect(() => {
+    if (settingsLoaded.current) settingsWriter.push(readerState);
+  }, [settingsWriter, readerState]);
+  // Flushed on the way out, and on `pagehide` as well: a reader who changes something and closes the tab
+  // inside the debounce window would otherwise lose precisely the change they just made.
+  useEffect(() => {
+    const flush = (): void => { settingsWriter.flush(); };
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      settingsWriter.flush();
+    };
+  }, [settingsWriter]);
+
+  // Published on `<html>` from here because the sidebar and the top bar are not descendants of this
+  // view — a custom property set on the view's root could never reach them. Deliberately not withdrawn
+  // when this component unmounts: the reader may only be switching views, and the backdrop belongs to
+  // the window until the preference changes.
+  //
+  // Published as soon as a wallpaper is chosen, in EITHER scope: the conversation column below the
+  // header — the space under the transcript, the gutter, the composer's fade band — is part of the
+  // reading view, and leaving it to the theme's colour kept those blocks black with the window switch
+  // off. The scope value is what the stylesheet gates the chrome on.
+  //
+  // In view scope the image is then sized to the READING PAGE (min ratio: the whole picture, never
+  // enlarged) rather than covering the window, which is only expressible in viewport coordinates —
+  // hence the measured size and place published as two more custom properties. The measurement is a
+  // refinement on top of the immediate publication, never a precondition: a resize or a composer that
+  // grows changes the page's box, and both are re-measured.
+  useEffect(() => {
+    if (wallpaperName === '') {
+      applyWindowScope(document, null);
+      return;
+    }
+    const image = `url("${wallpaperUrl(wallpaperName)}")`;
+    const publish = (geometry: { size: string; position: string } | null): void => {
+      applyWindowScope(document, {
+        scope: wallpaperScope,
+        image,
+        dim: wallpaperDim,
+        chrome: wallpaperChrome,
+        ...(geometry ?? {}),
+      });
+    };
+    publish(null);
+    if (wallpaperScope === 'window') return;
+
+    const source = new Image();
+    let frame = 0;
+    const measure = (): void => {
+      if (source.naturalWidth === 0) return;
+      const box = document.querySelector('[class*="_scrollBody"]');
+      if (box === null) return;
+      const rect = box.getBoundingClientRect();
+      publish(wallpaperGeometry({
+        imageWidth: source.naturalWidth,
+        imageHeight: source.naturalHeight,
+        target: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        scope: wallpaperScope,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      }));
+    };
+    // One measurement per frame at most: dragging a divider fires far more events than layout settles.
+    const schedule = (): void => {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => { frame = 0; measure(); });
+    };
+    source.addEventListener('load', schedule);
+    source.src = wallpaperUrl(wallpaperName);
+    if (source.complete) schedule();
+    window.addEventListener('resize', schedule);
+    const box = document.querySelector('[class*="_scrollBody"]');
+    const observer = typeof ResizeObserver === 'undefined' || box === null ? null : new ResizeObserver(schedule);
+    if (observer !== null && box !== null) observer.observe(box);
+    return () => {
+      source.removeEventListener('load', schedule);
+      window.removeEventListener('resize', schedule);
+      if (observer !== null) observer.disconnect();
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
+  }, [wallpaperName, wallpaperScope, wallpaperDim, wallpaperChrome]);
+
+  // The gutter's groove rides the skin's dial like the other surfaces, and like them it is published
+  // only while the skin is on: with it off the host's own transparent track is left untouched, which is
+  // the look that existed before this dial did.
+  useEffect(() => {
+    applyScrollbarFill(document, glassPreference ? scrollbarFillOf(glassValuesResolved.scrollbar) : '');
+  }, [glassPreference, glassValuesResolved]);
   const motion = useMotionAllowed(motionPreference);
   // The two collapse verbs and the bindings they answer to. A record written before the field
   // existed has no `shortcuts` at all, so the defaults are resolved here rather than assumed; a
@@ -891,20 +1047,28 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={glassVars as CSSProperties} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
     <div className={css.column} data-chat-flow="">
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <div className={css.collapseWrap} ref={collapseWrapRef} data-ud-check="collapse-wrap">
-          <button type="button" className={css.collapseControl} data-reader-collapse={currentTurnOpen ? 'open' : 'idle'} hidden={!currentTurnOpen} aria-keyshortcuts={collapseTurnKey || undefined} onClick={() => { rememberCollapseFocus(); collapseCurrentTurn(); }} title={`收起当前这一轮的过程${keyHint(collapseTurnKey)}`}>收起 <span aria-hidden="true">˄</span></button>
-          <button type="button" className={`${css.textButton} ${css.collapseAll}`} data-reader-collapse-all={otherTurnsOpen ? 'open' : 'idle'} hidden={!otherTurnsOpen} aria-keyshortcuts={collapseAllKey || undefined} onClick={() => { rememberCollapseFocus(); collapseEveryTurn(); }} title={`收起所有已展开的过程${keyHint(collapseAllKey)}`}>全部收起</button>
+          <CollapseControl mode={collapseMode} currentOpen={currentTurnOpen} othersOpen={otherTurnsOpen}
+            turnKey={collapseTurnKey} allKey={collapseAllKey} keyHint={keyHint}
+            remember={rememberCollapseFocus} collapseCurrent={collapseCurrentTurn} collapseAll={collapseEveryTurn} />
         </div>
         <SettingsMenu motion={motion} preference={motionPreference} onChange={props.actions.setMotion}
           glass={glassPreference} onGlass={props.actions.setGlass}
+          glassConversation={glassConversation} onGlassConversation={props.actions.setGlassConversation}
+          conversationSolid={conversationSolid} onConversationSolid={props.actions.setConversationSolid}
+          collapseMode={collapseMode} onCollapseMode={props.actions.setCollapseMode}
           glassParts={glassValuesResolved} onGlassPart={props.actions.setGlassPart}
           openInSidebar={openInSidebar} onOpenInSidebar={on => { props.actions.setDeliverableOpenMode(on ? 'sidebar' : 'external'); }}
+          wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
+          onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
+          wallpaperScope={wallpaperScope} wallpaperChrome={wallpaperChrome}
+          onWallpaperScope={props.actions.setWallpaperScope} onWallpaperChrome={props.actions.setWallpaperChrome}
           shortcuts={{ collapseTurn: collapseTurnKey, collapseAll: collapseAllKey }} onShortcut={props.actions.setShortcut} buttonRef={settingsRef} />
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {

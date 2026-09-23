@@ -11,6 +11,14 @@ import { installReaderEntry } from './entry.js';
 import { fillComposerDom } from './mcp-app.js';
 import { deliverableOpenModeOf, openDeliverableFile } from './open-file.js';
 import type { DeliverableOpenMode } from './open-file.js';
+import { installWindowScope } from './wallpaper-scope.js';
+import { installScrollbarStyle } from './scrollbar.js';
+import { installComposerWheel } from './composer-wheel.js';
+import { installResizerWheel } from './resizer-wheel.js';
+import { installComposerGlass } from './composer-glass.js';
+import { installAppBackdrop } from './app-backdrop.js';
+import { installConversationGlass } from './conversation-glass.js';
+import { installConversationSolid } from './conversation-solid.js';
 import type { ReaderInjected } from './types.js';
 
 /** Structural face of the sanctioned per-session composer writer. */
@@ -42,6 +50,48 @@ export const inject = ['slots', 'sessions', 'conversation', 'remote', 'remote.se
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
+  /**
+   * The window-wide wallpaper's stylesheet, installed once per activation.
+   *
+   * It is static and gated on an attribute the reading view writes onto `<html>`, so nothing here has
+   * to read the reader's store — which it could not do anyway (`createReaderStore()` is a handle; the
+   * live snapshot belongs to the framework's instance). Installing it from `apply` rather than from
+   * the view is also what lets the backdrop outlive the reader switching away from this view.
+   */
+  ctx.effect(() => installWindowScope(document), 'dsh-viewtune: window wallpaper scope');
+  // The scrollbar's groove is installed unconditionally; whether it paints anything is the dial's
+  // business (0% is byte-for-byte the host's own transparent track).
+  ctx.effect(() => installScrollbarStyle(document), 'dsh-viewtune: scrollbar groove');
+  // The composer is the host's, and the element that scrolls it carries a hash-only class name, so there is nothing
+  // stable to write a CSS selector against. The guard is therefore a capture-phase wheel listener on `window` that
+  // walks up from the event's own target instead; see composer-wheel.ts for why the declarative route was dropped.
+  ctx.effect(() => installComposerWheel(document), 'dsh-viewtune: composer wheel');
+  // The column handles sit BESIDE the reading scroller rather than inside it, so a wheel over them had no scroll
+  // container to reach and the gesture died there; this forwards it to the transcript. See resizer-wheel.ts.
+  ctx.effect(() => installResizerWheel(document), 'dsh-viewtune: column handle wheel');
+  // The host's input box, transparent like the rest of the skin — it follows the skin's master switch rather than the
+  // conversation one, because it is on screen in both views. See composer-glass.ts for the two host facts it rests on.
+  ctx.effect(() => installComposerGlass(document), 'dsh-viewtune: composer glass');
+  /**
+   * The backdrop's app-wide half, published once per activation rather than by the reading view.
+   *
+   * A new session opens on the host's conversation view, so that view is not mounted and everything it
+   * publishes — the wallpaper on `<html>`, the groove's dial — was missing until the reader switched to
+   * an older conversation. These are global preferences and belong to the plugin, not to one view; the
+   * reading view still refines the geometry when it is the view that is open.
+   */
+  ctx.effect(() => installAppBackdrop(document), 'dsh-viewtune: app-wide backdrop');
+  /**
+   * The skin's reach into the host's conversation page, installed unconditionally and switched on by an
+   * attribute on `<html>` (see conversation-glass.ts): nothing applies until the reader turns that switch
+   * on, and turning it off is one attribute removal rather than an unpicking of rules.
+   */
+  ctx.effect(() => installConversationGlass(document), 'dsh-viewtune: conversation glass');
+  /**
+   * The conversation page's own solid backdrop, installed the same way and switched on by its own
+   * attribute: a separate switch from the skin's, because it is about what that page is made of.
+   */
+  ctx.effect(() => installConversationSolid(document), 'dsh-viewtune: conversation solid page');
   /**
    * The right sidebar's resource opener, looked up per click rather than once at activation.
    *

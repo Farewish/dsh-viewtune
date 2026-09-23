@@ -155,6 +155,19 @@
   padding: 0 5px;
 }
 
+/*
+ * Inline code under the skin: it rides the CODE dial, not one of its own.
+ *
+ * It is a different surface from a fenced block — it is a chip inside a sentence, and the theme even
+ * gives it its own token — but the rule the diff dial already follows is the one that applies: paper of
+ * one kind belongs to one dial wherever it is drawn, or a reader has to move two controls to make one
+ * thing look even. At 0% the chip still groups the run, because what carries it then is the monospace
+ * face and the surrounding prose, not the plate.
+ */
+[data-reader-glass] .markdown :not(pre) > code {
+  background-color: color-mix(in srgb, var(--dsw-alias-markdown-inline-code) var(--glass-code, 25%), transparent);
+}
+
 .markdown :where(h1, h2, h3, h4, h5, h6) code {
   font: inherit;
   font-family: var(--ds-font-family-code);
