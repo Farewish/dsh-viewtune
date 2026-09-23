@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CONVERSATION_GLASS_ATTRIBUTE, applyConversationGlass, conversationGlassOf } from '../src/client/app-backdrop.ts';
 import { conversationGlassCss } from '../src/client/conversation-glass.ts';
+import { GLASS_PARTS } from '../src/client/glass.ts';
 
 /** The smallest document the publisher touches. */
 function fakeDocument() {
@@ -44,9 +45,10 @@ test('publishing sets the gate and just the two dials, and withdrawing takes the
   assert.equal(doc.attributes.has(CONVERSATION_GLASS_ATTRIBUTE), true);
   assert.equal(doc.properties.get('--glass-code'), '40%');
   assert.equal(doc.properties.get('--glass-user'), '10%');
-  // A part nobody moved falls back to its initial, the same rule every other reader follows.
+  // A part nobody moved falls back to its initial — the reader's own setting, so the assertion reads the table rather
+  // than repeating the number here.
   applyConversationGlass(doc, { glass: true, glassConversation: true });
-  assert.equal(doc.properties.get('--glass-user'), '25%');
+  assert.equal(doc.properties.get('--glass-user'), `${String(GLASS_PARTS.find(part => part.id === 'user')?.initial ?? -1)}%`);
   applyConversationGlass(doc, { glass: true, glassConversation: false });
   assert.equal(doc.attributes.has(CONVERSATION_GLASS_ATTRIBUTE), false);
   assert.deepEqual([...doc.properties.keys()], []);

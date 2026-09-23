@@ -140,7 +140,17 @@ want('the tooltip names the binding in force', 'keyHint(turnKey)', 1);
 // item and the primary's title when that action applies) — what matters is that the binding is READ rather
 // than spelled out, so rebinding cannot leave a stale literal in a tooltip.
 present('and the other action advertises its binding too', 'keyHint(allKey)');
-present('collapse-all label', '全部收起');
+// The caret's own words, and the fact that the two places which show them read ONE variable.
+//
+// This assertion used to read 全部收起, which the control has not said since the labels were shortened: that string was
+// in the bundle only because a SETTINGS HINT happened to contain it, so the check was passing on the panel's copy
+// rather than on the control, and it began failing the moment that hint was deleted for saying too much. What the caret
+// actually advertises — and what the reader asked it to say, word for word — is this sentence.
+present('the caret advertises its own action, in the control\'s words', '收起所有已展开的过程');
+// Its accessible name and its tooltip are the same variable, which is the property the reader asked for: one click,
+// and the same words the second control used to carry.
+want('and the caret\'s accessible name is that label', '"aria-label": allLabel', 1);
+want('…and so is its tooltip', 'title: allLabel', 1);
 // The two defaults, in the one table the resolver and the settings panel both read.
 want('the defaults live in one table', 'collapseAll: "Alt+Shift+C"', 1);
 want('including the turn default', 'collapseTurn: "Alt+C"', 1);

@@ -12,8 +12,8 @@ import { WallpaperSection } from './WallpaperSection.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 import css from './Reader.module.css';
 
-/** The panel's pages, in the order they are offered. */
-const PAGES = [['visual', '视效'], ['shortcuts', '快捷键']] as const;
+/** The panel's pages, in the order they are offered: what it looks like, what it does, and what the keys are. */
+const PAGES = [['visual', '视效'], ['features', '功能'], ['shortcuts', '快捷键']] as const;
 type SettingsPage = (typeof PAGES)[number][0];
 
 /**
@@ -43,13 +43,13 @@ const MOTION_OVERRIDE = '已按系统的「减少动态效果」关闭';
  * so this one keeps the browser's own box rather than growing a second kind of hover language. */
 const BUTTON_HINT = 'viewtune 设置';
 /** What the frosted-glass skin does, as the row's `title` box. */
-const GLASS_HINT = '默认关闭。打开后卡片、工具框与代码块透出宿主壁纸与皮肤，工具栏用同一套液体玻璃；路径、行数这类标签静止时透明，悬停或聚焦才显出轮廓。';
+const GLASS_HINT = '卡片、工具框与代码块透出壁纸；小标签悬停时才显形';
 /** What the skin's reach into the conversation view means, as that row's `title` box. */
-const GLASS_CONVERSATION_HINT = '默认关闭。打开后「对话」页里那些同样由本皮肤管的表面（代码块——含顶栏与行内代码、用户气泡）跟着上面这几个旋钮一起变；关闭时对话页保持原样。它只影响这一页，不影响宿主其它面板。';
-/** What the merged collapse button's mode means, as that row's `title` box. */
-const COLLAPSE_MODE_HINT = '工具栏左端只有一个控件的位置：正文宽度调到最大时，两个按钮里的第二个会跑出边界，而第一个已经外移到手感极限。所以收起与全部收起合并成一个按钮，这里决定它怎么表现——「二选一」保留两者的可达性（主按钮 + 箭头），两个单动作模式把它钉成一个动作；无论选哪个，另一个动作的键盘绑定都还在（它绑的是动作，不是这个按钮）。';
+const GLASS_CONVERSATION_HINT = '「对话」页里的代码块与用户气泡也跟着变';
 /** Where a delivered file opens, as the row's `title` box. */
-const OPEN_MODE_HINT = '默认关闭：点产物文件用系统程序打开。打开后改用右侧栏的内置预览（文件夹、「在文件夹中显示」仍然走系统程序）；宿主没有这个服务时会自动回落到系统程序，并在控制台说明原因。';
+const OPEN_MODE_HINT = '打开后点产物文件用右侧栏预览，而不是系统程序';
+/** What the toolbar's two column handles do with a wheel, as that row's `title` box. */
+const STRIP_WHEEL_HINT = '在阅读列两边的竖条上滚动，正文也会跟着滚动';
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
@@ -85,10 +85,10 @@ const OPEN_MODE_HINT = '默认关闭：点产物文件用系统程序打开。�
  *
  * The pages are a real tablist — `role="tab"` with a roving tabindex, the arrows and Home/End
  * moving focus and selection together — which is the same shape the tool ledger uses for its own
- * tabs. A settings panel with two pages should not be the one place in this view where a keyboard
- * reader has to guess.
+ * tabs. A settings panel with more than one page should not be the one place in this view where a
+ * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -113,6 +113,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** Whether a delivered file opens in the right sidebar rather than the system app. */
   openInSidebar: boolean;
   onOpenInSidebar: (next: boolean) => void;
+  /** Whether a wheel over the toolbar's two column handles is forwarded to the transcript. */
+  stripWheel: boolean;
+  onStripWheel: (next: boolean) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background. */
@@ -272,14 +275,6 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 </span>
               </div>
             ))}
-            {/* Where a delivered file opens. Independent of the skin, so it sits after the dials
-                rather than inside them; the row's `title` carries the fallback story. */}
-            <div className={css.settingsRow} title={OPEN_MODE_HINT} data-ud-check="reader-settings-openmode">
-              <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>产物用右侧栏打开</span>
-              </span>
-              <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
-            </div>
             {/* The wallpaper: the folder's own images, then the scrim that keeps prose readable on
                 one. It reads its list from the host half, so the row owns that fetch rather than
                 taking a list through props nobody else needs. */}
@@ -287,12 +282,31 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
               scope={wallpaperScope} chrome={wallpaperChrome} onScope={onWallpaperScope} onChrome={onWallpaperChrome}
               solid={conversationSolid} onSolid={onConversationSolid} />
           </>
+          : page === 'features'
+          ? <>
+            {/* What this plugin does to the app rather than how any of it looks: two switches, one for each piece of
+                behaviour it adds on top of the host. They live together because that is the question a reader asks
+                here — "what is this thing changing?" — and neither is a matter of taste about pixels. */}
+            <div className={css.settingsRow} title={STRIP_WHEEL_HINT} data-ud-check="reader-settings-strip-wheel">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>竖条滚轮</span>
+              </span>
+              <Switch checked={stripWheel} onChange={onStripWheel} label="竖条滚轮" />
+            </div>
+            <div className={css.settingsRow} title={OPEN_MODE_HINT} data-ud-check="reader-settings-openmode">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>产物用右侧栏打开</span>
+              </span>
+              <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
+            </div>
+          </>
           : <>
             {/* The collapse button's mode lives on the SHORTCUTS page rather than with the visual settings:
                 it is about the control, and its two actions are the two bindings right below it. A native
                 select because the choice is three named states, not a degree — and the one control here that
-                is not a switch or a dial. */}
-            <div className={css.settingsRow} title={COLLAPSE_MODE_HINT} data-ud-check="reader-settings-collapse-mode">
+                is not a switch or a dial. No `title`: the three options are their own description, and the
+                paragraph that used to ride here was an argument for merging the buttons in the first place. */}
+            <div className={css.settingsRow} data-ud-check="reader-settings-collapse-mode">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>收起按钮</span>
               </span>

@@ -6,7 +6,7 @@
  * class and keyframe names and reorders declarations on every build: a marker written as one
  * verbatim rule string verifies a single build rather than the rule being present.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { classSel, hasDecls, keyframeOf, moduleCssLiteral, pillBoundaryClass, ruleDecls } from './bundle-anchors.mjs';
 import { fileURLToPath } from 'node:url';
@@ -401,8 +401,64 @@ const markers = [
   // The reading view's preferences live behind one toolbar button: the lane keeps its geometry and
   // a preference becomes a row in this panel instead of another control in the lane.
   ['settings panel holds the preferences', '"data-ud-check": "reader-settings"'],
-  // The panel's subjects are pages: a tablist rather than a longer scroll of rows.
+  // The panel's COPY is written for a reader, not for this repository. The reader asked for exactly this: as a user of
+  // the plugin they do not need to know how an option is implemented or why it is implemented that way, and the rows
+  // that said the most were the ones carrying a paragraph of rationale — the collapse mode's, which argued for merging
+  // two buttons, was the worst of them. Read from the SOURCE rather than from the bundle, because the strings live in
+  // three modules and exporting them to be inspected would be the copy defining an API; this script runs in the
+  // checkout, where the sources are.
+  //
+  // The vocabulary is what a reader has — which surface a dial moves — and never the machinery: custom properties,
+  // token plumbing, selectors, or this repository's own word for a dial. A length cap catches the paragraph that a
+  // well-meaning explanation turns into even when it avoids every forbidden word.
+  ['the settings copy describes what an option does, not how it works', () => {
+    const files = ['SettingsMenu.tsx', 'WallpaperSection.tsx', 'glass.ts'];
+    const forbidden = /--[a-z-]|color-mix|backdrop-filter|token|伪元素|选择器|样式表|属性|旋钮|闸|宿主|默认关闭|默认不设/g;
+    const hints = [];
+    for (const file of files) {
+      const source = readFileSync(join(ROOT, 'src', 'client', file), 'utf8');
+      for (const match of source.matchAll(/const [A-Z_]+_HINT = '([^'\n]*)'/g)) hints.push([file, match[1]]);
+      for (const match of source.matchAll(/^\s*hint: '([^'\n]*)'/gm)) hints.push([file, match[1]]);
+    }
+    // A check that found nothing would pass forever: these three files hold more than a dozen boxes between them.
+    if (hints.length < 8) return false;
+    // Every offender is printed rather than the first, so one pass of the guard is one pass of the copy edit.
+    const offenders = hints.filter(([, hint]) => forbidden.test(hint) || hint.length > 28);
+    for (const [file, hint] of offenders) console.log(`     ${file}: ${String(hint.length)} chars — ${hint}`);
+    return offenders.length === 0;
+  }],
+  // The panel's subjects are pages: a tablist rather than a longer scroll of rows. Three of them now, and the ORDER
+  // is the claim — a reader looking for what this plugin DOES rather than what it looks like expects the page between
+  // the two that were there before, not appended after the keys. Pinned as the array itself rather than as three
+  // separate strings, so an insertion in the wrong place cannot pass by being present.
   ['and offers its pages as tabs', '"data-ud-check": "reader-settings-tabs"'],
+  ['the features page sits between the visual and the shortcut pages', () =>
+    /\[\s*"visual",\s*"视效"\s*\],\s*\[\s*"features",\s*"功能"\s*\],\s*\[\s*"shortcuts",\s*"快捷键"\s*\]/.test(bundle)],
+  // …and the bar under them is one page wide. It was written for two, as half the row; adding a page without touching
+  // it would have left a bar that never reaches the third tab, so the declaration is pinned where it is emitted —
+  // lightningcss folds the arithmetic, hence the two decimals.
+  ['the page bar is a third wide, with a stop per page', () =>
+    bundle.includes('width:calc(33.3333% - 1.33333px)')
+    && bundle.includes('[data-settings-page=features]:after')
+    && bundle.includes('[data-settings-page=shortcuts]:after')],
+  // The 功能 page's two rows: the handles' wheel, which is the one piece of BEHAVIOUR this plugin adds on top of the
+  // host, and the delivered file's destination, moved here from the visual page because it is not a matter of taste
+  // about pixels either.
+  ['the features page holds the strip wheel and the deliverable destination', () =>
+    bundle.includes('"data-ud-check": "reader-settings-strip-wheel"')
+    && bundle.includes('"data-ud-check": "reader-settings-openmode"')],
+  // …and the switch is real in both directions: the reading view publishes it on its own root (one occurrence) and the
+  // listener reads it there (the other) — two spellings of one string, which is why the count is asserted rather than
+  // the presence of either. The gate is asserted as the LINE it compiles to, because where it sits is the property
+  // that matters: before the notch is consumed, so a disabled wheel leaves the event exactly as it found it rather
+  // than swallowing it and doing nothing.
+  ['the strip wheel switch reaches the listener, which stops before consuming the notch', () => {
+    const attribute = (bundle.match(/data-reader-strip-wheel/g) ?? []).length;
+    const gate = bundle.indexOf('if (!stripWheelEnabled(root.getAttribute(STRIP_WHEEL_ATTRIBUTE))) return;');
+    return attribute === 2
+      && gate !== -1
+      && gate < bundle.indexOf('handleTakesWheel(view.getComputedStyle(element)', gate);
+  }],
   // The shortcut page is where a reader changes the two bindings; it holds the recorder.
   ['the shortcut page records new bindings', '"data-ud-check": "reader-settings-shortcuts"'],
   // The selected page's bar is ONE element on the row, translated between equal-width tabs — a bar
@@ -451,6 +507,22 @@ const markers = [
   // come from the plugin's own route, keyed by the file's mtime so a re-dropped image is not served
   // from the browser's cache. The folder itself never reaches the browser — see the forbidden list.
   ['the settings panel offers a wallpaper', '"data-ud-check": "reader-settings-wallpaper"'],
+  // The wallpaper a FRESH install opens with. Its name lives in three places — the client's default, the host's constant
+  // and the asset path resolved off the host module — in two bundles that cannot import each other, so the RELATION is
+  // what is asserted rather than any one spelling: a rename that misses one of them leaves every new reader with a
+  // default naming a file nobody has, which is the one failure this arrangement exists to prevent. The FILE is checked
+  // too, because a name and a constant agreeing about nothing is still nothing.
+  ['the shipped wallpaper is one name in three places, and the file is there', () => {
+    const host = readFileSync(join(installedPluginDir(), 'lib', 'dsh-viewtune.js'), 'utf8');
+    const name = 'sample-gradient.png';
+    return bundle.includes(`const DEFAULT_WALLPAPER = "${name}"`)
+      && host.includes(`const DEFAULT_WALLPAPER_NAME = "${name}"`)
+      && host.includes(`"../assets/${name}"`)
+      && existsSync(join(installedPluginDir(), 'assets', name))
+      // …and something actually puts it where the client will ask for it, at activation rather than on first listing.
+      && host.includes('seedDefaultWallpaper(WALLPAPER_DIR, WALLPAPER_ASSET)')
+      && host.includes('"dsh-viewtune: shipped wallpaper"');
+  }],
   ['the wallpaper is painted on the reading view root from the chosen name', () =>
     /"data-reader-wallpaper"/.test(bundle) && bundle.includes('wallpaperProperties(')],
   ['the wallpaper is a viewport-anchored backdrop with a theme-mixed scrim', () => {

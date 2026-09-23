@@ -3,8 +3,9 @@ import { createReadStream } from 'node:fs';
 import { mkdir, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import type { Context } from '@deepseek-ai/cordis';
-import { contentTypeOf, listWallpapers, resolveWallpaperFile, wallpaperDirOf } from './wallpaper-files.js';
+import { contentTypeOf, listWallpapers, resolveWallpaperFile, seedDefaultWallpaper, wallpaperDirOf } from './wallpaper-files.js';
 import { SETTINGS_MAX_BYTES, readSettings, settingsFileOf, writeSettings } from './viewtune-settings.js';
 
 declare module '@deepseek-ai/cordis' {
@@ -39,6 +40,14 @@ const WALLPAPER_REVEAL_PATH = '/better-display/wallpapers/reveal';
 /** The reader's settings record, kept by the host so a restart cannot lose it (see the settings module). */
 export const READER_SETTINGS_PATH = '/better-display/settings';
 const READER_SETTINGS_FILE = settingsFileOf(process.env, homedir());
+/**
+ * The wallpaper file this build ships, beside the manifest.
+ *
+ * Resolved off this module's own URL so it works wherever the plugin is installed from — a checkout, a packed
+ * tarball, or the `link:`ed copy the profile loads — because in all three the asset sits one directory up from
+ * `lib/`.
+ */
+const WALLPAPER_ASSET = fileURLToPath(new URL('../assets/sample-gradient.png', import.meta.url));
 
 /**
  * Read a request body, refusing anything past `limit` bytes.
@@ -108,6 +117,19 @@ function revealFolder(path: string): void {
 export function apply(ctx: Context): void {
   console.log('[my-plugins/dsh-viewtune] loaded');
   console.log(`[my-plugins/dsh-viewtune] wallpaper folder: ${WALLPAPER_DIR}`);
+
+  /**
+   * The wallpaper this plugin ships, put in the reader's folder before anything can ask for it.
+   *
+   * At ACTIVATION rather than on the first listing: the reading view paints the stored name the moment it mounts, so
+   * a seed that waited for the picker to open would leave the first look broken — which is the one case this exists
+   * for. Fire-and-forget, and it never overwrites, so a reader's own picture under that name stays theirs; the
+   * function answers false instead of throwing, because a bitmap must not be able to stop the plugin from mounting.
+   */
+  ctx.effect(() => {
+    void seedDefaultWallpaper(WALLPAPER_DIR, WALLPAPER_ASSET).catch(() => undefined);
+    return () => undefined;
+  }, 'dsh-viewtune: shipped wallpaper');
 
   if (ctx.webServer) {
     ctx.effect(() => {

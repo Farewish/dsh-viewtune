@@ -17,15 +17,30 @@ export interface WallpaperListing {
   readonly items: readonly WallpaperEntry[];
 }
 
-/** The scrim's shipped value: enough to read prose over a photograph, not enough to hide it. */
-export const WALLPAPER_DIM_INITIAL = 45;
+/**
+ * The wallpaper this plugin ships, which is also what the settings default to.
+ *
+ * The host half copies this file into the reader's folder on activation (`seedDefaultWallpaper`), so a fresh install
+ * has a picture rather than a reference to one nobody put there. The name is spelled twice — here and in
+ * `wallpaper-files.ts`, because the two bundles cannot import each other — and the guard pins the two against each
+ * other so a rename cannot leave the default pointing at nothing.
+ */
+export const DEFAULT_WALLPAPER = 'sample-gradient.png';
+/** The scrim's shipped value: the reader's own setting, taken as the default so a fresh install looks like theirs. */
+export const WALLPAPER_DIM_INITIAL = 35;
 export const WALLPAPER_DIM_MAX = 100;
 export const WALLPAPER_LIST_PATH = '/better-display/wallpapers';
 export const WALLPAPER_REVEAL_PATH = '/better-display/wallpapers/reveal';
 
-/** The stored name, read defensively: persistence replaces the whole record, so an old one has no key. */
+/**
+ * The stored name, read defensively: persistence replaces the whole record, so an old one has no key.
+ *
+ * A STRING is taken as it stands — including `''`, which is exactly how a reader says "no wallpaper" with 清除 — and
+ * anything that is not a string (a record written before the wallpaper existed, or a value that is not a name at all)
+ * falls back to the one this plugin ships.
+ */
 export function wallpaperNameOf(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+  return typeof value === 'string' ? value.trim() : DEFAULT_WALLPAPER;
 }
 
 export function wallpaperDimOf(value: unknown): number {

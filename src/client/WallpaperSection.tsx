@@ -9,16 +9,15 @@ import { WALLPAPER_CHROME_MAX, wallpaperChromeOf } from './wallpaper-scope.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 import css from './Reader.module.css';
 
-/** What the wallpaper row is, as its `title` box. */
-const WALLPAPER_HINT = '默认不设。壁纸放在插件自己的文件夹里（打开文件夹把图片拖进去），只读那里的图片；压暗滑块决定它离主题底色多近，好让正文压在上面也看得清。';
-/** Why the scrim exists, as the dial's own box. */
-const DIM_HINT = '压暗：0% 是原图，100% 只剩主题底色';
-/** What the window scope does, and what it costs. */
-const SCOPE_HINT = '默认只铺在阅读视图里。打开后同一张图铺满整个窗口：左侧栏与顶部栏改为透出它（它们各自的底板被让开），中部输入框周围的底色也跟着走。';
-/** Why the chrome keeps a scrim of its own even though the wallpaper is behind it. */
-const CHROME_HINT = '界面遮罩：左侧栏与顶部栏压在自己那份壁纸上的底色浓度。它们上面全是文字，0% 就是直接压在照片上。';
-/** What the conversation page's own solid backdrop means, as its row's `title` box. */
-const SOLID_HINT = '默认关闭。打开后「对话」页改成整页纯色底（深色主题下是黑、浅色主题下是白，也就是主题底色），并像「轨迹」页那样在输入框上方做一段抬起的渐变淡出——最后几行会提前淡掉，而不是硬切。它和「磨砂玻璃」互不依赖，也不需要先选一张壁纸：想只要纯色底就单开这一个。它只影响这一页。';
+/**
+ * The dials' own `title` boxes, and the rule they follow: a reader of this panel wants to know WHICH surface a slider
+ * moves, not how the surface is built. Where the row's own label already says it — 「壁纸」 with a picker, a folder
+ * button and a note that says what to do when the folder is empty — there is no box at all.
+ */
+const DIM_HINT = '越高越接近主题底色';
+const SCOPE_HINT = '打开后铺满整个窗口，而不只是阅读视图';
+const CHROME_HINT = '左侧栏与顶部栏的底色浓度';
+const SOLID_HINT = '「对话」页改用主题纯色底，输入框上方保留淡出';
 
 const LOADING = '正在读取文件夹…';
 const EMPTY = '文件夹里还没有图片：把图片拖进去，再点「刷新」';
@@ -70,7 +69,7 @@ export function WallpaperSection({ name, dim, scope, chrome, solid, onPick, onDi
       : listing.items.length === 0 ? EMPTY : null;
   const dimValue = wallpaperDimOf(dim);
   return <>
-    <div className={css.settingsRow} title={WALLPAPER_HINT} data-ud-check="reader-settings-wallpaper">
+    <div className={css.settingsRow} data-ud-check="reader-settings-wallpaper">
       <span className={css.settingsCopy}>
         <span className={css.settingsLabel}>壁纸</span>
         {state !== null && <span className={css.settingsNote}>{state}</span>}

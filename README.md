@@ -42,7 +42,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # 或从本地目录 / tarball 安装
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.3.0-relayout.14.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.4.0.tgz
 ```
 
 装完**重启 Host**再刷新页面：`dsh plugin add` 只写 profile，不会热挂正在运行的进程。

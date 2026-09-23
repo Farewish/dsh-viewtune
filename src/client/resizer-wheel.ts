@@ -56,6 +56,8 @@ const READER_ROOT = '[data-dsh-better-display]';
 const SCROLLER = '[class*="_scrollBody"]';
 /** The column both the handle and that scroller live in. */
 const COLUMN = '[class*="_centerCol"]';
+/** The reading view root's switch for this file, published beside `data-motion`. See `stripWheelEnabled`. */
+const STRIP_WHEEL_ATTRIBUTE = 'data-reader-strip-wheel';
 
 /**
  * The two ends of the stiffness, and the gap that separates them.
@@ -160,6 +162,18 @@ const STREAM_HOLD_MAX_SECONDS = 0.2;
  */
 export function handleTakesWheel(cursor: string, insideColumn: boolean): boolean {
   return insideColumn && cursor === HANDLE_CURSOR;
+}
+
+/**
+ * The reading view root's own switch: the reader's 「竖条滚轮」, published beside `data-motion`.
+ *
+ * OFF is one spelling and everything else is ON, including the attribute being absent — the root is the only thing
+ * that ever writes it, so a view that has not written it yet has not turned anything off, and the behaviour a reader
+ * has never touched is the forwarding they asked for. Split out for the same reason as the rule above: it is the whole
+ * of the decision and it can be tested without a DOM.
+ */
+export function stripWheelEnabled(attribute: string | null): boolean {
+  return attribute !== 'off';
 }
 
 /**
@@ -377,7 +391,14 @@ export function installResizerWheel(doc: Document): () => void {
   const onWheel = (event: WheelEvent): void => {
     const element = event.target;
     if (!(element instanceof view.Element)) return;
-    const scroller = readerScroller();
+    // The reading view's own root, read once: it carries both the switch below and the motion preference further
+    // down, and the scroller is reached through it.
+    const root = doc.querySelector(READER_ROOT);
+    if (root === null) return;
+    // Before anything else, so a disabled wheel is not merely ignored but never consumed: the notch is left to the
+    // browser exactly as it was before this file existed, and nothing here writes a position or swallows an event.
+    if (!stripWheelEnabled(root.getAttribute(STRIP_WHEEL_ATTRIBUTE))) return;
+    const scroller = root.closest(SCROLLER);
     if (scroller === null) return;
     const column = scroller.closest(COLUMN);
     if (column === null) return;
@@ -430,7 +451,7 @@ export function installResizerWheel(doc: Document): () => void {
     if (target === null) state = { at: scroller.scrollTop, velocity: 0 };
     target = (target ?? scroller.scrollTop) + pixels;
     // The reader's own motion switch decides whether there is a glide at all: with it off the notch lands at once.
-    if (doc.querySelector(READER_ROOT)?.getAttribute('data-motion') === 'off') {
+    if (root.getAttribute('data-motion') === 'off') {
       scroller.scrollTop = target;
       target = null;
       state = { at: 0, velocity: 0 };

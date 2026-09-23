@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  WALLPAPER_DIM_INITIAL, wallpaperDimOf, wallpaperGeometry, wallpaperListingOf, wallpaperNameOf, wallpaperProperties,
-  wallpaperUrl,
+  DEFAULT_WALLPAPER, WALLPAPER_DIM_INITIAL, wallpaperDimOf, wallpaperGeometry, wallpaperListingOf, wallpaperNameOf,
+  wallpaperProperties, wallpaperUrl,
 } from '../src/client/wallpaper.ts';
 
-test('the stored wallpaper name survives an old record, and anything else means none', () => {
+test('the stored wallpaper name survives an old record, and anything nameless gets the shipped one', () => {
   assert.equal(wallpaperNameOf('sunset.png'), 'sunset.png');
   assert.equal(wallpaperNameOf('  spaced name.jpg  '), 'spaced name.jpg');
-  // A record written before this preference existed has no such key at all.
-  assert.equal(wallpaperNameOf(undefined), '');
-  assert.equal(wallpaperNameOf(null), '');
-  assert.equal(wallpaperNameOf(42), '');
+  // A record written before this preference existed has no such key at all, and a value that is not a name is the
+  // same story: both mean the wallpaper this plugin ships, which the host seeds into the reader's folder.
+  assert.equal(wallpaperNameOf(undefined), DEFAULT_WALLPAPER);
+  assert.equal(wallpaperNameOf(null), DEFAULT_WALLPAPER);
+  assert.equal(wallpaperNameOf(42), DEFAULT_WALLPAPER);
+  // …but an EMPTY STRING is a reader who asked for none with 清除, and stays none rather than being overridden by the
+  // default. The two cases are one character apart in the record and must not be conflated.
+  assert.equal(wallpaperNameOf(''), '');
   // This side does not sanitize a path: what may be served is the host's decision, not the client's.
   assert.equal(wallpaperNameOf('../escape.png'), '../escape.png');
 });

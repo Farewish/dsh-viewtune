@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cruiseStep, handleTakesWheel, springStep, stiffnessForGap, streamCarries, streamHoldSeconds, streamSpeed, wheelPixels } from '../src/client/resizer-wheel.ts';
+import { cruiseStep, handleTakesWheel, springStep, stiffnessForGap, streamCarries, streamHoldSeconds, streamSpeed, stripWheelEnabled, wheelPixels } from '../src/client/resizer-wheel.ts';
 
 const FRAME = 1 / 60;
 
@@ -31,6 +31,16 @@ test('only the reading column’s own resize cursor forwards the wheel', () => {
   assert.equal(handleTakesWheel('auto', true), false, 'the transcript itself scrolls natively');
   assert.equal(handleTakesWheel('pointer', true), false, 'and so does anything else in the column');
   assert.equal(handleTakesWheel('', false), false, 'nothing at all when both conditions fail');
+});
+
+test('the strip wheel is on unless the reader has switched it off', () => {
+  // The reader's own switch, published on the reading view's root. ON is the behaviour they asked for and tuned, so
+  // the only thing that turns it off is the one spelling the root writes — and an ABSENT attribute is ON, because a
+  // view that has not written it yet has not switched anything off.
+  assert.equal(stripWheelEnabled(null), true, 'no attribute yet');
+  assert.equal(stripWheelEnabled('on'), true, 'the spelling the reading view writes when it is on');
+  assert.equal(stripWheelEnabled(''), true, 'an empty attribute is not an off switch either');
+  assert.equal(stripWheelEnabled('off'), false, 'and this is the whole of the off switch');
 });
 
 test('a notch becomes pixels, whichever unit the wheel reported', () => {

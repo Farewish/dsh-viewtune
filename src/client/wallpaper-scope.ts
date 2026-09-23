@@ -29,11 +29,17 @@ export const WINDOW_SCOPE_STYLE_ID = 'dsh-viewtune-wallpaper-scope';
 /** Where the wallpaper stops: the reading view alone, or the whole window. */
 export type WallpaperScope = 'view' | 'window';
 
-export const WALLPAPER_CHROME_INITIAL = 55;
+/**
+ * The chrome scrim's shipped value, and the scope a record that never chose one means.
+ *
+ * Both are the reader's own settings, taken as the defaults: the wallpaper carries the whole window and the sidebar
+ * and top bar keep 35% of their colour over it, which is the look a fresh install now opens with.
+ */
+export const WALLPAPER_CHROME_INITIAL = 35;
 export const WALLPAPER_CHROME_MAX = 100;
 
 export function wallpaperScopeOf(value: unknown): WallpaperScope {
-  return value === 'window' ? 'window' : 'view';
+  return value === 'view' ? 'view' : 'window';
 }
 
 export function wallpaperChromeOf(value: unknown): number {

@@ -3,7 +3,7 @@ import type { EngineStoreHandle } from '@deepseek-ai/dsh-client-store';
 import type { ShortcutAction } from './shortcuts.js';
 import type { CollapseMode } from './collapse-mode.js';
 import type { DeliverableOpenMode } from './open-file.js';
-import { WALLPAPER_DIM_INITIAL } from './wallpaper.js';
+import { DEFAULT_WALLPAPER, WALLPAPER_DIM_INITIAL } from './wallpaper.js';
 import { WALLPAPER_CHROME_INITIAL } from './wallpaper-scope.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 
@@ -16,10 +16,10 @@ export interface ReaderState {
   /**
    * Whether the skin also reaches the CONVERSATION view.
    *
-   * Off by default, and deliberately a SECOND switch rather than part of the skin: the reading view is
-   * this plugin's own surface, while the conversation page belongs to the host — a reader who wants the
-   * skin where they read has not thereby asked for it everywhere else. Read the defensive way
-   * (`=== true`), like `glass` itself.
+   * ON by default, and still deliberately a SECOND switch rather than part of the skin: the reading view is
+   * this plugin's own surface, while the conversation page belongs to the host, so a reader can have one without
+   * the other. Both defaults are the reader's own settings, adopted so this plugin opens for anyone the way it opens
+   * for them. Read the defensive way (`=== true`), like `glass` itself.
    */
   glassConversation: boolean;
   /**
@@ -41,7 +41,22 @@ export interface ReaderState {
   collapseMode: CollapseMode;
   /** Where a delivered file opens: the system app by default, the right sidebar on request. */
   deliverableOpenMode: DeliverableOpenMode;
-  /** The chosen wallpaper's file name inside the plugin's own folder, or `''` for none. */
+  /**
+   * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
+   *
+   * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
+   * belong to the shell and sit BESIDE the scroller, so without this a notch over one of them does nothing at all.
+   * It is a switch rather than a constant because it is the one thing in this plugin that changes how the app
+   * scrolls, and a reader who would rather have the silence back is entitled to it. Read defensively
+   * (`!== false`), so a record written before the switch existed keeps the forwarding it was written with.
+   */
+  stripWheel: boolean;
+  /**
+   * The wallpaper's file name inside the plugin's own folder; `''` means none, which the reader asks for with 清除.
+   *
+   * The default is the file this plugin ships and seeds into the folder (see `wallpaper-files.ts`), so a fresh
+   * install has a picture rather than a reference to one nobody put there.
+   */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background, so prose stays readable on it. */
   wallpaperDim: number;
@@ -60,6 +75,7 @@ type ReaderActions = {
   setConversationSolid: (draft: ReaderState, value: boolean) => void;
   setCollapseMode: (draft: ReaderState, value: CollapseMode) => void;
   setDeliverableOpenMode: (draft: ReaderState, value: DeliverableOpenMode) => void;
+  setStripWheel: (draft: ReaderState, value: boolean) => void;
   setWallpaper: (draft: ReaderState, value: string) => void;
   setWallpaperDim: (draft: ReaderState, value: number) => void;
   setWallpaperScope: (draft: ReaderState, value: WallpaperScope) => void;
@@ -81,17 +97,20 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
      * the same story again: `wallpaperNameOf` and `wallpaperDimOf` own its fallbacks.
      */
     init: (): ReaderState => ({
-      expanded: {}, motion: true, glass: false, glassParts: {}, deliverableOpenMode: 'external',
-      // The skin stops at the reading view until the reader asks otherwise.
-      glassConversation: false,
-      // …and the conversation page keeps whatever is behind it until asked for a page of its own.
+      expanded: {}, motion: true, glass: true, glassParts: {}, deliverableOpenMode: 'external',
+      // The handles forward the wheel until a reader says otherwise; see the field's own note for why that is the
+      // default rather than an opt-in.
+      stripWheel: true,
+      // The skin reaches the conversation page too, which is the look a fresh install opens with.
+      glassConversation: true,
+      // …while the conversation page keeps whatever is behind it: a separate choice, and this one is off.
       conversationSolid: false,
       // The pair of buttons' behaviour, which is what a reader who never opens this setting keeps.
       collapseMode: 'both',
-      // No wallpaper until one is chosen; the scrim starts where prose stays readable on a photo.
-      wallpaper: '', wallpaperDim: WALLPAPER_DIM_INITIAL,
-      // Opt-in: the reading view alone is what a reader gets, and the window scope is one switch away.
-      wallpaperScope: 'view', wallpaperChrome: WALLPAPER_CHROME_INITIAL, shortcuts: {},
+      // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
+      // window scope below means it carries the whole app rather than only the reading column.
+      wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
+      wallpaperScope: 'window', wallpaperChrome: WALLPAPER_CHROME_INITIAL, shortcuts: {},
     }),
     persist: 'dsh.reader.v1',
     actions: {
@@ -106,6 +125,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setConversationSolid: (draft, value: boolean) => { draft.conversationSolid = value; },
       setCollapseMode: (draft, value: CollapseMode) => { draft.collapseMode = value; },
       setDeliverableOpenMode: (draft, value: DeliverableOpenMode) => { draft.deliverableOpenMode = value; },
+      setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },
       setWallpaperDim: (draft, value: number) => { draft.wallpaperDim = value; },
       setWallpaperScope: (draft, value: WallpaperScope) => { draft.wallpaperScope = value; },

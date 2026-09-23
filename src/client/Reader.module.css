@@ -613,8 +613,11 @@
    (`flex: 1`), so the geometry needs no measurement: the bar is one tab wide, and the extra 2px in
    the second stop is the row's own gap. */
 .settingsTabs { position: relative; flex: none; display: flex; gap: 2px; padding: 6px 6px 0; margin-bottom: 6px; border-bottom: .5px solid var(--dsw-alias-border-l1); }
-.settingsTabs::after { content: ""; position: absolute; left: 0; bottom: -1px; width: calc((100% - 2px) / 2); height: 2px; border-radius: 2px; background: var(--dsw-alias-state-business-primary); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
-.settingsTabs[data-settings-page=shortcuts]::after { transform: translateX(calc(100% + 2px)); }
+.settingsTabs::after { content: ""; position: absolute; left: 0; bottom: -1px; width: calc((100% - 4px) / 3); height: 2px; border-radius: 2px; background: var(--dsw-alias-state-business-primary); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
+/* The bar is one tab wide and the tabs are equal, so a stop is one width plus one gap — and `translateX` percentages
+   are of the bar's own width, which is why the second stop is 200% rather than 100% over again. */
+.settingsTabs[data-settings-page=features]::after { transform: translateX(calc(100% + 2px)); }
+.settingsTabs[data-settings-page=shortcuts]::after { transform: translateX(calc(200% + 4px)); }
 .settingsTab { flex: 1; padding: 5px 8px 11px; border: 0; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; transition: color 160ms ease; }
 .settingsTab[aria-selected=true] { color: var(--dsw-alias-state-business-primary); }
 /* The switch governs both halves of that gesture. The system's reduced-motion request reaches this

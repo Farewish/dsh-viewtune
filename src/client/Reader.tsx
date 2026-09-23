@@ -680,6 +680,10 @@ export function Reader(props: ReaderProps) {
   // Where a delivered file opens. Read through the same fallback the skin uses: a record written
   // before this preference existed, or anything that is not `'sidebar'`, means the system app.
   const openInSidebar = props.useStore(state => deliverableOpenModeOf(state.deliverableOpenMode)) === 'sidebar';
+  // The column handles' wheel, default ON and read defensively (`!== false`): a record written before this switch
+  // existed keeps the forwarding it was written with. The listener is installed app-wide by index.tsx and reads this
+  // root's attribute, so the switch takes effect on the next notch rather than at the next mount.
+  const stripWheel = props.useStore(state => state.stripWheel) !== false;
   const glassVars = useMemo(() => glassProperties(glassValuesResolved), [glassValuesResolved]);
   // The wallpaper, read the same defensive way and handed over the same way: two custom properties
   // on the root, with the rest of the backdrop stated in the stylesheet. `wallpaperNameOf` is what
@@ -1047,7 +1051,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
@@ -1065,6 +1069,7 @@ export function Reader(props: ReaderProps) {
           collapseMode={collapseMode} onCollapseMode={props.actions.setCollapseMode}
           glassParts={glassValuesResolved} onGlassPart={props.actions.setGlassPart}
           openInSidebar={openInSidebar} onOpenInSidebar={on => { props.actions.setDeliverableOpenMode(on ? 'sidebar' : 'external'); }}
+          stripWheel={stripWheel} onStripWheel={props.actions.setStripWheel}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope} wallpaperChrome={wallpaperChrome}

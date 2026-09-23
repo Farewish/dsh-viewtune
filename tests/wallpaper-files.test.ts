@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
-  contentTypeOf, isWallpaperName, listWallpapers, resolveWallpaperFile, wallpaperDirOf,
+  contentTypeOf, isWallpaperName, listWallpapers, resolveWallpaperFile, seedDefaultWallpaper, wallpaperDirOf,
 } from '../src/wallpaper-files.ts';
 
 test('the folder is the instance home by default, and the override wins', () => {
@@ -68,5 +68,28 @@ test('the listing is images only, newest first, and a missing folder is empty ra
     assert.deepEqual(await listWallpapers(join(dir, 'missing')), []);
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('the shipped wallpaper is put in an empty folder, and never over one that is there', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'viewtune-seed-'));
+  const source = join(root, 'shipped.png');
+  await writeFile(source, 'shipped');
+  try {
+    // A FRESH install: the folder does not exist yet, and the settings' default names this file — so without the seed
+    // the reader's first look would be a reference to something nobody put there.
+    const fresh = join(root, 'wallpapers');
+    assert.equal(await seedDefaultWallpaper(fresh, source, 'shipped.png'), true);
+    assert.equal(await readFile(join(fresh, 'shipped.png'), 'utf8'), 'shipped');
+    // Second activation, and a reader's own picture under that name: neither may be replaced. The seed is a one-time
+    // "is anything here already", not a sync.
+    await writeFile(join(fresh, 'shipped.png'), 'mine');
+    assert.equal(await seedDefaultWallpaper(fresh, source, 'shipped.png'), false);
+    assert.equal(await readFile(join(fresh, 'shipped.png'), 'utf8'), 'mine');
+    // A source that is not there — a half-finished install — answers false rather than throwing, because activation
+    // must not be able to fail over a bitmap.
+    assert.equal(await seedDefaultWallpaper(join(root, 'elsewhere'), join(root, 'nope.png'), 'nope.png'), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });

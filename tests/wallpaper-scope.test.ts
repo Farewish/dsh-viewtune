@@ -41,9 +41,11 @@ function fakeDocument() {
 test('the scope and the chrome scrim fall back, and the scrim never leaves 0..100', () => {
   assert.equal(wallpaperScopeOf('window'), 'window');
   assert.equal(wallpaperScopeOf('view'), 'view');
-  // A record written before this preference existed has no such key at all.
-  assert.equal(wallpaperScopeOf(undefined), 'view');
-  assert.equal(wallpaperScopeOf('WINDOW'), 'view');
+  // A record written before this preference existed has no such key at all, and anything that is not one of the two
+  // named scopes is the same story: the default, which is the whole window — the shipped defaults are the reader's own
+  // settings.
+  assert.equal(wallpaperScopeOf(undefined), 'window');
+  assert.equal(wallpaperScopeOf('WINDOW'), 'window');
   assert.equal(wallpaperChromeOf(undefined), WALLPAPER_CHROME_INITIAL);
   assert.equal(wallpaperChromeOf('55'), WALLPAPER_CHROME_INITIAL);
   assert.equal(wallpaperChromeOf(-5), 0);
