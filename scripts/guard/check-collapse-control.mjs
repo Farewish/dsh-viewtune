@@ -280,6 +280,34 @@ const ridesKeeping = (state) => {
   const mine = transformOf(`${prefix}${collapseAllWord}`);
   return mine !== '' && mine === transformOf(`${prefix}${collapseKeeping}`);
 };
+/**
+ * Every rule of this control that animates has to be REACHED by the motion switch.
+ *
+ * The gate is written per element (`[data-motion=off] .collapseStage > span, …`), and that is not enough on its own:
+ * specificity is not order, so `[data-motion=off] .collapseStage > span` at (0,2,1) loses to
+ * `.collapseGroup[data-reader-collapse-action=all] .collapseAllWord` at (0,3,0) wherever the gate sits. The switch
+ * therefore ended the pill's own enter and exit while 全部 kept fading in and the chevron stack kept rising — the
+ * reader's report that it "did not control all of the collapse button's animations".
+ *
+ * Asserted as the PROPERTY rather than as a list of selectors, so a new state rule that animates fails here until a
+ * gate reaches it: collect the element names every `[data-motion=off]` rule names, then require every rule that
+ * mentions this control and declares an animation or a transition to name at least one of them. Both counts have to
+ * be non-zero — a check that found no rules at all would pass forever.
+ */
+const motionReach = (() => {
+  const rules = [...bundleCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(match => ({ selector: match[1].trim(), body: match[2] }))
+    .filter(rule => !rule.selector.startsWith('@'));
+  const names = (selector) => [...selector.matchAll(/\.([\w-]+)/g)].map(match => match[1]);
+  const reached = new Set(rules.filter(rule => rule.selector.includes('[data-motion=off]')).flatMap(rule => names(rule.selector)));
+  const animated = rules.filter(rule => !rule.selector.includes('[data-motion=off]')
+    && /(?:^|;)\s*(?:animation|transition)\s*:/.test(rule.body)
+    && (rule.selector.includes('collapse') || rule.body.includes('reader-collapse')));
+  const ungated = animated.filter(rule => !names(rule.selector).some(name => reached.has(name)));
+  // Named, not counted: a failure here is a rule somebody has to go and gate, and the count alone would not say which.
+  for (const rule of ungated) console.log(`       not reached by any motion gate: ${rule.selector}`);
+  return { ok: reached.size > 0 && animated.length > 0 && ungated.length === 0, total: animated.length, ungated };
+})();
 const styleChecks = [
   ['wrap lays the control out', ruleDecls(bundleCss, wrap).size > 0],
   ['control is a pill', hasDecls(bundleCss, collapse, ['display:inline-flex'])],
@@ -341,6 +369,8 @@ const styleChecks = [
   ['…so its own timing is only about the fade', hasDecls(bundleCss, `${collapseGroup}[data-reader-collapse-action=all] ${collapseAllWord}`,
     ['opacity:1', 'transform:translate(4px)'])],
   ['exit keyframes shipped', bundleCss.includes(`@keyframes ${exit}{`)],
+  [`the motion switch reaches every animated rule here (${String(motionReach.total - motionReach.ungated.length)}/${String(motionReach.total)})`,
+    motionReach.ok],
 ];
 for (const [label, pass] of styleChecks) {
   if (!pass) bad++;

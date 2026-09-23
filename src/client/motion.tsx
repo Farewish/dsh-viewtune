@@ -5,35 +5,12 @@ import { StreamMotionContext } from './streaming.js';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
 
-/** How close to the tail counts as "the reader is at the bottom". */
-export const FOLLOW_TAIL_PX = 72;
-/** A wheel has to move something to count as the reader taking over. */
-export const WHEEL_EPSILON_PX = 0;
-
 /**
- * Is the viewport close enough to the tail to keep auto-following?
- *
- * Pure and exported so this rule can be tested directly: it is what decides whether the reader
- * keeps following the stream or is left where they scrolled to.
+ * The follower's policy lives in its own module (see `reading-scroll.ts`), imported here because the follower uses it
+ * and re-exported because this is where every reader of these names looks for them.
  */
-export function isNearTail(scrollTop: number, scrollHeight: number, clientHeight: number, tailPx = FOLLOW_TAIL_PX): boolean {
-  return scrollHeight - scrollTop - clientHeight < tailPx;
-}
-
-/**
- * Does this wheel take scroll control away from auto-follow?
- *
- * ANY direction, not just upward. The listener sits on the conversation scroller, so it also
- * sees wheels that bubbled out of the reasoning card — and while the card is being scrolled it
- * handles the wheel natively and lets the event through. Treating only upward wheels as
- * "the reader took over" left `following` true during a downward gesture; the card keeps
- * growing as the model streams, every growth re-armed the follow animation, and that animation
- * wrote scrollTop back toward the bottom each frame. The reader's own scroll fought the wheel
- * and the page stepped instead of gliding until the pointer left the card.
- */
-export function wheelClaimsScroll(deltaY: number, epsilon = WHEEL_EPSILON_PX): boolean {
-  return Math.abs(deltaY) > epsilon;
-}
+import { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+export { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, isNearTail, wheelAtBottom, wheelClaimsScroll };
 
 export function useMotionAllowed(enabled: boolean): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -299,7 +276,19 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
 }
 
 // DOM-only behavior: the native Session remains the sole source of business data.
-export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean): {
+/**
+ * The reading view's scroll follower.
+ *
+ * `live` says whether a turn is still RUNNING, and tail-follow belongs to a live turn and nothing else: with nothing
+ * arriving there is nothing to keep up with, and a snap that keeps pulling the reader back to the bottom is only a
+ * fight with their own scrolling — 「在没有进行中的轮次的情况下，不应有自动吸附」. While idle the observer below still keeps
+ * the reader's PLACE (the anchor compensation), which is not a snap: it moves them by exactly what changed above them,
+ * so a growing tool row no longer shifts the line they are reading.
+ *
+ * The frame loop and the observer read it through a ref: putting it in the effect's dependency list would tear down and
+ * re-register every listener on each stream tick.
+ */
+export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true): {
   detached: boolean;
   jump: () => void;
   /** Stop tail-follow so a rail landing is not pulled back to the live bottom. */
@@ -307,9 +296,11 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
 } {
   const port = useRef<HTMLElement | null>(null);
   const following = useRef(true);
+  const liveRef = useRef(live);
   const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
   const cancelFollow = useRef<() => void>(() => {});
   const [detached, setDetached] = useState(false);
+  useEffect(() => { liveRef.current = live; }, [live]);
   useLayoutEffect(() => {
     const content = root.current;
     if (!content) return;
@@ -346,8 +337,11 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     const onWheel = (event: WheelEvent) => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
       // Any wheel takes over, not only an upward one — see wheelClaimsScroll for why that
-      // distinction is the difference between gliding and stepping on a long transcript.
-      if (wheelClaimsScroll(event.deltaY)) { following.current = false; setDetached(true); capture(); }
+      // distinction is the difference between gliding and stepping on a long transcript — except
+      // the downward one that finds the scroller already at its tail: nothing can move, so it is
+      // not a takeover, and treating it as one is what made the pill flicker here (see wheelAtBottom).
+      const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
+      if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY)) { following.current = false; setDetached(true); capture(); }
     };
     const onTouch = () => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
@@ -362,7 +356,8 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     const writeTop = (top: number) => { scroll.scrollTop = top; lastWrittenTop = scroll.scrollTop; };
     const follow = (now: number) => {
       followFrame = 0;
-      if (!following.current || selected() || content.contains(document.activeElement)) return;
+      // A follower with nothing to follow: see the `live` note on this hook.
+      if (!liveRef.current || !following.current || selected() || content.contains(document.activeElement)) return;
       const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
       const delta = Math.min(48, Math.max(1, now - lastFrameAt));
       lastFrameAt = now;
@@ -376,7 +371,9 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     });
     const observer = new ResizeObserver(() => {
       if (selected()) return;
-      if (following.current && !content.contains(document.activeElement)) {
+      // Following needs a turn to be running; otherwise the anchor below does the work, which keeps the reader's place
+      // instead of dragging them back to the bottom (see the `live` note on this hook).
+      if (liveRef.current && following.current && !content.contains(document.activeElement)) {
         if (!motion) writeTop(scroll.scrollHeight);
         else if (!followFrame) { lastFrameAt = performance.now(); followFrame = requestAnimationFrame(follow); }
       } else if (!following.current && anchor.current?.element.isConnected) {

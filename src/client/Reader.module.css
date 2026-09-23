@@ -545,14 +545,27 @@
 .collapseGroup[data-reader-collapse-action=all] .collapseKeeping { transform: translateX(4px); transition-delay: 0s, var(--reader-collapse-more-exit, 120ms); }
 .collapseGroup[data-reader-collapse-action=all] .collapseOneChevron { opacity: 0; transform: translateX(4px); transition-delay: 0s, var(--reader-collapse-more-exit, 120ms); }
 @keyframes readerChevronsOut { from { opacity: 1; transform: translate(var(--reader-collapse-more-shift, -1px), 0); } to { opacity: 0; transform: translate(var(--reader-collapse-more-shift, -1px), -.5em); } }
-/* The choreography above is decoration, so the motion switch ends it — unlike the pill's own enter/exit,
-   which is the control arriving and leaving and therefore runs either way. */
+/* The motion switch ends every bit of this control's choreography, and it has to be gated BY STATE as well as by
+   element — because specificity is not order. `[data-motion=off] .collapseStage > span` counts (0,2,1), while
+   `.collapseGroup[data-reader-collapse-action=all] .collapseAllWord` counts (0,3,0) and therefore kept its transition
+   wherever the gate sat in the sheet. That is exactly how the switch came to look half-wired: the pill's own enter and
+   exit went instant, and 全部 went on fading in while the chevron stack went on rising. Every state rule that
+   animates is named below with the prefix, which wins by one attribute.
+   (The pill's own enter/exit is gated separately, beside its keyframes: this list is the choreography inside it.) */
 [data-motion=off] .collapseStage > span,
 [data-motion=off] .collapseMore,
 [data-motion=off] .collapseMore::before,
-[data-motion=off] .collapseChevrons { transition: none; animation: none; }
+[data-motion=off] .collapseChevrons,
+[data-motion=off] .collapseGroup[data-reader-collapse-action=all] .collapseAllWord,
+[data-motion=off] .collapseGroup[data-reader-collapse-split=true] .collapseChevrons,
+[data-motion=off] .collapseGroup[data-reader-collapse-split=true] .collapseMore::before { transition: none; animation: none; }
+/* The system's own request gets the same coverage. Its state selectors are unprefixed, so they tie with the rules they
+   end and win on order — which is why this block has to stay below them. */
 @media (prefers-reduced-motion: reduce) {
-  .collapseStage > span, .collapseMore, .collapseMore::before, .collapseChevrons { transition: none; animation: none; }
+  .collapseStage > span, .collapseMore, .collapseMore::before, .collapseChevrons,
+  .collapseGroup[data-reader-collapse-action=all] .collapseAllWord,
+  .collapseGroup[data-reader-collapse-split=true] .collapseChevrons,
+  .collapseGroup[data-reader-collapse-split=true] .collapseMore::before { transition: none; animation: none; }
 }
 @keyframes readerCollapseIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes readerCollapseOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px); } }

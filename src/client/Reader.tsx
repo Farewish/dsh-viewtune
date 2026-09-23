@@ -959,7 +959,14 @@ export function Reader(props: ReaderProps) {
       observer?.disconnect();
     };
   }, [groups]);
-  const scroll = useReadingScroll(root, motion);
+  // Whether any turn is still RUNNING — the same `status === 'open'` the status line and the wait clock read. It gates
+  // the tail-follow (see `useReadingScroll`): with nothing arriving, following the bottom is not keeping up with
+  // anything, it is only fighting the reader's own scrolling.
+  const live = props.useChat(snapshot => {
+    for (const turn of snapshot.timeline.turns.values()) if (turn.status === 'open') return true;
+    return false;
+  });
+  const scroll = useReadingScroll(root, motion, live);
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);

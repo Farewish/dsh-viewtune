@@ -469,6 +469,19 @@ const markers = [
   // the anchor walks the group's own keys — a wake-up that counted from the turn start would show
   // the minutes the tools already spent, which is the bug this replaced.
   ['the status line carries a wait clock', '"data-reader-wait-clock"'],
+  // The tail-follow belongs to a LIVE turn, and the downward wheel that cannot move is not a takeover. Both were
+  // reported through their effects — a 「回到最新」 pill that appeared and vanished with every notch at the bottom of the
+  // page, and a transcript still pulled to the bottom with nothing running (「在没有进行中的轮次的情况下，不应有自动吸附」) —
+  // so this pins the shapes that produce them rather than restating the rule, which lives in `reading-scroll.ts` and is
+  // tested directly there. Two things are load-bearing: the follower consults `liveRef` in the FRAME LOOP and in the
+  // RESIZE OBSERVER (gating one leaves the other path still following), and the wheel handler asks `wheelAtBottom`
+  // before it treats the gesture as a takeover.
+  ['the tail-follow runs only while a turn is live, and a wheel at the bottom is not a takeover', () =>
+    bundle.includes('!liveRef.current ||')
+    && bundle.includes('liveRef.current && following.current')
+    && bundle.includes('motion, live')
+    && bundle.includes('function wheelAtBottom(deltaY, gap)')
+    && bundle.includes('if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY))')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
