@@ -44,7 +44,6 @@ export const McpAppFrame = memo(function McpAppFrame({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastParamsRef = useRef<Record<string, unknown>>({});
   const [height, setHeight] = useState(() => Math.max(60, Math.min(2400, initialHeight)));
-  const [ready, setReady] = useState(false);
   const [receipt, setReceipt] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -127,13 +126,11 @@ export const McpAppFrame = memo(function McpAppFrame({
           },
         };
         iframe.contentWindow?.postMessage(response, '*');
-        setReady(true);
         return;
       }
 
       // 2. ui/ready or initialized notification
       if (data.method === 'ui/ready' || data.method === 'ui/notifications/initialized') {
-        setReady(true);
         return;
       }
 
@@ -209,13 +206,10 @@ export const McpAppFrame = memo(function McpAppFrame({
         },
       },
     }, '*');
-
-    setReady(true);
   }, []);
 
   const handleReload = useCallback(() => {
     setReloadNonce(n => n + 1);
-    setReady(false);
     setReceipt(null);
   }, []);
 

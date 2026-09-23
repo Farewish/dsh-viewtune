@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { IconSettingsOutline14, Switch, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives';
 import {
-  bindingFromEvent, parseShortcut, shortcutLabel, shortcutProblem,
+  bindingFromEvent, shortcutLabel, shortcutProblem,
 } from './shortcuts.js';
 import type { ShortcutAction, ShortcutProblem } from './shortcuts.js';
 import { GLASS_PARTS } from './glass.js';
@@ -31,9 +31,6 @@ const PROBLEM_COPY: Record<ShortcutProblem, string> = {
   reserved: '这个组合被浏览器占用，换一个吧',
   taken: '这个组合已经给了另一个动作',
 };
-
-/** A binding shown after the action it runs, or nothing when the slot is cleared. */
-const keyHint = (binding: string): string => parseShortcut(binding) === null ? '' : `（${shortcutLabel(binding)}）`;
 
 /** What 动效 does, carried as the row's own `title` rather than a line under the label. */
 const MOTION_HINT = '新到文字柔和显现，过程平滑展开';

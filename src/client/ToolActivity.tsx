@@ -8,7 +8,7 @@ import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
 import { DiffPanel, DiffStatButton } from './DiffPanel.js';
-import { activityPhase, activitySummary, callDiffHunks, executionFacts, objectValue, toolIdentity } from './tool-activity.js';
+import { activityPhase, activitySummary, callDiffHunks, executionFacts, objectValue } from './tool-activity.js';
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';

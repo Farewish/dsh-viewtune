@@ -17,15 +17,6 @@ const timestamp = (value: number | undefined): number | null => typeof value ===
 export const WAIT_AFTER = new Set<ChatNodeKind>(['context', 'model-retry']);
 
 /**
- * Every chat-kind the handover logic reasons about, checked against the host's own
- * kind union at compile time. Adding a name here that the host does not register
- * fails `tsc` instead of failing silently at runtime.
- */
-export const HANDOVER_KINDS = [
-  'user', 'steering', 'context', 'model-retry', 'tool-call', 'command',
-] as const satisfies readonly ChatNodeKind[];
-
-/**
  * Mirrors the host's `isSettledTool`: a running call has no `kind`, a settled one
  * carries `kind: 'tool-result'`. Kept local so this module stays dependency-free,
  * and pinned by a test against the host's own helper contract.

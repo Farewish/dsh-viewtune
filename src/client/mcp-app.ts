@@ -300,24 +300,3 @@ export function fillComposerDom(text: string, doc?: Document): boolean {
   return false;
 }
 
-/**
- * Updates a React-controlled textarea and properly notifies React's valueTracker
- * so the backdrop and input state immediately reflect the text.
- */
-export function setReactInputValue(textarea: HTMLTextAreaElement, value: string): void {
-  try {
-    const nativeSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype,
-      'value'
-    )?.set;
-    if (nativeSetter) {
-      nativeSetter.call(textarea, value);
-    } else {
-      textarea.value = value;
-    }
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    textarea.focus();
-  } catch {
-    textarea.value = value;
-  }
-}
