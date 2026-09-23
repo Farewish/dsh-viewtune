@@ -128,8 +128,15 @@ const markers = [
   // notch causes are measured before wheelUntil is set and re-render the card mid-gesture.
   ['wheel-handler-runs-before-the-scroll', () => /addEventListener\("wheel", onWheel, \{\s*passive: false\s*\}\)/.test(bundle)],
   ['all user/steering nodes collected', 'group.keys.filter((key) => {\n\t\t\t\tconst kind = snapshot.nodes.get(key)?.kind;'],
+  // The whitespace between two revealed words has to be a KEYED child in both reveal paths. As a bare string it was
+  // matched by position, so each word folding into the settled prefix rebuilt the live window's strings — measured at
+  // 8,492 new text nodes under the reasoning container in two seconds. Each marker carries the `inline` expression of
+  // its own path, so a fix applied to one and forgotten in the other fails here.
+  ['the whitespace after a revealed think word is a keyed child', 'inline: true,\n\t\t\t\t\t\tchildren: word.text\n\t\t\t\t\t}, word.key) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MotionGap, { children: word.text }, word.key)'],
+  ['…and the whitespace in the answer body is one too', 'inline: inline || /^\\p{P}+$/u.test(word.text),\n\t\t\t\t\tchildren: word.text\n\t\t\t\t}, word.key) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MotionGap, { children: word.text }, word.key)'],
+  ['that keyed child is a plain inline span, so line breaking is unchanged', 'function MotionGap({ children }) {\n\t\t\treturn /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children });\n\t\t}'],
   ['every user message rendered in the leading slot', 'turnUserKeys.map((userKey) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BlockBoundary, {'],
-  ['user nodes excluded from the flow', 'const mainKeys = group.keys.filter((key) => !turnUserKeys.includes(key));'],
+  ['user nodes excluded from the flow, through a memoized key list', 'const mainKeys = (0, react.useMemo)(() => group.keys.filter((key) => !turnUserKeys.includes(key)), [group, turnUserKeys]);'],
   ['disclosure label still shows the duration', '用时 ${elapsed}'],
   ['reader column keeps the chat-flow hook (composer stays visible)', '"data-chat-flow": ""'],
   ['system-prompt detail has its own scrollport', 'Reader_module_css_default.systemPrompt'],
@@ -441,12 +448,43 @@ const markers = [
     bundle.includes('width:calc(33.3333% - 1.33333px)')
     && bundle.includes('[data-settings-page=features]:after')
     && bundle.includes('[data-settings-page=shortcuts]:after')],
-  // The 功能 page's two rows: the handles' wheel, which is the one piece of BEHAVIOUR this plugin adds on top of the
-  // host, and the delivered file's destination, moved here from the visual page because it is not a matter of taste
-  // about pixels either.
-  ['the features page holds the strip wheel and the deliverable destination', () =>
+  // The 功能 page's THREE rows now: the handles' wheel, which is one piece of BEHAVIOUR this plugin adds on top of
+  // the host, the delivered file's destination, moved here from the visual page because it is not a matter of taste
+  // about pixels either, and the reveal's cadence — the one row that trades a little smoothness for work.
+  ['the features page holds the strip wheel, the deliverable destination, the cadence, the blur and the per-word reveal', () =>
     bundle.includes('"data-ud-check": "reader-settings-strip-wheel"')
-    && bundle.includes('"data-ud-check": "reader-settings-openmode"')],
+    && bundle.includes('"data-ud-check": "reader-settings-openmode"')
+    && bundle.includes('"data-ud-check": "reader-settings-cadence"')
+    && bundle.includes('"data-ud-check": "reader-settings-reveal-blur"')
+    && bundle.includes('"data-ud-check": "reader-settings-reveal-words"')],
+  // The per-word reveal switch, pinned at the point where the work is: with it off the timeline is not STARTED in
+  // either path (two `begin` calls become two gates), and the reasoning text renders as the plain string it is while
+  // the markdown path drops the reveal hooks altogether. The default and the defensive read are the other two ends:
+  // a record written before this switch existed keeps the per-word reveal.
+  ['the per-word reveal can be turned off, and then the timeline is not started at all', () => {
+    const gated = (bundle.match(/if \(perWord\) timeline\.current\.begin/g) ?? []).length;
+    return gated === 2 && bundle.includes('perWord && current.hasLiveText') && bundle.includes('perWord ? ');
+  }],
+  ['…with the per-word reveal on unless a record says otherwise', 'revealWords: true'],
+  ['…and that record read the defensive way', 'state.revealWords) !== false'],
+  // The blur switch, pinned where the cost actually is: with it OFF there must be no `filter` in the keyframes at all,
+  // because a no-op `blur(0px)` would still keep the animated word off the compositor's own path. The other two ends
+  // are the animation asking for the choice, and the defensive read plus the default that make an older record keep
+  // the blur every card showed before the switch existed.
+  ['the reveal\'s blur can be turned off, and then no keyframe names a filter', 'if (!blur) return [{ opacity: 0 }, { opacity: 1 }];'],
+  ['…and the word animation is what asks for it', 'target.animate(revealFrames(blur), {'],
+  ['…with the blur on unless a record says otherwise', 'revealBlur: true'],
+  ['…and that record read the defensive way', 'state.revealBlur) !== false'],
+  // The cadence itself, pinned at all three ends: the two options the panel offers (as the array, so one cannot be
+  // dropped or renamed out from under the stored values), the defensive read that makes an older record mean the
+  // per-frame cadence, and the gate in the publish loop — where a hidden page still flushes rather than pacing, which
+  // is what keeps a backgrounded stream from returning with a backlog.
+  ['the reveal cadence offers exactly two options', 'const TEXT_CADENCES = [{\n\t\t\tid: "steady",\n\t\t\tlabel: "固定 60 次/秒"\n\t\t}, {\n\t\t\tid: "frame",\n\t\t\tlabel: "跟随屏幕刷新"\n\t\t}];'],
+  ['and an unrecognised record keeps the steadier cadence', 'return value === "frame" ? "frame" : "steady";'],
+  // The cadence a fresh install opens with, pinned on its own: the steady one, because per-frame publication is what
+  // makes the reveal's work follow the display's refresh rate — the option the panel labels as a cost.
+  ['…which is the cadence a fresh install opens with', 'textCadence: "steady"'],
+  ['the publication gate asks the cadence, and a hidden page still flushes', 'if (document.hidden) {\n\t\t\t\t\t\tcurrent.flush();\n\t\t\t\t\t\tpublish();\n\t\t\t\t\t\tpublishedAt = now;\n\t\t\t\t\t} else if (publishDue(now, publishedAt, cadence)) {\n\t\t\t\t\t\tcurrent.advance(now);\n\t\t\t\t\t\tpublish();\n\t\t\t\t\t\tpublishedAt = now;\n\t\t\t\t\t}'],
   // …and the switch is real in both directions: the reading view publishes it on its own root (one occurrence) and the
   // listener reads it there (the other) — two spellings of one string, which is why the count is asserted rather than
   // the presence of either. The gate is asserted as the LINE it compiles to, because where it sits is the property

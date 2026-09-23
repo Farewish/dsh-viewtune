@@ -65,12 +65,12 @@ A conversation is a sequence of **turns** (a prompt plus its answer), and the re
 Opened by 「viewtune ⚙」, with **three pages** (arrows, Home and End move between them):
 
 - **视效** (look): motion, the frosted glass, its nine dials, and the wallpaper.
-- **功能** (behaviour): what this plugin does to the app — the **strip wheel**, and **产物用右侧栏打开**.
+- **功能** (behaviour): what this plugin does to the app — the **strip wheel**, **产物用右侧栏打开**, the **reveal cadence**, the **reveal blur**, and the **per-word reveal**.
 - **快捷键**: what the collapse button does, plus recording for this plugin's two bindings (click a key to record, Escape cancels, clearing drops it; combinations without a modifier, or ones the browser already owns, are refused).
 
 One layout rule: a preference is a row and a new subject is a page, so the lane never grows a control wider; and **only an option whose label does not say it all carries a description**, which rides the row's `title` — the browser's own hover box, the same mechanism the button and 收起 use — so it takes no space. Genuine **state** (a system override, a recording in progress, a refused combination) is written in the row instead.
 
-**The defaults are this plugin's shipped ones** (see below: the skin on, the wallpaper shipped with it, the window scope). A stored record only carries the keys a reader **changed**; anything missing falls back to those defaults.
+**The defaults are this plugin's shipped ones** (see below: the skin on, the wallpaper shipped with it, the window scope, and a reveal cadence fixed at 60 per second). A stored record only carries the keys a reader **changed**; anything missing falls back to those defaults.
 
 ### Frosted glass
 
@@ -102,6 +102,14 @@ The plugin **ships a default wallpaper** (`assets/sample-gradient.png`), which t
 - The **scope** defaults to the **whole window**: the left column and the top bar show it too (their own plates step aside), and the colours around the composer follow. Turning 「铺满整个窗口」 off restricts it to the reading column, where the image **fills the reading page** (the MAX ratio of image ÷ target, centred, overflow cropped, small images scaled up). The window scope fills with `cover`.
 - A **界面遮罩** dial, in the window scope, sets how opaque those two columns stay over their copy of the image — they carry nothing but text, so `0%` is prose straight on a photograph. The image is painted once and the scrim counted once for the window, so the reading area is never darker than the columns beside it.
 - The **fade band above the composer** turns the host's opaque gradient into a mask over the same backdrop, so content still fades out smoothly — just into your picture instead of into a colour. All three pages (reading, conversation, trajectory) use the same lift.
+
+### The reveal
+
+Three choices govern how a streaming message grows:
+
+- **Reveal cadence** (default: **a fixed 60 per second**). One publication is one whole render of the growing node: the Markdown tail re-parsed, word identities rebuilt, new word elements mounted, and then the layout every follower below measures. Following the display's refresh rate means **four times** that work on a 240Hz screen, with a pace that depends on whatever the last frame cost. **Following the screen refresh** is therefore the explicit option, and its cost is stated in that row's own description; both cadences drive the **same reveal trajectory** (the advance is a function of the clock), so the fixed one merely samples it less often. Measured on one machine and one page streaming the same kind of long answer: **3430 → 4435–4568 frames per 20s (≈171 → 222–228fps), dropped frames 4 → 2, long tasks 0**, with an idle page back at 4800 (240Hz).
+- **Reveal blur** (default on): the reference recipe fades each word in while resolving a 1px blur, and `filter` is **not a property the compositor can animate on its own** — so every animating word repaints its own area on every frame, and with a 350ms reveal and ~50 words per second arriving, a dozen of those repaints overlap. Off, only the fade remains (crisp appearance rather than clearing up).
+- **Per-word reveal** (default on): off, the text simply appears, and **no word identities or timeline are built at all** (not just the animation: the segmentation and the birth table go too, and the Markdown path drops its reveal hooks entirely). The pace still comes from the stream buffer, so it still writes itself out.
 
 ### The strip wheel
 

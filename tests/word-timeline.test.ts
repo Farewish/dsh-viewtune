@@ -63,12 +63,42 @@ test('only new word identities receive the stagger, and the queue stays bounded'
   assert.ok(born[0]! >= 100);
   assert.ok(born.at(-1)! <= 100 + WORD_MOTION.batchMs, `batch ran past its window: ${born.at(-1)}`);
   // A single later word keeps the original typing rhythm rather than being
-  // silently absorbed into the previous batch.
-  timeline.begin('one two three four five six seven eight', true, 0, 900);
+  // silently absorbed into the previous batch, and words still inside their reveal window keep their identities.
+  timeline.begin('one two three four five six seven eight', true, 0, 300);
   const first = timeline.words('one two three', 0).filter(word => word.text.trim()).map(word => word.born);
   assert.deepEqual(first, born.slice(0, 3));
-  const added = timeline.words('eight', 40).filter(word => word.text.trim());
-  assert.ok(added[0]!.born! >= 900, 'a lone new word must not be scheduled in the past');
+  const justArrived = timeline.words('eight', 40).filter(word => word.text.trim());
+  assert.ok(justArrived[0]!.born! >= 300, 'a lone new word must not be scheduled in the past');
+
+  // Once a word's reveal window has closed it is no longer an IDENTITY: it collapses into one inert leaf. That is the
+  // point of the prefix — an identity exists to animate a word, and rebuilding thousands of them per frame is what
+  // made a streaming reasoning card janky.
+  timeline.begin('one two three four five six seven eight nine', true, 0, 900);
+  assert.deepEqual(timeline.words('one two three', 0), [{ key: 0, text: 'one two three', born: null }]);
+});
+
+test('a long stream keeps the per-frame word list independent of how much has arrived', () => {
+  const worstFor = (chunks: number): number => {
+    const timeline = new WordTimeline();
+    timeline.begin('', true, 0, 0);
+    let text = '';
+    let worst = 0;
+    for (let index = 0; index < chunks; index++) {
+      text += `word${String(index)} `;
+      // 20ms per chunk: a fast model, and about the cadence a reasoning card actually streams at.
+      timeline.begin(text, true, 0, index * 20);
+      worst = Math.max(worst, timeline.words(text, 0).length);
+    }
+    return worst;
+  };
+  const short = worstFor(300);
+  const long = worstFor(1200);
+  // The point of the prefix leaf: the per-frame list is bounded by the ~590ms reveal window — measured at 69 entries for
+  // one word per 20ms — and NOT by the length of the stream. So this compares two lengths instead of pinning a count,
+  // because that is the invariant that matters. Before the floor advanced, the long run was one entry per word
+  // received (1200 and rising) against the short run's 300.
+  assert.ok(long <= short + 8, `${String(short)} entries over 300 chunks became ${String(long)} over 1200`);
+  assert.ok(short > 1, 'and the newest words do still get their own identities');
 });
 
 test('stop, motion-off and authoritative replacement cancel old births', () => {

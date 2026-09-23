@@ -19,6 +19,7 @@ import { CollapseControl } from './CollapseControl.js';
 import { collapseModeOf } from './collapse-mode.js';
 import { glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf } from './open-file.js';
+import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
 import { applyWindowScope, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
 import { applyScrollbarFill, scrollbarFillOf } from './scrollbar.js';
@@ -27,6 +28,7 @@ import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
+import { firstRowPastIndex, firstRowWhere } from './reading-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -56,6 +58,15 @@ function cleanErrorMessage(raw: string | undefined): string {
 type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
   nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
 };
+
+/**
+ * The one empty key list, shared so its identity is stable.
+ *
+ * `mainKeys` is memoized on the array a turn's user/steering split produced, and a fresh `[]` on a turn
+ * with no leading messages would defeat that memo on every render — the exact per-delta cost the
+ * primitive-publishing subscription above exists to avoid.
+ */
+const NO_KEYS: readonly string[] = [];
 
 /**
  * A JSON record card — 轮次过程记录 / 模型重试记录 / 命令记录 — with a handle the SKIN can reach.
@@ -508,11 +519,23 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // (system prompt, the user's message, injected context, steering). Collect every
   // one of them so they all render in the turn's leading slot, above the process
   // disclosure, in source order.
-  const turnUserKeys = props.useChat(snapshot => group.keys.filter(key => {
+  // A subscription must not allocate. The snapshot hook compares what the selector returns by identity
+  // and is notified on every streamed chunk, so an array built in here is a new value every time — and
+  // this turn then re-rendered on every delta of every OTHER turn: one full `readerFlow` pass, the
+  // deliverables scan, and element creation for the whole transcript, per character. The selector
+  // therefore publishes a primitive, and the array is derived from it below, so a chunk that does not
+  // change this turn's classification costs nothing at all.
+  const turnUserSignature = props.useChat(snapshot => group.keys.filter(key => {
     const kind = snapshot.nodes.get(key)?.kind;
     return kind === 'user' || kind === 'steering';
-  }));
-  const mainKeys = group.keys.filter(key => !turnUserKeys.includes(key));
+  }).join('\u0000'));
+  const turnUserKeys = useMemo(
+    () => turnUserSignature === '' ? NO_KEYS : turnUserSignature.split('\u0000'),
+    [turnUserSignature],
+  );
+  // Memoized on the split above: `flow` and everything built from it keys on this identity, and a
+  // rebuilt array here would put the rest of this component back on the per-delta path.
+  const mainKeys = useMemo(() => group.keys.filter(key => !turnUserKeys.includes(key)), [group, turnUserKeys]);
   const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => nodes.get(key)), [nodes, group, mainKeys, turn]);
   const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(nodes.get(item.nodeKey), boundary));
   // Only a real, still-active text selection delays folding. Merely clicking,
@@ -636,7 +659,11 @@ export function currentTurnOf(
   // Indexed rather than for..of: the parameter is typed ArrayLike, which is indexable but not
   // iterable, and a test hands it a plain array.
   const list = rows ?? content.querySelectorAll('[data-reader-turn]');
-  for (let index = 0; index < list.length; index += 1) {
+  // Start at the first row the reading line has passed, found by bisection instead of by measuring every row: this
+  // runs once per frame while the reader scrolls, and the walk cost 10k–16k rect reads per second in a measured
+  // build. The predicate is then re-tested per row from there on, so a list whose rects are NOT monotone still
+  // resolves exactly as the walk did — bisection only decides where the scan may begin.
+  for (let index = firstRowPastIndex(list, viewportTop, 8); index < list.length; index += 1) {
     const element = list[index]!;
     // `data-reader-turn` is the turn number, or the literal 'unresolved' for a group the
     // snapshot cannot place; only a real turn can own a process.
@@ -684,6 +711,15 @@ export function Reader(props: ReaderProps) {
   // existed keeps the forwarding it was written with. The listener is installed app-wide by index.tsx and reads this
   // root's attribute, so the switch takes effect on the next notch rather than at the next mount.
   const stripWheel = props.useStore(state => state.stripWheel) !== false;
+  // How often a streaming message publishes its revealed text. Read through its own fallback reader, so a record
+  // written before this preference existed keeps the per-frame cadence it was written with.
+  const textCadence = props.useStore(state => textCadenceOf(state.textCadence));
+  // Whether a revealed word also resolves from a blur. Default ON and read defensively (`!== false`): a record written
+  // before the switch existed keeps the blur every card showed before it.
+  const revealBlur = props.useStore(state => state.revealBlur) !== false;
+  // Whether each word gets an identity and its own fade at all. Default ON and read defensively: a record written
+  // before the switch existed keeps the per-word reveal every card showed before it.
+  const revealWords = props.useStore(state => state.revealWords) !== false;
   const glassVars = useMemo(() => glassProperties(glassValuesResolved), [glassValuesResolved]);
   // The wallpaper, read the same defensive way and handed over the same way: two custom properties
   // on the root, with the rest of the backdrop stated in the stylesheet. `wallpaperNameOf` is what
@@ -822,7 +858,7 @@ export function Reader(props: ReaderProps) {
   const collapseAllKey = storedShortcuts?.collapseAll ?? DEFAULT_SHORTCUTS.collapseAll;
   /** The advertised key, or nothing at all when the reader cleared the slot. */
   const keyHint = (binding: string) => binding === '' ? '' : `（${shortcutLabel(binding)}）`;
-  const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
+  const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current, cadence: textCadence, blur: revealBlur, words: revealWords }), [motion, textCadence, revealBlur, revealWords]);
   const groups = useMemo(() => groupNodes(order, key => nodes.get(key)), [order, nodes, timeline]);
   // A "conversation" here is one turn (the question plus its answer), so "收起" folds the
   // turn the reader is currently looking at — not every open turn on the page. The current
@@ -912,31 +948,47 @@ export function Reader(props: ReaderProps) {
   // layout, and two listeners meant two rAF ticks, two queries and two flushes per scroll,
   // which is what made a handoff stutter while the pointer stayed over the transcript. One tick
   // now queries the rows once and reads both thresholds inside the same flush.
+  // What the effect below actually depends on is the SET OF ROWS, not the array that carries them. `groups` is
+  // rebuilt on structural publication — a new node anywhere, including one appended to a turn that is already on
+  // screen — and this effect would then tear down and re-run a forced measurement (a getBoundingClientRect, a
+  // querySelectorAll and two setStates) for a row set that did not move. A turn that grows does not move the rows
+  // ABOVE it, and those are the ones the reading line is measured against; position changes arrive through the scroll
+  // listener and the ResizeObserver on the scroller, both of which this effect installs and neither of which depends
+  // on the dependency list. (Text deltas alone do not rebuild `groups` at all: its deps — the node store, the order
+  // array and the timeline — keep their identity across a delta, so only the growing node itself is replaced.)
+  const turnSignature = useMemo(() => groups.map(group => group.turn).join('|'), [groups]);
   useLayoutEffect(() => {
     const content = root.current;
     if (!content) return;
     const scroller = content.closest<HTMLElement>('[data-conversation-scroll]') ?? content;
+    // One query per ROW SET, not per frame. This effect re-runs whenever `turnSignature` changes — a turn being added
+    // is the only thing that can add, remove or re-key a row element (keys are the turn numbers, and a node arriving
+    // inside a turn leaves its row element alone) — so the list stays valid for the life of the effect. Querying
+    // inside `measure` allocated a whole NodeList on every scroll frame.
+    const rows = content.querySelectorAll<HTMLElement>('[data-reader-turn]');
     const measure = () => {
       const viewportTop = scroller.getBoundingClientRect().top;
       // The reading line is 35% down the scrollport, measured from the scrollport's own top edge
       // rather than the window's, so it means the same thing wherever the transcript sits on
       // screen. currentTurnOf uses the same origin, so both readings share one coordinate system.
       const line = scroller.clientHeight * 0.35;
-      // One query for both readings: currentTurnOf keeps its documented shape but is handed the
-      // rows we already have, so the transcript is queried once and both thresholds are read
-      // inside the same layout flush.
-      const rows = content.querySelectorAll<HTMLElement>('[data-reader-turn]');
+      // Both readings bisect the same row list, so both are logarithmic in the number of turns: the rail's "last row
+      // that reached the line" used to be an indexed walk that measured every row ABOVE the reading line, once per
+      // frame. `firstRowWhere` and this predicate are documented together in `reading-scroll.ts`.
       let firstVisible = currentTurnOf(content, viewportTop, rows);
+      const past = firstRowWhere(rows, row => row.getBoundingClientRect().top > viewportTop + line);
+      // The rail marks the last turn that has reached the reading line, i.e. the one being
+      // read rather than merely visible. Every row before `past` is at or above the line, so the
+      // label is the last labelled one among them — and unresolved rows carry no label.
       let active: number | null = null;
+      for (let index = past - 1; index >= 0; index -= 1) {
+        const value = Number(rows[index]!.dataset.readerTurn);
+        if (Number.isSafeInteger(value)) { active = value; break; }
+      }
       let first: number | null = null;
-      for (const row of rows) {
-        const value = Number(row.dataset.readerTurn);
-        if (!Number.isSafeInteger(value)) continue;
-        if (first === null) first = value;
-        // The rail marks the last turn that has reached the reading line, i.e. the one being
-        // read rather than merely visible.
-        if (row.getBoundingClientRect().top <= viewportTop + line) active = value;
-        else break;
+      for (let index = 0; index < rows.length; index += 1) {
+        const value = Number(rows[index]!.dataset.readerTurn);
+        if (Number.isSafeInteger(value)) { first = value; break; }
       }
       setCurrentTurn(previous => previous === firstVisible ? previous : firstVisible);
       setActiveTurn(previous => {
@@ -958,7 +1010,7 @@ export function Reader(props: ReaderProps) {
       scroller.removeEventListener('scroll', schedule);
       observer?.disconnect();
     };
-  }, [groups]);
+  }, [turnSignature]);
   // Whether any turn is still RUNNING — the same `status === 'open'` the status line and the wait clock read. It gates
   // the tail-follow (see `useReadingScroll`): with nothing arriving, following the bottom is not keeping up with
   // anything, it is only fighting the reader's own scrolling.
@@ -1077,6 +1129,9 @@ export function Reader(props: ReaderProps) {
           glassParts={glassValuesResolved} onGlassPart={props.actions.setGlassPart}
           openInSidebar={openInSidebar} onOpenInSidebar={on => { props.actions.setDeliverableOpenMode(on ? 'sidebar' : 'external'); }}
           stripWheel={stripWheel} onStripWheel={props.actions.setStripWheel}
+          textCadence={textCadence} onTextCadence={props.actions.setTextCadence}
+          revealBlur={revealBlur} onRevealBlur={props.actions.setRevealBlur}
+          revealWords={revealWords} onRevealWords={props.actions.setRevealWords}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope} wallpaperChrome={wallpaperChrome}

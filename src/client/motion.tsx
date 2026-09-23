@@ -9,8 +9,8 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
  * The follower's policy lives in its own module (see `reading-scroll.ts`), imported here because the follower uses it
  * and re-exported because this is where every reader of these names looks for them.
  */
-import { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
-export { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, isNearTail, wheelAtBottom, wheelClaimsScroll };
+import { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+export { FOLLOW_TAIL_PX, WHEEL_EPSILON_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll };
 
 export function useMotionAllowed(enabled: boolean): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -320,7 +320,12 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     };
     const capture = () => {
       const top = scroll.getBoundingClientRect().top;
-      const candidate = Array.from(content.querySelectorAll<HTMLElement>('[data-reader-anchor]')).find(element => element.getBoundingClientRect().bottom > top + 8);
+      // Bisection, not a walk over every anchor: this runs on every scroll event and on every growth while the reader
+      // holds their own place, and the two scans in this file were measured together at 10k–16k rect reads per second.
+      // The NodeList is measured directly — the walk's `Array.from` was another whole-list allocation per call.
+      const anchors = content.querySelectorAll<HTMLElement>('[data-reader-anchor]');
+      const index = firstRowPastIndex(anchors, top, 8);
+      const candidate = index < anchors.length ? anchors[index]! : undefined;
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
     };
     const onScroll = () => {
@@ -332,7 +337,11 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       following.current = atBottom;
       setDetached(!atBottom);
       if (!atBottom) { cancelAnimationFrame(followFrame); followFrame = 0; }
-      capture();
+      // The anchor is only ever READ while the reader holds their own place — see the observer below, whose
+      // compensation branch is the only consumer. This handler runs once per streamed chunk (the follow loop
+      // writes `scrollTop`, which fires a scroll event), so capturing here while following was a
+      // whole-transcript `querySelectorAll` plus a rect per anchor, for a value nothing was going to look at.
+      if (!following.current) capture();
     };
     const onWheel = (event: WheelEvent) => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
@@ -353,21 +362,42 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
         following.current = false; setDetached(true); capture();
       }
     };
-    const writeTop = (top: number) => { scroll.scrollTop = top; lastWrittenTop = scroll.scrollTop; };
+    /**
+     * Write a scroll position and remember what the element will actually hold.
+     *
+     * That remembered value is what the `onScroll` guard compares against to tell our own easing frames apart from the
+     * reader moving, and it used to be read back off the element — a read after a write, which forces a layout on every
+     * single frame of the follow. The clamp is applied here instead, so the recorded number is the number the browser
+     * will report; callers that already know the limit pass it (the follow loop reads it as its gap), and a write that
+     * cannot be clamped from what the caller knows leaves it out.
+     */
+    const writeTop = (top: number, limit?: number) => {
+      const value = Math.max(0, limit === undefined ? top : Math.min(top, limit));
+      scroll.scrollTop = value;
+      lastWrittenTop = value;
+    };
     const follow = (now: number) => {
       followFrame = 0;
       // A follower with nothing to follow: see the `live` note on this hook.
       if (!liveRef.current || !following.current || selected() || content.contains(document.activeElement)) return;
       const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
+      const limit = scroll.scrollTop + gap;
       const delta = Math.min(48, Math.max(1, now - lastFrameAt));
       lastFrameAt = now;
-      if (!motion || Math.abs(gap) < 1.5) { writeTop(scroll.scrollHeight); capture(); return; }
-      writeTop(scroll.scrollTop + gap * (1 - Math.exp(-delta / 52)));
+      // No anchor capture on this line. The function returns above unless the reader IS following, and the
+      // anchor is read only in the branch that runs when they are not — so this measured the whole transcript
+      // on every frame of a follower that had already caught up, which is the branch that becomes common as
+      // soon as the frames stop being starved. The capture was pure cost, and an expensive one: a
+      // querySelectorAll over every anchor plus a rect for each, per frame, for a value nothing looked at.
+      if (!motion || Math.abs(gap) < 1.5) { writeTop(scroll.scrollHeight, limit); return; }
+      writeTop(scroll.scrollTop + gap * (1 - Math.exp(-delta / 52)), limit);
       followFrame = requestAnimationFrame(follow);
     };
     const firstFrame = requestAnimationFrame(() => {
       if (following.current && !selected()) writeTop(scroll.scrollHeight);
-      capture();
+      // The reader may already have detached before this effect installed; then the anchor is what holds
+      // their place and it has to be captured now. While following it is never read.
+      if (!following.current) capture();
     });
     const observer = new ResizeObserver(() => {
       if (selected()) return;
@@ -378,9 +408,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
         else if (!followFrame) { lastFrameAt = performance.now(); followFrame = requestAnimationFrame(follow); }
       } else if (!following.current && anchor.current?.element.isConnected) {
         const delta = anchor.current.element.getBoundingClientRect().top - anchor.current.top;
-        if (Math.abs(delta) > .5) writeTop(scroll.scrollTop + delta);
+        // The metrics are read here, before the write: reading them after would be the same forced layout this branch
+        // used to pay for nothing.
+        if (Math.abs(delta) > .5) writeTop(scroll.scrollTop + delta, scroll.scrollHeight - scroll.clientHeight);
       }
-      capture();
+      // Only worth capturing when the anchor is what holds the reader's place. While following, the anchor is not
+      // read at all — and this fires once per streamed chunk, so the scan was pure cost on the one path where the
+      // reader is already complaining about jank.
+      if (!following.current) capture();
     });
     observer.observe(content);
     if (scroll !== content) observer.observe(scroll);

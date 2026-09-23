@@ -44,7 +44,7 @@ const checks = {
     && turn.indexOf('\n\t\t\t\t\thasProcess &&') < turn.indexOf('id: flowId'),
   'all user/steering nodes are collected': bundle.includes('group.keys.filter((key) => {\n\t\t\t\tconst kind = snapshot.nodes.get(key)?.kind;'),
   'every user message is rendered in the leading slot': bundle.includes('turnUserKeys.map((userKey) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BlockBoundary, {'),
-  'user nodes are excluded from the flow': bundle.includes('const mainKeys = group.keys.filter((key) => !turnUserKeys.includes(key));'),
+  'user nodes are excluded from the flow, through a memoized key list': bundle.includes('const mainKeys = (0, react.useMemo)(() => group.keys.filter((key) => !turnUserKeys.includes(key)), [group, turnUserKeys]);'),
   'MainNode still draws user nodes as a fallback': bundle.includes('if (isNode(node, "user") || isNode(node, "steering")) {\n\t\t\t\tconst blocks = contentBlocks(node.data.content);'),
   'no leftover startsWithUser assumption': !bundle.includes('startsWithUser'),
   'disclosure label still shows the duration': bundle.includes('用时 ${elapsed}'),

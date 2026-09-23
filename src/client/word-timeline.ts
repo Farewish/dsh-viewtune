@@ -25,6 +25,8 @@ export class WordTimeline {
   private enabled = false;
   private revision = 0;
   private floor = 0;
+  /** How much of `births` is already past its reveal window — see the advance at the end of `begin`. */
+  private settled = 0;
   private lastBirth = -Infinity;
   private readonly births: SourceBirth[] = [];
 
@@ -33,6 +35,7 @@ export class WordTimeline {
     const replaced = revision !== this.revision || (this.source !== null && !source.startsWith(this.source));
     if (replaced || !enabled) {
       this.births.length = 0;
+      this.settled = 0;
       this.lastBirth = -Infinity;
       this.generation++;
       this.floor = source.length;
@@ -67,6 +70,20 @@ export class WordTimeline {
         const previous = this.births.at(-1);
         if (previous && previous.born === born) previous.end = end;
         else this.births.push({ end, born });
+      }
+      // A word only needs an identity while it is still animating. Everything whose window has closed collapses back
+      // into ONE inert leaf in `words()`, which is what keeps a streaming card's per-frame work proportional to the
+      // NEW words instead of to everything received so far. Without this the floor never moved off zero on a live
+      // card — it is only set on the two reset paths above — so the whole accumulated reasoning was re-segmented with
+      // `Intl.Segmenter` and rebuilt as N `<Word>` elements sixty times a second. That is the jank: a reasoning stream
+      // publishes text every frame, while a tool call flushes once and stops the loop, which is why only thinking
+      // stuttered. `born` never decreases and the table is append-only, so a cursor is enough to find the boundary.
+      const settledBy = now - (WORD_MOTION.duration + WORD_MOTION.maxDelay);
+      while (this.settled < this.births.length) {
+        const entry = this.births[this.settled]!;
+        if (entry.born !== null && entry.born > settledBy) break;
+        this.floor = Math.max(this.floor, entry.end);
+        this.settled += 1;
       }
     }
     this.source = source;

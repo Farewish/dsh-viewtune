@@ -54,12 +54,25 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     let targetOffset = lastPainted;
     const tail = () => Math.max(0, text.offsetHeight - port.clientHeight);
     const clamp = (value: number) => Math.max(0, Math.min(tail(), value));
+    /**
+     * The translateY a computed transform is painting, in pixels.
+     *
+     * The value has to come from `getComputedStyle` — only the browser knows where its own interpolation is — but it does
+     * not need a `DOMMatrixReadOnly` object built for it sixty times a second. A 2D `matrix(a, b, c, d, tx, ty)` carries
+     * the translation as its fifth and sixth numbers; anything else (a `matrix3d`, which a 2D translate never produces
+     * here) falls back to the DOM API rather than guessing.
+     */
+    const translateYOf = (transform: string): number => {
+      if (!transform.startsWith('matrix(')) return transform.startsWith('matrix3d(') ? new DOMMatrixReadOnly(transform).m42 : 0;
+      const numbers = transform.slice(7, -1).split(',').map(Number);
+      return numbers.length === 6 && numbers.every(Number.isFinite) ? numbers[5]! : 0;
+    };
     const paintedOffset = () => {
       if (!automatic) return port.scrollTop;
       const transform = getComputedStyle(scrollTrack).transform;
       // Reduced-motion CSS may win before React receives the media change.
       // Retain the last painted position rather than snapping back to the top.
-      return clamp(transform === 'none' ? lastPainted : port.scrollTop - new DOMMatrixReadOnly(transform).m42);
+      return clamp(transform === 'none' ? lastPainted : port.scrollTop - translateYOf(transform));
     };
     const hasSelection = () => {
       const selection = document.getSelection();
@@ -93,14 +106,38 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       automatic = true;
       port.dataset.reasoningMode = 'transform';
     };
+    /**
+     * The card's own measurements, and the one thing that is cached across the animation.
+     *
+     * `--reason-preview-height` is a layout constant of this card (the stylesheet resets it for a narrow container), so
+     * reading it is a style recalculation for a number that only changes when the card is resized. `recordHeight` says
+     * which kind of call this is: the measuring ones (a resize, a mode change) re-read it, and the animation's
+     * per-frame calls reuse the cached value. That per-frame read was one of the two style reads this loop made sixty
+     * times a second while reasoning text streamed.
+     */
+    // Read once at setup: the animation's per-frame calls must never be the first to look at it, or the overflow
+    // comparison below would run against a zero.
+    let previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
+    /**
+     * The last values handed to React, so an unchanged frame calls neither setter.
+     *
+     * React already bails out of re-rendering when a state update carries the value it holds, but the update is still
+     * scheduled and the component is still rendered once to discover that. The animation calls this every frame for
+     * values that only change when a fade starts or stops, so the comparison is made here instead: the rendered result
+     * is identical (both states are only ever written from this function) and a streaming card stops offering React
+     * one or two renders per frame.
+     */
+    let lastOverflow = false;
+    let lastEdges = 'none';
     const measure = (recordHeight = true) => {
-      const previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
-      setOverflow(text.offsetHeight > previewHeight + 1);
+      if (recordHeight) previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
+      const overflowing = text.offsetHeight > previewHeight + 1;
+      if (overflowing !== lastOverflow) { lastOverflow = overflowing; setOverflow(overflowing); }
       lastPainted = paintedOffset();
       const top = lastPainted > 1;
       const bottom = tail() - lastPainted > 1;
       const next = top ? bottom ? 'both' : 'top' : bottom ? 'bottom' : 'none';
-      setEdges(value => value === next ? value : next);
+      if (next !== lastEdges) { lastEdges = next; setEdges(next); }
       if (recordHeight && !resize.current) lastHeight.current = port.clientHeight;
     };
     stopFollow.current = () => { cancel(); manual(); measure(false); };
@@ -121,6 +158,21 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const began = performance.now();
       nextAt = began + REASON_HOLD;
       targetOffset = target;
+      /**
+       * Can this step still change either fade?
+       *
+       * A step is only worth OBSERVING on the frames where an edge can move. `measure` reads the track's interpolated
+       * transform and the content's height — a style read and two layout reads — and while text is streaming the
+       * layout it reads is dirty, so each of those can force a fresh layout. Both fades are decided by where the
+       * painted offset sits, and the offset travels monotonically from `from` to `target`: if the two ends agree
+       * about the top edge (is the card scrolled off it) and about the bottom one (is there more below), no frame in
+       * between can disagree, and the state `measure` would publish is the one already on screen. `tail()` is
+       * re-read here rather than captured, so text that grew during the step is still accounted for.
+       */
+      const edgesMayMove = () => {
+        const limit = tail();
+        return (from > 1) !== (target > 1) || (limit - from > 1) !== (limit - target > 1);
+      };
       // The supplied recipe: commit the start pose, then transition the track.
       // No per-frame scrollTop writes and no catch-up across unread lines.
       scrollTrack.style.transition = 'none';
@@ -135,9 +187,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const tick = (now: number) => {
         frame = 0;
         if (!canFollow()) { cancel(); manual(); return; }
-        // Observe the browser's actual CSS interpolation for masks and handoff.
-        measure();
-        if (now - began < REASON_STEP || Math.abs(lastPainted - target) > .05) frame = requestAnimationFrame(tick);
+        const done = now - began >= REASON_STEP;
+        // Observe the browser's actual CSS interpolation for masks and handoff. The last frame always measures, which
+        // is what leaves the recorded painted offset on the step's target; the frames in between skip it when the
+        // answer cannot differ (see `edgesMayMove`).
+        if (done || edgesMayMove()) measure(false);
+        else lastPainted = target;
+        if (!done) frame = requestAnimationFrame(tick);
         else { delete port.dataset.reasoningMoving; schedule(); }
       };
       frame = requestAnimationFrame(tick);

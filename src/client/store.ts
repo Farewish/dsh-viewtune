@@ -3,6 +3,7 @@ import type { EngineStoreHandle } from '@deepseek-ai/dsh-client-store';
 import type { ShortcutAction } from './shortcuts.js';
 import type { CollapseMode } from './collapse-mode.js';
 import type { DeliverableOpenMode } from './open-file.js';
+import type { TextCadence } from './text-cadence.js';
 import { DEFAULT_WALLPAPER, WALLPAPER_DIM_INITIAL } from './wallpaper.js';
 import { WALLPAPER_CHROME_INITIAL } from './wallpaper-scope.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
@@ -42,6 +43,33 @@ export interface ReaderState {
   /** Where a delivered file opens: the system app by default, the right sidebar on request. */
   deliverableOpenMode: DeliverableOpenMode;
   /**
+   * How often a streaming message publishes its revealed text.
+   *
+   * The steady 60Hz cadence is the DEFAULT, and `textCadenceOf` answers it for anything unrecognised: publishing once
+   * per frame makes the reveal's cost follow the display's refresh rate — on a 240Hz screen that is four times the
+   * work a reader can see — so the per-frame cadence is the one a reader has to ask for by name.
+   */
+  textCadence: TextCadence;
+  /**
+   * Whether a revealed word also resolves from a 1px blur, or only fades in.
+   *
+   * ON by default — the reference recipe — because that is what every card in this plugin has always shown. It is a
+   * switch because the blur is the expensive half of the reveal and the subtle one: a `filter` cannot be animated by
+   * the compositor, so every animating word repaints its own area on every frame, and about a dozen of those overlap
+   * for as long as a message streams. Read defensively (`!== false`), so a record written before the switch existed
+   * keeps the blur it was written with.
+   */
+  revealBlur: boolean;
+  /**
+   * Whether the reveal gives each word an identity at all — a per-word fade — or lets the text appear as it streams.
+   *
+   * ON by default: it is what every card in this plugin has always done, and the pacing a reader sees comes from the
+   * stream buffer either way. Off, a growing message renders as plain text: no per-word elements, no per-word
+   * animation, and no word identities to rebuild — the timeline is not even started. Read defensively (`!== false`),
+   * so a record written before the switch existed keeps the per-word reveal.
+   */
+  revealWords: boolean;
+  /**
    * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
    *
    * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
@@ -75,6 +103,9 @@ type ReaderActions = {
   setConversationSolid: (draft: ReaderState, value: boolean) => void;
   setCollapseMode: (draft: ReaderState, value: CollapseMode) => void;
   setDeliverableOpenMode: (draft: ReaderState, value: DeliverableOpenMode) => void;
+  setTextCadence: (draft: ReaderState, value: TextCadence) => void;
+  setRevealBlur: (draft: ReaderState, value: boolean) => void;
+  setRevealWords: (draft: ReaderState, value: boolean) => void;
   setStripWheel: (draft: ReaderState, value: boolean) => void;
   setWallpaper: (draft: ReaderState, value: string) => void;
   setWallpaperDim: (draft: ReaderState, value: number) => void;
@@ -107,6 +138,13 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       conversationSolid: false,
       // The pair of buttons' behaviour, which is what a reader who never opens this setting keeps.
       collapseMode: 'both',
+      // The reveal's cadence: the steady one, which is what this plugin now opens with — per-frame publication makes
+      // the reveal's work follow the display's refresh rate, so it is the explicit choice rather than the default.
+      textCadence: 'steady',
+      // …and its blur, kept by default for the same reason: it is what every card showed before the switch existed.
+      revealBlur: true,
+      // …and the per-word reveal itself, which is what a fresh install (and an older record) opens with.
+      revealWords: true,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
@@ -125,6 +163,9 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setConversationSolid: (draft, value: boolean) => { draft.conversationSolid = value; },
       setCollapseMode: (draft, value: CollapseMode) => { draft.collapseMode = value; },
       setDeliverableOpenMode: (draft, value: DeliverableOpenMode) => { draft.deliverableOpenMode = value; },
+      setTextCadence: (draft, value: TextCadence) => { draft.textCadence = value; },
+      setRevealBlur: (draft, value: boolean) => { draft.revealBlur = value; },
+      setRevealWords: (draft, value: boolean) => { draft.revealWords = value; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },
       setWallpaperDim: (draft, value: number) => { draft.wallpaperDim = value; },

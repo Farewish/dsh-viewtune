@@ -8,6 +8,8 @@ import type { ShortcutAction, ShortcutProblem } from './shortcuts.js';
 import { GLASS_PARTS } from './glass.js';
 import { COLLAPSE_MODES, collapseModeOf } from './collapse-mode.js';
 import type { CollapseMode } from './collapse-mode.js';
+import { TEXT_CADENCES, textCadenceOf } from './text-cadence.js';
+import type { TextCadence } from './text-cadence.js';
 import { WallpaperSection } from './WallpaperSection.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 import css from './Reader.module.css';
@@ -47,6 +49,12 @@ const GLASS_CONVERSATION_HINT = '「对话」页里的代码块与用户气泡�
 const OPEN_MODE_HINT = '打开后点产物文件用右侧栏预览，而不是系统程序';
 /** What the toolbar's two column handles do with a wheel, as that row's `title` box. */
 const STRIP_WHEEL_HINT = '在阅读列两边的竖条上滚动，正文也会跟着滚动';
+/** What the two reveal cadences cost and buy, as that row's `title` box. */
+const CADENCE_HINT = '跟随屏幕刷新可能严重影响性能';
+/** What turning the reveal's blur off changes, as that row's `title` box. */
+const REVEAL_BLUR_HINT = '关掉后逐字只剩淡入，画面更省';
+/** What turning the per-word reveal itself off changes, as that row's `title` box. */
+const REVEAL_WORDS_HINT = '关掉后文字直接出现，不再逐词淡入';
 
 /**
  * The reading view's settings, behind one toolbar button: "viewtune" and a gear.
@@ -85,7 +93,7 @@ const STRIP_WHEEL_HINT = '在阅读列两边的竖条上滚动，正文也会跟
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -113,6 +121,12 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** Whether a wheel over the toolbar's two column handles is forwarded to the transcript. */
   stripWheel: boolean;
   onStripWheel: (next: boolean) => void;
+  textCadence: TextCadence;
+  onTextCadence: (next: TextCadence) => void;
+  revealBlur: boolean;
+  onRevealBlur: (next: boolean) => void;
+  revealWords: boolean;
+  onRevealWords: (next: boolean) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background. */
@@ -295,6 +309,30 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>产物用右侧栏打开</span>
               </span>
               <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
+            </div>
+            {/* How often a streaming message updates. It sits with the behaving switches because that is what it is:
+                the theme of the page above is pixels, this page is what the plugin DOES — and this one is the only
+                choice here that trades a little smoothness of the reveal for a lot less work per second. */}
+            <div className={css.settingsRow} title={CADENCE_HINT} data-ud-check="reader-settings-cadence">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>正文更新节奏</span>
+              </span>
+              <select className={css.settingsSelect} value={textCadence} aria-label="正文更新节奏"
+                onChange={event => { onTextCadence(textCadenceOf(event.currentTarget.value)); }}>
+                {TEXT_CADENCES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
+            </div>
+            <div className={css.settingsRow} title={REVEAL_BLUR_HINT} data-ud-check="reader-settings-reveal-blur">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>逐词显现的模糊</span>
+              </span>
+              <Switch checked={revealBlur} onChange={onRevealBlur} label="逐词显现的模糊" />
+            </div>
+            <div className={css.settingsRow} title={REVEAL_WORDS_HINT} data-ud-check="reader-settings-reveal-words">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>逐词显现</span>
+              </span>
+              <Switch checked={revealWords} onChange={onRevealWords} label="逐词显现" />
             </div>
           </>
           : <>

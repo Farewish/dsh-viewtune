@@ -49,8 +49,10 @@ const slotFlow = (region.match(/\n\t{5}\/\* @__PURE__ \*\/ \(0, react_jsx_runtim
 console.log(`disclosure slots: ${String(slotDisclosures)}, flow slots: ${String(slotFlow)}`);
 if (slotDisclosures !== 1 || slotFlow !== 1) ok = false;
 
-// The user node is rendered from the turn's own slot, not from the flow.
-const userFromTurnSlot = bundle.includes('const mainKeys = group.keys.filter((key) => !turnUserKeys.includes(key));');
+// The user node is rendered from the turn's own slot, not from the flow. `mainKeys` is asserted together
+// with its memo dependencies on purpose: rebuilding that array during render — the shape this fork used to
+// emit — put every turn's `flow` and deliverables scan back on the per-character path.
+const userFromTurnSlot = bundle.includes('const mainKeys = (0, react.useMemo)(() => group.keys.filter((key) => !turnUserKeys.includes(key)), [group, turnUserKeys]);');
 console.log(`${userFromTurnSlot ? 'ok  ' : 'BAD '} flow keys exclude the user node`);
 if (!userFromTurnSlot) ok = false;
 

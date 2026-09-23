@@ -204,7 +204,7 @@ want('the predicate is a named function', 'function currentTurnOf(content, viewp
 // runs this rule on its own against a fake DOM. Indexed so a NodeList works without the DOM
 // iterable lib.
 want('it walks the turn list when not handed one', 'const list = rows ?? content.querySelectorAll("[data-reader-turn]");', 1);
-want('the walk is indexed, not iterated', 'for (let index = 0; index < list.length; index += 1) {', 1);
+want('the walk is indexed from the row the reading line reached, not iterated', 'for (let index = firstRowPastIndex(list, viewportTop, 8); index < list.length; index += 1) {', 1);
 // Same predicate the reading scroll uses for its anchor, so the two agree on what is current.
 want('first turn whose bottom passed the top edge', 'if (element.getBoundingClientRect().bottom > viewportTop + 8) return turnNumber;', 1);
 want('skips groups without a turn number', 'if (!Number.isInteger(turnNumber)) continue;', 1);

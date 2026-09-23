@@ -29,13 +29,13 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const bundlePath = process.argv[2] ?? join(ROOT, 'lib/client.js');
 const bundle = readFileSync(bundlePath, 'utf8');
 
-/** Lift the compiled predicate out of the bundle. */
-function extractFn() {
+/** Lift a compiled function out of the bundle by the start of its signature. */
+function extractFn(signature) {
   // Match the signature by its name and first parameters rather than the whole parameter list:
   // the predicate gained an optional rows argument so one scroll pass can reuse its query, and a
   // guard pinned to the old exact spelling would have failed for that rather than for behaviour.
-  const start = bundle.indexOf('function currentTurnOf(content, viewportTop');
-  if (start === -1) throw new Error('compiled currentTurnOf not found');
+  const start = bundle.indexOf(signature);
+  if (start === -1) throw new Error(`compiled ${signature} not found`);
   // Walk to the matching closing brace of the function body.
   let depth = 0;
   let i = bundle.indexOf('{', start);
@@ -47,7 +47,12 @@ function extractFn() {
 }
 
 const context = createContext({ console });
-runInContext(`${extractFn()}\nthis.currentTurnOf = currentTurnOf;`, context);
+// The predicate finds its starting row through the bisection helpers, so they have to come along: the
+// fixtures below are what proves the bisection picks exactly the row the walk used to find.
+runInContext(
+  `${extractFn('function firstRowWhere(')}\n${extractFn('function firstRowPastIndex(')}\n${extractFn('function currentTurnOf(content, viewportTop')}\nthis.currentTurnOf = currentTurnOf;`,
+  context,
+);
 const currentTurnOf = context.currentTurnOf;
 
 /** A turn element: bottom edge in viewport coordinates, plus its data attribute. */

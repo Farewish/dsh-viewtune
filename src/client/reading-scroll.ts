@@ -50,3 +50,42 @@ export function wheelClaimsScroll(deltaY: number, epsilon = WHEEL_EPSILON_PX): b
 export function wheelAtBottom(deltaY: number, gap: number): boolean {
   return deltaY > 0 && gap < 1;
 }
+
+/**
+ * The index of the first row for which `passes` returns true, or `rows.length` when none does.
+ *
+ * The predicate has to be monotone over the list — false, false, …, true — which is what a list of non-overlapping
+ * block rows gives for both of the questions the reading view asks of them (has this row's bottom passed the line;
+ * has this row's top passed it). Callers pass a predicate rather than a threshold so the same search serves both.
+ *
+ * Takes the rows rather than querying them, so a caller measures the same list it renders, and stays a plain function
+ * over an array-like — the contract is `length` and indexing — so it can be tested without a DOM.
+ */
+export function firstRowWhere<T>(rows: ArrayLike<T>, passes: (row: T, index: number) => boolean): number {
+  let low = 0;
+  let high = rows.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (passes(rows[middle]!, middle)) high = middle;
+    else low = middle + 1;
+  }
+  return low;
+}
+
+/**
+ * The index of the first row whose bottom edge has passed a line, or `rows.length` when none has.
+ *
+ * Rows are in document order and block rows do not overlap, so their bottom edges increase down the list and the
+ * first match can be found by bisection instead of by measuring every row. That matters because both callers run once
+ * per scroll event and once per frame while the reader is reading: a measured build showed the two scans together
+ * costing 10,000–16,000 `getBoundingClientRect` calls per second, and while a message streams the layout they read is
+ * dirty, so every one of them can force a fresh layout.
+ */
+export function firstRowPastIndex(
+  rows: ArrayLike<{ getBoundingClientRect(): { bottom: number } }>,
+  viewportTop: number,
+  slack: number,
+): number {
+  const line = viewportTop + slack;
+  return firstRowWhere(rows, row => row.getBoundingClientRect().bottom > line);
+}
