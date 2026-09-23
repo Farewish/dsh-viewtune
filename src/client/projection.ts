@@ -47,9 +47,14 @@ export function isEarlierNarration(data: AssistantChatData, boundary: TurnBounda
  * turns the reader had opened (their stored choice is cleared when a new turn starts streaming). The reader's own
  * choice still WINS when one exists, which is what keeps the disclosure control answering a click while this is on:
  * a default that overrode it would look like a dead button.
+ *
+ * `answering` is 「回答开始时收起流程」, and the caller only passes it when the reader asked for it: with it, the process
+ * folds as soon as this turn's ANSWER starts streaming instead of waiting for the turn to end. Same rule about the
+ * choice — it is a default, so a reader who opens the process keeps it open.
  */
-export function processExpanded(choice: boolean | undefined, boundary: TurnBoundary, foldEarlier = false): boolean {
+export function processExpanded(choice: boolean | undefined, boundary: TurnBoundary, foldEarlier = false, answering = false): boolean {
   if (choice !== undefined) return choice;
+  if (answering) return false;
   if (foldEarlier && boundary.status !== 'open') return false;
   return !(boundary.status === 'closed' && boundary.reason === 'completed');
 }
@@ -73,6 +78,39 @@ export function hasProcessContent(node: ChatConversationViewNode | undefined, bo
 
 export function hasVisibleBody(blocks: readonly AssistantBlock[]): boolean {
   return blocks.some(block => block.kind === 'image' || block.kind === 'other' || (block.kind === 'text' && block.text.trim() !== ''));
+}
+
+/**
+ * Is this turn writing its ANSWER right now?
+ *
+ * A turn's process folds when the turn ENDS, which means it stays open — taking the top of the screen — for as long as
+ * the answer is streaming underneath it. This is the fact that says the answer has started: the newest step of a
+ * running turn is body text, with no tool call in it, and that body is not the earlier narration a process step
+ * carries. It is deliberately the SAME shape the rendering already uses to decide what counts as an answer rather than
+ * narration (a body in the latest step of a turn renders outside the process), so this cannot disagree with what the
+ * reader sees.
+ *
+ * Asked of the turn's keys rather than of a rendered node, because the toolbar's "what is open" pass has to reach the
+ * same answer as the view without rendering anything.
+ */
+export function answeringTurn(
+  keys: readonly string[],
+  get: (key: string) => ChatConversationViewNode | undefined,
+  boundary: TurnBoundary,
+): boolean {
+  if (boundary.status !== 'open' || boundary.latestStep < 0) return false;
+  for (const key of keys) {
+    const node = get(key);
+    if (!node || node.visibility === 'hidden' || node.kind !== 'assistant-step') continue;
+    const data = node.data as AssistantChatData;
+    if (data.step !== boundary.latestStep) continue;
+    if (data.status !== 'running') return false;
+    // A tool call appearing in the same step means this was mid-turn narration after all: the process belongs on
+    // screen again, and it reopens on the next render because this answer becomes false again.
+    if (data.blocks.some(block => block.kind === 'tool-call')) return false;
+    return hasVisibleBody(data.blocks) && !isEarlierNarration(data, boundary);
+  }
+  return false;
 }
 
 /** Keep native block order. In particular, never lift a later Think above text. */

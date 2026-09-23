@@ -460,7 +460,14 @@ const markers = [
     && bundle.includes('"data-ud-check": "reader-settings-follow-mode"')
     && bundle.includes('"data-ud-check": "reader-settings-auto-collapse"')
     && bundle.includes('"data-ud-check": "reader-settings-reasoning-follow"')
-    && bundle.includes('"data-ud-check": "reader-settings-reasoning-rate"')],
+    && bundle.includes('"data-ud-check": "reader-settings-reasoning-rate"')
+    && bundle.includes('"data-ud-check": "reader-settings-focus-expand"')
+    && bundle.includes('"data-ud-check": "reader-settings-fold-answering"')],
+  // 「回答开始时收起流程」, pinned at each end: the fold itself, the fact it acts on being asked in BOTH places (the view
+  // and the toolbar's own "what is open" pass, which would otherwise disagree), and the default plus its defensive read.
+  ['回答开始时收起流程 folds the process while the answer streams', 'if (answering) return false;'],
+  ['…with the fact asked of the turn’s own keys everywhere it is needed (the view, and the toolbar’s two passes)', () => (bundle.match(/answeringTurn\(group\.keys/g) ?? []).length === 3],
+  ['…on by default, and read the defensive way', () => bundle.includes('foldWhileAnswering: true') && bundle.includes('state.foldWhileAnswering) !== false')],
   // The reasoning card's own movement, pinned at each end that could silently change the DEFAULT behaviour: the three
   // modes, the pace realised as a whole-line step on the fixed cadence, the standard pace coming out as exactly the
   // two lines this card has always taken, 手动滚动 never moving on its own, 跟随最新 aiming at the newest line, both
@@ -514,7 +521,7 @@ const markers = [
   // would otherwise disagree with what is on screen — the default and the defensive read, and the clear that makes a
   // new turn put the earlier processes away (gated by the same two conditions the fold uses).
   ['自动收起更早流程 folds every turn but the growing one', 'if (foldEarlier && boundary.status !== "open") return false;'],
-  ['…and the toolbar asks the same rule, so it agrees with the screen', () => (bundle.match(/processExpanded\(choice, boundary, foldEarlier\)/g) ?? []).length === 2],
+  ['…and the toolbar asks the same rule, so it agrees with the screen', () => (bundle.match(/processExpanded\(choice, boundary, foldEarlier, answering\)/g) ?? []).length === 2],
   ['…with the switch off unless a record says otherwise', 'autoCollapseEarlier: false'],
   ['…and that record read the defensive way', 'state.autoCollapseEarlier) === true'],
   ['…and a new turn clearing the stored choices, so the earlier ones fold by themselves', () => {

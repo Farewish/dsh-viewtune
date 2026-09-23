@@ -300,6 +300,15 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
   jump: () => void;
   /** Stop tail-follow so a rail landing is not pulled back to the live bottom. */
   release: () => void;
+  /**
+   * Re-arm tail-follow after something suspended it — for a caller that knows the suspension is over.
+   *
+   * The follower resumes on its own when content grows, but that path runs through guards that are allowed to swallow
+   * it (a focus inside the reading view, a live text selection, a glide already in flight), so a caller that suspended
+   * the follow deliberately has to be able to hand it back deliberately. Does nothing unless the reader is at the tail:
+   * re-arming from anywhere else would be the "fight the reader's scrolling" this hook exists to avoid.
+   */
+  resume: () => void;
 } {
   const port = useRef<HTMLElement | null>(null);
   const following = useRef(true);
@@ -453,5 +462,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     anchor.current = null;
     setDetached(true);
   }, []);
-  return { detached, jump, release };
+  const resume = useCallback(() => {
+    const scroll = port.current;
+    if (scroll === null) return;
+    if (!isNearTail(scroll.scrollTop, scroll.scrollHeight, scroll.clientHeight)) return;
+    cancelFollow.current();
+    anchor.current = null;
+    following.current = true;
+    setDetached(false);
+  }, []);
+  return { detached, jump, release, resume };
 }

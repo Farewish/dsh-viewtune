@@ -67,6 +67,8 @@ const REASONING_FOLLOW_HINT = '自动滚动按阅读速度走；跟随最新停�
 const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
 /** What the focused expansion does, as that row's `title` box. */
 const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到展开阅读那么高';
+/** When the process folds, as that row's `title` box. */
+const FOLD_WHILE_ANSWERING_HINT = '回答一开始就收起本轮过程，只留正文';
 
 /**
  * A settings page grouped by subject: a hairline above the group, and a caption when the group's subject is not
@@ -117,7 +119,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, foldWhileAnswering, onFoldWhileAnswering, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -161,6 +163,8 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onReasoningRate: (next: number) => void;
   focusExpand: boolean;
   onFocusExpand: (next: boolean) => void;
+  foldWhileAnswering: boolean;
+  onFoldWhileAnswering: (next: boolean) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background. */
@@ -384,6 +388,14 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
               </select>
             </div>
             <Group caption="流程展示设置" />
+            {/* The reader's own rule was "fold when the turn ends", which leaves the process on screen for the whole
+                time its answer streams underneath it. This is that rule moved to the moment the answer starts. */}
+            <div className={css.settingsRow} title={FOLD_WHILE_ANSWERING_HINT} data-ud-check="reader-settings-fold-answering">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>回答开始时收起流程</span>
+              </span>
+              <Switch checked={foldWhileAnswering} onChange={onFoldWhileAnswering} label="回答开始时收起流程" />
+            </div>
             <div className={css.settingsRow} title={FOLLOW_MODE_HINT} data-ud-check="reader-settings-follow-mode">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>跟随到最新</span>

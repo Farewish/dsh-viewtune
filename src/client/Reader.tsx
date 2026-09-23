@@ -12,7 +12,7 @@ import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { answeringTurn, assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -509,10 +509,16 @@ function DeliverablesRow({ deliverables, openFile, revealFile }: {
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, foldWhileAnswering, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; foldWhileAnswering: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
+  // Is this turn's answer streaming right now? ─ the fact 「回答开始时收起流程」 acts on, asked of the turn's own keys so
+  // the toolbar's "what is open" pass and this render cannot disagree about it.
+  const answering = useMemo(
+    () => foldWhileAnswering && answeringTurn(group.keys, key => nodes.get(key), boundary),
+    [foldWhileAnswering, group.keys, nodes, boundary],
+  );
   const choiceKey = processChoiceKey(group.key, boundary);
   const expansionChoice = props.useStore(state => state.expanded[choiceKey]);
   const flowId = useId();
@@ -545,7 +551,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
-  const expanded = holdingSelection || processExpanded(expansionChoice, boundary, foldEarlier);
+  const expanded = holdingSelection || processExpanded(expansionChoice, boundary, foldEarlier, foldWhileAnswering && answering);
   const deliverables = useMemo(() => getTurnDeliverables(turn, flow), [turn, flow]);
   // The open mode is read HERE, through the subscriber, and handed to the opener as an argument.
   // The injected `openFile` cannot read it: `createReaderStore()` returns a handle (spec + create)
@@ -899,6 +905,9 @@ export function Reader(props: ReaderProps) {
   // 「焦点思考展开」: whether the card being written into grows to show its content. Read defensively (`=== true`), so a
   // record written before the switch existed keeps the fixed preview card.
   const focusExpand = props.useStore(state => state.focusExpand) === true;
+  // Whether the process folds as soon as the turn's answer starts streaming. Default ON, read defensively
+  // (`!== false`), so a record written before the switch existed keeps the process open for the whole turn.
+  const foldWhileAnswering = props.useStore(state => state.foldWhileAnswering) !== false;
   /**
    * The card that holds the focus, by node key, and the grants it hands out.
    *
@@ -926,10 +935,11 @@ export function Reader(props: ReaderProps) {
       const turn = timeline.turns.get(group.turn);
       const boundary = boundaryOf(turn);
       const choice = expansionChoices[processChoiceKey(group.key, boundary)];
-      if (processExpanded(choice, boundary, foldEarlier)) open.add(processChoiceKey(group.key, boundary));
+      const answering = foldWhileAnswering && answeringTurn(group.keys, key => nodes.get(key), boundary);
+      if (processExpanded(choice, boundary, foldEarlier, answering)) open.add(processChoiceKey(group.key, boundary));
     }
     return open;
-  }, [groups, timeline, expansionChoices, currentTurn, foldEarlier]);
+  }, [groups, timeline, expansionChoices, currentTurn, foldEarlier, foldWhileAnswering, nodes]);
   const currentTurnOpen = openTurnKeys.size > 0;
   // Every turn the reader has expanded, not just the one in view. The toolbar button stays scoped to
   // the current turn (that was a deliberate narrowing), but a reader who has opened several turns
@@ -941,10 +951,11 @@ export function Reader(props: ReaderProps) {
       const turn = timeline.turns.get(group.turn);
       const boundary = boundaryOf(turn);
       const choice = expansionChoices[processChoiceKey(group.key, boundary)];
-      if (processExpanded(choice, boundary, foldEarlier)) open.add(processChoiceKey(group.key, boundary));
+      const answering = foldWhileAnswering && answeringTurn(group.keys, key => nodes.get(key), boundary);
+      if (processExpanded(choice, boundary, foldEarlier, answering)) open.add(processChoiceKey(group.key, boundary));
     }
     return open;
-  }, [groups, timeline, expansionChoices, foldEarlier]);
+  }, [groups, timeline, expansionChoices, foldEarlier, foldWhileAnswering, nodes]);
   const otherTurnsOpen = allOpenKeys.size > openTurnKeys.size;
   const collapseCurrentTurn = useCallback(() => {
     for (const key of openTurnKeys) props.actions.setExpanded(key, false);
@@ -1062,6 +1073,22 @@ export function Reader(props: ReaderProps) {
     };
   }, [turnSignature]);
   const scroll = useReadingScroll(root, motion, live && focusedCard === null, followMode);
+  /**
+   * Hand the follow back the moment a focus ends.
+   *
+   * Suspending the tail-follow while a card holds the focus is not enough on its own: the follower resumes on the next
+   * growth, but that path is guarded (a focus inside the reading view, a live selection, a glide already in flight) and
+   * any of those can swallow the one pass that would have brought it back — which is exactly the shape of "it stops
+   * following after the card folded, sometimes". Handing it back here makes the resume deliberate instead of
+   * incidental, and `resume` re-arms only while the reader is actually at the tail.
+   */
+  const focusWasHeld = useRef(false);
+  useEffect(() => {
+    if (focusedCard !== null) { focusWasHeld.current = true; return; }
+    if (!focusWasHeld.current) return;
+    focusWasHeld.current = false;
+    scroll.resume();
+  }, [focusedCard, scroll.resume]);
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
@@ -1180,6 +1207,7 @@ export function Reader(props: ReaderProps) {
           reasoningFollow={reasoningFollow} onReasoningFollow={props.actions.setReasoningFollow}
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
+          foldWhileAnswering={foldWhileAnswering} onFoldWhileAnswering={props.actions.setFoldWhileAnswering}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope} wallpaperChrome={wallpaperChrome}
@@ -1193,7 +1221,7 @@ export function Reader(props: ReaderProps) {
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} />)}
+      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} foldWhileAnswering={foldWhileAnswering} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (
