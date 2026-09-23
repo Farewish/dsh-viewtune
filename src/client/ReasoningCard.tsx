@@ -33,6 +33,16 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const focusedRef = useRef(false);
   /** The ceiling the focus has published, so a growth can be compensated by EXACTLY its own delta. */
   const focusHeight = useRef(0);
+  /**
+   * When this card's OWN content last grew.
+   *
+   * The focus belongs to a card that is being written INTO, not to a card that merely sits in the step being written:
+   * a mid-turn narration streams in the same step but outside this card, and while the focus was keyed on the step
+   * alone it stayed held through that narration — which kept the page's tail-follow suspended, so the narration
+   * arrived and the page did not follow it. Measuring this card's own growth is what tells the two apart.
+   */
+  const ownGrowthAt = useRef(performance.now());
+  const lastOwnHeight = useRef(-1);
   const allowed = following && active && motion && !selected && reasoningMode !== 'manual';
 
   /**
@@ -81,6 +91,31 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   }, [focused]);
   // A card that unmounts while focused must hand the focus back, or the follower below would stay suspended forever.
   useEffect(() => () => { onFocusChange(focusKey, false); }, [focusKey, onFocusChange]);
+  /**
+   * The focus follows this card's OWN writing, not the step it happens to sit in.
+   *
+   * The request effect above cannot see growth: its dependencies are the card's states, and the whole point of the
+   * distinction is that a sibling block can stream without changing any of them. So the focus is watched here instead,
+   * against the timestamp `measure` keeps: a card that has not grown for a beat hands the focus back (the page follows
+   * the narration, and keeps following), and one that starts growing again takes it back — still only while the page is
+   * at the bottom, which is where a new determination is allowed to start. Cheap by construction: two checks a second,
+   * and only while this card is the one being written into.
+   */
+  useEffect(() => {
+    if (!active || !following || expanded || !focusExpand) return;
+    const IDLE_MS = 600;
+    const check = window.setInterval(() => {
+      const idle = performance.now() - ownGrowthAt.current > IDLE_MS;
+      if (focused) {
+        if (idle) onFocusChange(focusKey, false);
+        return;
+      }
+      if (!idle) return;
+      const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
+      if (scroller && isNearTail(scroller.scrollTop, scroller.scrollHeight, scroller.clientHeight)) onFocusChange(focusKey, true);
+    }, 300);
+    return () => window.clearInterval(check);
+  }, [active, following, expanded, focusExpand, focused, focusKey, onFocusChange]);
 
   const pause = useCallback(() => {
     stopFollow.current();
@@ -192,6 +227,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
         lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
       }
+      // Note the card's OWN growth (see ownGrowthAt): the height is already in hand, so this costs nothing.
+      const ownHeight = text.offsetHeight;
+      if (ownHeight !== lastOwnHeight.current) { lastOwnHeight.current = ownHeight; ownGrowthAt.current = performance.now(); }
       /**
        * 「焦点思考展开」 asks the stylesheet for a taller ceiling, in whole lines, while this card holds the focus.
        *

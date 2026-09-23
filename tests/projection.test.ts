@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { answeringTurn, assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
 import type { TurnBoundary } from '../src/client/projection.ts';
 import { activityPhase, activitySummary, inputFields, readerFlow } from '../src/client/tool-activity.ts';
 
@@ -60,28 +60,8 @@ test('deliberate process expansion or collapse overrides the automatic lifecycle
   assert.equal(processExpanded(false, { ...completed, reason: 'error' }), false);
 });
 
-test('回答开始时收起流程 folds the process once the answer is streaming', () => {
-  // The fact itself, asked of the turn's own keys: the newest step of a RUNNING turn carrying body text.
-  const step = (data: Record<string, unknown>) => ({ kind: 'assistant-step', visibility: 'visible', data });
-  const ask = (nodes: Record<string, unknown>) => (key: string) => nodes[key] as never;
-  const body = { step: 2, status: 'running', blocks: [{ kind: 'text', text: '答案' }] };
-  assert.equal(answeringTurn(['a'], ask({ a: step(body) }), { ...active, latestStep: 2 }), true);
-  // …and every reason it is NOT the answer: a tool call in the same step (mid-turn narration after all, which reopens
-  // the process on the next render), a step that is not the newest, a settled step, and a turn that is not running.
-  assert.equal(answeringTurn(['a'], ask({ a: step({ ...body, blocks: [...body.blocks, { kind: 'tool-call' }] }) }), { ...active, latestStep: 2 }), false);
-  assert.equal(answeringTurn(['a'], ask({ a: step(body) }), { ...active, latestStep: 3 }), false);
-  assert.equal(answeringTurn(['a'], ask({ a: step({ ...body, status: 'settled' }) }), { ...active, latestStep: 2 }), false);
-  assert.equal(answeringTurn(['a'], ask({ a: step(body) }), { ...active, status: 'closed', latestStep: 2 }), false);
-  assert.equal(answeringTurn([], ask({}), { ...active, latestStep: 2 }), false, 'a turn with no step yet is not answering');
-
-  // And what the switch does with it: a DEFAULT, so a reader who opened the process keeps it open.
-  assert.equal(processExpanded(undefined, active, false, true), false, 'the process folds while the answer streams');
-  assert.equal(processExpanded(undefined, active, false, false), true, '…and stays open without the switch');
-  assert.equal(processExpanded(true, active, false, true), true, 'a deliberate expansion still wins');
-  assert.equal(processExpanded(false, active, false, false), false, 'and so does a deliberate collapse');
-});
-
-test('自动收起更早流程 folds every turn except the one that is growing', () => {  // Only the RUNNING turn stays open — that is the whole of the switch — and "earlier" is asked of the same status the
+test('自动收起更早流程 folds every turn except the one that is growing', () => {
+  // Only the RUNNING turn stays open — that is the whole of the switch — and "earlier" is asked of the same status the
   // default rule already uses, so a turn that ended without completing folds too (which the default rule keeps open).
   assert.equal(processExpanded(undefined, active, true), true, 'the turn that is growing stays open');
   assert.equal(processExpanded(undefined, completed, true), false, 'a finished turn stays folded');

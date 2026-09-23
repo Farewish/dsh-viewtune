@@ -470,6 +470,16 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     anchor.current = null;
     following.current = true;
     setDetached(false);
+    /**
+     * …and take up what arrived while the follow was suspended.
+     *
+     * Re-arming alone is not enough: anything that grew during the suspension is sitting below the viewport, and the
+     * follower only resumes when content GROWS. If nothing grows afterwards — and the moment this is called is exactly
+     * the moment a card stopped being written, which is often the end of the output — nobody ever takes it up, and the
+     * reader is left above the bottom with room to scroll down. Bounded by the tail margin, because this only runs
+     * while the reader is at the tail.
+     */
+    scroll.scrollTop = scroll.scrollHeight;
   }, []);
   return { detached, jump, release, resume };
 }

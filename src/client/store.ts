@@ -111,15 +111,6 @@ export interface ReaderState {
    */
   focusExpand: boolean;
   /**
-   * Whether the process folds as soon as this turn's ANSWER starts streaming — 「回答开始时收起流程」.
-   *
-   * ON by default: the reader asked for it, and it is the behaviour the reading view was already reaching for (the
-   * process folds the moment a turn ends, which is one answer-length too late). It is a switch because the other half
-   * of the page's own rule — "fold when the turn is done" — is a legitimate taste. Read defensively (`!== false`), so
-   * a record written before the switch existed keeps the process open for the whole turn.
-   */
-  foldWhileAnswering: boolean;
-  /**
    * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
    *
    * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
@@ -161,7 +152,6 @@ type ReaderActions = {
   setReasoningFollow: (draft: ReaderState, value: ReasoningFollowMode) => void;
   setReasoningRate: (draft: ReaderState, value: number) => void;
   setFocusExpand: (draft: ReaderState, value: boolean) => void;
-  setFoldWhileAnswering: (draft: ReaderState, value: boolean) => void;
   /** Drop every stored expansion choice, so each turn falls back to its default. */
   clearExpanded: (draft: ReaderState) => void;
   setStripWheel: (draft: ReaderState, value: boolean) => void;
@@ -211,9 +201,6 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       reasoningFollow: 'auto', reasoningRate: 2,
       // …and it stays the same SIZE until a reader asks for the focused card to grow.
       focusExpand: false,
-      // The process folds the moment the answer starts, which is the behaviour the reader asked for and the one the
-      // reading view's own rule ("fold when the turn ends") was one answer-length away from.
-      foldWhileAnswering: true,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
@@ -240,7 +227,6 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setReasoningFollow: (draft, value: ReasoningFollowMode) => { draft.reasoningFollow = value; },
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
       setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },
-      setFoldWhileAnswering: (draft, value: boolean) => { draft.foldWhileAnswering = value; },
       clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },
