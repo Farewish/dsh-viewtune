@@ -500,7 +500,7 @@ const markers = [
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
   ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
   ['…with the newest request winning, so exactly one card can hold it', 'focused ? key : current === key ? null : current'],
-  ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live || liveGrace, followMode, focusedCard !== null)'],
+  ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live, followMode, focusedCard !== null)'],
   ['…because a suspension only yields to a scroll that moved BACKWARDS, which is what a reader taking over does', 'if (suspendedRef.current && scroll.scrollTop >= lastSuspendedTop) {'],
   ['…with the expansion ON unless a record says otherwise', 'focusExpand: true'],
   ['…and that record read the defensive way', 'state.focusExpand) !== false'],
@@ -588,10 +588,14 @@ const markers = [
   // tested directly there. Two things are load-bearing: the follower consults `liveRef` in the FRAME LOOP and in the
   // RESIZE OBSERVER (gating one leaves the other path still following), and the wheel handler asks `wheelAtBottom`
   // before it treats the gesture as a takeover.
-  ['the tail-follow runs only while a turn is live and nothing has it suspended, and a wheel at the bottom is not a takeover', () =>
-    bundle.includes('!liveRef.current || suspendedRef.current ||')
-    && bundle.includes('liveRef.current && !suspendedRef.current && following.current')
+  ['the tail-follow runs while the layout is still producing, and a wheel at the bottom is not a takeover', () =>
+    bundle.includes('!producingRef.current || suspendedRef.current ||')
+    && bundle.includes('producingRef.current && !suspendedRef.current && following.current')
     && bundle.includes('motion, live')
+    && bundle.includes('producingRef.current = liveRef.current || now - endedAt.current < OUTPUT_TAIL_MS;')
+    // …and the state it reads is written in a LAYOUT effect, so it is current for the commit that caused the growth
+    // rather than one paint later. That ordering was the bug: a passive effect let the observer run first.
+    && bundle.includes('(0, react.useLayoutEffect)(() => {\n\t\t\t\tliveRef.current = live;')
     && bundle.includes('function wheelAtBottom(deltaY, gap)')
     && bundle.includes('if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY))')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],

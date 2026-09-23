@@ -295,6 +295,16 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
  * per growth instead, so those paths go quiet. It IS in the dependency list, unlike `live`: it changes when a reader
  * changes a setting, not on every stream tick, and re-registering then is exactly what should happen.
  */
+/**
+ * How long after a turn's status flips a layout change still counts as that turn's output.
+ *
+ * Short, and now for a REASON rather than as a guess about host latency: upstream publishes the turn's `turn-tail`
+ * node on `turn/end`, so the rows that belong to a turn — its metrics, its action row, the deliverable chips — are
+ * laid out in the same commit as the status flip, or in the frame after it. What this covers is that commit reaching
+ * the layout and the observer, which is milliseconds; the value is generous without being a guess.
+ */
+const OUTPUT_TAIL_MS = 400;
+
 export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true, followMode: FollowMode = 'glide', suspended = false): {
   detached: boolean;
   jump: () => void;
@@ -324,10 +334,30 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
    * off writes none. Reported as "a card with a scrollbar stops following when it folds", with no reader input at all.
    */
   const suspendedRef = useRef(suspended);
+  /**
+   * Is the turn still PRODUCING output? — asked of the turn's status, plus the breath it takes for that status's own
+   * layout to reach the observer.
+   *
+   * Upstream publishes the turn's `turn-tail` node on `turn/end`, so the rows that belong to a turn are laid out in
+   * the same commit as the status flip — the status alone would be right if the follower could read it at that
+   * instant. It cannot, and that was the bug: this state used to be set in a PASSIVE effect, while the growth arrives
+   * through a ResizeObserver, and the observer can run before the passive effect does. The one growth carrying the
+   * rows was therefore sometimes seen while the tail window was still off, which is exactly the reported "sometimes it
+   * stops at the answer's last line". The refs below are written in LAYOUT effects, which run synchronously at the
+   * end of the commit and before the browser's rendering steps — so when the observer fires, the state it reads is the
+   * state of the commit that caused the growth.
+   */
+  const producingRef = useRef(false);
+  const endedAt = useRef(0);
   const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
   const cancelFollow = useRef<() => void>(() => {});
   const [detached, setDetached] = useState(false);
-  useEffect(() => { liveRef.current = live; }, [live]);
+  useLayoutEffect(() => {
+    liveRef.current = live;
+    // The instant a turn stops producing — read by the observer, so it has to be current for the commit that flipped
+    // it rather than one paint later (see the producingRef note).
+    if (!live) endedAt.current = performance.now();
+  }, [live]);
   useEffect(() => { suspendedRef.current = suspended; }, [suspended]);
   useLayoutEffect(() => {
     const content = root.current;
@@ -418,23 +448,27 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       lastWrittenTop = value;
     };
     /**
-     * Is the reader typing, or driving the page with the keyboard, INSIDE this view?
+     * Is the reader typing INSIDE THIS VIEW's transcript — as opposed to in the composer?
      *
-     * The follower must not move the page under someone who is doing either — but the test used to be "is anything in
-     * the view focused", and a reasoning card that has a scrollbar is focusable (`tabIndex` for the overflow case), so
-     * simply clicking the card to read it left the focus in the view and the tail-follow never came back: reported as
-     * "a card with a scrollbar stops the following when it folds". Naming the targets that actually take keys is the
-     * same test the key handler below uses, and it leaves a focused button, link or card alone.
+     * The follower must not move the page under someone who is typing into the transcript… and there is no such thing
+     * here: the composer is the only text target inside the reading view, and it is the host's own pinned element at
+     * the bottom, so scrolling the transcript cannot disturb it. Treating it as a reason to freeze was the old "any
+     * focus in the view" rule surviving in narrower clothes, and it froze the follow for the most ordinary situation
+     * there is — a reader who has clicked into the composer while an answer is still arriving, and then watches the
+     * answer finish while the deliverables and the action row appear below it with nobody taking them up. Reported as
+     * "it stops at the answer's last line". The wheel, touch, keyboard and selection rules are untouched: those are
+     * the reader reading, and they still take over.
      */
     const typingInside = () => {
       const active = document.activeElement;
       return active instanceof HTMLElement && content.contains(active)
+        && active.closest('[data-composer-seat]') === null
         && active.closest('textarea,input,[contenteditable=true]') !== null;
     };
     const follow = (now: number) => {
       followFrame = 0;
-      // A follower with nothing to follow: see the `live` note on this hook.
-      if (!liveRef.current || suspendedRef.current || !following.current || selected() || typingInside()) return;
+      // A follower with nothing to follow: see the `producingRef` note on this hook.
+      if (!producingRef.current || suspendedRef.current || !following.current || selected() || typingInside()) return;
       const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
       const limit = scroll.scrollTop + gap;
       const delta = Math.min(48, Math.max(1, now - lastFrameAt));
@@ -456,9 +490,11 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     });
     const observer = new ResizeObserver(() => {
       if (selected()) return;
-      // Following needs a turn to be running; otherwise the anchor below does the work, which keeps the reader's place
-      // instead of dragging them back to the bottom (see the `live` note on this hook).
-      if (liveRef.current && !suspendedRef.current && following.current && !typingInside()) {
+      // The turn's own status, plus the breath its closing commit needs to reach the layout (see producingRef). The
+      // refs are written in layout effects, so this reads the state of the commit that caused this growth.
+      const now = performance.now();
+      producingRef.current = liveRef.current || now - endedAt.current < OUTPUT_TAIL_MS;
+      if (producingRef.current && !suspendedRef.current && following.current && !typingInside()) {
         if (!motion || followMode === 'snap') writeTop(scroll.scrollHeight);
         else if (!followFrame) { lastFrameAt = performance.now(); followFrame = requestAnimationFrame(follow); }
       } else if (!following.current && anchor.current?.element.isConnected) {

@@ -1079,24 +1079,7 @@ export function Reader(props: ReaderProps) {
       observer?.disconnect();
     };
   }, [turnSignature]);
-  /**
-   * Keep the follower alive for a short beat after the last turn closes.
-   *
-   * The reader's rule is that an IDLE transcript is not followed: with nothing arriving, pulling them back to the
-   * bottom is only a fight with their own scrolling. But a turn does not finish when its answer does — the
-   * deliverables row, the metrics and the action row are laid out just AFTER it, and by then the turn is already
-   * closed, so the follow had stopped and the page was left above the bottom with room to scroll down. This grace is
-   * what takes those rows up. It is short, it is cancelled the moment a turn starts again, and it does not fight the
-   * reader: a wheel or a scroll away during it turns the follow off exactly as it always did.
-   */
-  const [liveGrace, setLiveGrace] = useState(false);
-  useEffect(() => {
-    if (live) { setLiveGrace(false); return; }
-    setLiveGrace(true);
-    const timer = setTimeout(() => setLiveGrace(false), 1500);
-    return () => clearTimeout(timer);
-  }, [live]);
-  const scroll = useReadingScroll(root, motion, live || liveGrace, followMode, focusedCard !== null);
+  const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null);
   /**
    * Hand the follow back the moment a focus ends.
    *
