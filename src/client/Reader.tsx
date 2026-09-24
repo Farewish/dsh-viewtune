@@ -10,7 +10,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
-import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
+import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
@@ -30,7 +30,7 @@ import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
-import { firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
+import { READING_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -69,6 +69,14 @@ type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
  * primitive-publishing subscription above exists to avoid.
  */
 const NO_KEYS: readonly string[] = [];
+/**
+ * What the selection is asked about, in one scan.
+ *
+ * A module constant on purpose: `usePinnedSelections` re-registers its listener when this array's identity changes (it
+ * is a dependency), so a fresh literal at the call site would add and remove a `selectionchange` listener per render.
+ * The order is the order the two lists come back in.
+ */
+const PINNED_SELECTORS: readonly string[] = ['[data-reader-answer]', '[data-reader-process]'];
 
 /**
  * A JSON record card — 轮次过程记录 / 模型重试记录 / 命令记录 — with a handle the SKIN can reach.
@@ -694,17 +702,20 @@ export function currentTurnOf(
   // iterable, and a test hands it a plain array.
   const list = rows ?? content.querySelectorAll('[data-reader-turn]');
   // Start at the first row the reading line has passed, found by bisection instead of by measuring every row: this
-  // runs once per frame while the reader scrolls, and the walk cost 10k–16k rect reads per second in a measured
-  // build. The predicate is then re-tested per row from there on, so a list whose rects are NOT monotone still
-  // resolves exactly as the walk did — bisection only decides where the scan may begin.
-  for (let index = firstRowPastIndex(list, viewportTop, 8); index < list.length; index += 1) {
+  // runs once per frame while the reader scrolls, and the walk cost 10k–16k rect reads per second in a measured build.
+  // The predicate is then re-tested per row from there on, which is what makes the answer robust for the rows it
+  // considers — but it is NOT the same answer as a full walk: bisection decides where the scan may begin, so a list
+  // whose bottoms are not monotone can have a match BEFORE that point and the scan starts past it (`[false, true,
+  // false, true]` resolves to index 3 where the walk returns 1). Monotonicity is the premise, and it holds because
+  // turn sections are document-order block rows that do not overlap.
+  for (let index = firstRowPastIndex(list, viewportTop, READING_LINE_OFFSET_PX); index < list.length; index += 1) {
     const element = list[index]!;
     // `data-reader-turn` is the turn number, or the literal 'unresolved' for a group the
     // snapshot cannot place; only a real turn can own a process.
     const label = element.dataset.readerTurn;
     const turnNumber = label === undefined ? Number.NaN : Number(label);
     if (!Number.isInteger(turnNumber)) continue;
-    if (element.getBoundingClientRect().bottom > viewportTop + 8) return turnNumber;
+    if (element.getBoundingClientRect().bottom > viewportTop + READING_LINE_OFFSET_PX) return turnNumber;
   }
   return null;
 }
@@ -1128,8 +1139,7 @@ export function Reader(props: ReaderProps) {
     focusWasHeld.current = false;
     scroll.resume();
   }, [focusedCard, scroll.resume]);
-  const pinnedKeys = usePinnedSelection(root);
-  const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
+  const [pinnedKeys, selectedProcessKeys] = usePinnedSelections(root, PINNED_SELECTORS);
   const [historyError, setHistoryError] = useState(false);
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);

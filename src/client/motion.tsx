@@ -9,9 +9,9 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
  * The follower's policy lives in its own module (see `reading-scroll.ts`), imported here because the follower uses it
  * and re-exported because this is where every reader of these names looks for them.
  */
-import { firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+import { READING_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 import type { FollowMode } from './reading-scroll.js';
-export { FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+export { FOLLOW_TAIL_PX, FOLLOW_MODES, READING_LINE_OFFSET_PX, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
 export function useMotionAllowed(enabled: boolean): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -24,22 +24,43 @@ export function useMotionAllowed(enabled: boolean): boolean {
   return enabled && !reduced;
 }
 
-export function usePinnedSelection(root: RefObject<HTMLElement>, selector = '[data-reader-answer], [data-reader-process]'): readonly string[] {
-  const [keys, setKeys] = useState<readonly string[]>([]);
+/**
+ * The keys of the pinned content a live text selection touches, one list per selector — from ONE scan.
+ *
+ * The reading view asks two questions of the same selection (is an answer pinned, is a process pinned), and it used to
+ * ask them by calling a single-selector hook twice. Each call registered its own `selectionchange` listener and walked
+ * the whole transcript with a `range.intersectsNode` per element, so a drag-select over a long conversation paid two
+ * full scans per selection update — on an event that fires per mousemove while the reader drags.
+ *
+ * The elements are matched once against the union of the selectors and then bucketed by which one matched, which is
+ * exact rather than a guess: an answer carries `data-reader-answer` and a process `data-reader-process`, never both.
+ * `selectors` must be a stable array (a module constant) — a fresh literal would re-register the listener per render.
+ */
+export function usePinnedSelections(root: RefObject<HTMLElement>, selectors: readonly string[]): readonly (readonly string[])[] {
+  const [keys, setKeys] = useState<readonly (readonly string[])[]>(() => selectors.map(() => []));
   useEffect(() => {
     const update = () => {
       const selection = document.getSelection();
       const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
-      const next = range && root.current
-        ? [...new Set(Array.from(root.current.querySelectorAll<HTMLElement>(selector))
-          .filter(element => range.intersectsNode(element))
-          .map(element => element.dataset.readerKey ?? element.dataset.readerProcessKey!).filter(Boolean))]
-        : [];
-      setKeys(previous => previous.length === next.length && previous.every((key, index) => key === next[index]) ? previous : next);
+      const next = selectors.map(() => [] as string[]);
+      if (range !== null && root.current !== null) {
+        for (const element of root.current.querySelectorAll<HTMLElement>(selectors.join(', '))) {
+          if (!range.intersectsNode(element)) continue;
+          const index = selectors.findIndex(selector => element.matches(selector));
+          if (index === -1) continue;
+          const key = element.dataset.readerKey ?? element.dataset.readerProcessKey;
+          if (key === undefined || next[index]!.includes(key)) continue;
+          next[index]!.push(key);
+        }
+      }
+      setKeys(previous => previous.length === next.length && previous.every((list, index) => {
+        const candidate = next[index]!;
+        return list.length === candidate.length && list.every((key, at) => key === candidate[at]);
+      }) ? previous : next);
     };
     document.addEventListener('selectionchange', update);
     return () => document.removeEventListener('selectionchange', update);
-  }, [root, selector]);
+  }, [root, selectors]);
   return keys;
 }
 
@@ -396,7 +417,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // holds their own place, and the two scans in this file were measured together at 10k–16k rect reads per second.
       // The NodeList is measured directly — the walk's `Array.from` was another whole-list allocation per call.
       const anchors = content.querySelectorAll<HTMLElement>('[data-reader-anchor]');
-      const index = firstRowPastIndex(anchors, top, 8);
+      const index = firstRowPastIndex(anchors, top, READING_LINE_OFFSET_PX);
       const candidate = index < anchors.length ? anchors[index]! : undefined;
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
     };

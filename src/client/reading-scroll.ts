@@ -94,6 +94,15 @@ export function firstRowWhere<T>(rows: ArrayLike<T>, passes: (row: T, index: num
 }
 
 /**
+ * How far below the scrollport's own top edge the "reading line" sits, in pixels.
+ *
+ * Both readers of it (`capture`'s anchor and `currentTurnOf`) used to pass a bare `8` at the call site and the parameter
+ * they passed it to was named `slack` without saying what it was for. It is a small bias past the very top edge, so a
+ * row whose bottom has just crossed into the viewport counts as read rather than being missed by a sub-pixel.
+ */
+export const READING_LINE_OFFSET_PX = 8;
+
+/**
  * The index of the first row whose bottom edge has passed a line, or `rows.length` when none has.
  *
  * Rows are in document order and block rows do not overlap, so their bottom edges increase down the list and the
@@ -101,12 +110,21 @@ export function firstRowWhere<T>(rows: ArrayLike<T>, passes: (row: T, index: num
  * per scroll event and once per frame while the reader is reading: a measured build showed the two scans together
  * costing 10,000–16,000 `getBoundingClientRect` calls per second, and while a message streams the layout they read is
  * dirty, so every one of them can force a fresh layout.
+ *
+ * Monotonicity is the caller's premise, not something checked here: a row that is hidden, zero-height or out of order
+ * makes the bisection return an index PAST a real match. Callers that need to survive that have to re-test rows
+ * themselves from somewhere earlier — `currentTurnOf` re-tests forward from the index it gets, which covers the rows it
+ * considers but cannot recover a match the bisection skipped.
+ *
+ * @param rows - The block rows in document order.
+ * @param viewportTop - The scrollport's own top edge, in the same viewport coordinates as the rows' rects.
+ * @param lineOffset - How far below that edge the reading line sits; see `READING_LINE_OFFSET_PX`.
  */
 export function firstRowPastIndex(
   rows: ArrayLike<{ getBoundingClientRect(): { bottom: number } }>,
   viewportTop: number,
-  slack: number,
+  lineOffset: number,
 ): number {
-  const line = viewportTop + slack;
+  const line = viewportTop + lineOffset;
   return firstRowWhere(rows, row => row.getBoundingClientRect().bottom > line);
 }
