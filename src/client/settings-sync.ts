@@ -81,6 +81,18 @@ export async function loadHostSettings(): Promise<HostSettingsRead> {
   }
 }
 
+/**
+ * Whether a refusal has been reported yet.
+ *
+ * ONCE per session, deliberately. A refusal is not a hiccup: the host answered that this is not a record it will keep,
+ * so nothing the reader changes from here on is stored — which is worth one line, and not one per change, because a
+ * dragged slider is a hundred writes a second. It is one of the two halves of the same story: a READ that failed is
+ * now told apart from an empty record (see `loadHostSettings`), and a WRITE that was refused stops being invisible
+ * here. Without this, the first symptom of any future unbounded key would be a settings file that quietly stopped
+ * changing, which is exactly what the per-turn expansion map was on its way to becoming.
+ */
+let refusalReported = false;
+
 /** Send one record. Never throws: a failed write leaves the reader working and the next change retries. */
 export async function saveHostSettings(state: unknown): Promise<void> {
   try {
@@ -91,7 +103,13 @@ export async function saveHostSettings(state: unknown): Promise<void> {
     });
     // Only a record the host ACCEPTED is announced: the app-wide backdrop follows what is actually
     // stored, so a refused or failed write cannot make the window show something no restart would.
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (!refusalReported) {
+        refusalReported = true;
+        console.warn(`[viewtune] the settings record was refused (HTTP ${String(res.status)}), so nothing changed from now on will be stored`);
+      }
+      return;
+    }
     if (state === null || typeof state !== 'object' || Array.isArray(state)) return;
     for (const listener of [...listeners]) listener(state as Record<string, unknown>);
   } catch {

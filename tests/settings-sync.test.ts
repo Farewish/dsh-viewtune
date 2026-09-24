@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { READER_SETTINGS_PATH as HOST_PATH } from '../src/dsh-viewtune.ts';
 import {
-  READER_SETTINGS_PATH, createSettingsWriter, hostRecordOf, loadHostSettings,
+  READER_SETTINGS_PATH, createSettingsWriter, hostRecordOf, loadHostSettings, saveHostSettings,
 } from '../src/client/settings-sync.ts';
 
 test('the client reads and writes the route the host actually registers', () => {
@@ -54,6 +54,26 @@ test('the record sent to the host is the preferences, never the per-turn expansi
   const plain = hostRecordOf({ motion: false });
   assert.deepEqual(plain, { motion: false });
   assert.notEqual(plain, hostRecordOf({ motion: false }));
+});
+
+test('a record the host REFUSED is reported once, and is not announced as stored', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const warned: string[] = [];
+  console.warn = (...args: unknown[]) => { warned.push(args.map(String).join(' ')); };
+  try {
+    globalThis.fetch = (async () => ({ ok: false, status: 400 })) as unknown as typeof fetch;
+    await saveHostSettings({ motion: true });
+    await saveHostSettings({ motion: false });
+    // A refusal means nothing this reader changes will be stored — worth one line, not one per change: a dragged
+    // slider is a hundred writes a second, and a console full of them is its own kind of silence.
+    assert.equal(warned.length, 1);
+    assert.match(warned[0]!, /refused/);
+    assert.match(warned[0]!, /400/);
+  } finally {
+    console.warn = originalWarn;
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('a failed write is swallowed, and the next change still goes out', async () => {
