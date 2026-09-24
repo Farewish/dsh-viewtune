@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased (the host half bounds what it reads, and answers what it refuses)
+
+**修掉我们插件 host half 自己的三个洞——同一个文件、同一条规则，其中两个是"设置路由有上限，旁边的路由没有"。**
+
+- **`/reveal` 无上限累积请求体**：它把整份 body 收完才解析，于是载荷可以被撑到进程内存那么大 ✗⇒✓。现在走 `readBody`，上限 **4 KiB**（载荷就是一条路径），超限回 413——与设置路由一致，而那条规则本来就写在同一个文件的注释里。
+- **`readBody` 自己也有两个洞**：① 越过上限后**要等客户端把 body 发完**才回答，一个一直发的客户端就能把路由挂住 ✗⇒✓，现在一旦越界立刻 settle（后续 chunk 由同一个 guard 丢弃，累积量始终被上限夹住）；② 被中断的请求并不保证触发 `end` 或 `error`，这个 promise——连同路由自己的 promise——可以永远悬着 ✗⇒✓，现在 `aborted` 与 `close` 都会 settle，而正常 `end` 之后的 `close` 是对已 settle 的 promise 的空操作。
+- **写入抛错被吞成一个裸 400**：`writeSettings` 里的 `mkdir`/`writeFile`/`rename` 会抛（磁盘满、实例目录只读、文件被别的进程占着），而 host webserver 把被拒绝的处理器变成**没有 body 的 400** ⇒ 客户端无法与"这不是一份设置记录"的**有意拒绝**区分 ✗⇒✓。现在路由自己 catch、打日志、回 **500**。
+- 客户端那句警告也跟着改：原来写 "refused (HTTP n)"，只对 400 成立；现在写 "was not stored (HTTP n)"，因为对读者来说两者是同一件事 ✓。
+- **一条操作性事实**：host half 的改动**要重启 Host 才生效**（client half 走 HMR，这一个不会）——写在这里，免得以后照 client 的习惯以为已经生效。
+
+## Unreleased (a panel lands the way a turn lands, and no ref is written during render)
+
+**修掉两条审计条目（改之前都先读了源码核实），外加一个我自己上一步弄错的名字。**
+
+- **本视图最后一个 `scrollIntoView`**：`conversation-scroll.ts` 点名禁用 `Element.scrollIntoView`（它会遍历祖先滚动容器，能把吸底输入框顶起来），`Reader.tsx` 的跳转处也重申了这条；而 `DiffPanel` 的揭示函数是幸存的那一处 ✗⇒✓。同一个函数的判据本身也错："内容比盒子高的最近祖先"不等于"能滚的容器"——`overflow: visible` 的祖先满足前者却忽略 `scrollTop`，卡片会留在屏幕外而揭示"成功"了。现在用 `scrollerOf` + `landTurn`（rail 跳转用的同一对），"一行落在哪里"只有一个答案 ✓；已经完全在视口里的面板照旧不动。
+- **渲染期写 ref**：`ToolActivity` 靠"渲染中给 `heldPreview.current` 赋值"来冻结预览。这正是冻结能工作的原因，也正是 React 禁止的：被丢弃的一次渲染（并发渲染允许发生）会让 ref 留下一个从未提交的值 ✗⇒✓。现在显示值是**派生**的（有选区时用被冻结的那份，否则用本次渲染的），对屏幕上的东西等价，而 ref 只在 effect 里写 ✓。
+- **一个我该认的名字**：上一步我把常量引入为 `READING_LINE_OFFSET_PX`，而 `conversation-scroll.ts` 已经用这个名字表示 **24**（一行"落地"的线）；我的是 **8**，只决定哪一行算"已读"。两个不同的线共用一个名字，正是这个仓库的注释一直在反对的事 ⇒ 改名为 `ANCHOR_LINE_OFFSET_PX`，并在文档里写明两者为什么必须分开 ✓。
+- 守护新增一条：断言 `scrollIntoView` 的**调用**不存在、而共享的 `landTurn` 存在；反向自检里有一个把它加回来的用例 ✓。
+- **同一次审计里还有一条被判为"非问题"，记在这里免得重查**：`WaitClock` 的 250ms 定时器确实是无条件的（依赖列表为空），但该组件只在 `wait !== null`（真的在等模型）时挂载、并且按"交接点"重新挂载；阈值前的空转是每次等待约 12 次返回 null 的渲染，而 250ms 之后本来就必须开始计数。机制描述对，影响不成立 ⇒ 没有为它加第二条定时器路径（那是无收益的复杂度）。
+
+## Unreleased (the tool table names the cordis verbs this host really registers)
+
+**修掉一张表里的两个死名字，以及一段把"产品自己的视图"当成"本视图"的说法。**
+
+- `TOOL_VARIANTS`/`TOOL_TITLES` 里写着 `cordis_package_inspect` 与 `cordis_runtime_inspect`，而本宿主**两个都不注册**：inspect 动词是 `cordis_inspect_list`/`cordis_inspect_query`/`cordis_inspect_self`。于是三个真实调用落到通用行，而两个条目永远匹配不到任何东西——更糟的是那两个死条目独占着唯一的 `Inspect` 标题，读者**真正看到**的工具反而没有名字 ✗⇒✓。
+- `cordis_define` 是另一半：本文件原来断言它的缺席是刻意的，理由是 ui-cordis 为它注册了 keyed `tool.call.toolview` 卡片、而 keyed 命中会**替换**通用行 ✗。那对**产品自己的视图**成立，对本视图不成立——本阅读视图自己渲染过程、从不查那张注册表，而这句话在同一文件下方三行的注释里本来就这么写着。定义插件的那个动词，成了唯一没有名字的 cordis 调用 ⇒ 现在有名字了 ✓。
+- 守护一条：三个真名与新标题必须作为**条目**存在，两个死名必须**不存在**——而且按**条目形状**断言而不是子串，因为表上方的注释故意提到旧名（作为这次错误的来历），子串断言会禁止说明错在哪里 ✓。
+
+## Unreleased (say so when the host refuses the settings record)
+
+**修掉「读取失败」的另一半：写入被拒原来完全不发声。**
+
+- `saveHostSettings` 原来 `if (!res.ok) return;`，一声不响，而下次变更会把同一份记录再发一次 ⇒ 任何将来出现的无界键，第一个症状都会是"设置文件悄悄不再变化" ✗⇒✓。这不是假想：那正是每轮展开记忆被移出共享记录之前走到的位置。
+- **每会话只报一次**是刻意的：拒绝不是抖动，宿主是在说"这份记录我不会留着"，那么从这一刻起读者改的任何东西都不会被存——这值得一行，而不是每次改动一行（拖一次滑块是每秒上百次写入，把控制台刷满本身就是另一种沉默）✓。**网络失败不报**：下次变更本来就会重试，断网会把控制台刷满。
+- 测试钉住两半：两次被拒只产生**一条**警告；被拒的写入**不通知订阅者**——否则应用级背景会显示一个重启后并不存在的状态 ✓。
+
+## Unreleased (ask the selection once, and say what that 8 was)
+
+**三处卫生问题，都不是读者会报的行为，而是"读起来就是错的"东西。**
+
+- **选择被扫两遍**：阅读视图对同一次选区问两个问题（答案被钉住吗、流程被钉住吗），原来是**调用两次单选择器 hook**：两个 `selectionchange` 监听，各自对每个元素做一次 `range.intersectsNode` 走一遍全文——而拖选时这个事件是跟着鼠标移动触发的 ✗⇒✓。现在一个 hook、一个监听、一次扫描，按"命中了哪个选择器"分桶；这是精确的而不是猜的（答案带 `data-reader-answer`、流程带 `data-reader-process`，从不共有）。选择器数组是**模块常量**，因为它是这个 hook 的依赖：字面量会在每次渲染重注册监听 ✓。
+- **一句站不住的注释**：`currentTurnOf` 说逐行复核让"非单调的列表也与走法完全一致"——做不到，二分决定的是**扫描从哪里开始**，所以 `[false,true,false,true]` 得到 3 而逐行走法返回 1 ✗⇒✓。现在写的是前提本身（底边单调，这对文档顺序、互不重叠的行成立），并且把这条前提写进 `firstRowPastIndex` 自己的文档——它才是假设它的那个函数。
+- **那个裸 `8`**：两个调用点都往一个叫 `slack`、毫无文档的参数里传 `8` ⇒ 现在是有名字、有解释的常量（后来因为与 `conversation-scroll.ts` 的 24 撞名又改名，见上面那条）✓。
+- **一条过程教训**（与仓库里已有的那条相反）：我先把两个源文件用 PowerShell `Get-Content`/`Set-Content` 往返改，控制台随后把**所有非 ASCII 字符**渲染成替换字符，我把它读成"文件坏了"并回滚了两个其实完好的文件。往返本身是 UTF-8 无损的；**控制台渲染不出这个仓库自己的文字，任何字节级结论都不能从它的输出里得出** ✓。
+
 ## Unreleased (a jump into loaded history lands from the commit that rendered it)
 
 **修掉「跳到还没载入的轮次时，有时候什么也不发生」：跳转在 `loadThrough` 之后等一个猜的 50ms，然后调用一个不回答任何东西的 `reveal`。**
