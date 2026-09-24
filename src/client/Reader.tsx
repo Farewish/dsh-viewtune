@@ -349,6 +349,8 @@ const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFi
 }) {
   const [status, setStatus] = useState<'idle' | 'opened' | 'copied' | 'revealed'>('idle');
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  // Last flash on the way out, so the pending one cannot call back into a component that is gone.
+  useEffect(() => () => { clearTimeout(timer.current); }, []);
 
   const flash = (next: 'opened' | 'copied' | 'revealed') => {
     setStatus(next);
@@ -464,11 +466,16 @@ function DeliverablesRow({ deliverables, openFile, revealFile }: {
   revealFile?: (path: string) => Promise<void> | void;
 }) {
   const [folderStatus, setFolderStatus] = useState<'idle' | 'opened'>('idle');
+  // The chip's own timer is cancelled by the next flash; this one had no ref at all, so a second click stacked a second
+  // timer and unmounting left the callback holding a component that was gone.
+  const folderTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { clearTimeout(folderTimer.current); }, []);
   const onOpenWorkspace = () => {
     try {
       openFile?.('.');
       setFolderStatus('opened');
-      setTimeout(() => setFolderStatus('idle'), 1600);
+      clearTimeout(folderTimer.current);
+      folderTimer.current = setTimeout(() => setFolderStatus('idle'), 1600);
     } catch {
       // ignore
     }
@@ -553,8 +560,14 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
    * elements that are about to fold are REMOUNTED at that very instant) and it folds the process. A collapse animation
    * has nothing to animate from on an element that has just been mounted and never seen open, which is exactly the
    * reported "it folds instantly when the answer ends": the block simply vanished while every other fold in this view
-   * animates. Waiting ~150ms lets the new tree land, so the element that folds is one that was mounted open. The
-   * reader's own click is unaffected in any way they can perceive, and opening bypasses the wait entirely.
+   * animates. Waiting ~150ms lets the new tree land, so the element that folds is one that was mounted open. Opening
+   * bypasses the wait entirely.
+   *
+   * The button toggles from `wantsProcess`, NOT from the value it is displaying. Deriving the new state from `expanded`
+   * — which is what a plain `onChange(!open)` did — made the control dead for exactly the window this hold creates:
+   * the click said "收起", the answer was already folding, the button still reported open, and a second click computed
+   * `!true = false` and folded it again instead of reopening. The displayed state stays consistent with what is on
+   * screen (both held), and the reader's intent is what a click acts on.
    */
   const [settledProcess, setSettledProcess] = useState(wantsProcess);
   useEffect(() => {
@@ -639,7 +652,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // row: the disclosure label is what expands and folds the process.
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {turnUserKeys.map(userKey => <BlockBoundary key={userKey}><MainNode {...shared} boundary={boundary} nodeKey={userKey} /></BlockBoundary>)}
-    {hasProcess && <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
+    {hasProcess && <Disclosure open={expanded} onToggle={() => setExpanded(!wantsProcess)} controls={flowId} buttonRef={processButton}
       label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
     {!hasProcess && boundary.status === 'open' && <div className={css.disclosure} data-reader-status-only>
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
@@ -911,11 +924,16 @@ export function Reader(props: ReaderProps) {
   // It answers three questions at once: whether the tail-follow has anything to keep up with (`live`), which turn
   // 「自动收起更早流程」 has to leave open, and when a NEW turn has started (which is when the earlier processes fold).
   const autoCollapseEarlier = props.useStore(state => state.autoCollapseEarlier) === true;
-  const liveTurn = props.useChat(snapshot => {
+  // A `useMemo` on `timeline`, NOT a selector: `useChat` runs its selector on every store notification, and text arrives
+  // as one notification per delta, so scanning the turn map inside the selector meant walking every turn in the
+  // conversation once per streamed chunk — work that grows with the history and can only ever change at a turn or step
+  // BOUNDARY, which is exactly when `timeline` is replaced. It keeps its identity across deltas (see the note on
+  // `order`/`nodes`/`timeline` in this file), so the memo is free and the scan happens when its answer can change.
+  const liveTurn = useMemo(() => {
     let open: number | null = null;
-    for (const turn of snapshot.timeline.turns.values()) if (turn.status === 'open') open = turn.turn;
+    for (const turn of timeline.turns.values()) if (turn.status === 'open') open = turn.turn;
     return open;
-  });
+  }, [timeline]);
   // Whether any turn is still RUNNING. It gates the tail-follow (see `useReadingScroll`): with nothing arriving,
   // following the bottom is not keeping up with anything, it is only fighting the reader's own scrolling.
   const live = liveTurn !== null;

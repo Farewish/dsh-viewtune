@@ -654,6 +654,15 @@ const markers = [
     && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_pulseDot\{animation:none\}\}/.test(bundle)],
   ['the steps pill never claims a denominator it does not have', '`${answer} 步`'],
   ['…and the 动效 switch is read the defensive way, like every other switch that is on unless a record says otherwise', 'state.motion) !== false'],
+  ['the running turn is worked out when the TURN MAP changes, not once per streamed delta', () =>
+    // `useChat` runs its selector on every notification and text arrives one per delta, so a scan of every turn inside
+    // the selector cost work proportional to the history on every chunk, for an answer that only changes at a boundary.
+    bundle.includes('for (const turn of timeline.turns.values())')
+    && !bundle.includes('for (const turn of snapshot.timeline.turns.values())')],
+  ['the process disclosure toggles from the reader’s decision, not from the state it is holding behind that decision', () =>
+    // The 150ms hold exists so the collapsing element was mounted open; deriving the next state from the held value
+    // made the button dead for exactly that window (a second click folded it again instead of reopening).
+    bundle.includes('onToggle: () => setExpanded(!wantsProcess),')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
