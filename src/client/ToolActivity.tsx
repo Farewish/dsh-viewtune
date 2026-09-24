@@ -282,6 +282,13 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
 }, (previous, next) => previous.entry.callId === next.entry.callId && previous.entry.block === next.entry.block
   && previous.entry.draft === next.entry.draft && previous.entry.step === next.entry.step
   && previous.motion === next.motion && previous.turnClosed === next.turnClosed && previous.depth === next.depth
+  // `fileMentions` is read by the subtree (`Blocks` hands it to the markdown renderer) and it was missing here, so a
+  // tool result that mentions a file in inline code kept the vocabulary of the moment it first rendered: produce a
+  // file later in the same turn and the mention stayed inert. The other forwarding props are compared because they are
+  // read down there too — `renderSlotChain`, `loadImage`, `fillComposer` — and the rest of `BlockRenderProps`
+  // (`openFile`, `metrics`, `forkAt`) is NOT, because this subtree does not read them: adding them would re-render
+  // every tool row whenever a number changed for nothing.
+  && previous.fileMentions === next.fileMentions
   && previous.onRead === next.onRead && previous.renderSlotChain === next.renderSlotChain && previous.loadImage === next.loadImage && previous.fillComposer === next.fillComposer);
 
 /** Rich media (images, MCP widgets) rendered outside the folded tool ledger. */

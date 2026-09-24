@@ -689,6 +689,16 @@ const markers = [
     && bundle.includes('cordis_define: "Define Cordis Plugin",')
     && !bundle.includes('cordis_package_inspect: "read",')
     && !bundle.includes('cordis_runtime_inspect: "Inspect",')],
+  ['a tool row re-renders when the file vocabulary changes, which is what makes a mention clickable', () =>
+    // `Blocks` hands `fileMentions` to the markdown renderer, and the hand-written memo comparator did not compare it:
+    // a file produced later in the turn left the mention that names it inert in every already-rendered tool row.
+    bundle.includes('previous.fileMentions === next.fileMentions')],
+  ['the wallpaper column is looked up once, and re-found only when it leaves the document', () =>
+    // `measure` runs once per frame while a divider is dragged or the window resizes; the whole-document
+    // attribute-substring scan used to live inside it, for an element that does not move. Re-finding it on
+    // `isConnected` is what keeps the reason the query was there: a detached box measures as zeros.
+    bundle.includes('if (column !== null && !column.isConnected) column = document.querySelector')
+    && !bundle.includes('const box = document.querySelector(')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

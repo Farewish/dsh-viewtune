@@ -871,11 +871,17 @@ export function Reader(props: ReaderProps) {
 
     const source = new Image();
     let frame = 0;
+    // The column is looked up ONCE and re-found only if the one we hold has left the document. It used to be queried
+    // inside `measure`, which runs once per frame while a divider is dragged or the window resizes: a whole-document
+    // attribute-substring scan per frame for an element that does not move. Re-finding it on `isConnected` keeps the
+    // reason the query was there — the host can replace the column without this effect re-running — because a detached
+    // box measures as zeros, which would publish a wallpaper geometry of nothing.
+    let column = document.querySelector<HTMLElement>('[class*="_scrollBody"]');
     const measure = (): void => {
       if (source.naturalWidth === 0) return;
-      const box = document.querySelector('[class*="_scrollBody"]');
-      if (box === null) return;
-      const rect = box.getBoundingClientRect();
+      if (column !== null && !column.isConnected) column = document.querySelector<HTMLElement>('[class*="_scrollBody"]');
+      if (column === null) return;
+      const rect = column.getBoundingClientRect();
       publish(wallpaperGeometry({
         imageWidth: source.naturalWidth,
         imageHeight: source.naturalHeight,
@@ -894,9 +900,9 @@ export function Reader(props: ReaderProps) {
     source.src = wallpaperUrl(wallpaperName);
     if (source.complete) schedule();
     window.addEventListener('resize', schedule);
-    const box = document.querySelector('[class*="_scrollBody"]');
-    const observer = typeof ResizeObserver === 'undefined' || box === null ? null : new ResizeObserver(schedule);
-    if (observer !== null && box !== null) observer.observe(box);
+    // The same element `measure` holds: the observer watches the column's own resizes, which is what a divider drag is.
+    const observer = typeof ResizeObserver === 'undefined' || column === null ? null : new ResizeObserver(schedule);
+    if (observer !== null && column !== null) observer.observe(column);
     return () => {
       source.removeEventListener('load', schedule);
       window.removeEventListener('resize', schedule);
