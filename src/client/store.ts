@@ -12,6 +12,14 @@ import type { WallpaperScope } from './wallpaper-scope.js';
 
 export interface ReaderState {
   expanded: Record<string, boolean>;
+  /**
+   * Whether this plugin's own movement runs at all — 「动效」.
+   *
+   * Read defensively (`!== false`) like the other switches that are ON by default: a record written before this
+   * preference existed has no such key, and what it describes is a view that had no way to turn the movement off, so
+   * an absent key means ON. Strictly it is not only a default: `undefined` reaching the settings switch makes React
+   * treat it as an UNCONTROLLED `<Switch>`, which then stops reflecting the store on any later change.
+   */
   motion: boolean;
   glass: boolean;
   /** The skin's per-surface opacities, recording only the ones the reader moved off their initial. */

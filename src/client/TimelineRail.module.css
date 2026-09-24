@@ -105,6 +105,13 @@
   to { width: 18px; opacity: 1; }
 }
 
+/* The busy mark pulses for as long as a turn runs, which is the one kind of movement a reader who asked the system for
+   less of it must not be given. `Reader.module.css` gates every animation it owns this way; this file shipped without
+   one. `animation: none` leaves the tick at its declared size instead of freezing it mid-pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .markBusy .tick { animation: none; }
+}
+
 .preview {
   position: absolute;
   top: clamp(

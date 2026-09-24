@@ -90,7 +90,17 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   }
   if (answer === null && total === null) return null;
 
-  const label = answer !== null ? `${answer}/${total} 个步骤` : `${answer ?? total} 个步骤`;
+  /**
+   * The label has to cope with knowing the answer's step but not the turn's.
+   *
+   * `totalSteps` is optional and comes from the loaded turn record, while `answerStep` comes from the answer itself —
+   * so a turn whose steps are not loaded yet has an answer step and no denominator. The old expression printed the
+   * missing half as the word "null": `3/null 个步骤`, in the pill's own label and in its `aria-label`. A denominator
+   * that is not known is not claimed.
+   */
+  const label = answer !== null && total !== null
+    ? `${answer}/${total} 个步骤`
+    : total !== null ? `${total} 个步骤` : `${answer} 步`;
 
   return (
     <span ref={containerRef} className={css.container}>

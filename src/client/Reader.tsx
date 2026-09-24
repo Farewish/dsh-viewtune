@@ -708,7 +708,7 @@ export function Reader(props: ReaderProps) {
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
-  const motionPreference = props.useStore(state => state.motion);
+  const motionPreference = props.useStore(state => state.motion) !== false;
   // Read defensively, like `shortcuts` below: persistence replaces the whole record, so a record
   // written before this preference existed comes back with no `glass` key at all.
   const glassPreference = props.useStore(state => state.glass) === true;

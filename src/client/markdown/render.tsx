@@ -2,8 +2,12 @@
 /**
  * Direct mdast→React markdown renderer. Replaces the react-markdown /
  * remark-rehype pipeline with one switch over parsed nodes so streaming can
- * cache frozen blocks as React elements; the rendered DOM is pinned
- * byte-for-byte by `tests/fixtures/markdown-dom` and must not drift.
+ * cache frozen blocks as React elements. The DOM it emits is meant to match the
+ * pipeline it replaced, and NOTHING PINS THAT: this header used to say the shape
+ * was held byte-for-byte by `tests/fixtures/markdown-dom`, and no such fixture
+ * has ever existed here — the suite reaches `parse.ts` and nothing else of this
+ * directory, and there is no DOM in the suite at all. Treat a change to what
+ * this emits as a change to the reader's page.
  *
  * Untrusted-output policy (unchanged from the replaced pipeline): link and
  * image destinations pass a protocol allowlist, images additionally require
@@ -169,8 +173,8 @@ export function renderBlocks(
 /**
  * Interleave the newline text nodes the replaced pipeline emitted between
  * block-level children. They are invisible between elements but coalesce
- * into adjacent literal raw-HTML text, where the DOM parity fixtures pin
- * them.
+ * into adjacent literal raw-HTML text, so they are part of the shape that has
+ * to match — the shape nothing pins, as the header of this file explains.
  * @param elements - Rendered block children with empty renders already dropped.
  * @param edges - Also emit the leading and trailing newline (hast's loose wrap).
  * @returns The interleaved children.

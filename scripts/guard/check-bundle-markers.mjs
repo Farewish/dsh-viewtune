@@ -642,6 +642,18 @@ const markers = [
       && bundle.includes('if (read.kind === "stored") {')
       && bundle.includes('settingsWriter.push(hostRecordOf(readerState))');
   }],
+  ['the two looping indicators are gated for a reader who asked for less movement', () =>
+    // The rail's busy tick and the running-tool dot in the MCP frame. `Reader.module.css` gates every animation it owns
+    // on this query; these two stylesheets shipped with an endless one and no gate at all. Both halves are pinned,
+    // because the gate is only worth having for an animation that never ends — and both are matched by SHAPE rather
+    // than by the literal the source wrote: the build reorders the `animation` shorthand and hashes the keyframe name,
+    // so the artifact reads `animation:1s ease-in-out infinite alternate <hash>_markBusyPulse`.
+    /animation:1s ease-in-out infinite alternate \w+_markBusyPulse\}/.test(bundle)
+    && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_markBusy \.\w+_tick\{animation:none\}\}/.test(bundle)
+    && /animation:1\.5s ease-in-out infinite \w+_pulse\}/.test(bundle)
+    && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_pulseDot\{animation:none\}\}/.test(bundle)],
+  ['the steps pill never claims a denominator it does not have', '`${answer} 步`'],
+  ['…and the 动效 switch is read the defensive way, like every other switch that is on unless a record says otherwise', 'state.motion) !== false'],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

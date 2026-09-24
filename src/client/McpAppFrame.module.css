@@ -198,6 +198,13 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* An MCP tool that is running pulses this dot for as long as it takes — indefinitely, from the reader's point of view.
+   `Reader.module.css` gates every animation it owns on this query; this file shipped without one. The dot keeps its
+   colour and size, it just stops breathing. */
+@media (prefers-reduced-motion: reduce) {
+  .pulseDot { animation: none; }
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 0.35;
