@@ -663,6 +663,14 @@ const markers = [
     // The 150ms hold exists so the collapsing element was mounted open; deriving the next state from the held value
     // made the button dead for exactly that window (a second click folded it again instead of reopening).
     bundle.includes('onToggle: () => setExpanded(!wantsProcess),')],
+  ['a jump that had to load history lands from the commit that rendered the rows, not from a guessed delay', () =>
+    // The rows arrive with the commit that follows the load and nothing announces it, so the request is remembered and
+    // retried from the layout effect — which is why BOTH the retry and the "did it land" answer are pinned. The old
+    // shape waited 50ms and called a reveal that returned nothing, so a slower commit left the reader where they were,
+    // silently.
+    bundle.includes('if (revealTurn(pendingReveal)) setPendingReveal(null);')
+    && bundle.includes('setPendingReveal(item.turn);')
+    && bundle.includes('if (!targetRow) return false;')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

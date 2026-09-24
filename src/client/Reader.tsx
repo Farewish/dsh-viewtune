@@ -1159,28 +1159,43 @@ export function Reader(props: ReaderProps) {
   const [activeTurn, setActiveTurn] = useState<number | null>(null);
   const [busyTurn, setBusyTurn] = useState<number | null>(null);
 
+  /**
+   * Land on a turn's row, answering whether the row was there to land on.
+   *
+   * The answer is what makes a jump that had to LOAD history work. Those rows arrive with the commit that follows the
+   * load, and there is no event for "that commit has rendered"; the caller used to wait a guessed 50ms and then call
+   * this blind, so a commit that took longer left the reader exactly where they were, with nothing said. The request is
+   * remembered instead and retried after every commit until it lands.
+   */
+  const revealTurn = useCallback((turn: number): boolean => {
+    const el = root.current;
+    if (!el) return false;
+    const targetRow = el.querySelector<HTMLElement>(`[data-reader-turn="${turn}"]`);
+    if (!targetRow) return false;
+    const last = timelineItems.at(-1);
+    if (last !== undefined && last.turn === turn) scroll.jump();
+    else { scroll.release(); landTurn(targetRow, scrollerOf(el)); }
+    setActiveTurn(turn);
+    return true;
+  }, [scroll.jump, scroll.release, timelineItems]);
+  const [pendingReveal, setPendingReveal] = useState<number | null>(null);
+  // Deliberately no dependency list: any commit may be the one that rendered the row — that is the whole point — and
+  // this runs on Reader's own renders, which are structural rather than per streamed delta. A second navigation
+  // replaces the request instead of queueing behind the first.
+  useLayoutEffect(() => {
+    if (pendingReveal === null) return;
+    if (revealTurn(pendingReveal)) setPendingReveal(null);
+  });
+
   // Navigation handler (supports loaded jump & unloaded loadThrough).
   // Land on the conversation scroller only — scrollIntoView also moves
   // ancestor boxes and can lift the sticky composer after a top→bottom jump.
   const onNavigateTurn = useCallback(async (item: TimelineItem) => {
     const el = root.current;
     if (!el) return;
-    const port = scrollerOf(el);
-    const reveal = (turn: number) => {
-      const targetRow = el.querySelector<HTMLElement>(`[data-reader-turn="${turn}"]`);
-      if (!targetRow) return;
-      const last = timelineItems.at(-1);
-      if (last !== undefined && last.turn === turn) {
-        scroll.jump();
-      } else {
-        scroll.release();
-        landTurn(targetRow, port);
-      }
-      setActiveTurn(turn);
-    };
 
     if (item.anchor.kind === 'loaded') {
-      reveal(item.turn);
+      revealTurn(item.turn);
       return;
     }
 
@@ -1191,11 +1206,12 @@ export function Reader(props: ReaderProps) {
       } else {
         await props.loadOlder();
       }
-      setTimeout(() => { reveal(item.turn); }, 50);
+      // The commit this await schedules is the one that renders the rows; the effect above lands on them.
+      setPendingReveal(item.turn);
     } finally {
       setBusyTurn(null);
     }
-  }, [props.loadThrough, props.loadOlder, scroll.jump, scroll.release, timelineItems]);
+  }, [props.loadThrough, props.loadOlder, revealTurn]);
 
   const lastKey = order.at(-1);
   const lastNode = lastKey ? nodes.get(lastKey) : undefined;
