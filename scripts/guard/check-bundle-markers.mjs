@@ -494,16 +494,23 @@ const markers = [
   // request wins, which is what makes it singular), and — rule 1 — the page stops following the tail while a card
   // holds it, so two auto-scrollers never pull at once. The motion switch and reduced motion both drop the transition.
   ['a focused card grows in whole lines', 'const lines = Math.max(1, Math.ceil(content / line));'],
-  ['…asking for a whole-line height, and taking the growth the browser APPLIED out of the space ABOVE the card', () =>
+  ['…asking for a whole-line height, and taking the growth the CARD applied out of the space ABOVE it', () =>
     bundle.includes('port.style.height = `${String(wanted)}px`')
-    // The delta is the RENDERED one, not the requested one: the stylesheet caps this box, so a card past the ceiling is
-    // asked to grow while its height stands still, and compensating the request walked the page up a line per line.
-    && bundle.includes('const rendered = port.offsetHeight;')
+    // The measured thing is the CARD, not the viewport whose height is written: the reading row under the viewport is
+    // part of the card, appears the moment the card overflows, and pushing that down uncompensated left the card's own
+    // bottom below the visible area (the page's tail-follow is suspended while a card holds the focus).
+    && bundle.includes('const rendered = card?.offsetHeight ?? 0;')
     && bundle.includes('const grew = rendered - focusRendered.current;')
+    && bundle.includes('if (!focusedRef.current || grew <= 0) return;')
     && bundle.includes('scroller.scrollTop += grew')],
-  ['…and the focus that frame loop reads is written in a LAYOUT effect, with the rendered height seeded from the grant', () =>
+  ['…recording it on every measure, so growth from a LATER commit is taken too', () =>
+    // The reading row is React state set from `measure`, so it lands one commit after the height write; and the focus
+    // grant changes the ceiling in an earlier commit. Both are caught by the call that sits right before the overflow
+    // read. Pinned as CODE, not as the comment beside it: the build drops comments in this region.
+    bundle.includes('compensateHeight();\n\t\t\t\t\tconst overflowing = text.offsetHeight')],
+  ['…and the focus that frame loop reads is written in a LAYOUT effect, with the pre-grant height recorded before the request', () =>
     bundle.includes('(0, react.useLayoutEffect)(() => {\n\t\t\t\tfocusedRef.current = focused;')
-    && bundle.includes('focusRendered.current = viewport.current?.offsetHeight ?? 0;')],
+    && bundle.includes('focusRendered.current = viewport.current?.closest("[data-reader-reasoning-card]")?.offsetHeight ?? 0;')],
   ['…under a ceiling that stays in the stylesheet, with the growth eased only when the reader asked for 滑行', () =>
     // The ceiling is CSS, and the focused rule still turns transitions off by default: the easing is a SEPARATE rule
     // with three gates on it, because the reader's 逐帧滑行 is what asks for it, 动效关 must still stop it, and so must the
@@ -518,8 +525,8 @@ const markers = [
     // (with no transition in flight the first read IS the target, which is why 贴底 and 动效关 are untouched) or on a
     // deadline (a target the stylesheet's ceiling clamps never arrives).
     bundle.includes('"data-reader-follow-mode": followMode,')
-    && bundle.includes('if (compensateHeight(target)) return;')
-    && bundle.includes('if (compensateHeight(target) || performance.now() > deadline) return;')],
+    && bundle.includes('heightChase = 0;\n\t\t\t\t\tcompensateHeight();\n\t\t\t\t\tif (port.offsetHeight === target) return;')
+    && bundle.includes('compensateHeight();\n\t\t\t\t\t\tif (port.offsetHeight === target || performance.now() > deadline) return;')],
   ['…with the motion switch dropping those transitions', () => bundle.includes('[data-motion=off] .WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport,') && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(bundle)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
   ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],

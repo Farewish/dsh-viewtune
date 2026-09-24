@@ -101,23 +101,34 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * again. That is exactly the shape of the report: the first thinking card of a turn never expanded while every
      * later one did. Watching the scroller is also what the rule says in as many words.
      */
-    const request = () => { if (atTail()) onFocusChange(focusKey, true); };
+    const request = () => { if (atTail()) { recordCardHeight(); onFocusChange(focusKey, true); } };
     request();
     scroller.addEventListener('scroll', request, { passive: true });
     return () => scroller.removeEventListener('scroll', request);
   }, [expanded, focusExpand, focused, following, active, reasoningMode, focusKey, onFocusChange]);
   /**
-   * The focus, in a LAYOUT effect, and the rendered height seeded with it.
+   * The card's height right now, recorded before the focus is REQUESTED.
+   *
+   * Granting the focus changes the viewport's ceiling in the same commit (`224px` → `min(60vh, 560px)`), so by the time
+   * any effect of ours runs the card is already taller than it was — and the compensation, which reads the card, has to
+   * be measuring against the height of the frame BEFORE that. Recording it here is the only place that value exists.
+   */
+  const recordCardHeight = useCallback((): void => {
+    focusRendered.current = viewport.current?.closest<HTMLElement>('[data-reader-reasoning-card]')?.offsetHeight ?? 0;
+  }, []);
+
+  /**
+   * The focus, in a LAYOUT effect, and the gap it hands back.
    *
    * `focusedRef` is read by `measure`, which the port's own ResizeObserver calls — and the focus flip is exactly what
    * resizes that port (the preview ceiling gives way to `min(60vh, 560px)`), so the growth it causes can reach the
    * observer before a passive effect would have written the new value. That is the same ordering the page follower's
-   * refs are written for. Seeding `focusRendered` here is the other half: the accounting of "what the browser actually
-   * applied" has to start from the height the card already has, or the first write would claim the whole card as growth.
+   * refs are written for. `focusRendered` is deliberately NOT seeded here: the height to measure against is the one
+   * recorded before the request (`recordCardHeight`), because this effect runs after the card has already grown.
    */
   useLayoutEffect(() => {
     focusedRef.current = focused;
-    if (focused) { focusRendered.current = viewport.current?.offsetHeight ?? 0; return; }
+    if (focused) return;
     focusHeight.current = 0;
     focusRendered.current = 0;
     viewport.current?.style.removeProperty('height');
@@ -149,7 +160,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       }
       if (!idle) return;
       const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
-      if (scroller && isNearTail(scroller.scrollTop, scroller.scrollHeight, scroller.clientHeight)) onFocusChange(focusKey, true);
+      if (scroller && isNearTail(scroller.scrollTop, scroller.scrollHeight, scroller.clientHeight)) { recordCardHeight(); onFocusChange(focusKey, true); }
     }, 300);
     return () => window.clearInterval(check);
   }, [active, following, expanded, focusExpand, focused, focusKey, onFocusChange]);
@@ -170,9 +181,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
 
   useLayoutEffect(() => {
     const port = viewport.current;
+    if (!port) return;
+    // The card itself, for the compensation below: what pushes the page is the CARD's height, not the viewport's (the
+    // reading row under the viewport is part of it).
+    const card = port.closest<HTMLElement>('[data-reader-reasoning-card]');
     const text = content.current;
     const scrollTrack = track.current;
-    if (!port || !text || !scrollTrack) return;
+    if (!text || !scrollTrack) return;
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let nextAt = performance.now() + REASON_HOLD;
@@ -270,26 +285,46 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * box — the bottom edge would rise and then settle — which is why this is a chase rather than a one-shot read.
      * Untouched for 直接贴底, 动效关 and reduced motion: there the first read IS the target and nothing is scheduled.
      */
-    const compensateHeight = (target: number): boolean => {
-      const rendered = port.offsetHeight;
+    /**
+     * Move the conversation by exactly what the CARD grew, so the card's BOTTOM edge stays where the reader's eye is.
+     *
+     * The measurement is the whole CARD, not the viewport whose height this code writes, and that difference is a bug
+     * the reader reported: the reading row under the viewport (可滚动阅读 / 暂停跟随 / 展开阅读) is part of the card, it
+     * appears the moment the card starts to overflow, and pushing the card's bottom down without any compensation left
+     * the bottom of the card — that row, and the last lines above it — below the visible area with nothing to bring it
+     * back, because the page's tail-follow is deliberately suspended while a card holds the focus.
+     *
+     * The same hole covered the bigger jump: on the frame the focus is GRANTED the viewport's ceiling changes
+     * (`224px` → `min(60vh, 560px)`), which can be hundreds of pixels of card height in one commit, and none of it was
+     * compensated either. `focusRendered` is therefore recorded just before the focus is requested — see
+     * `recordCardHeight` — so the first measurement after the grant sees that jump and takes it out of the space above.
+     *
+     * A card that does NOT hold the focus still records its height and scrolls nothing: the recorded value has to be the
+     * pre-grant one at the moment of the grant.
+     */
+    const compensateHeight = (): void => {
+      const rendered = card?.offsetHeight ?? 0;
       const grew = rendered - focusRendered.current;
       focusRendered.current = rendered;
-      if (grew > 0) {
-        const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
-        if (scroller !== null) scroller.scrollTop += grew;
-      }
-      return rendered === target;
+      if (!focusedRef.current || grew <= 0) return;
+      const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
+      if (scroller !== null) scroller.scrollTop += grew;
     };
     const chaseHeight = (target: number): void => {
       cancelAnimationFrame(heightChase);
       heightChase = 0;
-      if (compensateHeight(target)) return;
+      compensateHeight();
+      // The stop condition is the VIEWPORT's height — the property the stylesheet eases — while the compensation above
+      // is the card's. They are different numbers on purpose: the ceiling clamps the former and the footer moves the
+      // latter.
+      if (port.offsetHeight === target) return;
       // The deadline is what ends it when the stylesheet's ceiling clamps the target, so a card past `min(60vh, 560px)`
       // cannot leave a frame loop running for as long as it holds the focus.
       const deadline = performance.now() + HEIGHT_CHASE_MS;
       const step = (): void => {
         heightChase = 0;
-        if (compensateHeight(target) || performance.now() > deadline) return;
+        compensateHeight();
+        if (port.offsetHeight === target || performance.now() > deadline) return;
         heightChase = requestAnimationFrame(step);
       };
       heightChase = requestAnimationFrame(step);
@@ -342,6 +377,11 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         focusHeight.current = 0;
         port.style.height = '';
       }
+      // Everything that can move the card's bottom, not only the height written above: the reading row appears in a
+      // LATER commit (it is React state, set from this function), and the focus grant changed the ceiling in an earlier
+      // one. Recording and compensating here on every measure is what catches those; the delta is zero when nothing
+      // moved, and a card without the focus records without scrolling.
+      compensateHeight();
       // Read again rather than reusing the height taken at the top of this function: a height write above can put the
       // port's scrollbar in or out, and a scrollbar changes the text's WIDTH, which rewraps it. The comparison is against
       // the preview height rather than the port's, so only a rewrap can move this answer — which is the one case the
