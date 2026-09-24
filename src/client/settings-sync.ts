@@ -47,23 +47,37 @@ export function hostRecordOf<T extends object>(state: T): Record<string, unknown
 export const SETTINGS_SAVE_DELAY_MS = 400;
 
 /**
- * The host's record, or `undefined` when there is nothing to take.
+ * What a read of the host's record actually established.
  *
- * An empty record reads as `undefined` on purpose: it is what the host answers before anything has ever
- * been stored, and the caller's job in that case is to SEED it from this browser rather than to blank
- * the reader's settings with it. Every failure — offline, refused, malformed — answers the same way,
- * because a reader whose settings cannot be fetched still has to get a working app.
+ * Three outcomes, and the whole point is that they are NOT collapsed into "no settings". A record that was read,
+ * a host that answered that nothing is stored, and a read that failed call for three different things from the caller:
+ * take this record, seed the record from this browser, or touch the record not at all. Collapsing the last two — which
+ * is what `undefined` did — means a transient failure reads as "nothing stored", and the caller's seed then replaces a
+ * record it never managed to fetch with whatever this origin happens to hold: the defaults, on a fresh port.
  */
-export async function loadHostSettings(): Promise<Record<string, unknown> | undefined> {
+export type HostSettingsRead =
+  | { kind: 'stored'; record: Record<string, unknown> }
+  | { kind: 'empty' }
+  | { kind: 'unavailable' };
+
+/**
+ * Read the host's record.
+ *
+ * `empty` is the host answering `{}`, which it does before anything has ever been stored. Every failure — offline,
+ * refused, a body that is not a record, a body that is not even JSON — is `unavailable`, and the caller keeps its
+ * hands off the record. A reader whose settings cannot be fetched still gets a working app; what they must not get is
+ * a working app that quietly overwrote the settings it failed to fetch.
+ */
+export async function loadHostSettings(): Promise<HostSettingsRead> {
   try {
     const res = await fetch(READER_SETTINGS_PATH, { headers: { accept: 'application/json' } });
-    if (!res.ok) return undefined;
+    if (!res.ok) return { kind: 'unavailable' };
     const body = await res.json() as { settings?: unknown };
     const settings = body.settings;
-    if (settings === null || typeof settings !== 'object' || Array.isArray(settings)) return undefined;
-    return Object.keys(settings).length > 0 ? settings as Record<string, unknown> : undefined;
+    if (settings === null || typeof settings !== 'object' || Array.isArray(settings)) return { kind: 'unavailable' };
+    return Object.keys(settings).length > 0 ? { kind: 'stored', record: settings as Record<string, unknown> } : { kind: 'empty' };
   } catch {
-    return undefined;
+    return { kind: 'unavailable' };
   }
 }
 

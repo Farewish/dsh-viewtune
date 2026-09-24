@@ -72,22 +72,24 @@ test('a failed write is swallowed, and the next change still goes out', async ()
   assert.deepEqual(saved, [{ dim: 2 }]);
 });
 
-test("the host's record is what restores, and an empty one means nothing was ever stored", async () => {
+test('a read answers three ways, and a failed one is not an empty one', async () => {
   const original = globalThis.fetch;
   const answer = (body: unknown, ok = true) => (async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
   try {
     globalThis.fetch = answer({ settings: { wallpaper: 'x.jpg', wallpaperDim: 51 } });
-    assert.deepEqual(await loadHostSettings(), { wallpaper: 'x.jpg', wallpaperDim: 51 });
-    // The host answers `{}` before anything has been stored. That has to read as "seed me from this
-    // browser", never as "the reader's settings are empty" — blanking them is the bug being fixed.
+    assert.deepEqual(await loadHostSettings(), { kind: 'stored', record: { wallpaper: 'x.jpg', wallpaperDim: 51 } });
+    // The host answers `{}` before anything has been stored. THIS is the one case where the caller may seed the
+    // record from this browser — and telling it apart from the failures below is the whole reason this is a result
+    // type rather than `undefined`. Collapsed together, a transient failure would seed the defaults over a record
+    // nobody managed to fetch.
     globalThis.fetch = answer({ settings: {} });
-    assert.equal(await loadHostSettings(), undefined);
+    assert.deepEqual(await loadHostSettings(), { kind: 'empty' });
     globalThis.fetch = answer({ settings: [1, 2] });
-    assert.equal(await loadHostSettings(), undefined);
+    assert.deepEqual(await loadHostSettings(), { kind: 'unavailable' });
     globalThis.fetch = answer({}, false);
-    assert.equal(await loadHostSettings(), undefined);
+    assert.deepEqual(await loadHostSettings(), { kind: 'unavailable' });
     globalThis.fetch = (async () => { throw new Error('offline'); }) as unknown as typeof fetch;
-    assert.equal(await loadHostSettings(), undefined);
+    assert.deepEqual(await loadHostSettings(), { kind: 'unavailable' });
   } finally {
     globalThis.fetch = original;
   }

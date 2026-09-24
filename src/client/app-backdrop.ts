@@ -180,7 +180,9 @@ export function installAppBackdrop(doc: Document): () => void {
   // The resting state, stated rather than assumed: with nothing read yet there is no wallpaper, and the
   // host's own track is what the groove hands back.
   publish(undefined);
-  void loadHostSettings().then(publish);
+  // Only a record that was actually read is published; `empty` and a failed read both leave the resting state, which
+  // is what the line above already stated.
+  void loadHostSettings().then(read => { publish(read.kind === 'stored' ? read.record : undefined); });
   const unsubscribe = subscribeToHostSettings(publish);
   return () => {
     unsubscribe();

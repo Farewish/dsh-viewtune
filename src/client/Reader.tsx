@@ -773,13 +773,27 @@ export function Reader(props: ReaderProps) {
   const settingsLoaded = useRef(false);
   useEffect(() => {
     let cancelled = false;
-    void loadHostSettings().then(hostRecord => {
+    void loadHostSettings().then(read => {
       if (cancelled) return;
+      /**
+       * A read that FAILED is not a record that is empty, and the difference is a reader's whole configuration.
+       *
+       * Treating the two alike is what made a transient failure destructive: the seed below sends this browser's
+       * entire state, and on a fresh port that state is the defaults — so a record nobody managed to fetch would be
+       * replaced by the factory settings, with the save reporting success. Nothing is sent on this path at all: the
+       * writer stays unarmed for the session and the record is left alone for a read that works. The cost is real and
+       * is stated here rather than hidden: changes made in this session are not persisted. Worth it — a session that
+       * forgets is recoverable by setting the thing again, a record that has been overwritten is not.
+       */
+      if (read.kind === 'unavailable') {
+        console.warn('[viewtune] the settings record could not be read, so this session will not write it');
+        return;
+      }
       settingsLoaded.current = true;
-      if (hostRecord !== undefined) props.actions.hydrate(hostRecord);
-      // Nothing stored yet: THIS browser's copy becomes the record. That is also the migration for
-      // settings a reader made before the host kept any.
-      else settingsWriter.push(hostRecordOf(readerState));
+      if (read.kind === 'stored') { props.actions.hydrate(read.record); return; }
+      // The host answered, and answered that nothing is stored: THIS browser's copy becomes the record. That is also
+      // the migration for settings a reader made before the host kept any.
+      settingsWriter.push(hostRecordOf(readerState));
     });
     return () => { cancelled = true; };
     // Once per activation: the record is read on the way in, and every later change flows the other way.

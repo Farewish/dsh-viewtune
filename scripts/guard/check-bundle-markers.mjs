@@ -632,6 +632,16 @@ const markers = [
     // keys are bare turn numbers that another session is free to mean something else by.
     (bundle.match(/settingsWriter\.push\(hostRecordOf\(readerState\)\)/g) ?? []).length === 2
     && (bundle.match(/if \(key === "expanded"\) continue;/g) ?? []).length === 2],
+  ['a settings read that FAILED is not a record that is empty, and nothing is written on that path', () => {
+    // The order is the assertion: the failure branch has to come BEFORE the writer is armed, or a session that could
+    // not read the record would still push its own state (the defaults, on a fresh port) over the record it failed to
+    // fetch — the destructive half of collapsing the two cases into `undefined`.
+    const failed = bundle.indexOf('if (read.kind === "unavailable")');
+    const armed = bundle.indexOf('settingsLoaded.current = true');
+    return failed !== -1 && armed !== -1 && failed < armed
+      && bundle.includes('if (read.kind === "stored") {')
+      && bundle.includes('settingsWriter.push(hostRecordOf(readerState))');
+  }],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
