@@ -31,8 +31,18 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const stopFollow = useRef<() => void>(() => {});
   /** The focus, readable from the frame loop's closure without putting it in that effect's dependencies. */
   const focusedRef = useRef(false);
-  /** The ceiling the focus has published, so a growth can be compensated by EXACTLY its own delta. */
+  /** The ceiling the focus has published — what the card last ASKED to be. */
   const focusHeight = useRef(0);
+  /**
+   * What the card was actually RENDERED at, the last time it was written.
+   *
+   * The compensation below is the delta the browser applied, and the two are not the same number: the stylesheet caps
+   * this box at `min(60vh, 560px)` (the ceiling 展开阅读 uses), so a card whose content has outgrown the ceiling keeps
+   * being asked to grow while its rendered height stands still. Comparing the request with the request compensated the
+   * scroll for height that never existed — a line of page movement per line of text that added no height, which is the
+   * opposite of what the compensation is for. Seeded when the focus is granted, from the element itself.
+   */
+  const focusRendered = useRef(0);
   /**
    * When this card's OWN content last grew.
    *
@@ -53,8 +63,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * is the one being written into AND the reader is sitting at the bottom of the transcript, the moment
    * 「焦点思考展开」 specifies for a new determination. Losing the tail does NOT release it (a reader who scrolls up to
    * re-read must not watch the card shrink under them); what releases it is the reader taking the card over, the
-   * reader asking for the full height with 展开阅读, or — in 跟随最新 only — the thinking ending, which is the one mode
-   * specified to fold back to the small card.
+   * reader asking for the full height with 展开阅读, or this card no longer being the one being written into — which is
+   * EVERY mode, not only 跟随最新: it is the focus, not the height, that suspends the page's tail-follow. (跟随最新 is
+   * the only mode that also folds the card back to its preview height; the release itself is not mode-specific — see
+   * the effect below, which says the same thing where it is done.)
    */
   useEffect(() => {
     if (expanded || !focusExpand) return;
@@ -85,9 +97,21 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     scroller.addEventListener('scroll', request, { passive: true });
     return () => scroller.removeEventListener('scroll', request);
   }, [expanded, focusExpand, focused, following, active, reasoningMode, focusKey, onFocusChange]);
-  useEffect(() => {
+  /**
+   * The focus, in a LAYOUT effect, and the rendered height seeded with it.
+   *
+   * `focusedRef` is read by `measure`, which the port's own ResizeObserver calls — and the focus flip is exactly what
+   * resizes that port (the preview ceiling gives way to `min(60vh, 560px)`), so the growth it causes can reach the
+   * observer before a passive effect would have written the new value. That is the same ordering the page follower's
+   * refs are written for. Seeding `focusRendered` here is the other half: the accounting of "what the browser actually
+   * applied" has to start from the height the card already has, or the first write would claim the whole card as growth.
+   */
+  useLayoutEffect(() => {
     focusedRef.current = focused;
-    if (!focused) { focusHeight.current = 0; viewport.current?.style.removeProperty('height'); }
+    if (focused) { focusRendered.current = viewport.current?.offsetHeight ?? 0; return; }
+    focusHeight.current = 0;
+    focusRendered.current = 0;
+    viewport.current?.style.removeProperty('height');
   }, [focused]);
   // A card that unmounts while focused must hand the focus back, or the follower below would stay suspended forever.
   useEffect(() => () => { onFocusChange(focusKey, false); }, [focusKey, onFocusChange]);
@@ -98,8 +122,12 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * distinction is that a sibling block can stream without changing any of them. So the focus is watched here instead,
    * against the timestamp `measure` keeps: a card that has not grown for a beat hands the focus back (the page follows
    * the narration, and keeps following), and one that starts growing again takes it back — still only while the page is
-   * at the bottom, which is where a new determination is allowed to start. Cheap by construction: two checks a second,
-   * and only while this card is the one being written into.
+   * at the bottom, which is where a new determination is allowed to start. Cheap by construction: the timer is a third
+   * of a second, so just over three checks a second, and only while this card is the one being written into. The beat
+   * it waits for is `IDLE_MS`, twice the timer: a growth timestamp that has not moved for that long is a card that has
+   * stopped being written into — and note that the timestamp only moves when this card's HEIGHT changes, so a card
+   * still streaming inside one line of text reads as idle here. That is the intended trade: the focus exists to make
+   * room for text that is arriving, and text that arrives without crossing a line has nothing to make room for.
    */
   useEffect(() => {
     if (!active || !following || expanded || !focusExpand) return;
@@ -248,18 +276,23 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
        * a card holds the focus: nothing else is writing that scroll position. Where there is no room above, the
        * clamp leaves the write short and the card grows downward as it always did.
        *
-       * The height is whole lines and INTENTIONAL rather than content-driven, which is what makes the delta exact:
-       * a card that followed its content between two line boundaries would grow on every publication, and its real
-       * delta could not be known without measuring the layout after the write. It also keeps the layout below this
-       * card changing once per line instead of once per publication. The ceiling itself (min(60vh, 560px)) stays in
-       * the stylesheet, so nothing here needs the viewport.
+       * The height is whole lines and INTENTIONAL rather than content-driven, which is what keeps the layout below this
+       * card changing once per line instead of once per publication. What the compensation moves the scroll by, though,
+       * is not the request but the RENDERED delta (see `focusRendered`): the request is allowed to run past the
+       * stylesheet's ceiling, and charging the scroll for a height the browser refused is what walked the page upward
+       * line by line once a long card was capped. The ceiling itself (min(60vh, 560px)) stays in the stylesheet, so
+       * nothing here needs the viewport.
        */
       if (focusedRef.current) {
         const wanted = focusedHeight(text.offsetHeight, previewHeight, lineHeight);
         if (wanted !== focusHeight.current) {
-          const grew = wanted - focusHeight.current;
           focusHeight.current = wanted;
           port.style.height = `${String(wanted)}px`;
+          // The height the browser actually gave us. Reading it costs nothing extra: the overflow test three lines
+          // below already reads layout, so this is the same flush, and this box was just written.
+          const rendered = port.offsetHeight;
+          const grew = rendered - focusRendered.current;
+          focusRendered.current = rendered;
           if (grew > 0) {
             const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
             if (scroller !== null) scroller.scrollTop += grew;
@@ -294,7 +327,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       timer = undefined;
       if (!canFollow()) return;
       const from = paintedOffset();
-      const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
+      // `lineHeight` is `measure`'s cached read, refreshed whenever the mode or the size changes. It used to be
+      // re-read here under the same name, which shadowed the cache the note above it promises and gave the two copies
+      // a chance to disagree after a resize.
       // The mode only decides what this step aims at: the reading pace (so many whole lines), the newest line, or —
       // never, because `allowed` is false for it — nothing at all. Nothing else about a step changes, so takeover,
       // the fades and the handoff behave identically in all three.

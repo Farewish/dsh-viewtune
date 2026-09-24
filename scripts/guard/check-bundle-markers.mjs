@@ -494,7 +494,16 @@ const markers = [
   // request wins, which is what makes it singular), and — rule 1 — the page stops following the tail while a card
   // holds it, so two auto-scrollers never pull at once. The motion switch and reduced motion both drop the transition.
   ['a focused card grows in whole lines', 'const lines = Math.max(1, Math.ceil(content / line));'],
-  ['…asking for a whole-line height, and taking the growth out of the space ABOVE the card', () => bundle.includes('port.style.height = `${String(wanted)}px`') && bundle.includes('scroller.scrollTop += grew')],
+  ['…asking for a whole-line height, and taking the growth the browser APPLIED out of the space ABOVE the card', () =>
+    bundle.includes('port.style.height = `${String(wanted)}px`')
+    // The delta is the RENDERED one, not the requested one: the stylesheet caps this box, so a card past the ceiling is
+    // asked to grow while its height stands still, and compensating the request walked the page up a line per line.
+    && bundle.includes('const rendered = port.offsetHeight;')
+    && bundle.includes('const grew = rendered - focusRendered.current;')
+    && bundle.includes('scroller.scrollTop += grew')],
+  ['…and the focus that frame loop reads is written in a LAYOUT effect, with the rendered height seeded from the grant', () =>
+    bundle.includes('(0, react.useLayoutEffect)(() => {\n\t\t\t\tfocusedRef.current = focused;')
+    && bundle.includes('focusRendered.current = viewport.current?.offsetHeight ?? 0;')],
   ['…under a ceiling that stays in the stylesheet, with the growth instant and only the return animated', '.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}.WGoHxG_reasonCard:not([data-focus=true]) .WGoHxG_reasonViewport{transition:max-height .3s var(--reason-ease,ease-out)}'],
   ['…with the motion switch dropping those transitions', () => bundle.includes('[data-motion=off] .WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport,') && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(bundle)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
