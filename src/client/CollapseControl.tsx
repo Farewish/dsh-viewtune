@@ -22,7 +22,6 @@
  * The keyboard bindings are the actions' own and stay bound to the actions (collapseTurn / collapseAll),
  * which is why each control advertises the binding of what it will actually do.
  */
-import { useRef } from 'react';
 import type { CollapseMode } from './collapse-mode.js';
 import css from './Reader.module.css';
 
@@ -43,7 +42,6 @@ export interface CollapseControlProps {
 }
 
 export function CollapseControl({ mode, currentOpen, othersOpen, turnKey, allKey, keyHint, remember, collapseCurrent, collapseAll }: CollapseControlProps) {
-  const group = useRef<HTMLSpanElement>(null);
   // The pair's conditions, narrowed by the mode. `all` and `current` mean "only this action", so the other
   // one's condition is not consulted at all — in those modes the button is that action or it is nothing.
   const showCurrent = mode !== 'all' && currentOpen;
@@ -71,7 +69,7 @@ export function CollapseControl({ mode, currentOpen, othersOpen, turnKey, allKey
     : allLabel;
 
   return (
-    <span className={css.collapseGroup} ref={group}
+    <span className={css.collapseGroup}
       data-reader-collapse-split={both ? 'true' : 'false'}
       data-reader-collapse-action={primary}>
       {/* Always rendered, merely hidden when nothing applies — that is what keeps the enter/exit animation

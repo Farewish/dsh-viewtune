@@ -151,6 +151,14 @@ for (const [name, needle] of [
 
 // --------------------------------------------------------- 6. artifact cross-check
 {
+  /**
+   * Each row: the decision, and whether each side satisfies it — so every row, including the one about an ABSENCE
+   * (`no backfill`, already negated in the tuple), agrees on `true`.
+   *
+   * The comparison used to be `inSource !== inBundle`, which reads "neither side carries it" as agreement. That is the
+   * exact failure mode these rows exist for: revert the decision in `src/` and rebuild, and the two sides go missing
+   * together while the suite stays green. Both sides must satisfy the row, and a missing pair is named as such.
+   */
   const decisions = [
     ["pill marks an out-of-window turn", has(source.pill, 'data-ud-check="steps-window"'), has(bundle, '"data-ud-check": "steps-window"')],
     ["pill is boundary-wrapped", has(source.pill, "QuietBoundary"), pillBoundaryClass(bundle) !== undefined],
@@ -163,8 +171,9 @@ for (const [name, needle] of [
     ["no backfill", !has(source.reader, "fillHistory"), !has(bundle, "fillHistory")],
   ];
   for (const [name, inSource, inBundle] of decisions) {
-    if (inSource !== inBundle) {
-      note("DRIFT", "source vs lib/client.js", `${name}: source=${String(inSource)} bundle=${String(inBundle)}`);
+    if (!inSource || !inBundle) {
+      const missing = inSource || inBundle ? "" : "  (neither side carries it)";
+      note("DRIFT", "source vs lib/client.js", `${name}: source=${String(inSource)} bundle=${String(inBundle)}${missing}`);
     }
   }
 }

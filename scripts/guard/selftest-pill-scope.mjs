@@ -30,7 +30,6 @@ import { fileURLToPath } from 'node:url';
  */
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-const TOOLS = join(ROOT, "../..");
 const CHECKER = join(ROOT, 'scripts', 'guard', 'check-pill-scope.mjs');
 const HEALTHY = join(ROOT, "lib/client.js");
 

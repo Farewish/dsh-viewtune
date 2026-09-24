@@ -63,11 +63,12 @@ export interface ReaderState {
   /**
    * Whether a revealed word also resolves from a 1px blur, or only fades in.
    *
-   * ON by default — the reference recipe — because that is what every card in this plugin has always shown. It is a
-   * switch because the blur is the expensive half of the reveal and the subtle one: a `filter` cannot be animated by
-   * the compositor, so every animating word repaints its own area on every frame, and about a dozen of those overlap
-   * for as long as a message streams. Read defensively (`!== false`), so a record written before the switch existed
-   * keeps the blur it was written with.
+   * OFF by default — the reader's own setting, adopted like the rest of this file's defaults, and the one they settled
+   * on after measuring what the per-frame repaint it causes was worth (see the note on the initial value below). This
+   * comment claimed ON for a long time, which is what the README's table says it is not. It is a switch because the blur
+   * is the expensive half of the reveal and the subtle one: a `filter` cannot be animated by the compositor, so every
+   * animating word repaints its own area on every frame, and about a dozen of those overlap for as long as a message
+   * streams. Read defensively (`=== true`), which is what an OFF default means: an absent key is off.
    */
   revealBlur: boolean;
   /**

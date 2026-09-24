@@ -18,6 +18,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { pillBoundaryClass } from './bundle-anchors.mjs';
 
 /**
  * The checkout this guard lives in. Ported from the authoring machine, where every guard named
@@ -126,8 +127,16 @@ const GLOBALS = new Set([
   "globalThis", "setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame",
 ]);
 
-/** Names the enclosing module factory legitimately provides. */
-const fromModule = ["react", "react_jsx_runtime", "TurnMetrics_module_css_default", "StepsPillBoundary"];
+/**
+ * Names the enclosing module factory legitimately provides.
+ *
+ * The boundary's name comes from the artifact (`pillBoundaryClass`, the same lookup the other guards use) rather than
+ * from a literal, and the literal it used to be was `StepsPillBoundary` — a name the source has not carried since the
+ * class was renamed to `QuietBoundary`. A stale entry here does not fail loudly; it simply stops the checker from
+ * reporting the CURRENT name as undeclared, which is the one thing this list is for.
+ */
+const boundaryClass = pillBoundaryClass(text);
+const fromModule = ["react", "react_jsx_runtime", "TurnMetrics_module_css_default", ...(boundaryClass === undefined ? [] : [boundaryClass])];
 
 const declared = new Set([
   ...fromModule,

@@ -759,10 +759,13 @@
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.35)) 65%, transparent);
 }
+/* `.toolRaw` is deliberately NOT in this group, though it used to be: it has a rule of its own further down that dials
+   it with `--glass-code` (it is the 「原始数据」 <pre>, a code plate), and with both selectors at the same specificity the
+   later one won — so the card dial's entry here was a value that could never apply, and the two lines disagreed about
+   the fallback (`--glass-card, 0%` against `--glass-code, 25%`). One surface, one dial, stated once. */
 .root[data-reader-glass] .toolDetails,
 .root[data-reader-glass] .notice,
 .root[data-reader-glass] .unknown,
-.root[data-reader-glass] .toolRaw,
 .root[data-reader-glass] .systemPrompt,
 .root[data-reader-glass] .compactionSummaryBox,
 .root[data-reader-glass] .attention,

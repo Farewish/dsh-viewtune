@@ -108,16 +108,34 @@ const declaredFor = (path) => {
 
 const violations = [];
 let scanned = 0;
+const unreadable = [];
 for (const { path, text } of sources) {
   for (const { alias, relativePath } of importsOf(text)) {
     const stylesheet = resolve(dirname(path), relativePath);
     let declared;
-    try { declared = declaredFor(stylesheet); } catch { continue; }
+    // A stylesheet that cannot be READ is a violation, not a skip. `continue` here meant a renamed, moved or deleted
+    // `.module.css` — the exact mistake this checker exists for — silently removed its own subject from the scan, and
+    // the run still ended in `ok`.
+    try {
+      declared = declaredFor(stylesheet);
+    } catch (error) {
+      unreadable.push({ path, stylesheet, error });
+      continue;
+    }
     scanned += 1;
     for (const item of missingClasses(text, declared, alias)) {
       violations.push({ ...item, path: relative(ROOT, path).replace(/\\/g, '/'), stylesheet: relative(ROOT, stylesheet).replace(/\\/g, '/') });
     }
   }
+}
+
+if (unreadable.length > 0) {
+  console.error(`STYLESHEET UNREADABLE — ${String(unreadable.length)}`);
+  for (const item of unreadable) {
+    console.error(`  ${relative(ROOT, item.path).replace(/\\/g, '/')} imports ${relative(ROOT, item.stylesheet).replace(/\\/g, '/')}: ${String(item.error)}`);
+  }
+  console.error('\nA css module that cannot be read cannot be checked, so its classes are unverified.');
+  process.exit(1);
 }
 
 if (violations.length > 0) {

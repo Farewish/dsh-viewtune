@@ -2,8 +2,10 @@
  * Compares the compiled bundle against its source mirror decision by decision.
  *
  * This was written when a full typecheck was believed impossible here (the client UI packages
- * were said not to be published separately — they are, and `verify-types.mjs` now runs the real
- * check). What this still adds is a *correspondence* check: the artifact and `src/` are edited
+ * were said not to be published separately — they are, and `npm run typecheck`, i.e.
+ * `tsc -p tsconfig.json --noEmit`, now runs the real check; the workspace-level helper that
+ * drives it lives outside this repository, so this comment names the command rather than that
+ * file). What this still adds is a *correspondence* check: the artifact and `src/` are edited
  * as a pair, so a change applied to one and not the other shows up instead of hiding. Type
  * checking cannot see that, because it only ever looks at the source.
  *
@@ -50,7 +52,11 @@ const pairs = [
   // out-of-window turn, but it now says so instead of rendering nothing. What the two sides must
   // agree on is the marker, not the absence.
   ["pill: marks a turn outside the window", 'data-ud-check="steps-window"', '"data-ud-check": "steps-window"'],
-  ["pill: loaded count only in the ratio", "`${answer}/${loaded} 个步骤`", "`${answer}/${loaded} 个步骤`"],
+  // This row used to read `` `${answer}/${loaded} 个步骤` `` — a shape BOTH sides had stopped carrying, so the pair
+  // compared false with false and printed `ok (neither)`: a row that asserted nothing, in the one guard whose job is to
+  // notice when the two sides stop agreeing. The loop below no longer accepts "neither" as agreement, and the row now
+  // names the label shape the pill actually emits.
+  ["pill: the label never prints a missing half", "`${answer}/${total} 个步骤`", "`${answer}/${total} 个步骤`"],
   ["pill: error boundary", "class QuietBoundary", (b) => pillBoundaryClass(b) !== undefined],
   ["pill: boundary wraps the component", "<QuietBoundary>", (b) => {
     const boundary = pillBoundaryClass(b);
@@ -77,11 +83,20 @@ for (const [name, inSource, inBundle] of pairs) {
   const hasSource = source.reader.includes(inSource) || source.blocks.includes(inSource)
     || source.pill.includes(inSource) || source.types.includes(inSource) || source.metrics.includes(inSource);
   const hasBundle = typeof inBundle === "function" ? inBundle(bundle) : bundle.includes(inBundle);
-  if (hasSource === hasBundle) {
-    console.log(`ok    ${name}  (${hasSource ? "both" : "neither"})`);
+  /**
+   * BOTH sides, not "the same answer on both sides".
+   *
+   * `hasSource === hasBundle` treated "neither" as agreement, and that is precisely the failure this guard exists to
+   * catch: revert the decision in `src/`, rebuild, and both markers go missing together — the run printed
+   * `ok (neither)` and the suite stayed green. A row that no longer exists on either side is a row asserting nothing,
+   * and the honest report is a failure that names it. (One row was in exactly that state when this changed; it is now
+   * spelled against the shape the code actually carries.)
+   */
+  if (hasSource && hasBundle) {
+    console.log(`ok    ${name}  (both)`);
   } else {
     mismatched += 1;
-    console.log(`DRIFT ${name}  source=${String(hasSource)} bundle=${String(hasBundle)}`);
+    console.log(`DRIFT ${name}  source=${String(hasSource)} bundle=${String(hasBundle)}${hasSource || hasBundle ? "" : "  (neither side carries it)"}`);
   }
 }
 

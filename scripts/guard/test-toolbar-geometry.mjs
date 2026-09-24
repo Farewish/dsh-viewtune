@@ -19,6 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { moduleCssLiteral } from './bundle-anchors.mjs';
 
 /**
  * The checkout this guard lives in. Ported from the authoring machine, where every guard named
@@ -30,21 +31,15 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const bundlePath = process.argv[2] ?? join(ROOT, 'lib/client.js');
 const text = readFileSync(bundlePath, 'utf8');
 
-/** Pull the Reader CSS literal out of the bundle and evaluate it as a string. */
+/**
+ * The Reader stylesheet, located by the stylesheet it CAME FROM — not by `const css$4 = `.
+ *
+ * The ordinal is an emission-order artefact: add or reorder a CSS module and this guard measures a different stylesheet
+ * while still reporting confident geometry. `moduleCssLiteral` pairs each literal with its owning
+ * `tagId$N = "<package>/Reader.module.css"`, which is a fact about the file rather than about the build.
+ */
 function readReaderCss() {
-  const marker = 'const css$4 = ';
-  const start = text.indexOf(marker);
-  if (start === -1) throw new Error('css$4 assignment not found');
-  let i = start + marker.length;
-  if (text[i] !== '"') throw new Error('css$4 does not open with a quote');
-  i++;
-  while (i < text.length) {
-    if (text[i] === '\\') { i += 2; continue; }
-    if (text[i] === '"') break;
-    i++;
-  }
-  const statement = text.slice(start, i + 2);
-  return new Function(`${statement}\nreturn css$4;`)();
+  return moduleCssLiteral(text, 'Reader.module.css');
 }
 
 const css = readReaderCss();

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.1 (four checks that could not fail, and the hygiene the audit listed)
+
+**这一批全是"检查本身不可信"和"注释与代码说的不是一件事"：没有读者能直接看见的变化，但正是它们让上一次的疏漏变得可见。**
+
+- **对应性守护把"两边都没有"当成一致（§4.3）**：`compare-source-and-bundle.mjs` 判的是 `hasSource === hasBundle`，`audit-source-edits.mjs` 判的是 `inSource !== inBundle`——**在 `src/` 里把某个决定改回去再重建，两边的 marker 一起消失，前者照样打印 `ok (neither)`、后者一声不响**，而这正是这两条守护唯一要抓的失效模式 ✗⇒✓。现在两边都必须满足该行；`no backfill` 那种"断言一个不存在的东西"的行在元组里已经是取反后的结果，所以它同样要求两边为真。顺带发现并修掉一条**早就不存在**的行（`` `${answer}/${loaded} 个步骤` ``，两边都没有、却一路报 ok），它现在钉的是胶囊真正发出的标签形状 ✓。
+- **两条守护按 `const css$4 = ` 找样式表（§4.3）**：这是**发射顺序**的产物——多一个或少一个 CSS module，`test-collapse-fade.mjs` 与 `test-toolbar-geometry.mjs` 会读到**另一份**样式表，然后照样给出"淡出正常 / 几何正常"的结论 ✗⇒✓。改用 `moduleCssLiteral()`（`bundle-anchors.mjs` 早就写好、并按 `tagId$N = "<包>/Reader.module.css"` 配对查找的那个），哈希或序号都再不参与 ✓。
+- **`check-stylesheet-classes.mjs` 在样式表读不出来时 `continue`（§4.4）**：重命名、移走、删掉一个 `.module.css`——正是这个 checker 存在的理由——会把自己的检查对象悄悄移出扫描范围，然后整轮以 `ok` 结束 ✗⇒✓。现在它是一项独立的失败项（`STYLESHEET UNREADABLE`），并列出是哪个文件 import 了哪个读不到的文件 ✓。
+- **`tsdown.config.ts` 的产物可移植性断言永远不可能触发（§4.4）**：它匹配 `\0dshx-css-module:`（它被移植过来的那次构建的前缀），而这次构建发的是 `\0dsh-css:`；那句 `this.error('client.js contains a non-portable CSS module path')` 因此是一句永远不会发生的承诺，而它旁边的重写逻辑也早就没有对象（vendored 预设从源头就给相对 id）✗⇒✓。重写删掉、断言留下并改成匹配真正发出的三个 CSS 前缀；实测当前产物**不**命中，把一条绝对路径塞进注释则**命中** ✓。
+- **`check-pill-scope.mjs` 的 `fromModule` 里写着 `StepsPillBoundary`（§4.4）**：源码里那个类早就改名 `QuietBoundary`，于是这张"模块工厂合法提供的名字"表里，真正在用的名字**不在**表内、退休的名字还在——它不会报错，只会让这个 checker 恰好漏掉它唯一要抓的那类问题。现在边界类名由 `pillBoundaryClass()` 从产物里读出来 ✓。
+- **`selftest-pill-scope.mjs` 里一个没人读的 `const TOOLS`**：删掉 ✓。
+- **`store.ts` 的 `revealBlur` 注释说"默认开"**：实现从某次测量起就是 `false`（README 的表格一直是对的）⇒ 注释是与代码相反的那个，改写并写明理由与"OFF 默认 ⇒ 读法是 `=== true`" ✓。
+- **`Reader.tsx` 里一段描述**已被删掉**的实现的注释**（"walked the turn's step payloads…"，还带着为那段代码写的 Map 守卫说明）：删掉，只留描述当前实现的那段（并修正它的缩进）✓。
+- **`dsh-viewtune.ts` 的路由名注释仍是 `/api/better-display/reveal`**：改成这条路由真正的路径（`/better-display/wallpapers/reveal`）✓。
+- **`CollapseControl.tsx` 的 `group` ref 只写不读**（挂在一个 `<span>` 上、没人读它）：连同 `useRef` 的 import 一起删掉 ✓。
+- **`.toolRaw` 同时挂在两个旋钮上（§3.1）**：卡片旋钮组里那条与它自己的代码旋钮规则**同特异度**，后者胜 ⇒ 前者是永不生效的值，而且两处的 fallback 还不一样（`--glass-card, 0%` vs `--glass-code, 25%`）✗⇒✓。从卡片组里移出，让"一个表面一个旋钮"只写一次 ✓（这也是它旁边注释一直说的归属）。
+- **README 里"三种模式都保持 840ms 节拍"**：`跟随最新` 用的是 `REASON_LATEST_STEP = 180ms` 且步间不停（源码自己解释过为什么必须不同）——两个语言版本都改成分别说明各自的实际节拍 ✓。
+- 验证：build、`tsc`、**35/35** 测试文件、**22/22** 不变式、**53/53** 反向用例全过 ✓。§3.2 的两处死值（`--glass-scrollbar` / `--glass-input` 写在阅读根上却只从 `<html>` 读）、`background-attachment: fixed`、`dsh.client.inject` 对构建无效、`lib/client.js.map` 进包、格式脆性与重复断言，以及 §5 的宿主侧取舍：仍然**没做**，理由见上一节 ✓。
+
 ## 0.4.1 (the audit round: our own defects, the checks that pin them, and the verdicts that did not hold)
 
 **同时拿到的 586 行外部审查报告逐条读完。属于我们自己的缺陷全部改掉，改不掉的写明理由，审查里不成立的三条留下证据。**

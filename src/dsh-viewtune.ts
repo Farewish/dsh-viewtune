@@ -191,7 +191,7 @@ export function apply(ctx: Context): void {
           }
         },
       });
-    }, 'dsh-viewtune: /api/better-display/reveal route');
+    }, 'dsh-viewtune: /better-display/wallpapers/reveal route');
 
     // The reader's settings, kept HERE rather than only in the browser. The client store persists to
     // localStorage, which is keyed by ORIGIN — and this server's port is ephemeral, so every launch is a

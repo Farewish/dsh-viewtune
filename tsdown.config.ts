@@ -27,16 +27,26 @@ const bundle = externalClientBundle(packageName, ['src/dsh-viewtune.ts'], {
   clientEntry: 'src/client/index.tsx',
 }) as UserConfig[];
 
+/**
+ * The portability assertion — which, as shipped, could never fail.
+ *
+ * Upstream rewrote each CSS module's region comment from an absolute path to a relative one and then asserted that none
+ * was left. The vendored preset hands lightningcss a repository-relative virtual id in the first place
+ * (`scripts/client-bundle.mjs`, `portableId`), so there is nothing left to rewrite; the rewrite is gone and the
+ * assertion stays. It could not fire, though: it looked for `\0dshx-css-module:`, the prefix of the build it was ported
+ * from, while this one emits `\0dsh-css:` — visible in `lib/client.js` as
+ * `//#region \0dsh-css:src/client/McpAppFrame.module.css.mjs`. A check that cannot fail is the one thing this
+ * repository's own notes call worse than no check, so the pattern now matches what is emitted (all three CSS virtual
+ * prefixes) and fails the build if a stylesheet id ever comes back absolute.
+ */
 const portableOutput: TsdownPlugin = {
   name: 'dsh-better-display-portable-output',
   generateBundle(_options, output) {
     const client = output['client.js'];
     if (client?.type !== 'chunk') this.error('client.js was not emitted');
-    client.code = client.code.replace(
-      /^([ \t]*\/\/#region \\0dshx-css-module:).*[\\/]([^/\\\r\n]+\.module\.css\.mjs)(\r?)$/gmu,
-      '$1$2$3',
-    );
-    if (/^.*\/\/#region \\0dshx-css-module:.*[\\/].*$/mu.test(client.code)) {
+    // After the prefix: a drive letter followed by either slash, or a bare leading slash. A relative id starts with a
+    // directory name, so neither shape can appear by accident.
+    if (/^[ \t]*\/\/#region \\0dsh-(?:css|global-css|inline-css):(?:[A-Za-z]:[\\/]|\/)/mu.test(client.code)) {
       this.error('client.js contains a non-portable CSS module path');
     }
   },
