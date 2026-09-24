@@ -194,11 +194,39 @@ function firstString(source: Record<string, unknown> | undefined, fields: readon
 }
 
 /**
+ * The host's own `meta.diffs` rows, read the one way every consumer agrees on.
+ *
+ * There were TWO normalisers for this list. The row's +N/-M badge went through `callDiffHunks` below, which treats an
+ * ABSENT `oldText` as "no old side" (a created file) and skips a row it cannot use; the 「结果」 pane had its own copy
+ * that rejected the WHOLE list the moment one row failed its test. So a `meta.diffs` entry with `oldText` omitted — the
+ * same shape, one key absent — advertised counts on the tool row and left the panel rendering the generic fallback:
+ * the row promised a diff and opening it showed none. One function, one reading, and a row that cannot be used is
+ * skipped rather than taking its neighbours with it.
+ *
+ * `null` when there is nothing to show, which is what the caller's "is this a diff surface at all" test needs.
+ */
+export function diffHunksOf(meta: unknown): DiffHunk[] | null {
+  const diffs = objectValue(meta)?.diffs;
+  if (!Array.isArray(diffs) || diffs.length === 0) return null;
+  const hunks: DiffHunk[] = [];
+  for (const raw of diffs) {
+    const row = objectValue(raw);
+    if (!row) continue;
+    const oldText = typeof row.oldText === 'string' ? row.oldText : null;
+    const newText = typeof row.newText === 'string' ? row.newText : '';
+    if (!lineCount(newText) && !lineCount(oldText)) continue;
+    hunks.push({ path: firstString(row, DIFF_PATH_FIELDS) ?? '', oldText, newText });
+  }
+  return hunks.length > 0 ? hunks : null;
+}
+
+/**
  * Every changed file this call is responsible for, in the order they ran.
  *
  * Three sources, in the order the reader would trust them:
  *
- *   - the host's own result metadata (`meta.diffs`), which is what the official row renders;
+ *   - the host's own result metadata (`meta.diffs`), which is what the official row renders — read through
+ *     `diffHunksOf`, the one normaliser both this and the 「结果」 pane use;
  *   - the call's own arguments, for `write` / `edit` / `str_replace_editor` only — the same source
  *     the official row reads while a write is still pending, and the reason the tool-name whitelist
  *     exists at all;
@@ -213,19 +241,8 @@ export function callDiffHunks(block: ToolCallBlock | undefined, name?: string, a
     nested.push(...callDiffHunks(child, identity.name, inputFields(identity.raw)));
   }
   if (block && 'kind' in block) {
-    const diffs = objectValue(block.meta)?.diffs;
-    if (Array.isArray(diffs) && diffs.length > 0) {
-      const hunks: DiffHunk[] = [];
-      for (const raw of diffs) {
-        const row = objectValue(raw);
-        if (!row) continue;
-        const oldText = typeof row.oldText === 'string' ? row.oldText : null;
-        const newText = typeof row.newText === 'string' ? row.newText : '';
-        if (!lineCount(newText) && !lineCount(oldText)) continue;
-        hunks.push({ path: firstString(row, DIFF_PATH_FIELDS) ?? '', oldText, newText });
-      }
-      if (hunks.length > 0) return [...hunks, ...nested];
-    }
+    const hunks = diffHunksOf(block.meta);
+    if (hunks !== null) return [...hunks, ...nested];
   }
   if (!name || !DIFF_MUTATION_TOOLS.has(name)) return nested;
   const path = firstString(args, DIFF_PATH_FIELDS);

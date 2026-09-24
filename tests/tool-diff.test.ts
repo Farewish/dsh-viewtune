@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { callDiffHunks } from '../src/client/tool-activity.ts';
+import { callDiffHunks, diffHunksOf } from '../src/client/tool-activity.ts';
 
 /** A settled call: `kind` present is what makes its metadata available to read. */
 const settled = (name: string, args: unknown, extra: { meta?: unknown; subCalls?: ToolCallBlock[] } = {}) => ({
@@ -67,4 +67,26 @@ test('a parent call reports what its children changed, not its own arguments', (
   const bare = settled('run_code', { code: 'ls' }, { subCalls: [named] });
   assert.deepEqual(callDiffHunks(bare, 'run_code', { code: 'ls' }).map(hunk => hunk.path), ['/w/child.ts']);
   assert.deepEqual(callDiffHunks(settled('run_code', {}), 'run_code', {}), []);
+});
+
+test('the row’s badge and the 「结果」 pane read meta.diffs through one function', () => {
+  // The reported shape: the host omits `oldText` for a created file. The badge (`callDiffHunks`) has always accepted
+  // that, while the pane had its own normaliser that REJECTED the whole list on the same input — so the tool row
+  // advertised +N/-M and opening it rendered the generic fallback. Both go through `diffHunksOf` now, and this pins
+  // that they agree on every shape that reaches them.
+  const omitted = { diffs: [{ path: '/w/new.ts', newText: 'a\nb\n' }] };
+  assert.deepEqual(diffHunksOf(omitted), [{ path: '/w/new.ts', oldText: null, newText: 'a\nb\n' }]);
+  const block = settled('write', {}, { meta: omitted });
+  assert.deepEqual(callDiffHunks(block, 'write', {}), diffHunksOf(omitted));
+
+  // A row that cannot be used is SKIPPED, not fatal for its neighbours: one malformed entry used to hide the diff of
+  // every other file in the same call.
+  const mixed = { diffs: [{ path: '/w/a.ts', newText: 'a\n' }, 42, { path: '/w/b.ts', newText: 'b\nc\n' }] };
+  assert.deepEqual(diffHunksOf(mixed)?.map(hunk => hunk.path), ['/w/a.ts', '/w/b.ts']);
+
+  // Nothing usable is `null` — the caller's "is this a diff surface at all" answer — and never a truthy empty array.
+  assert.equal(diffHunksOf({ diffs: [] }), null);
+  assert.equal(diffHunksOf({ diffs: [{ path: '/w/a.ts', oldText: '', newText: '' }] }), null);
+  assert.equal(diffHunksOf({ diffs: 'nope' }), null);
+  assert.equal(diffHunksOf(undefined), null);
 });

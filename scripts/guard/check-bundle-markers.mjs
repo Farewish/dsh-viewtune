@@ -1263,6 +1263,14 @@ const markers = [
     // The badge counted lines from one field list and the body read another: `new_str` was missing from the second, so
     // `str_replace_editor` showed +N/-M with nothing to describe.
     bundle.includes('content: stringValue(args, "content", "new_string", "new_str", "newText", "file_text")')],
+  ['both diff surfaces read meta.diffs through ONE normaliser', () =>
+    // They were two: the row's +N/-M badge accepted a row with `oldText` omitted (a created file) and skipped rows it
+    // could not use, while the 「结果」 pane had its own copy that rejected the whole list on the same input — the row
+    // advertised a diff and opening it rendered the generic fallback. The last clause is the point of the marker: the
+    // second normaliser must not come back.
+    bundle.includes('function diffHunksOf(meta) {')
+    && bundle.includes('const diffs = diffHunksOf(meta);')
+    && !bundle.includes('function diffHunks(value) {')],
   ['the diff badge states which two numbers it is showing', () =>
     // `diffTotals` counts each SIDE's content lines, not the changed ones, so a one-line edit to a long file reads as
     // hundreds. The `+N/-M` shape is kept (it is the host's own convention and is right for a write); the label and the

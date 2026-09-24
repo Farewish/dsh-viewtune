@@ -8,7 +8,7 @@ import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
 import { DiffPanel, DiffStatButton } from './DiffPanel.js';
-import { activityPhase, activitySummary, callDiffHunks, executionFacts, objectValue } from './tool-activity.js';
+import { activityPhase, activitySummary, callDiffHunks, diffHunksOf, executionFacts, objectValue } from './tool-activity.js';
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
@@ -58,17 +58,6 @@ function readLines(value: unknown): ReadBlockLine[] | null {
     lines.push({ number: row.number, text: row.text });
   }
   return lines;
-}
-
-function diffHunks(value: unknown): DiffHunk[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null;
-  const diffs: DiffHunk[] = [];
-  for (const item of value) {
-    const row = objectValue(item);
-    if (typeof row?.path !== 'string' || (row.oldText !== null && typeof row.oldText !== 'string') || typeof row.newText !== 'string') return null;
-    diffs.push({ path: row.path, oldText: row.oldText, newText: row.newText });
-  }
-  return diffs;
 }
 
 function searchFiles(value: unknown): SearchFileGroup[] | null {
@@ -150,7 +139,10 @@ function ResultView({ entry, model, phase, ...render }: BlockRenderProps & { ent
   }
   const lines = readLines(meta?.lines);
   if (model.category === 'read' && typeof meta?.path === 'string' && typeof meta.totalLines === 'number' && lines) return <div data-reader-tool-file><ReadBlock label={meta.path} lang={typeof meta.lang === 'string' ? meta.lang : undefined} lines={lines} totalLines={meta.totalLines} maxLines={18} labels={readBlockLabels} /></div>;
-  const diffs = diffHunks(meta?.diffs);
+  // `diffHunksOf`, not a local copy: the row's +N/-M badge reads `meta.diffs` through the same function, and the two
+  // used to disagree about a row with `oldText` omitted — the badge accepted it, this pane rejected the whole list, so
+  // the row advertised a diff that opening it did not show.
+  const diffs = diffHunksOf(meta);
   if (model.category === 'write' && diffs) return <div data-reader-tool-diff><DiffBlock diffs={diffs} maxLines={18} labels={diffBlockLabels} /></div>;
   if (model.category === 'search' && typeof meta?.total === 'number' && typeof meta.truncated === 'boolean') {
     if (meta.shape === 'paths' && Array.isArray(meta.paths) && meta.paths.every((path): path is string => typeof path === 'string')) return <div data-reader-tool-search><SearchBlock kind="paths" paths={meta.paths} total={meta.total} truncated={meta.truncated} maxLines={18} labels={searchBlockLabels} /></div>;

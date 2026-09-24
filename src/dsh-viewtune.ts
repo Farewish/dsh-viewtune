@@ -68,18 +68,24 @@ const WALLPAPER_ASSET = fileURLToPath(new URL('../assets/sample-gradient.png', i
 function readBody(req: IncomingMessage, limit: number): Promise<string | undefined> {
   return new Promise(resolve => {
     let body = '';
+    let bytes = 0;
     let over = false;
     req.setEncoding('utf8');
     req.on('data', chunk => {
       if (over) return;
-      body += chunk;
-      if (Buffer.byteLength(body, 'utf8') > limit) {
+      // The cap is counted from the CHUNK, not by measuring the string accumulated so far: `Buffer.byteLength(body)`
+      // walks and encodes the whole body again on every chunk, so a request being refused for its size was also the
+      // most expensive one to read — quadratic in the number of chunks, exactly while refusing it.
+      bytes += Buffer.byteLength(chunk, 'utf8');
+      if (bytes > limit) {
         over = true;
         body = '';
         // Answer now rather than waiting for the rest of a body that has already been refused: a client that keeps
         // sending must not hold the route open, and the remaining chunks are dropped by the guard above either way.
         resolve(undefined);
+        return;
       }
+      body += chunk;
     });
     req.on('end', () => { resolve(over ? undefined : body); });
     req.on('error', () => { resolve(undefined); });

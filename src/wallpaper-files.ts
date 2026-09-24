@@ -83,24 +83,32 @@ export function resolveWallpaperFile(dir: string, rawName: string): string | und
   return target.startsWith(root + sep) ? target : undefined;
 }
 
-/** Every image in the folder, newest first. A missing folder is an empty list, not an error. */
-export async function listWallpapers(dir: string): Promise<WallpaperEntry[]> {  let entries;
+/**
+ * Every image in the folder, newest first. A missing folder is an empty list, not an error.
+ *
+ * The `stat`s run together rather than one after another: a folder with a few hundred pictures was a few hundred
+ * sequential awaits, each one a round trip to the filesystem for a number the listing could not carry. The results are
+ * collected in the listing's order and sorted afterwards, so the answer does not depend on which stat finished first.
+ */
+export async function listWallpapers(dir: string): Promise<WallpaperEntry[]> {
+  let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
-  const found: WallpaperEntry[] = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || !isWallpaperName(entry.name)) continue;
+  const files = entries.filter(entry => entry.isFile() && isWallpaperName(entry.name)).map(entry => entry.name);
+  const stated = await Promise.all(files.map(async (name): Promise<WallpaperEntry | undefined> => {
     try {
-      const info = await stat(join(dir, entry.name));
-      found.push({ name: entry.name, bytes: info.size, mtimeMs: Math.round(info.mtimeMs) });
+      const info = await stat(join(dir, name));
+      return { name, bytes: info.size, mtimeMs: Math.round(info.mtimeMs) };
     } catch {
       // A file that vanished between the listing and the stat is simply not offered.
+      return undefined;
     }
-  }
-  return found.sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name));
+  }));
+  return stated.filter((entry): entry is WallpaperEntry => entry !== undefined)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name));
 }
 
 /**

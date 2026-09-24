@@ -364,6 +364,12 @@ const cases = [
     replace: 'if (false) {',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
+  {
+    label: 'the second meta.diffs normaliser put back, so the row can advertise a diff the pane will not show',
+    search: 'function diffHunksOf(meta) {',
+    replace: 'function diffHunksOf(meta, extra) {',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
 ];
 
 let failed = 0;
