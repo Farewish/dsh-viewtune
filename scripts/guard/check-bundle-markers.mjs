@@ -714,6 +714,11 @@ const markers = [
     // `isConnected` is what keeps the reason the query was there: a detached box measures as zeros.
     bundle.includes('if (column !== null && !column.isConnected) column = document.querySelector')
     && !bundle.includes('const box = document.querySelector(')],
+  ['a document with <html> but no <head> still gets the theme bridge and the height reporter', () =>
+    // Such a document is legal HTML — the browser infers a head — and returning it verbatim, which is what it did, skipped
+    // both of the things this function exists for. What is pinned is the INJECTION: reverting to `return trimmed;` takes
+    // this call out of the artifact and fails here.
+    bundle.includes('trimmed.replace(/<html([^>]*)>/i,')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

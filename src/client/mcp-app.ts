@@ -118,7 +118,11 @@ export function ensureHtmlDocument(rawHtml: string, initialTheme: 'dark' | 'ligh
     if (/<head[\s>]/i.test(trimmed)) {
       return trimmed.replace(/<head([^>]*)>/i, `<head$1>\n  ${themeScript}`);
     }
-    return trimmed;
+    // A document with <html> and no <head> is perfectly legal HTML — the browser infers a head for it — and returning it
+    // verbatim, which is what this did, silently skipped BOTH of the things this function exists for: the theme bridge
+    // and the height reporter. Such a frame never followed a dark/light switch and never resized to its content, and the
+    // doc above promised exactly those. The head goes where the browser would have inferred it.
+    return trimmed.replace(/<html([^>]*)>/i, `<html$1>\n<head>\n  ${themeScript}\n</head>`);
   }
   return `<!DOCTYPE html>
 <html lang="zh-CN" data-theme="${initialTheme}" class="${isDark ? 'dark' : ''}">

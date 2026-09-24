@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (a head-less document gets its bridge, and three audit verdicts)
+
+**三条"仍未核实"的审计条目核实完毕：一条真、两条不成立；真的那条修掉，两条不成立的证据留在代码旁边。**
+
+- **真的那条（S3）**：`ensureHtmlDocument` 对"有 `<html>` 但**没有** `<head>`"的文档**原样返回**——而那样的文档是完全合法的 HTML（浏览器会自己补一个 head），于是这个函数存在的两件事**一件都没发生**：主题桥与高度上报 ⇒ 这样的 iframe 永远不跟随明暗切换、也永远不按内容调整高度，而它自己的文档注释承诺的正是这两件事 ✗⇒✓。现在 head 插在**浏览器本来会推断出它的位置**，并加了一条测试钉住三件事（主题桥、`ui/resize`、原文未被改动）✓。守护一条 marker（钉住那次注入；退回 `return trimmed;` 就会失败）+ 一个反向用例 ✓。
+- **不成立 ①（F2："`groupNodes`/`readerFlow` 每个 chunk 重建"）**：`groups` 挂在 `[order, nodes, timeline]` 上，而这三者跨文本增量**身份不变**；`flow` 同样挂在 `[nodes, group, mainKeys, turn]` 上。而"一个 chunk 必然重渲染 TurnGroup"也是错的——每增量重渲染的是**读取正在增长那个节点**的 seat（`AssistantNode`），这正是设计。证据写进了 `projection.ts` 那行注释旁边，免得下次再被读反 ✓。
+- **不成立 ②（B3："导航项身份随每个增量抖动"）**：上游 `items()` 返回**缓存数组**，`touch()` 只在项目**真的不同**时才换数组（逐字段比较），而项目里的 `response` 是**截断预览**（`preview(…, RESPONSE_PREVIEW_LIMIT)`）⇒ 抖动只在每条回答开头那约 120 字符内发生、之后稳定。机制真实、**有界**，而且是上游的发布行为 ⇒ 不改（我们的选择器消费它；为这点代价重做 rail 的选择器不划算）✓。
+- **A4 那条（`measure()` 里第二次 `text.offsetHeight`）**：核实后**保留并注释**——两次读之间有一次高度写入，它可能让端口的滚动条出现或消失，而滚动条改变文本的**宽度**、于是重新折行；比较对象是预览高度而不是端口高度，所以只有折行能改变这个答案。审计把它读成"多余的一次读"，它其实是那笔交易里便宜的一侧 ✓。
+
 ## Unreleased (the focused card is eased into each new line when the reader asked for 滑行)
 
 **「焦点思考展开」的高度增长现在会缓入——但只在「跟随到最新」是「逐帧滑行」时，并且仍然受「动效」与系统 reduced-motion 管。**

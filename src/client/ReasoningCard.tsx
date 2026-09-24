@@ -342,6 +342,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         focusHeight.current = 0;
         port.style.height = '';
       }
+      // Read again rather than reusing the height taken at the top of this function: a height write above can put the
+      // port's scrollbar in or out, and a scrollbar changes the text's WIDTH, which rewraps it. The comparison is against
+      // the preview height rather than the port's, so only a rewrap can move this answer — which is the one case the
+      // second read is for. An audit read it as a redundant read; it is the cheap side of that trade.
       const overflowing = text.offsetHeight > previewHeight + 1;
       if (overflowing !== lastOverflow) { lastOverflow = overflowing; setOverflow(overflowing); }
       lastPainted = paintedOffset();

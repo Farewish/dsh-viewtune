@@ -76,6 +76,18 @@ test('ensureHtmlDocument wraps bare fragments and preserves complete documents w
   assert.ok(wrapped.includes(fragment));
 });
 
+test('a document with <html> and no <head> still gets the bridge and the height reporter', () => {
+  // Legal HTML — the browser infers a head for it — and this used to be returned verbatim, which skipped both the theme
+  // listener and the resize reporter: the frame never followed a theme switch and never resized to its content, while
+  // the doc comment promised exactly those two things.
+  const headless = '<!DOCTYPE html>\n<html lang="en"><body><p>hi</p></body></html>';
+  const processed = ensureHtmlDocument(headless, 'dark');
+  assert.ok(processed.includes('applyTheme'), 'the theme bridge');
+  assert.ok(processed.includes('ui/resize'), 'the height reporter');
+  assert.ok(processed.includes('<body><p>hi</p></body>'), 'and the document itself is untouched');
+  assert.ok(processed.indexOf('<head>') < processed.indexOf('<body>'), 'the head goes where the browser would infer it');
+});
+
 test('markdown parsing correctly extracts MCP App code fence and prepares for McpAppFrame mounting', () => {
   const markdown = `
 这里是为您生成的方案评测器，请在下方直接点击交互：

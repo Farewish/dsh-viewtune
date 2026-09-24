@@ -6,6 +6,12 @@ export interface ReaderGroup { key: string; turn: number | null; keys: readonly 
 export interface TurnBoundary { status: 'open' | 'closed' | 'unknown'; reason: string | null; latestStep: number; closingStep: number | null }
 
 // Run on structural publication, not on each text delta. Node seats subscribe by key.
+//
+// That is a claim about where this is CALLED from, so it is worth the evidence: Reader holds `groups` in a memo keyed on
+// `order`, the node store and `timeline`, and those three keep their identity across a text delta — only the growing
+// node's own object is replaced — so this runs when the structure moves. The per-delta re-render is one node SEAT
+// (`AssistantNode`, which selects its own node), not the turn group around it, and `flow` is held the same way. An audit
+// read the opposite into this line; the memos are the answer.
 export function groupNodes(order: readonly string[], get: (key: string) => ChatConversationViewNode | undefined): ReaderGroup[] {
   const groups: ReaderGroup[] = [];
   const seenTurns = new Set<number>();
