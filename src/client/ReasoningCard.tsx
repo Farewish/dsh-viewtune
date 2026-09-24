@@ -329,7 +329,11 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * pre-grant one at the moment of the grant.
      */
     const compensateHeight = (): void => {
-      const rendered = card?.offsetHeight ?? 0;
+      // A FRACTIONAL height, not `offsetHeight`: the stylesheet eases this box's height in glide mode, so between two
+      // frames the layout moves by a fraction of a pixel while `offsetHeight` reports a rounded integer. Charging the
+      // scroll in whole pixels against a smooth change is a step of up to a pixel every frame — visible as a tremble at
+      // the card's bottom edge — where the rect reports exactly what the layout did.
+      const rendered = card?.getBoundingClientRect().height ?? 0;
       const grew = rendered - focusRendered.current;
       focusRendered.current = rendered;
       if (!focusedRef.current || grew <= 0) return;

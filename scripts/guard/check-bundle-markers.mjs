@@ -499,7 +499,7 @@ const markers = [
     // The measured thing is the CARD, not the viewport whose height is written: the reading row under the viewport is
     // part of the card, appears the moment the card overflows, and pushing that down uncompensated left the card's own
     // bottom below the visible area (the page's tail-follow is suspended while a card holds the focus).
-    && bundle.includes('const rendered = card?.offsetHeight ?? 0;')
+    && bundle.includes('const rendered = card?.getBoundingClientRect().height ?? 0;')
     && bundle.includes('const grew = rendered - focusRendered.current;')
     && bundle.includes('if (!focusedRef.current || grew <= 0) return;')
     && bundle.includes('scroller.scrollTop += grew')],

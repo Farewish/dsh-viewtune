@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (the card's bottom stops trembling while it grows)
+
+**读者确认「卡片底部不完整」已消失，但报了一个新症状：卡片**长高时**底部会微微颤动。**
+
+- **候选一：两个锚定权威在互拉。** 宿主的滚动容器没有任何 `overflow-anchor` 规则 ⇒ 浏览器默认的 scroll anchoring 是**开着**的，而这个视图**自己**写 `scrollTop`（跟随器的锚点补偿、以及焦点补偿）。于是每一次补偿写完，浏览器的锚定把锚点拉回原位、又调整一次 ⇒ 每帧互相修正一次，读起来就是"长高时的微颤" ✓。改法是把我们整棵子树的锚定关掉（`.root { overflow-anchor: none }`，与 `.reasonViewport` 同一个理由），**只作用于我们的内容**：宿主自己的会话视图没有挂载这个 root，所以那边一切照旧 ✓。
+- **候选二：补偿按整像素跳，而布局在按小数移动。** 滑行模式下的高度是**缓动**的，一帧内布局可能只移动 0.4px，而 `offsetHeight` 报的是**取整**后的整数 ⇒ 补偿以最多 1px 的台阶追赶一个平滑变化，画面上就是底边以不均匀的步长微跳 ✓。改成读 `getBoundingClientRect().height`（小数，正是布局做的那件事）✓。
+- 两条都是**独立成立**的（各自都有理由，不是碰运气），而且都是**我们自己的元素与代码**。若颤动仍在，下一步是探针采样（不再推断）✓。
+- 守护：那条 marker 与反向用例里的形状随之更新（`offsetHeight` → `getBoundingClientRect().height`）✓；反向自检 42 例全过 ✓。
+
 ## Unreleased (the focus closes the tail gap it was granted in)
 
 **焦点思考展开的第二次修复。读者的重述把机制钉死了，而且它和第一次不是同一个原因：第一次是"补偿量错了盒子"，这一次是"锚定的那个位置本身看不见"。**

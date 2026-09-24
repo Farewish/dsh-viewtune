@@ -32,7 +32,14 @@
   padding: var(--reader-top-pad) var(--reader-inline-pad) 24px;
   min-width: 0;
   flex: 0 0 auto;
-  overflow-anchor: auto;
+  /* The reading view is its own anchoring authority, so the browser's is off for this whole subtree.
+     Chrome's scroll anchoring is a second mechanism that adjusts `scrollTop` when the content above the anchor changes
+     size — and this view writes `scrollTop` itself, deliberately: the follower's anchor compensation while the reader
+     holds their place, and the focus compensation while a card grows. Two authorities correcting the same scroll is a
+     fight, and a fight at this scale reads as a micro-tremble while the card grows. `.reasonViewport` opts out for the
+     same reason, and the host leaves its own scroller at the default, so this is scoped to our content: with the host's
+     conversation view there is no reading view mounted and nothing here applies. */
+  overflow-anchor: none;
   container-type: inline-size;
 }
 .column { max-width: var(--dsh-chat-content-width, 748px); width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
