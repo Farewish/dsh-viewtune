@@ -145,5 +145,18 @@ if (!keep) {
   rmSync(join(scratch, 'node_modules'), { force: true });
   rmSync(scratch, { recursive: true, force: true });
 }
-console.log(bad === 0 ? '\nREBUILD REPRODUCES THE SHIPPED SHAPE' : `\nREBUILD DIVERGES: ${String(bad)} difference(s)`);
+/**
+ * Say what was compared, and what was NOT.
+ *
+ * This used to print "REBUILD REPRODUCES THE SHIPPED SHAPE" beside two bundles of visibly different length, which reads
+ * as a byte-for-byte claim and is not one: the CSS-module class hash is derived from the artifact's ABSOLUTE PATH
+ * (measured: the same stylesheet in two directories gives `voucca_` and `ED26sW_`), so no rebuild in a scratch directory
+ * can produce identical bytes. What is compared is the contract-bearing shape — registration id, requires, exports, the
+ * CSS literals, and every stylesheet rule with the build-specific naming normalised away — and that is what a rebuild
+ * has to reproduce.
+ */
+console.log(`\nbyte lengths: shipped ${String(shipped.length)} chars | rebuilt ${String(rebuilt.length)} chars — NOT compared byte for byte: the class hash in the stylesheet comes from the artifact's own path, so the two files cannot be identical and pretending otherwise hid what this check actually covers.`);
+console.log(bad === 0
+  ? 'REBUILD REPRODUCES THE SHIPPED SHAPE (registration id, require() specifiers, exports, CSS literals, tagIds, and every stylesheet rule — with build-specific naming normalised)'
+  : `REBUILD DIVERGES: ${String(bad)} difference(s)`);
 process.exitCode = bad === 0 ? 0 : 1;

@@ -2,10 +2,12 @@
  * Runs the artifact-level guards against this repository's own `lib/client.js`.
  *
  * These are not unit tests. `npm test` exercises the sources through Node's test runner; these
- * assert the *compiled* bundle the Host actually serves — the module-table registration, the
- * injected CSS literals, the turn order the reader renders, and the correspondence between
- * `src/` and the committed artifact. They exist because most of this plugin's history was spent
- * editing the built file directly, where a mistake is invisible to any source-level check.
+ * assert the *compiled* bundles the Host actually serves — `lib/client.js` (the module-table
+ * registration, the injected CSS literals, the turn order the reader renders, the correspondence
+ * between `src/` and the committed artifact) and `lib/dsh-viewtune.js` (the host routes' caps,
+ * settle paths and cache contract, which nothing checked before `check-host-markers.mjs`). They
+ * exist because most of this plugin's history was spent editing the built file directly, where a
+ * mistake is invisible to any source-level check.
  *
  * Split from `npm test` on purpose:
  *   - `npm test` needs no build and should stay fast;
@@ -36,6 +38,7 @@ const GUARDS = [
   ['selftest-pill-scope.mjs', 'that checker is able to fail (it is fed a known-bad bundle)'],
   ['check-stylesheet-classes.mjs', 'every CSS-module class the sources use has a rule, and the checker is able to fail'],
   ['check-settings-fallbacks.mjs', 'every boolean setting default and its defensive reader agree, bar the declared inversions'],
+  ['check-host-markers.mjs', 'the HOST bundle keeps its own invariants (body caps, settle paths, revalidation)'],
   ['verify-session-changes.mjs', 'the reading-view changes survive compilation'],
   ['compare-source-and-bundle.mjs', 'source and artifact agree on every decision this fork made'],
   ['audit-source-edits.mjs', 'no dead branches, leftovers, or drift between the two'],

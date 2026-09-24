@@ -219,7 +219,10 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
     }),
     persist: 'dsh.reader.v1',
     actions: {
-      setExpanded: (draft, key: string, value: boolean) => { draft.expanded[key] = value; },
+      // `??= {}` for the same reason the actions below do it: persistence replaces the WHOLE state rather than merging
+      // into `init`, so a record written by a build without this key arrives with `expanded` missing and this write
+      // would throw on `undefined[key]` — inside a store update, which takes the reading view down with it.
+      setExpanded: (draft, key: string, value: boolean) => { (draft.expanded ??= {})[key] = value; },
       setMotion: (draft, value: boolean) => { draft.motion = value; },
       setGlass: (draft, value: boolean) => { draft.glass = value; },
       setGlassPart: (draft, id: string, value: number) => {

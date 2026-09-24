@@ -55,6 +55,11 @@ export function wallpaperDimOf(value: unknown): number {
  * do it, so the URL has to change with the file or the browser keeps showing the old bitmap. The name
  * is percent-encoded, which is also what keeps a `"` in a file name from escaping the `url("…")` the
  * stylesheet receives.
+ *
+ * The revision is optional because only the picker has one: it reads the folder listing, so it can key each thumbnail by
+ * its entry's mtime. The reading page paints the CHOSEN wallpaper and never lists the folder, so it calls this without
+ * a revision and depends on the host route's own revalidation instead (`no-cache` plus an `ETag` over size+mtime, see
+ * `dsh-viewtune.ts`) — the two paths to freshness had to meet somewhere, and the route is the only place both see.
  */
 export function wallpaperUrl(name: string, revision?: number): string {
   const path = `/better-display/wallpaper/${encodeURIComponent(name)}`;

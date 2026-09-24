@@ -154,8 +154,11 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
     : category === 'todo' ? '待办'
     : category === 'delivery' ? '交付文件'
     : name;
+  // `content` reads the same field names `DIFF_NEW_FIELDS` does, and it did not: `new_str` was missing here, so
+  // `str_replace_editor` — which spells its replacement `new_str` — showed a +N/-M badge while the body it is supposed
+  // to describe ("the tool returned; this is what it wrote") never rendered, because `content` stayed null.
   return { name, raw, args, category, title, target: target ?? command ?? stringValue(args, 'query', 'pattern', 'url'), command,
-    cwd: stringValue(args, 'workdir', 'cwd'), content: stringValue(args, 'content', 'new_string', 'newText', 'file_text') };
+    cwd: stringValue(args, 'workdir', 'cwd'), content: stringValue(args, 'content', 'new_string', 'new_str', 'newText', 'file_text') };
 }
 
 export function preparingLabel(name: string): string {

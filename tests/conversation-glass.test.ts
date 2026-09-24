@@ -76,6 +76,14 @@ test('the page claims code paper and the user bubble, and no other dial', () => 
   assert.ok(css.includes('--dsw-alias-markdown-code-block-banner:'));
   assert.ok(css.includes('--dsw-alias-markdown-inline-code:'));
   assert.ok(css.includes('[class*="_bubble"]'));
+  // …and the bubble rule carries the exclusion too. Matching by a class-name SUBSTRING reaches every element on the
+  // page whose class contains it, so "this plugin's own bubble is named `…_user`" was a statement about today's name
+  // rather than a boundary: renaming that local would have let the conversation switch into the reading view.
+  const bubbleRule = css.split('\n').find(line => line.includes('[class*="_bubble"]'));
+  assert.ok(
+    bubbleRule !== undefined && bubbleRule.includes(':not([data-dsh-better-display], [data-dsh-better-display] *)'),
+    `the bubble rule is not excluded from the reading view: ${String(bubbleRule)}`,
+  );
   assert.ok(css.includes('--glass-code'));
   assert.ok(css.includes('--glass-user'));
   assert.ok(css.includes('--glass-diff'));

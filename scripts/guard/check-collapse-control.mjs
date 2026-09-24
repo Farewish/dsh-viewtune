@@ -174,7 +174,17 @@ function wantAsSource(label, needle) {
 }
 want('current turn state', 'const [currentTurn, setCurrentTurn] = (0, react.useState)(null);', 1);
 want('open set memo', 'const openTurnKeys = (0, react.useMemo)', 1);
-want('expansion read', 'state.expanded);', 1);
+/**
+ * The two expansion reads, and the fallback in each.
+ *
+ * Persistence replaces the WHOLE state instead of merging into `init` (the store's own comment says so), so a record
+ * written before per-turn expansion existed arrives with `expanded` absent — and both of these used to read it directly,
+ * inside a store selector, which is a render-time throw that replaces the entire reading view with an error placeholder.
+ * The fallback has to be an object of STABLE identity: this subscription is notified on every streamed chunk and compares
+ * by identity, so `?? {}` inline would re-render the reader once per delta.
+ */
+want('per-turn expansion read tolerates a missing key', 'state.expanded?.[choiceKey])', 1);
+want('turn-wide expansion read has a shared empty fallback', 'state.expanded ?? NO_CHOICES)', 1);
 /**
  * Assert the bundle carries AT LEAST as many occurrences as the decision needs.
  *

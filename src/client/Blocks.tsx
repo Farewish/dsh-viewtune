@@ -13,9 +13,40 @@ import css from './Reader.module.css';
 
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
-export class BlockBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+/**
+ * The notice a block that failed to render gets — and why it is not the last word.
+ *
+ * `failed` used to be sticky: a half-arrived payload that threw once during streaming kept the notice for the rest of the
+ * session, because nothing could clear it — the state was never reset, and this boundary's key is its index, which does
+ * not change when the payload finishes arriving. So a transient failure became permanent, and only switching views (which
+ * remounts the tree) brought the block back.
+ *
+ * A retry is bounded rather than a reset on every render: resetting whenever the parent re-renders would re-throw on
+ * every streamed delta for a block that is genuinely broken, filling the console with the same error and re-running the
+ * failing render per character. Three attempts over ~2.3s covers a payload completing; after that the notice is final,
+ * which is the honest answer for content the reading page cannot render at all.
+ */
+const BLOCK_RETRY_LIMIT = 3;
+const BLOCK_RETRY_MS = 750;
+
+export class BlockBoundary extends Component<{ children: ReactNode }, { failed: boolean; attempt: number }> {
+  state = { failed: false, attempt: 0 };
+  private retry: ReturnType<typeof setTimeout> | null = null;
   static getDerivedStateFromError() { return { failed: true }; }
+  componentDidUpdate(_prevProps: { children: ReactNode }, prevState: { failed: boolean; attempt: number }) {
+    // Only on the transition into failure: the retry's own reset must not schedule the next one, and `attempt` is what
+    // counts the resets, so a block that keeps failing walks towards the limit instead of looping.
+    if (!this.state.failed || prevState.failed) return;
+    if (this.state.attempt >= BLOCK_RETRY_LIMIT) return;
+    if (this.retry !== null) clearTimeout(this.retry);
+    this.retry = setTimeout(() => {
+      this.retry = null;
+      this.setState(state => ({ failed: false, attempt: state.attempt + 1 }));
+    }, BLOCK_RETRY_MS);
+  }
+  componentWillUnmount() {
+    if (this.retry !== null) clearTimeout(this.retry);
+  }
   render() {
     return this.state.failed ? <div className={css.notice}>此内容暂时无法在阅读页显示；原对话中的记录未受影响。</div> : this.props.children;
   }

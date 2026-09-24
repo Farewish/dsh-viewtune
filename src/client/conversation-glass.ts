@@ -82,7 +82,11 @@ export function conversationGlassCss(): string {
     `/* The user's bubble: the one surface on this page with a token of its own, and the reason this switch`,
     `   exists at all. Matched by the local name the host's chat package ends its bubble class with — this`,
     `   plugin's own bubble is a different local ("…_user"), so the reading view's copy keeps its own rule. */`,
-    `${GATE} [class*="_bubble"] {`,
+    // …and that was an argument from the CURRENT name, not a boundary: `[class*="_bubble"]` matches any class CONTAINING
+    // the word, anywhere in the document, and the reading view is only spared because its own bubble happens to be named
+    // `…_user` today. `COLUMN` states the real rule for this module — the conversation switch must not reach into the
+    // reading view — so this rule carries the same exclusion the column rules do, rather than depending on a rename.
+    `${GATE} [class*="_bubble"]:not([data-dsh-better-display], [data-dsh-better-display] *) {`,
     `  background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0, 0, 0, .08)) var(--glass-user, 25%), transparent);`,
     `}`,
   ].join('\n');

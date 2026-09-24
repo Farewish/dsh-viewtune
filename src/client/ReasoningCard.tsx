@@ -20,6 +20,17 @@ const WHEEL_IDLE_MS = 140;
  */
 const HEIGHT_CHASE_MS = 400;
 
+/**
+ * How many consecutive frames of a still layout end the chase before its deadline.
+ *
+ * The deadline above is the backstop; this is the actual end for the case that motivated it. A card asked for a height
+ * past the stylesheet's ceiling never reaches its target, so the equality test never fires and the whole 400ms is spent
+ * reading layout every frame for a box that stopped moving after the first one. One or two still frames are normal at
+ * the START of a transition (the style write has not been sampled yet); four is ~66ms, which no part of a 160ms ease
+ * can spend without moving the integer `offsetHeight` unless there is less than a pixel left to move.
+ */
+const CHASE_STILL_FRAMES = 4;
+
 /** One real transcript: reference transform while following, native scroll while reading. */
 export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, focusKey, focused, onFocusChange }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
@@ -349,12 +360,25 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // latter.
       if (port.offsetHeight === target) return;
       // The deadline is what ends it when the stylesheet's ceiling clamps the target, so a card past `min(60vh, 560px)`
-      // cannot leave a frame loop running for as long as it holds the focus.
+      // cannot leave a frame loop running for as long as it holds the focus. The still-frame count below is what usually
+      // ends exactly that case, and well before the deadline.
       const deadline = performance.now() + HEIGHT_CHASE_MS;
+      let still = 0;
+      let previous = port.offsetHeight;
       const step = (): void => {
         heightChase = 0;
         compensateHeight();
-        if (port.offsetHeight === target || performance.now() > deadline) return;
+        const rendered = port.offsetHeight;
+        if (rendered === target) return;
+        if (rendered === previous) {
+          // A frame in which the eased height did not move by so much as the integer this reads. See CHASE_STILL_FRAMES:
+          // the transition has either not been sampled yet or has finished at a height the browser refused to exceed.
+          if (++still >= CHASE_STILL_FRAMES) return;
+        } else {
+          still = 0;
+          previous = rendered;
+        }
+        if (performance.now() > deadline) return;
         heightChase = requestAnimationFrame(step);
       };
       heightChase = requestAnimationFrame(step);

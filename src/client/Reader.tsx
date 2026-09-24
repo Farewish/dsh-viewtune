@@ -70,6 +70,26 @@ type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
  */
 const NO_KEYS: readonly string[] = [];
 /**
+ * The one empty expansion map, shared so its identity is stable.
+ *
+ * `expanded` is written with `??= {}` because it can genuinely be ABSENT at runtime — persistence replaces the whole
+ * state rather than merging into `init`, so a record written before per-turn expansion existed arrives without the
+ * key (see `setExpanded` in store.ts). Reading it defensively here is what keeps that from being a throw inside a
+ * store selector, which takes the reading view down. A fresh `{}` at the call site would not do: this subscription
+ * is notified on every streamed chunk and compares by identity, so a new object each time is a render per delta.
+ */
+const NO_CHOICES: Record<string, boolean> = {};
+/**
+ * How long an outstanding timeline jump keeps retrying before it is dropped.
+ *
+ * The retry exists because the rows a jump had to LOAD arrive in the commit after the load resolves, and nothing announces
+ * that commit; it is retried from a layout effect instead. Unbounded, a request whose row never renders stayed set for the
+ * rest of the session — a `querySelector` over the transcript on every later commit, and a jump the reader had long stopped
+ * asking for the moment some unrelated render finally produced that row. The window is measured from the resolved load, so
+ * it covers a slow render rather than a slow load, and it is generous for exactly that reason.
+ */
+const REVEAL_RETRY_MS = 3000;
+/**
  * What the selection is asked about, in one scan.
  *
  * A module constant on purpose: `usePinnedSelections` re-registers its listener when this array's identity changes (it
@@ -529,7 +549,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
-  const expansionChoice = props.useStore(state => state.expanded[choiceKey]);
+  const expansionChoice = props.useStore(state => state.expanded?.[choiceKey]);
   const flowId = useId();
   const processButton = useRef<HTMLButtonElement>(null);
   const setExpanded = useCallback((value: boolean) => props.actions.setExpanded(choiceKey, value), [props.actions, choiceKey]);
@@ -936,7 +956,7 @@ export function Reader(props: ReaderProps) {
   const [currentTurn, setCurrentTurn] = useState<number | null>(null);
   // Expansion is read here exactly as TurnGroup reads it, so a turn held open by the
   // reader's own text selection counts too.
-  const expansionChoices = props.useStore(state => state.expanded);
+  const expansionChoices = props.useStore(state => state.expanded ?? NO_CHOICES);
   // The turn that is currently growing, if any — the same `status === 'open'` the status line and the wait clock read.
   // It answers three questions at once: whether the tail-follow has anything to keep up with (`live`), which turn
   // 「自动收起更早流程」 has to leave open, and when a NEW turn has started (which is when the earlier processes fold).
@@ -1195,12 +1215,17 @@ export function Reader(props: ReaderProps) {
     return true;
   }, [scroll.jump, scroll.release, timelineItems]);
   const [pendingReveal, setPendingReveal] = useState<number | null>(null);
+  const pendingRevealUntil = useRef(0);
   // Deliberately no dependency list: any commit may be the one that rendered the row — that is the whole point — and
   // this runs on Reader's own renders, which are structural rather than per streamed delta. A second navigation
   // replaces the request instead of queueing behind the first.
   useLayoutEffect(() => {
     if (pendingReveal === null) return;
-    if (revealTurn(pendingReveal)) setPendingReveal(null);
+    if (revealTurn(pendingReveal)) { setPendingReveal(null); return; }
+    if (performance.now() > pendingRevealUntil.current) {
+      setPendingReveal(null);
+      console.warn('[dsh-better-display] jump target never rendered:', pendingReveal);
+    }
   });
 
   // Navigation handler (supports loaded jump & unloaded loadThrough).
@@ -1223,7 +1248,13 @@ export function Reader(props: ReaderProps) {
         await props.loadOlder();
       }
       // The commit this await schedules is the one that renders the rows; the effect above lands on them.
+      pendingRevealUntil.current = performance.now() + REVEAL_RETRY_MS;
       setPendingReveal(item.turn);
+    } catch (error) {
+      // A rejected load is an ordinary outcome (the host may refuse or the request may be superseded), and this runs as a
+      // click handler: without the catch it surfaced as an unhandled rejection with nothing to say where it came from.
+      // The 加载更早记录 button in this same file has always caught; this path had not.
+      console.warn('[dsh-better-display] jump load failed:', error);
     } finally {
       setBusyTurn(null);
     }
@@ -1244,7 +1275,10 @@ export function Reader(props: ReaderProps) {
     if (appendedUser || appendedSubmission) {
       scroll.jump();
     }
-  }, [lastKey, lastNode?.kind, lastSubmissionId, scroll]);
+    // `scroll.jump`, not `scroll`: the hook returns a fresh object every render, so depending on it re-ran this effect on
+    // every render of the reading view (the two refs above then made it a no-op — the work was the dependency, not the
+    // body). The two callbacks the hook returns are stable, which is what this effect actually needs.
+  }, [lastKey, lastNode?.kind, lastSubmissionId, scroll.jump]);
 
   const visibleSubmissions = useMemo(() => {
     if (!pendingSubmissions || pendingSubmissions.length === 0) return [];
@@ -1252,7 +1286,7 @@ export function Reader(props: ReaderProps) {
   }, [pendingSubmissions]);
 
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.4.1" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
-    <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
+    <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
     <div className={css.column} data-chat-flow="">

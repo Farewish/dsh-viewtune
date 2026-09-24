@@ -94,6 +94,35 @@ test('a failed write is swallowed, and the next change still goes out', async ()
   assert.deepEqual(saved, [{ dim: 2 }]);
 });
 
+test('a record the host already stored is not sent again, so an unrelated change costs no write', async () => {
+  const saved: unknown[] = [];
+  const writer = createSettingsWriter(async state => { saved.push(state); return true; }, 1);
+  writer.push({ motion: true, wallpaperDim: 51 });
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  assert.deepEqual(saved, [{ motion: true, wallpaperDim: 51 }]);
+  // The same bytes again — which is exactly what opening one thinking card produces, because the record is the state
+  // minus `expanded`. Each of these used to be a PUT, and each accepted PUT re-paints the window scope.
+  writer.push({ motion: true, wallpaperDim: 51 });
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  assert.deepEqual(saved, [{ motion: true, wallpaperDim: 51 }]);
+  // A real change is still written.
+  writer.push({ motion: false, wallpaperDim: 51 });
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  assert.deepEqual(saved, [{ motion: true, wallpaperDim: 51 }, { motion: false, wallpaperDim: 51 }]);
+});
+
+test('a write that did NOT land is not deduplicated away', async () => {
+  const attempted: unknown[] = [];
+  // `false` is what `saveHostSettings` answers for a refusal and for a failed request; the same record pushed again must
+  // reach the host, or one hiccup would leave the record permanently behind this browser's copy.
+  const writer = createSettingsWriter(async state => { attempted.push(state); return false; }, 1);
+  writer.push({ motion: true });
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  writer.push({ motion: true });
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  assert.deepEqual(attempted, [{ motion: true }, { motion: true }]);
+});
+
 test('a read answers three ways, and a failed one is not an empty one', async () => {
   const original = globalThis.fetch;
   const answer = (body: unknown, ok = true) => (async () => ({ ok, json: async () => body })) as unknown as typeof fetch;

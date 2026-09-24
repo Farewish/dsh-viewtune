@@ -149,12 +149,14 @@ dsh plugin --profile web remove dsh-viewtune
 浏览器半边是预编译的 `lib/client.js`，Host 启动时直接加载它。仓库把编译结果一并提交，所以**安装与分享都不需要构建**：
 
 ```sh
-npm ci                # 按仓库里的 package-lock.json 装依赖
-npm run build         # src/ -> lib/client.js 与 lib/dsh-viewtune.js
-npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
+npm ci --legacy-peer-deps   # 按仓库里的 package-lock.json 装依赖（为什么必须带这个参数见下）
+npm run build               # src/ -> lib/client.js 与 lib/dsh-viewtune.js
+npm run typecheck           # tsc -p tsconfig.json --noEmit，对着真实声明检查
 ```
 
-用 `npm ci` 而不是 `npm install`：`tsdown` / `lightningcss` / `typescript` 都写在 `^` 区间上，只有锁文件能保证在别的机器上装出**能复现当前 `lib/`** 的同一套工具链——`npm run guard` 里的 `verify-build` 正是这么比的。只有动了依赖才用 `npm install` 回写锁文件。
+用锁文件而不是裸 `npm install`：`tsdown` / `lightningcss` / `typescript` 都写在 `^` 区间上，只有锁文件能钉住**能复现当前 `lib/`** 的那套工具链——`npm run guard` 里的 `verify-build` 正是这么比的。只有动了依赖才用 `npm install` 回写锁文件。
+
+`--legacy-peer-deps` 是**上游包的 peer 区间互相打架**造成的，不是本仓库能改掉的东西：这个版本的各种 `@deepseek-ai/dsh-*` 开发依赖（以及它们的 peer）钉在 `0.1.5-rc.2`，而其中若干包把 peer 写成 `^0.1.5-rc.2`，注册表上现在解析到 `0.1.5-rc.3`，那个版本又要求 `@deepseek-ai/dsh-session@^0.1.5-rc.3`。于是裸 `npm ci` 会以 `ERESOLVE` 失败——锁文件本身是完整可解的（`lockfileVersion: 3`，21 个开发依赖与 9 个依赖全部在册，工具链版本与构建 `lib/` 的那棵树一致）。这个参数只是让 npm 不再拒绝这组 peer 声明。
 
 上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器取 `externalClientBundle`，所以在克隆出来的仓库里跑不起来。本仓库把它的真身（官方预设的 `clientBundle()`，Harness tag `dsh-v0.1.5-rc.2`）移植成了 [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs)。产物契约不变，针对产物的断言依然有效。
 
@@ -176,13 +178,19 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit，对着真实声明检查
 分两层，因为它们回答的是不同的问题：
 
 ```sh
-npm test        # 源码层：Node 自带测试跑当前全部测试文件（31 个）
-npm run guard   # 产物层：19 条不变式，全部针对构建出来的 lib/client.js
+npm test        # 源码层：Node 自带测试跑当前全部测试文件（35 个）
+npm run guard   # 产物层：22 条不变式，针对构建出来的 lib/client.js 与 lib/dsh-viewtune.js
 ```
 
-`npm run guard` 检查的是**产物**：模块表注册 id 与 `require()` 集合、注入的 CSS 字面量是否完整、轮次渲染顺序、收起控件的形状与淡出、工具栏几何、设置面板的三页与滑块的宽度、自带壁纸的三处拼写与文件本身，以及**`src/` 与产物的对应关系**与**「重新构建仍能复现已提交的形状」**。最后一条是这类仓库唯一能做的「产物与源码一致」证明——字节相等不可用（压缩器输出本就不稳定），所以它比对的是契约面与样式表规则。
+`npm run guard` 检查的是**产物**：模块表注册 id 与 `require()` 集合、注入的 CSS 字面量是否完整、轮次渲染顺序、收起控件的形状与淡出、工具栏几何、设置面板的三页与滑块的宽度、自带壁纸的三处拼写与文件本身、**Host 半边**的几条路由决定（两个未鉴权请求体的上限、请求中断时不会留下永不落地的 promise、写盘失败必须回失败、壁纸路由的重新校验与 `ETag`），以及**`src/` 与产物的对应关系**与**「重新构建仍能复现契约形状」**。最后一条是这类仓库唯一能做的「产物与源码一致」证明——两边的字节永远不同（`lib/client.js` 里的 CSS 类名哈希由产物自身的绝对路径决定，实测同一份样式表在两个目录里得到 `voucca_` 与 `ED26sW_`），所以它比对的是注册 id、`require()` 集合、导出、CSS 字面量与每一条样式表规则（名称差异先归一化），并在输出里把两个长度都列出来，不再用一句「复现」暗示字节相等。
 
-这套做法有个前提值得说明：**能解析（`node --check` 通过）不等于正确**。本仓库的历史大量是直接改压缩产物，出现过语法完全合法、却因为一个引用被删掉而在运行时抛错的情况——那类错误只有「名字是否有声明」这一层检查能抓住，或者「重新构建一次」能暴露。两条都在 `npm run guard` 里，而且每条新断言都做过**反向自检**（喂一份动过手脚的产物，确认它真的会失败）。
+这套做法有个前提值得说明：**能解析（`node --check` 通过）不等于正确**。本仓库的历史大量是直接改压缩产物，出现过语法完全合法、却因为一个引用被删掉而在运行时抛错的情况——那类错误只有「名字是否有声明」这一层检查能抓住，或者「重新构建一次」能暴露。两条都在 `npm run guard` 里，而且每条新断言都做过**反向自检**（喂一份动过手脚的产物，确认它真的会失败）。这份反向自检表就在仓库里，可以自己跑：
+
+```sh
+node scripts/guard/negcheck-shape-markers.mjs   # 52 个用例：逐个把产物改回修复前的形状，要求对应断言全部失败
+```
+
+它**不**进 `npm run guard`：每个用例都要起一到三个新的 guard 进程，整表是分钟级，而 `npm run guard` 是每次构建后都要跑的快速闸门。表里出现 `SKIP` 会被算作失败——那说明产物已经没有被断言的那个形状（断言在空跑），或者已经有被改回去的形状（用例测的不是它说的东西）。
 
 ## 许可
 

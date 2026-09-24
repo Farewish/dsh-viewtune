@@ -3,12 +3,23 @@ import {
   type CSSProperties, type MouseEvent, type PointerEvent,
 } from 'react';
 import type { TimelineItem } from './timeline.js';
+import { useMotionAllowed } from './motion.js';
 import css from './TimelineRail.module.css';
 
 interface TimelineRailProps {
   items: readonly TimelineItem[];
   activeTurn: number | null;
+  /** The tick whose history load is in flight. */
   busyTurn?: number | null;
+  /**
+   * The turn that is RUNNING right now.
+   *
+   * A separate prop from `busyTurn` because the two are different events that the rail had been conflating: the pulse is
+   * specified — here and in CHANGELOG — as 「忙碌刻度在轮次运行期间一直脉动」, and the running turn was the one thing never
+   * passed in. So the tick pulsed while a history load was in flight and stayed still while a turn streamed, which is the
+   * signal inverted. Both pulse; only the load adds `aria-busy`, because that is the one that is waiting on something.
+   */
+  runningTurn?: number | null;
   onNavigate: (item: TimelineItem) => void;
 }
 
@@ -70,10 +81,13 @@ export const TimelineRail = memo(function TimelineRail({
   items,
   activeTurn,
   busyTurn,
+  runningTurn,
   onNavigate,
 }: TimelineRailProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [scrollState, setScrollState] = useState<RailScrollState>(RAIL_AT_REST);
+  // The system's own animation preference, which the smooth scroll below never consulted.
+  const allowMotion = useMotionAllowed(true);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const pointerInsideRef = useRef(false);
   const previewId = useId();
@@ -106,12 +120,15 @@ export const TimelineRail = memo(function TimelineRail({
     if (viewHeight <= 0 || (markTop >= viewTop + FADE_PX && markTop <= viewTop + viewHeight - FADE_PX)) return;
     const target = Math.max(0, markTop - viewHeight / 2);
     if (typeof scroller.scrollTo === 'function') {
-      scroller.scrollTo({ top: target, behavior: 'smooth' });
+      // The rail's own movement, gated like every other one this plugin owns: a reader who asked the system for less
+      // motion must not get a smooth scroll each time the active tick leaves the fade band. `auto` is the browser's
+      // instant jump — the same landing, without the animation.
+      scroller.scrollTo({ top: target, behavior: allowMotion ? 'smooth' : 'auto' });
     } else {
       scroller.scrollTop = target;
     }
     syncScrollState();
-  }, [activeTurn, items]);
+  }, [activeTurn, items, allowMotion]);
 
   if (items.length < 2) return null;
 
@@ -161,7 +178,11 @@ export const TimelineRail = memo(function TimelineRail({
         >
           <div className={css.marks}>
             {items.map((item, index) => {
-              const isBusy = busyTurn === item.turn;
+              // Two sources, one pulse: the turn that is streaming (the documented meaning) and the tick whose history
+              // load has not come back yet. `loading` is what `aria-busy` reports — a running turn is busy, but it is
+              // not waiting on the reader's click.
+              const loading = busyTurn === item.turn;
+              const isBusy = loading || runningTurn === item.turn;
               const isActive = activeTurn === item.turn;
               const isUnloaded = item.anchor.kind === 'unloaded';
 
@@ -228,7 +249,7 @@ export const TimelineRail = memo(function TimelineRail({
                     className={markClasses.join(' ')}
                     aria-label={`第 ${item.turn + 1} 轮`}
                     aria-current={isActive ? 'true' : undefined}
-                    aria-busy={isBusy ? 'true' : undefined}
+                    aria-busy={loading ? 'true' : undefined}
                     aria-describedby={hoveredIndex === index ? previewId : undefined}
                     onMouseDown={event => { event.preventDefault(); }}
                     onClick={(e) => {

@@ -295,13 +295,29 @@ export function apply(ctx: Context): void {
               json(res, 404, { ok: false, error: 'not a file' });
               return;
             }
-            res.writeHead(200, {
+            /**
+             * Revalidate every time, and give the browser something to revalidate WITH.
+             *
+             * `max-age=60` was the wrong half of the fix for "a replacement must show up": the client keys the URL by
+             * mtime only for the thumbnails, which read the folder listing — the wallpaper the reading page paints has
+             * no listing in hand, so it asked for the same URL and got the cached bytes for up to a minute. The etag is
+             * the file's identity, so an unchanged file costs one conditional request and answers 304, while a replaced
+             * one answers 200 immediately. `no-cache` does not mean "do not store"; it means "ask before using".
+             */
+            const etag = `W/"${String(info.size)}-${String(Math.round(info.mtimeMs))}"`;
+            const headers = {
               'Content-Type': contentTypeOf(file),
               'Content-Length': String(info.size),
-              // Short, because the reader replaces a wallpaper by dropping a new file under the same
-              // name; the client also keys the URL by the folder entry's mtime (see wallpaper.ts).
-              'Cache-Control': 'private, max-age=60',
-            });
+              'Cache-Control': 'private, no-cache',
+              ETag: etag,
+              'Last-Modified': new Date(info.mtimeMs).toUTCString(),
+            };
+            if (req.headers['if-none-match'] === etag) {
+              res.writeHead(304, headers);
+              res.end();
+              return;
+            }
+            res.writeHead(200, headers);
             if (req.method === 'HEAD') {
               res.end();
               return;

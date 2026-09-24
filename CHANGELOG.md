@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.4.1 (the audit round: our own defects, the checks that pin them, and the verdicts that did not hold)
+
+**同时拿到的 586 行外部审查报告逐条读完。属于我们自己的缺陷全部改掉，改不掉的写明理由，审查里不成立的三条留下证据。**
+
+**读者能看见的（高 / 中）**
+
+- **键盘打不开差异面板（H1）**：宿主那一行是 `role="button"` 的 disclosure，它的键盘处理**不看 `event.target`**；内层按钮上的 Enter/Space 冒泡上去被 `preventDefault()`，浏览器对按钮的默认激活被取消 ⇒ 键盘用户永远打不开差异面板，按回车反而折叠整行 ✗⇒✓。按钮自己的 `onKeyDown` 现在拦下 Enter/Space（只 `stopPropagation`，不 `preventDefault`），鼠标路径原有的 `stopPropagation` 保持不动 ✓。
+- **关页前的那次补写会丢（H2）**：`flush()` 只是同步发起一个普通 `fetch`，而 `pagehide`／卸载期间发起的请求不保证送达 ⇒ 防抖窗口内改完就关页的改动静默丢失，而两处注释都承诺「最后那一次永远不会丢」✗⇒✓。现在带 `keepalive: true`（它的 64KB 上限比设置记录大三个数量级，宿主本身也把记录限在 64KiB）✓。
+- **`state.expanded` 没有兜底（H4）**：持久化是整条 `setState` 替换而不是合并进 `init`（store 自己的注释写了），所以缺这个键的记录会让选择器在**渲染期**抛错、被宿主的错误边界换成整页占位；同文件里 `glassParts`／`shortcuts`／`glass` 都兜了，只有它没有 ✗⇒✓。两处读取改成 `state.expanded?.[choiceKey]` 与 `state.expanded ?? NO_CHOICES`，`setExpanded` 里 `(draft.expanded ??= {})`；`NO_CHOICES` 必须是**模块常量**——这个订阅每个流式分片都会被通知并按身份比较，内联 `{}` 等于每个分片重渲染一次 ✓。
+- **「忙碌刻度」接错了对象（M1）**：CSS 注释与本文档都写「轮次运行期间一直脉动」，而传进轨道的只有「跳转加载中」那个 turn ⇒ 真正在流式的轮次不脉动、反而在加载历史时脉动，信号正好反过来 ✗⇒✓。轨道新增 `runningTurn`，两者都脉动；`aria-busy` 只留给真正在等待的那一个 ✓。
+- **轨道的平滑滚动不看 reduced-motion（M2）**：全仓库唯一一处没有闸门的动效，而同一文件 CSS 的三行之下就有那条媒体查询 ✗⇒✓。改用同一套 `useMotionAllowed`：`behavior: allowMotion ? 'smooth' : 'auto'` ✓。
+- **差异角标说的不是它显示的数（M3）**：`diffTotals` 数的是**每一侧的整篇行数**，不是「改动行数」，所以改一行会显示「改动 812 行」✗⇒✓。`+N/-M` 的形状保留（宿主自己的惯例，且对 `write` 是准确的），`aria-label` 与 `title` 改成「新内容 N 行、原内容 M 行」并写明「按两侧全文统计，不是最小差异」✓。
+- **`new_str` 漏在一张字段表里（M4）**：角标用的 `DIFF_NEW_FIELDS` 有它，`content` 的读取列表没有 ⇒ `str_replace_editor` 有 +N/-M，而「工具写进去的正文」永远不渲染 ✗⇒✓。
+- **`NaN` 穿过了「只在 null 上加固」的守卫（M5）**：`typeof NaN === 'number'` 且 `NaN !== null` ⇒ 胶囊文本与 `aria-label` 会显示 `NaN/5 个步骤` ✗⇒✓。改用 `Number.isFinite`（`total` 那行不需要：`NaN > 0` 为假；两行拼写不同是故意的）✓。
+- **同名换图后背景最长 60 秒不变（M6）**：缩略图按 mtime 换 URL，而阅读页画的背景**没有列表可查**，只能拿同一个 URL 吃缓存 ✗⇒✓。修在两条路都看得见的地方——宿主路由：`Cache-Control: private, no-cache` 加一个由 size + mtime 组成的 `ETag`，未变回答 304、换图立刻 200 ✓。
+- **一次瞬时渲染失败会永久替换那个块（M7）**：`failed` 是黏性状态，而 key 是下标（不随 payload 完成而变）⇒ 流式早期半截 payload 抛一次，这个块到切换视图为止都显示「暂时无法显示」✗⇒✓。改成**有界重试**（三次、每次 750ms）；刻意不做「每次渲染就重置」——那会让一个真正坏掉的块在每个流式分片上重复抛异常并把控制台刷满 ✓。
+- **帧消息能打穿 handler（M10）**：`postMessage` 送的是结构化克隆，**允许循环引用与 `BigInt`**，两者都让 `JSON.stringify` 抛错；而 `formatReceiptPrompt` 原来在 `try` **之外**、整个 `handleMessage` 没有任何边界 ⇒ 每条这样的消息都是一次未捕获异常，而且帧可以无限刷 ✗⇒✓。收据与摘要的序列化改用不会抛的 `safeJson`，整行与单个值都有上限（`RECEIPT_MAX_CHARS` / `RECEIPT_SUMMARY_CHARS`），`params` 只接受普通对象，dispatch 整体包在监听器的 `try` 里 ✓。
+- **「展开一张卡 = 一次 PUT + 一次整页强制布局」（M11.1）**：记录是「整个 state 减去 `expanded`」而路由是**整份替换**，所以视图必须订阅整个 state；于是任何键变化（包括被明确剥掉的 `expanded`）都会发一次**内容完全相同**的 PUT，而每次被接受的 PUT 又会重跑窗口作用域绘制（全文档扫描 + 强制布局）✗⇒✓。`createSettingsWriter` 现在记住**最后一次真的存下**的那份记录的字节，相同的不再发送；失败的写入不记住，所以一次打嗝之后的同一条记录仍会重发（有测试）✓。
+- **每个工具行无条件美化序列化整个结果（M11.3）**：`rawResult` 的消费者只有「原始数据」页，而那一页在读者打开前**根本没挂载**，这个字符串却按 block 身份重算 ⇒ 现在只有 `tab === 'raw'` 时才算 ✓。（顺带更正审计的说法：draft 阶段 `'kind' in value` 为假、本来就早退，所以它不是「每 delta 一次全文序列化」，而是「每次重渲染一次」。）
+- **高度追赶在被上限钳住时空转 400ms（M11.7）**：停止条件是 `port.offsetHeight === target`，而样式表上限 `min(60vh,560px)` 让目标永远不成立 ⇒ 每帧一次 `getBoundingClientRect` 跑满期限，为一个第一帧就不再移动的盒子 ✗⇒✓。加一条**连续静止帧**退出（4 帧 ≈ 66ms；过渡开始后一两帧不动是正常的），期限留作兜底 ✓。
+- **跳转失败会永久重试且不给反馈（§3.4）**：`pendingReveal` 挂着不放 ⇒ 之后每个 commit 一次整篇 `querySelector`，而且**某个无关的渲染**终于产出那一行时会跳到一个读者早已不再要求的位置 ✗⇒✓。请求带上 3 秒期限（从**加载已返回**算起，所以覆盖的是慢渲染而不是慢加载），过期即丢弃并在控制台说明；同时给轨道跳转的 `await` 补上 `catch`（同文件的「加载更早记录」一直有，这条路没有）✓。
+- **轨道跳转的 layout effect 依赖一个每次渲染都新建的对象（§3.4）**：`scroll` 是 `useReadingScroll` 每次返回的新对象 ⇒ 依赖它等于每个渲染都跑一次（里面靠两个 ref 比较变成空操作）。改成依赖稳定的 `scroll.jump` ✓。
+- **`_bubble` 那条规则没有排除阅读视图（§3.1）**：它用**类名子串**匹配，等于匹配页面上任何类名含这个词的元素；「本插件自己的气泡叫 `…_user`」是关于**今天这个名字**的理由，不是边界 ⇒ 补上 `COLUMN` 的同一条 `:not(...)` 排除，并用测试钉住这一条 ✓。
+- **状态色是硬编码的（§3.1）**：同文件已经有三处读 `--dsw-alias-state-error-primary` / `-success-primary`，这几处却写死 hex ⇒ 不跟主题，暗色底上 13px `#dc2626` 对比度约 4:1。改成读同一批 token（原字面量留作 fallback，取色走 `color-mix`），缺 token 的主题看起来与以前完全一样 ✓。
+
+**守护与构建**
+
+- **新增第 22 条不变式 `check-host-markers.mjs`**：此前 `scripts/guard/` 里的一切**只读** `lib/client.js`，Host 半边（路由、设置文件、壁纸目录）**没有任何断言**——那边的决定被改回去，`GUARD OK` 照样通过。现在钉住 9 条：两个未鉴权请求体的上限、`readBody` 在 aborted/close 上一定落地、写盘失败必须回 500、壁纸路由的 `no-cache` + `ETag` + 304、前缀路由不能带尾斜杠、reveal 只接受 POST 且同源；并自带 `selfTest()`（空产物必须让 9 条全部失败，构造出的合规产物必须一条都不失败）✓。
+- **产物版本与 `package.json` 对齐**：读者根上的 `data-dsh-better-display` 原来是 JSX 里的字面量——写下的当天是对的，从第一次升版本起就会悄悄落后。现在从 `package.json` 读出并断言 ✓。
+- **反向自检表搬进仓库**（`scripts/guard/negcheck-shape-markers.mjs`，42 → **52 例**）：它原来住在工作区的 `_tmp/` 里，而 README 声称「每条新断言都做过反向自检」——克隆的人无法验证这句话。现在它随仓库发布，并且**覆盖两个半边**（两条宿主用例针对 `lib/dsh-viewtune.js`）。它**不**进 `npm run guard`（每个用例要起 1–3 个 guard 进程，整表分钟级），两个语言的 README 都写清了命令与「`SKIP` 也算失败」✓。
+- **`verify-build` 不再用一句「REPRODUCES」暗示字节相等**：它本来就只比契约面与样式表规则，现在把两个长度都打印出来，并说明为什么两边永远不可能相等——`lib/client.js` 的 CSS 类名哈希由**产物自身的绝对路径**决定（实测同一份样式表在两个目录里得到 `voucca_` 与 `ED26sW_`）✓。
+- **`package-lock.json` 重新生成**：原锁文件与 `package.json` 不一致（21 个开发依赖里 13 个不在册、`lightningcss` 一条都没有、12 条 spec 与锁里的版本不符）⇒ `npm ci` 事实上不可用。现在 21 + 9 个依赖全部在册，工具链版本与构建 `lib/` 的那棵树一致（`tsdown 0.22.14` / `lightningcss 1.33.0` / `typescript 6.0.3`）。**但裸 `npm ci` 仍然会 `ERESOLVE`**，原因不在锁文件而在上游：各种 `@deepseek-ai/dsh-*` 钉在 `0.1.5-rc.2`，而它们的 peer 写成 `^0.1.5-rc.2`，注册表现在解析到 `0.1.5-rc.3`，那个版本又要求 `dsh-session@^0.1.5-rc.3`。所以文档里的命令是 `npm ci --legacy-peer-deps` 并写明原因；实测该命令 `--dry-run` 通过 ✓。
+- 两个 README 的计数改成实际值：**35** 个测试文件、**22** 条不变式；验证一节补上了反向自检表的命令 ✓。
+
+**三条不成立 / 不改，留证据**
+
+- **`motion.tsx` 的 200ms `setTimeout`「永远清不掉」——不成立。** 清理闭包与 rAF 回调共享同一个 `let timer` 绑定（JS 闭包捕获的是**变量**，不是值），所以 rAF 里赋的 id 在清理时读得到；而若清理先跑，`cancelAnimationFrame` 已经阻止了那次赋值 ⇒ 没有可泄漏的 timeout ✓。（审计说「靠 `current.id === id` 才没出问题」不准确：那个判断管的是另一个竞态。）
+- **「`npm test` 在本沙箱跑不了」是审计自身的环境限制**，不是仓库的限制：这里用 `node run-plugin-tests.mjs` 跑，**35/35 文件全过** ✓。
+- **§3.3 的数组下标 key**：`AssistantBlock` 的 text/reasoning 分支**不带任何身份**（只有 `tool-call` 有 `callId`、`image` 有 `attachmentId`），改成内容派生的 key 会在每个增量重挂整段 markdown——比现状更糟。真正的修法要宿主发布块身份 ⇒ 不改，记在这里备查 ✓。
+
+**这次没做（明确留下）**
+
+- **M9 的完整加固**（用户手势要求 / 强制 `ui/initialize` 握手 / schema 校验）：帧仍然可以在任意时刻写入输入框草稿（**不会自动发送**，仍需读者回车）。手势门槛会打断现在能用的帧，而这是产品决策，不该由我们单方面拍 ⇒ 只做了 schema 与体量校验。
+- **M12 的稳定宿主钩子**：`_scrollBody` / `_centerCol` / `_sidebarCol` / `_header` / `_bubble` 仍是按构建变的类名片段，仍是「找不到就什么都不做」。换成宿主发布的稳定钩子（如 `data-chat-flow`）是一次单独的重构。
+- **M11 的其余性能项**：壁纸 effect 在**视图作用域**下拖「压暗」会整段重跑（新建 `Image`、重挂 `ResizeObserver`）；`resizer-wheel` 每帧全文档查询；`composer-wheel` 每个 wheel 事件强制布局；`inputFields` 在长 `write` 上的 O(n²)。都确认存在，都没动。
+- **§3.2 的两处死值**（`--glass-scrollbar` / `--glass-input` 写在阅读根上、却只从 `<html>` 读）、**`.toolRaw` 的旋钮归属**（两条同特异度规则，实际由代码旋钮胜出，与旁边注释不一致）、`background-attachment: fixed`、`entry-policy` 的 `0.1.0-trial` 遗留分支、几处改名残留与过期注释：都确认了，都没改。
+
+**生效范围**：客户端半边由 HMR 立即生效；Host 半边的改动（`/reveal` 上限、`readBody` 无论何种情况都落地、设置写盘失败回 500、壁纸 `no-cache` + `ETag`）**需要重启 Host** 才生效 ✓。
+
 ## 0.4.1 (the card's bottom stops trembling while it grows)
 
 **读者确认「卡片底部不完整」已消失，但报了一个新症状：卡片**长高时**底部会微微颤动。**
@@ -8,6 +57,7 @@
 - **候选二：补偿按整像素跳，而布局在按小数移动。** 滑行模式下的高度是**缓动**的，一帧内布局可能只移动 0.4px，而 `offsetHeight` 报的是**取整**后的整数 ⇒ 补偿以最多 1px 的台阶追赶一个平滑变化，画面上就是底边以不均匀的步长微跳 ✓。改成读 `getBoundingClientRect().height`（小数，正是布局做的那件事）✓。
 - 两条都是**独立成立**的（各自都有理由，不是碰运气），而且都是**我们自己的元素与代码**。若颤动仍在，下一步是探针采样（不再推断）✓。
 - 守护：那条 marker 与反向用例里的形状随之更新（`offsetHeight` → `getBoundingClientRect().height`）✓；反向自检 42 例全过 ✓。
+- **读者确认：微颤已消失 ✓。** 两条候选都保留（各自独立成立），无需探针采样。
 
 ## 0.4.1 (the focus closes the tail gap it was granted in)
 

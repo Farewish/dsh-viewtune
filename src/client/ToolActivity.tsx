@@ -233,9 +233,13 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const showState = phase === 'preparing' || phase === 'running' || phase === 'failed' || phase === 'interrupted';
   const elapsed = block && 'kind' in block && block.callTime != null ? Math.max(0, block.time - block.callTime) : null;
   const rawResult = useMemo(() => {
+    // The raw pane is the only consumer and it is not even MOUNTED unless the reader opened the row and chose that tab.
+    // Built unconditionally, this was a pretty-printed copy of the whole tool result — a `null, 2` walk of every payload
+    // the call ever produced — on every streamed delta of every tool row on the page.
+    if (tab !== 'raw') return '';
     const value = preview.entry.block;
     return value && 'kind' in value ? JSON.stringify({ content: value.content, isError: value.isError, meta: value.meta }, null, 2) : '';
-  }, [preview.entry.block]);
+  }, [tab, preview.entry.block]);
   const tabs = [['result', phase === 'preparing' ? '生成预览' : '结果'], ['input', '输入'], ['raw', '原始数据']] as const;
   const activate = (index: number) => { const item = tabs[(index + tabs.length) % tabs.length]!; setTab(item[0]); tabRefs.current[(index + tabs.length) % tabs.length]?.focus(); };
   if (depth > 6) return <p className={css.meta}>更深的嵌套调用可在原对话查看。</p>;

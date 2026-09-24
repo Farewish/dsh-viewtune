@@ -149,12 +149,14 @@ The two handles that set the reading column's width belong to the **shell** and 
 The browser half is the pre-built `lib/client.js`, which the Host loads directly, and the repository commits it — so **installing and sharing need no build**:
 
 ```sh
-npm ci                # install from the committed package-lock.json
-npm run build         # src/ -> lib/client.js and lib/dsh-viewtune.js
-npm run typecheck     # tsc -p tsconfig.json --noEmit, against the real declarations
+npm ci --legacy-peer-deps   # install from the committed package-lock.json (why the flag is required: below)
+npm run build               # src/ -> lib/client.js and lib/dsh-viewtune.js
+npm run typecheck           # tsc -p tsconfig.json --noEmit, against the real declarations
 ```
 
-Use `npm ci` rather than `npm install`: `tsdown`, `lightningcss` and `typescript` are all on `^` ranges, and only the lockfile guarantees that another machine installs the toolchain that **reproduces the committed `lib/`** — which is exactly what `verify-build` does inside `npm run guard`. Reach for `npm install` only when a dependency changed, to rewrite the lockfile.
+Use the lockfile rather than a bare `npm install`: `tsdown`, `lightningcss` and `typescript` are all on `^` ranges, and only the lockfile pins the toolchain that **reproduces the committed `lib/`** — which is exactly what `verify-build` does inside `npm run guard`. Reach for `npm install` only when a dependency changed, to rewrite the lockfile.
+
+`--legacy-peer-deps` is forced by **upstream packages whose peer ranges disagree with each other**, which this repository cannot fix: the `@deepseek-ai/dsh-*` dev dependencies (and the peers those pull in) are pinned at `0.1.5-rc.2`, while several of them declare `^0.1.5-rc.2` peers, which the registry now resolves to `0.1.5-rc.3` — a version that in turn requires `@deepseek-ai/dsh-session@^0.1.5-rc.3`. A bare `npm ci` therefore fails with `ERESOLVE`, although the lockfile itself is complete and resolvable (`lockfileVersion: 3`; all 21 dev dependencies and 9 dependencies are present, at the versions the committed `lib/` was built with). The flag only stops npm from refusing that set of peer declarations.
 
 Upstream's `tsdown.config.ts` takes `externalClientBundle` from a Harness adapter that is not published, so it cannot run in a clone. This repository ports its real implementation (the official preset's `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2`) into [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs). The artifact contract is unchanged, so every assertion about the artifact still holds.
 
@@ -176,13 +178,19 @@ Change `src/`, then `npm run build`. Two identity markers in the artifact must m
 Two layers, because they answer different questions:
 
 ```sh
-npm test        # source layer: Node's own test runner, every test file (31 today)
-npm run guard   # artifact layer: 19 invariants, all against the built lib/client.js
+npm test        # source layer: Node's own test runner, every test file (35 today)
+npm run guard   # artifact layer: 22 invariants, against the built lib/client.js and lib/dsh-viewtune.js
 ```
 
-`npm run guard` inspects the **artifact**: the module table's registered id and `require()` set, the injected CSS literal, turn render order, the collapse control's shape and fade, the toolbar geometry, the settings panel's three pages and the width of its sliding bar, the shipped wallpaper's three spellings and the file itself, the correspondence between `src/` and the artifact, and **"a rebuild still reproduces the committed shape"**. That last one is the only proof of source/artifact agreement available here — byte equality is not (a minifier's output is not stable), so it compares the contract surface and the stylesheet rules.
+`npm run guard` inspects the **artifacts**: the module table's registered id and `require()` set, the injected CSS literal, turn render order, the collapse control's shape and fade, the toolbar geometry, the settings panel's three pages and the width of its sliding bar, the shipped wallpaper's three spellings and the file itself, the **Host half**'s route decisions (the cap on each unauthenticated body, a body reader that always settles, a failed disk write answering as a failure, the wallpaper route's revalidation and `ETag`), the correspondence between `src/` and the artifact, and **"a rebuild still reproduces the contract shape"**. That last one is the only proof of source/artifact agreement available here — byte equality is not (the CSS class hash in `lib/client.js` is derived from the artifact's own absolute path: the same stylesheet in two directories measured `voucca_` and `ED26sW_`), so it compares the registered id, the `require()` set, exports, the CSS literals and every stylesheet rule with the build-specific naming normalised away — and it now prints both lengths instead of letting one word, "reproduces", imply byte equality.
 
-One premise is worth stating: **parsing (`node --check` passing) is not correctness**. This repository's history is largely direct edits of a minified artifact, which produced syntax that was perfectly legal and still threw at runtime because a reference had been deleted — a class of error only a "is this name declared" check catches, or a rebuild exposes. Both are in `npm run guard`, and every new assertion has been **negative-tested** (fed a doctored artifact to prove it really fails).
+One premise is worth stating: **parsing (`node --check` passing) is not correctness**. This repository's history is largely direct edits of a minified artifact, which produced syntax that was perfectly legal and still threw at runtime because a reference had been deleted — a class of error only a "is this name declared" check catches, or a rebuild exposes. Both are in `npm run guard`, and every new assertion has been **negative-tested** (fed a doctored artifact to prove it really fails). That table of negative checks lives in the repository, so anyone can run it:
+
+```sh
+node scripts/guard/negcheck-shape-markers.mjs   # 52 cases: each reverts one fix in the artifact and requires its guards to fail
+```
+
+It is deliberately **not** part of `npm run guard`: every case spawns one to three fresh guard processes, so the whole table takes minutes, while `npm run guard` is the fast gate that runs after every build. A `SKIP` in that table counts as a failure — it means the artifact no longer carries the asserted shape (the assertion is running on nothing), or already carries the reverted one (the case tests something other than what it says).
 
 ## License
 

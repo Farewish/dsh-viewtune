@@ -6,8 +6,17 @@ import {
   ensureHtmlDocument,
   formatReceiptPrompt,
   fillComposerDom,
+  safeJson,
 } from './mcp-app.js';
 import css from './McpAppFrame.module.css';
+
+/**
+ * How much of a frame's payload the receipt SUMMARY line may carry.
+ *
+ * Shorter than the prompt's own bound (`RECEIPT_MAX_CHARS`): this line is one row of chrome under the frame, not the
+ * thing the reader sends, and the full payload is already in the prompt it writes to the composer.
+ */
+const RECEIPT_SUMMARY_CHARS = 300;
 
 /**
  * Composer fill channel shared by every McpAppFrame in one Reader tree.
@@ -61,9 +70,13 @@ export const McpAppFrame = memo(function McpAppFrame({
   const preparedHtml = useMemo(() => ensureHtmlDocument(html, initialTheme), [html, initialTheme]);
 
   const fillComposer = useCallback((params: Record<string, unknown>) => {
-    const prompt = formatReceiptPrompt(params, title);
-    setLastPrompt(prompt);
+    // Everything the frame's payload touches is inside this boundary, `formatReceiptPrompt` included: it stringifies the
+    // payload, and a circular value or a `BigInt` — both legal in a structured clone — makes that a `TypeError`. The old
+    // shape called it OUTSIDE the `try`, so one such message skipped the receipt entirely and surfaced as an uncaught
+    // error from a click handler.
     try {
+      const prompt = formatReceiptPrompt(params, title);
+      setLastPrompt(prompt);
       if (writeComposer(prompt)) return true;
       // Composer refused: leave the prompt visible in the receipt bar and
       // stash a clipboard copy as a fallback.
@@ -72,8 +85,8 @@ export const McpAppFrame = memo(function McpAppFrame({
       } catch {
         // Clipboard unavailable; the visible receipt text remains copyable.
       }
-    } catch {
-      // Ignore DOM query errors in non-browser environments
+    } catch (error) {
+      console.warn('[dsh-better-display] MCP app receipt failed:', error);
     }
     return false;
   }, [title, writeComposer]);
@@ -85,11 +98,11 @@ export const McpAppFrame = memo(function McpAppFrame({
       const desc = typeof params.desc === 'string' ? ` (${params.desc})` : '';
       summary = `选择: ${params.choice}${desc}`;
     } else if (typeof params.action === 'string') {
-      summary = `操作: ${params.action}${params.payload ? ` (${JSON.stringify(params.payload)})` : ''}`;
+      summary = `操作: ${params.action}${params.payload ? ` (${safeJson(params.payload, RECEIPT_SUMMARY_CHARS)})` : ''}`;
     } else if (typeof params.selectedVariant === 'string') {
       summary = `方案: ${params.selectedVariant}`;
     } else {
-      summary = JSON.stringify(params);
+      summary = safeJson(params, RECEIPT_SUMMARY_CHARS);
     }
     setReceipt(summary);
 
@@ -98,13 +111,14 @@ export const McpAppFrame = memo(function McpAppFrame({
   }, [fillComposer]);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const iframe = iframeRef.current;
-      if (!iframe || event.source !== iframe.contentWindow) return;
-
-      const data = event.data;
-      if (!data || typeof data !== 'object') return;
-
+    /**
+     * Dispatch one frame message.
+     *
+     * A function of its own so the listener below can be one `try`: `postMessage` delivers a structured clone, which may
+     * legally contain a cycle or a `BigInt`, and `JSON.stringify` throws on both. This handler had no boundary at all, so
+     * each such message was an uncaught error — and a frame can send them as fast as it likes.
+     */
+    const dispatch = (data: Record<string, unknown>) => {
       // Protocol SEP-1865 JSON-RPC 2.0
       const currentTheme = getHostTheme();
       const cssTokens = getCssTokens(currentTheme);
@@ -125,7 +139,7 @@ export const McpAppFrame = memo(function McpAppFrame({
             },
           },
         };
-        iframe.contentWindow?.postMessage(response, '*');
+        iframeRef.current?.contentWindow?.postMessage(response, '*');
         return;
       }
 
@@ -135,8 +149,9 @@ export const McpAppFrame = memo(function McpAppFrame({
       }
 
       // 3. ui/resize
-      if (data.method === 'ui/resize' && data.params?.height) {
-        const h = Number(data.params.height);
+      const params = data.params;
+      if (data.method === 'ui/resize' && params && typeof params === 'object' && (params as { height?: unknown }).height) {
+        const h = Number((params as { height: unknown }).height);
         if (Number.isFinite(h) && h > 0) {
           setHeight(Math.max(60, Math.min(2400, Math.round(h))));
         }
@@ -145,9 +160,26 @@ export const McpAppFrame = memo(function McpAppFrame({
 
       // 4. ui/submit or ui/update-model-context
       if (data.method === 'ui/submit' || data.method === 'ui/update-model-context') {
-        const params = (data.params as Record<string, unknown>) || {};
-        handleUserSubmit(params);
+        // `params` is a structured clone: not necessarily an object, and not necessarily this component's shape. Only a
+        // plain object is passed on, so nothing downstream has to cope with an array or a primitive.
+        const submitted = params !== null && typeof params === 'object' && !Array.isArray(params)
+          ? params as Record<string, unknown>
+          : {};
+        handleUserSubmit(submitted);
         return;
+      }
+    };
+
+    const handleMessage = (event: MessageEvent) => {
+      const iframe = iframeRef.current;
+      if (!iframe || event.source !== iframe.contentWindow) return;
+
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      try {
+        dispatch(data as Record<string, unknown>);
+      } catch (error) {
+        console.warn('[dsh-better-display] MCP app message failed:', error);
       }
     };
 

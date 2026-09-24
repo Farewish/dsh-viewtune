@@ -216,10 +216,45 @@ export function extractMcpAppHeight(meta: string | null | undefined): number | u
 }
 
 /**
+ * How much of a frame's payload may reach the receipt bar and the composer.
+ *
+ * A frame writes the payload; the payload has no size limit of its own, and every character of it lands in the DOM, in
+ * the reader's input box, and — if the reader sends it — in the conversation. The bound is the plugin's, not the
+ * protocol's, and it is deliberately generous: a receipt is a summary, not the data.
+ */
+export const RECEIPT_MAX_CHARS = 2000;
+
+/**
+ * `JSON.stringify` that neither throws nor grows without bound.
+ *
+ * Both failure modes are reachable from the message channel, which is why this exists: `postMessage` delivers a
+ * structured clone, and a structured clone may contain a cycle or a `BigInt` — both legal to send, both a `TypeError`
+ * from `JSON.stringify`. The callers here are inside a message handler whose throw is an uncaught error, so the
+ * stringify has to be the thing that gives way, not the handler. `undefined`, functions and symbols stringify to
+ * nothing and are spelled out instead of rendering as the empty string.
+ */
+export function safeJson(value: unknown, max = RECEIPT_MAX_CHARS): string {
+  try {
+    const text = JSON.stringify(value);
+    if (typeof text !== 'string') return String(value);
+    return text.length > max ? `${text.slice(0, max)}…` : text;
+  } catch {
+    return '[无法序列化的数据]';
+  }
+}
+
+/**
  * Formats a user-submitted MCP App event into a concise, natural language conversational prompt.
  * Avoids raw multiline JSON and excessive whitespace.
  */
 export function formatReceiptPrompt(params: Record<string, unknown>, title?: string): string {
+  // The bound is applied to the FINISHED line, not only inside `safeJson`: the branches below read strings straight off
+  // the frame (`choice`, `desc`, `action`), and none of those is the frame's to size.
+  const text = formatReceiptBody(params, title);
+  return text.length > RECEIPT_MAX_CHARS ? `${text.slice(0, RECEIPT_MAX_CHARS)}…` : text;
+}
+
+function formatReceiptBody(params: Record<string, unknown>, title?: string): string {
   // If user selected a choice/variant (e.g. quiz or blind test)
   if (typeof params.choice === 'string') {
     const desc = typeof params.desc === 'string' ? `（${params.desc}）` : '';
@@ -231,7 +266,7 @@ export function formatReceiptPrompt(params: Record<string, unknown>, title?: str
     return `我在方案评测中选择了：${params.selectedVariant}${score}。请根据该方案继续分析。`;
   }
   if (typeof params.action === 'string') {
-    const payloadStr = params.payload ? (typeof params.payload === 'string' ? params.payload : JSON.stringify(params.payload)) : '';
+    const payloadStr = params.payload ? (typeof params.payload === 'string' ? params.payload : safeJson(params.payload)) : '';
     return `[${title ?? '组件操作'}] 已完成 ${params.action}${payloadStr ? `: ${payloadStr}` : ''}`;
   }
   // Generic single field
@@ -239,7 +274,7 @@ export function formatReceiptPrompt(params: Record<string, unknown>, title?: str
   if (keys.length === 1 && typeof params[keys[0]] === 'string') {
     return `[${title ?? '组件回执'}] ${keys[0]}: ${params[keys[0]]}`;
   }
-  return `[${title ?? '组件回执'}] ${JSON.stringify(params)}`;
+  return `[${title ?? '组件回执'}] ${safeJson(params)}`;
 }
 
 /**

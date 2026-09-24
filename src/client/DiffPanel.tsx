@@ -95,13 +95,35 @@ export function DiffStatButton({ hunks, label, open, onToggle }: {
 }) {
   const totals = useMemo(() => diffTotals(hunks), [hunks]);
   if (hunks.length === 0) return null;
+  /**
+   * What these two numbers ARE, said in full rather than assumed.
+   *
+   * `diffTotals` counts the content lines of each SIDE — the whole old text and the whole new text — not the lines that
+   * differ, so a one-line edit to a 812-line file reports 812 and 813. The badge keeps the familiar `+N/-M` shape, which
+   * is also the host's own tool-row convention and reads correctly for a `write` (nothing on the old side); the label is
+   * where the difference is stated, because `+N/-M` alone means "changed lines" to anyone who has used a diff view.
+   */
+  const description = `差异视图：新内容 ${String(totals.added)} 行、原内容 ${String(totals.removed)} 行`;
   return <span className={css.diffStatRoot}>
     <button type="button" className={css.diffStatButton} aria-expanded={open}
-      aria-label={`${label} · 改动 ${String(totals.added)} 行，删除 ${String(totals.removed)} 行`}
+      aria-label={`${label} · ${description}`}
+      title={`${description}（行数按两侧全文统计，不是最小差异的行数）`}
       onClick={event => {
         // The row itself is a disclosure; this click is about the diff, not about opening it.
         event.stopPropagation();
         onToggle();
+      }}
+      /**
+       * …and the KEYBOARD path needs the same interception, which `stopPropagation` on the click does not give it.
+       *
+       * The host's row is a `role="button"` disclosure whose key handler does not look at `event.target`: Enter or Space
+       * pressed on THIS button bubbles to the row, the row calls `preventDefault()`, and the browser's default
+       * activation of the button is cancelled — so the diff panel could never be opened from the keyboard, and pressing
+       * Enter folded the whole tool row instead. Stopping the bubble here (without `preventDefault`) leaves the button's
+       * own activation intact: the row never sees the key, and the click it produces goes through the handler above.
+       */
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
       }}>
       <span className={css.diffCaret} aria-hidden>{open ? '\u25be' : '\u25b8'}</span>
       {totals.added > 0 && <span className={css.diffAdded}>+{totals.added}</span>}

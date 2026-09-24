@@ -61,8 +61,11 @@ const Pill = memo(function Pill({ data, totalSteps }: StepsPillProps) {
   }, [open]);
 
   if (!data) return null;
-  const answerStep = typeof data.answerStep === 'number' ? data.answerStep : null;
-  const total = typeof totalSteps === 'number' && totalSteps > 0 ? totalSteps : null;
+  // `Number.isFinite`, not just `typeof === 'number'`: `NaN` IS a number and is NOT null, so it walked straight past the
+  // guard that was added for exactly this class of leak and printed 「NaN/5 个步骤」. The `total` line below needs no
+  // change — `NaN > 0` is false — which is why the two are spelled differently.
+  const answerStep = typeof data.answerStep === 'number' && Number.isFinite(data.answerStep) ? data.answerStep : null;
+  const total = typeof totalSteps === 'number' && Number.isFinite(totalSteps) && totalSteps > 0 ? totalSteps : null;
   const answer = answerStep;
   // The count covers only the steps that were loaded, while the answer's position is
   // absolute. A count that cannot reach the position is a partial sum: it is not used

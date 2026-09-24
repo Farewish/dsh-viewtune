@@ -80,11 +80,21 @@ function handlerBody(needle) {
 // failure mode is the whole page reporting "Failed to load plugins", so assert
 // it here rather than discovering it in the browser.
 const packageName = pluginPackageName();
+const packageVersion = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 const registered = /__ModuleLoader__\.load\(\{\s*\n\s*id: "([^"]+)"/u.exec(bundle)?.[1];
 
 const registration = [
   ['bundle registers the package name', registered === packageName],
   ['no stale upstream registration id', !bundle.includes('id: "dsh-better-display"')],
+  /**
+   * The version the reading view publishes on its own root, against the version in `package.json`.
+   *
+   * The attribute is what a marker-based check outside this repository can identify a build by, and it was a literal in
+   * the JSX: correct on the day it was written, and silently one release behind from the first version bump onward. Read
+   * from the manifest here, so bumping `package.json` without the attribute fails this guard instead of shipping.
+   */
+  ['the version published on the reader root is the package version',
+    bundle.includes(`"data-dsh-better-display": "${String(packageVersion)}"`)],
 ];
 
 /**
@@ -519,14 +529,16 @@ const markers = [
     bundle.includes('.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}')
     && bundle.includes('@media (prefers-reduced-motion:no-preference){[data-reader-follow-mode=glide]:not([data-motion=off]) .WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{transition:height .16s var(--reason-ease,ease-out)}}')
     && bundle.includes('.WGoHxG_reasonCard:not([data-focus=true]) .WGoHxG_reasonViewport{transition:max-height .3s var(--reason-ease,ease-out)}')],
-  ['…and the compensation chases that easing frame by frame, ending on the target or on a deadline', () =>
+  ['…and the compensation chases that easing frame by frame, ending on the target, on a still layout, or on a deadline', () =>
     // A transitioned height has not moved yet at the moment of the write, so a single read would see no growth at all;
     // charging the whole request instead would lead the box and wobble its bottom edge. The chase ends on the target
-    // (with no transition in flight the first read IS the target, which is why 贴底 and 动效关 are untouched) or on a
-    // deadline (a target the stylesheet's ceiling clamps never arrives).
+    // (with no transition in flight the first read IS the target, which is why 贴底 and 动效关 are untouched), on a layout
+    // that has stopped moving (a target the stylesheet's ceiling clamps NEVER arrives, and waiting out the 400ms deadline
+    // there is 400ms of per-frame layout reads for a box that stopped on the first frame), or on that deadline.
     bundle.includes('"data-reader-follow-mode": followMode,')
     && bundle.includes('heightChase = 0;\n\t\t\t\t\tcompensateHeight();\n\t\t\t\t\tif (port.offsetHeight === target) return;')
-    && bundle.includes('compensateHeight();\n\t\t\t\t\t\tif (port.offsetHeight === target || performance.now() > deadline) return;')],
+    && bundle.includes('if (++still >= CHASE_STILL_FRAMES) return;')
+    && bundle.includes('if (performance.now() > deadline) return;\n\t\t\t\t\t\theightChase = requestAnimationFrame(step);')],
   ['…with the motion switch dropping those transitions', () => bundle.includes('[data-motion=off] .WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport,') && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(bundle)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
   ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
@@ -690,9 +702,20 @@ const markers = [
     // retried from the layout effect — which is why BOTH the retry and the "did it land" answer are pinned. The old
     // shape waited 50ms and called a reveal that returned nothing, so a slower commit left the reader where they were,
     // silently.
-    bundle.includes('if (revealTurn(pendingReveal)) setPendingReveal(null);')
+    bundle.includes('if (revealTurn(pendingReveal)) {')
     && bundle.includes('setPendingReveal(item.turn);')
     && bundle.includes('if (!targetRow) return false;')],
+  ['…and a jump that never lands is dropped instead of retrying for the rest of the session', () =>
+    // Unbounded, the retry was a whole-transcript query on every later commit AND a jump the reader had long stopped
+    // asking for, fired by whichever unrelated render eventually produced the row. Past the window the request is
+    // dropped and logged: the reading view has no transient-notice surface, and the reader can see they did not move.
+    bundle.includes('if (performance.now() > pendingRevealUntil.current) {')
+    && bundle.includes('pendingRevealUntil.current = performance.now() + REVEAL_RETRY_MS;')
+    && bundle.includes('"[dsh-better-display] jump target never rendered:"')],
+  ['…and a rejected history load is caught rather than left as an unhandled rejection', () =>
+    // This runs as a click handler, so a rejection had nothing to attach to. The 加载更早记录 button in the same file has
+    // always caught its own; the timeline rail's path had not.
+    bundle.includes('"[dsh-better-display] jump load failed:"')],
   ['nothing in this view scrolls by walking ancestor boxes', () =>
     // `conversation-scroll.ts` bans `Element.scrollIntoView` by name: it walks ancestor scrollers and can lift the
     // sticky composer off the bottom of the viewport. The one call site that survived the ban lived in DiffPanel's
@@ -1165,6 +1188,54 @@ const markers = [
   // spelling of a valueless JSX attribute so a restyle of that markup is not a false failure.
   ['question set renders its own card', () => /"data-reader-tool-question":\s*(?:""|true)/.test(bundle)],
   ['delivery renders its own list', () => /"data-reader-tool-present":\s*(?:""|true)/.test(bundle)],
+
+  // ===================== the audit round =====================
+  // One marker per defect this round fixed in our OWN code, each pinned to the shape that fixes it. They are grouped
+  // here rather than filed into the sections above so the next reader can see what this pass changed and why, and so a
+  // revert of any one of them fails loudly instead of silently.
+  ['a step position that is not a finite number is withheld, not printed as NaN', () =>
+    // `typeof NaN === 'number'` and `NaN !== null`, so the guard that had been added for a missing count let `NaN/5`
+    // through to the label and the aria-label. `total` needs no such test: `NaN > 0` is false, which is why the two
+    // lines are spelled differently.
+    bundle.includes('typeof data.answerStep === "number" && Number.isFinite(data.answerStep)')],
+  ['a block that failed to render is retried a bounded number of times instead of staying replaced', () =>
+    // Sticky `failed` + an index key meant one half-arrived payload replaced the block for the whole session. Retrying on
+    // every render would be worse (a re-throw per streamed delta for content that is genuinely unrenderable), so it is a
+    // bounded schedule: the limit is the decision, and so is the timer being cancelled on unmount and on entry only.
+    bundle.includes('const BLOCK_RETRY_LIMIT = 3;')
+    && bundle.includes('if (this.state.attempt >= BLOCK_RETRY_LIMIT) return;')
+    && bundle.includes('attempt: state.attempt + 1')],
+  ['a frame message cannot take the handler down with it', () =>
+    // `postMessage` delivers a structured clone, which may legally hold a cycle or a `BigInt` — both a `TypeError` from
+    // `JSON.stringify`. The receipt is formatted INSIDE the try, and the whole dispatch is inside one at the listener.
+    bundle.includes('console.warn("[dsh-better-display] MCP app message failed:", error);')
+    && bundle.includes('handleUserSubmit(params !== null && typeof params === "object" && !Array.isArray(params) ? params : {});')],
+  ['a frame payload is stringified without throwing and without growing without bound', () =>
+    // The two bounds: `safeJson` catches the throw and caps one value; `RECEIPT_MAX_CHARS` caps the finished line, whose
+    // other branches read strings straight off the frame.
+    bundle.includes('function safeJson(value, max = RECEIPT_MAX_CHARS) {')
+    && bundle.includes('const RECEIPT_SUMMARY_CHARS = 300;')],
+  ['the rail\u2019s pulse follows the turn that is RUNNING, and aria-busy only the loading tick', () =>
+    // The pulse is documented as 「轮次运行期间一直脉动」 and the running turn was the one thing never passed in: the tick
+    // pulsed while a history load was in flight and stood still while a turn streamed. `aria-busy` stays on the load,
+    // which is the one of the two that is waiting on the reader's click.
+    bundle.includes('const loading = busyTurn === item.turn;')
+    && bundle.includes('const isBusy = loading || runningTurn === item.turn;')
+    && bundle.includes('"aria-busy": loading ? "true" : void 0')],
+  ['the rail\u2019s smooth scroll obeys prefers-reduced-motion like every other movement here', () =>
+    // The one animation in the plugin that ran without the system gate, in a file whose own CSS has the media query
+    // three lines below it. `auto` is the browser's instant jump: the same landing, without the animation.
+    bundle.includes('behavior: allowMotion ? "smooth" : "auto"')],
+  ['the diff body reads the same field names the diff badge does, new_str included', () =>
+    // The badge counted lines from one field list and the body read another: `new_str` was missing from the second, so
+    // `str_replace_editor` showed +N/-M with nothing to describe.
+    bundle.includes('content: stringValue(args, "content", "new_string", "new_str", "newText", "file_text")')],
+  ['the diff badge states which two numbers it is showing', () =>
+    // `diffTotals` counts each SIDE's content lines, not the changed ones, so a one-line edit to a long file reads as
+    // hundreds. The `+N/-M` shape is kept (it is the host's own convention and is right for a write); the label and the
+    // tooltip say what the numbers are.
+    bundle.includes('\u5dee\u5f02\u89c6\u56fe\uff1a\u65b0\u5185\u5bb9')
+    && bundle.includes('\u884c\u6570\u6309\u4e24\u4fa7\u5168\u6587\u7edf\u8ba1')],
 ];
 
 const forbidden = [

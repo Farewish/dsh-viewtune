@@ -93,13 +93,26 @@ export async function loadHostSettings(): Promise<HostSettingsRead> {
  */
 let refusalReported = false;
 
-/** Send one record. Never throws: a failed write leaves the reader working and the next change retries. */
-export async function saveHostSettings(state: unknown): Promise<void> {
+/**
+ * Send one record. Never throws: a failed write leaves the reader working and the next change retries.
+ *
+ * `keepalive` is what makes the flush on the way out true. The writer's flush runs on `pagehide` and on teardown, and a
+ * plain `fetch` started there is NOT guaranteed to go out — the page may be gone before it is sent, which is exactly the
+ * case the flush exists for ("a reader who changes something and closes the tab inside the debounce window"). The flag
+ * asks the browser to finish the request outside the page's lifetime; the 64 KB body limit it comes with is three orders
+ * of magnitude above a settings record (the host caps those at 64 KiB anyway).
+ *
+ * The answer says whether the record was STORED, not merely answered, because the writer uses it: a record this client
+ * already stored is not sent again (see `createSettingsWriter`), and a write that failed must not be mistaken for one
+ * that landed.
+ */
+export async function saveHostSettings(state: unknown): Promise<boolean> {
   try {
     const res = await fetch(READER_SETTINGS_PATH, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(state),
+      keepalive: true,
     });
     // Only a record the host ACCEPTED is announced: the app-wide backdrop follows what is actually
     // stored, so a refused or failed write cannot make the window show something no restart would.
@@ -108,13 +121,15 @@ export async function saveHostSettings(state: unknown): Promise<void> {
         refusalReported = true;
         console.warn(`[viewtune] the settings record was not stored (HTTP ${String(res.status)}), so nothing changed from now on will be saved`);
       }
-      return;
+      return false;
     }
-    if (state === null || typeof state !== 'object' || Array.isArray(state)) return;
+    if (state === null || typeof state !== 'object' || Array.isArray(state)) return true;
     for (const listener of [...listeners]) listener(state as Record<string, unknown>);
+    return true;
   } catch {
     // Deliberately silent: the browser's own copy is still there, and the whole record is re-sent on
     // the next change, so there is nothing to repair and nothing worth interrupting a reader over.
+    return false;
   }
 }
 
@@ -144,6 +159,17 @@ export interface SettingsWriter {
 /**
  * A debounced writer. The save function and the delay are parameters so the behaviour is testable
  * without a server or a real clock, and `push` of the same settled state twice is one write.
+ *
+ * The second, coarser dedupe is `lastStored`: a record whose BYTES are the ones this writer already stored is not sent
+ * again, even minutes later. That is not a micro-optimisation, it is what keeps an unrelated store change from writing
+ * the file: the reading view subscribes to the whole state (it has to — the host record is the whole state minus
+ * `expanded`, and the route replaces the record rather than merging), so opening one thinking card changes the store
+ * without changing a single byte of what would be written. Each such write would also re-run the window-scope paint, a
+ * whole-document scan plus a forced layout, so "expand a card" cost one HTTP write and one full-page layout for nothing.
+ *
+ * Only a body the host ACCEPTED is remembered. A failed or refused write leaves `lastStored` alone, so the next push of
+ * that same record still goes out — which is the behaviour a reader depends on after a hiccup. A `save` that answers
+ * nothing at all (`undefined`, as the test doubles do) is treated the same way: nothing is ever suppressed on a guess.
  */
 export function createSettingsWriter(
   save: (state: unknown) => Promise<unknown> = saveHostSettings,
@@ -152,12 +178,23 @@ export function createSettingsWriter(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let pending: unknown;
   let waiting = false;
+  let lastStored: string | undefined;
   const send = (): void => {
     timer = undefined;
     if (!waiting) return;
     const state = pending;
     waiting = false;
-    void save(state).catch(() => undefined);
+    let body: string | undefined;
+    try {
+      body = JSON.stringify(state);
+    } catch {
+      // A record that cannot be serialised is handed over anyway: `save` owns what happens next, and it does not throw.
+      body = undefined;
+    }
+    if (body !== undefined && body === lastStored) return;
+    void save(state).then(stored => {
+      if (stored === true) lastStored = body;
+    }, () => undefined);
   };
   return {
     push(state: unknown): void {
