@@ -41,6 +41,14 @@ const WALLPAPER_REVEAL_PATH = '/better-display/wallpapers/reveal';
 export const READER_SETTINGS_PATH = '/better-display/settings';
 const READER_SETTINGS_FILE = settingsFileOf(process.env, homedir());
 /**
+ * The most a reveal request may carry.
+ *
+ * The payload is one path — a few hundred bytes at the outside — and the route is unauthenticated on localhost, which
+ * is the same reason the settings route has a cap. That route had one and this one did not: it accumulated whatever
+ * arrived and parsed it at the end, so the body could be made as large as the process's memory.
+ */
+const REVEAL_MAX_BYTES = 4 * 1024;
+/**
  * The wallpaper file this build ships, beside the manifest.
  *
  * Resolved off this module's own URL so it works wherever the plugin is installed from — a checkout, a packed
@@ -68,10 +76,18 @@ function readBody(req: IncomingMessage, limit: number): Promise<string | undefin
       if (Buffer.byteLength(body, 'utf8') > limit) {
         over = true;
         body = '';
+        // Answer now rather than waiting for the rest of a body that has already been refused: a client that keeps
+        // sending must not hold the route open, and the remaining chunks are dropped by the guard above either way.
+        resolve(undefined);
       }
     });
     req.on('end', () => { resolve(over ? undefined : body); });
     req.on('error', () => { resolve(undefined); });
+    // A client that dies mid-body used to leave this promise unsettled for ever, and with it the route's own promise:
+    // neither `end` nor `error` is guaranteed on an aborted request. `close` also fires after a normal end, where the
+    // resolve is a no-op because the promise has already settled.
+    req.on('aborted', () => { resolve(undefined); });
+    req.on('close', () => { resolve(undefined); });
   });
 }
 
@@ -146,36 +162,33 @@ export function apply(ctx: Context): void {
             json(res, 403, { ok: false, error: 'cross-origin' });
             return;
           }
-          let body = '';
-          req.on('data', chunk => { body += chunk; });
-          req.on('end', () => {
-            try {
-              const data = JSON.parse(body);
-              const targetPath = typeof data.path === 'string' ? data.path.trim() : '';
-              if (!targetPath) {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ ok: false, error: 'Empty path' }));
-                return;
-              }
-
-              if (process.platform === 'darwin') {
-                // Exact file reveal in macOS Finder with selection highlight
-                spawn('open', ['-R', targetPath], { detached: true, stdio: 'ignore' });
-              } else if (process.platform === 'win32') {
-                // Exact file selection in Windows Explorer
-                spawn('explorer.exe', [`/select,${targetPath}`], { detached: true, stdio: 'ignore' });
-              } else {
-                spawn('xdg-open', [targetPath], { detached: true, stdio: 'ignore' });
-              }
-
-              res.setHeader('Content-Type', 'application/json');
-              res.statusCode = 200;
-              res.end(JSON.stringify({ ok: true }));
-            } catch (err) {
-              res.statusCode = 400;
-              res.end(JSON.stringify({ ok: false, error: String(err) }));
+          const body = await readBody(req, REVEAL_MAX_BYTES);
+          if (body === undefined) {
+            json(res, 413, { ok: false, error: 'payload too large' });
+            return;
+          }
+          try {
+            const data = JSON.parse(body);
+            const targetPath = typeof data.path === 'string' ? data.path.trim() : '';
+            if (!targetPath) {
+              json(res, 400, { ok: false, error: 'Empty path' });
+              return;
             }
-          });
+
+            if (process.platform === 'darwin') {
+              // Exact file reveal in macOS Finder with selection highlight
+              spawn('open', ['-R', targetPath], { detached: true, stdio: 'ignore' });
+            } else if (process.platform === 'win32') {
+              // Exact file selection in Windows Explorer
+              spawn('explorer.exe', [`/select,${targetPath}`], { detached: true, stdio: 'ignore' });
+            } else {
+              spawn('xdg-open', [targetPath], { detached: true, stdio: 'ignore' });
+            }
+
+            json(res, 200, { ok: true });
+          } catch (err) {
+            json(res, 400, { ok: false, error: String(err) });
+          }
         },
       });
     }, 'dsh-viewtune: /api/better-display/reveal route');
@@ -216,7 +229,18 @@ export function apply(ctx: Context): void {
           }
           // The record is refused rather than coerced: whatever is stored is what the next run reads
           // back, so a shape this half does not recognise must not be written over a good one.
-          if (!(await writeSettings(READER_SETTINGS_FILE, parsed))) {
+          let written: boolean;
+          try {
+            written = await writeSettings(READER_SETTINGS_FILE, parsed);
+          } catch (error) {
+            // The write itself threw: a full disk, a read-only instance home, a file another process holds. The host
+            // webserver answers a bare 400 for a rejected handler, which the client cannot tell apart from the
+            // deliberate refusal below — so this answers for itself, and says which of the two happened.
+            console.warn(`[viewtune] the settings record could not be written: ${String(error)}`);
+            json(res, 500, { ok: false, error: 'write failed' });
+            return;
+          }
+          if (!written) {
             json(res, 400, { ok: false, error: 'not a settings record' });
             return;
           }

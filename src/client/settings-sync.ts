@@ -106,7 +106,7 @@ export async function saveHostSettings(state: unknown): Promise<void> {
     if (!res.ok) {
       if (!refusalReported) {
         refusalReported = true;
-        console.warn(`[viewtune] the settings record was refused (HTTP ${String(res.status)}), so nothing changed from now on will be stored`);
+        console.warn(`[viewtune] the settings record was not stored (HTTP ${String(res.status)}), so nothing changed from now on will be saved`);
       }
       return;
     }

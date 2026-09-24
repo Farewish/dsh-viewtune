@@ -68,7 +68,9 @@ test('a record the host REFUSED is reported once, and is not announced as stored
     // A refusal means nothing this reader changes will be stored — worth one line, not one per change: a dragged
     // slider is a hundred writes a second, and a console full of them is its own kind of silence.
     assert.equal(warned.length, 1);
-    assert.match(warned[0]!, /refused/);
+    // The wording covers both halves the host can answer with: a record it declined to keep (400) and a write that
+    // failed outright (500). Both mean the same thing to the reader, which is what the line has to say.
+    assert.match(warned[0]!, /not stored/);
     assert.match(warned[0]!, /400/);
   } finally {
     console.warn = originalWarn;
