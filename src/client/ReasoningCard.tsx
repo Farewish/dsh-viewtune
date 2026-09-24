@@ -11,6 +11,15 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 /** How long after the last wheel notch a gesture counts as finished. */
 const WHEEL_IDLE_MS = 140;
 
+/**
+ * An upper bound on chasing a height transition.
+ *
+ * The stylesheet eases the focused card's height over 160ms (Reader.module.css), and the chase ends on reaching the
+ * target — but a card whose content has outgrown the ceiling is asked for a height the browser will not give, so the
+ * deadline is what ends that one. Comfortably past the transition, far below anything a reader could perceive as lag.
+ */
+const HEIGHT_CHASE_MS = 400;
+
 /** One real transcript: reference transform while following, native scroll while reading. */
 export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, focusKey, focused, onFocusChange }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
@@ -250,6 +259,41 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     let lastEdges = 'none';
     /** The line box, cached with the preview height and for the same reason: a focused card grows in whole lines. */
     let lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
+    let heightChase = 0;
+    /**
+     * Take the growth the browser has ACTUALLY applied out of the space above the card, and keep taking it while the
+     * browser still owes some.
+     *
+     * With 逐帧滑行 the stylesheet eases the focused card's `height` (see the rule in Reader.module.css), so at the moment
+     * of the write the height has not moved yet: one read would see no growth at all and the content below the card
+     * would be pushed down and never pulled back. Charging the scroll the whole REQUESTED growth instead would lead the
+     * box — the bottom edge would rise and then settle — which is why this is a chase rather than a one-shot read.
+     * Untouched for 直接贴底, 动效关 and reduced motion: there the first read IS the target and nothing is scheduled.
+     */
+    const compensateHeight = (target: number): boolean => {
+      const rendered = port.offsetHeight;
+      const grew = rendered - focusRendered.current;
+      focusRendered.current = rendered;
+      if (grew > 0) {
+        const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
+        if (scroller !== null) scroller.scrollTop += grew;
+      }
+      return rendered === target;
+    };
+    const chaseHeight = (target: number): void => {
+      cancelAnimationFrame(heightChase);
+      heightChase = 0;
+      if (compensateHeight(target)) return;
+      // The deadline is what ends it when the stylesheet's ceiling clamps the target, so a card past `min(60vh, 560px)`
+      // cannot leave a frame loop running for as long as it holds the focus.
+      const deadline = performance.now() + HEIGHT_CHASE_MS;
+      const step = (): void => {
+        heightChase = 0;
+        if (compensateHeight(target) || performance.now() > deadline) return;
+        heightChase = requestAnimationFrame(step);
+      };
+      heightChase = requestAnimationFrame(step);
+    };
     const measure = (recordHeight = true) => {
       if (recordHeight) {
         previewHeight = parseFloat(getComputedStyle(port).getPropertyValue('--reason-preview-height'));
@@ -288,15 +332,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         if (wanted !== focusHeight.current) {
           focusHeight.current = wanted;
           port.style.height = `${String(wanted)}px`;
-          // The height the browser actually gave us. Reading it costs nothing extra: the overflow test three lines
-          // below already reads layout, so this is the same flush, and this box was just written.
-          const rendered = port.offsetHeight;
-          const grew = rendered - focusRendered.current;
-          focusRendered.current = rendered;
-          if (grew > 0) {
-            const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
-            if (scroller !== null) scroller.scrollTop += grew;
-          }
+          chaseHeight(wanted);
         }
       } else if (focusHeight.current !== 0 && !active && reasoningMode === 'latest') {
         // 跟随最新 is the one mode specified to fold back to the small card once the thinking ends. The other two KEEP the
@@ -440,6 +476,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     measure(false); schedule();
     return () => {
       alive = false; cancel(); manual(); observer.disconnect();
+      cancelAnimationFrame(heightChase);
       wheelUntil = 0;
       port.removeEventListener('scroll', onScroll); port.removeEventListener('wheel', onWheel);
       document.removeEventListener('selectionchange', onSelection);

@@ -297,6 +297,22 @@
   max-height: min(60vh, 560px);
   transition: none;
 }
+/* 「焦点思考展开」 grows one whole line at a time, and with 跟随到最新 set to 逐帧滑行 the card EASES into each new line
+   instead of stepping to it — the growth is the only motion on screen while a focused card holds the page's follow
+   suspended, so it is the one place the reader's smoothness setting was not visible.
+   Three gates, all of them load-bearing:
+     - `data-reader-follow-mode=glide` is the reader's choice: 直接贴底 means they asked for no easing, and the step
+       stays instant for them.
+     - the `:not([data-motion=off])` is the 动效 switch. It is spelled here rather than left to the gate below because
+       THIS selector is more specific than that one (an extra attribute and the `:not()`), so the gate would lose.
+     - the media query is the system's request. `no-preference` rather than relying on the reduce block below, for the
+       same specificity reason.
+   The compensation in ReasoningCard chases this transition frame by frame: see the note there. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reader-follow-mode=glide]:not([data-motion=off]) .reasonCard[data-focus=true]:not([data-expanded=true]) .reasonViewport {
+    transition: height .16s var(--reason-ease, ease-out);
+  }
+}
 .reasonCard:not([data-focus=true]) .reasonViewport {
   transition: max-height .3s var(--reason-ease, ease-out);
 }

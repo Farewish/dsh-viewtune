@@ -504,7 +504,22 @@ const markers = [
   ['…and the focus that frame loop reads is written in a LAYOUT effect, with the rendered height seeded from the grant', () =>
     bundle.includes('(0, react.useLayoutEffect)(() => {\n\t\t\t\tfocusedRef.current = focused;')
     && bundle.includes('focusRendered.current = viewport.current?.offsetHeight ?? 0;')],
-  ['…under a ceiling that stays in the stylesheet, with the growth instant and only the return animated', '.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}.WGoHxG_reasonCard:not([data-focus=true]) .WGoHxG_reasonViewport{transition:max-height .3s var(--reason-ease,ease-out)}'],
+  ['…under a ceiling that stays in the stylesheet, with the growth eased only when the reader asked for 滑行', () =>
+    // The ceiling is CSS, and the focused rule still turns transitions off by default: the easing is a SEPARATE rule
+    // with three gates on it, because the reader's 逐帧滑行 is what asks for it, 动效关 must still stop it, and so must the
+    // system's reduced-motion request. Both are spelled in the selector (`:not([data-motion=off])`) or in the media
+    // query's `no-preference` because this rule is MORE specific than the gates further down, which would otherwise lose.
+    bundle.includes('.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}')
+    && bundle.includes('@media (prefers-reduced-motion:no-preference){[data-reader-follow-mode=glide]:not([data-motion=off]) .WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{transition:height .16s var(--reason-ease,ease-out)}}')
+    && bundle.includes('.WGoHxG_reasonCard:not([data-focus=true]) .WGoHxG_reasonViewport{transition:max-height .3s var(--reason-ease,ease-out)}')],
+  ['…and the compensation chases that easing frame by frame, ending on the target or on a deadline', () =>
+    // A transitioned height has not moved yet at the moment of the write, so a single read would see no growth at all;
+    // charging the whole request instead would lead the box and wobble its bottom edge. The chase ends on the target
+    // (with no transition in flight the first read IS the target, which is why 贴底 and 动效关 are untouched) or on a
+    // deadline (a target the stylesheet's ceiling clamps never arrives).
+    bundle.includes('"data-reader-follow-mode": followMode,')
+    && bundle.includes('if (compensateHeight(target)) return;')
+    && bundle.includes('if (compensateHeight(target) || performance.now() > deadline) return;')],
   ['…with the motion switch dropping those transitions', () => bundle.includes('[data-motion=off] .WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport,') && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(bundle)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
   ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
