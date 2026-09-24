@@ -671,6 +671,17 @@ const markers = [
     bundle.includes('if (revealTurn(pendingReveal)) setPendingReveal(null);')
     && bundle.includes('setPendingReveal(item.turn);')
     && bundle.includes('if (!targetRow) return false;')],
+  ['the tool table names the cordis verbs this host actually registers', () =>
+    // A table of wire names cannot check itself against the host, which is how it carried two names this host does not
+    // register for a long time while the three real inspect verbs fell to the generic row. The absent half is asserted
+    // as ENTRY SHAPES, not as substrings: the comment above the table names the old ones deliberately, as the history
+    // of the mistake, and a substring check would forbid saying what was wrong.
+    bundle.includes('cordis_inspect_list: "read",')
+    && bundle.includes('cordis_inspect_query: "read",')
+    && bundle.includes('cordis_inspect_self: "read",')
+    && bundle.includes('cordis_define: "Define Cordis Plugin",')
+    && !bundle.includes('cordis_package_inspect: "read",')
+    && !bundle.includes('cordis_runtime_inspect: "Inspect",')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

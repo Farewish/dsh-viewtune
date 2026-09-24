@@ -31,11 +31,11 @@ export const VARIANT_TITLES: Record<ToolRowVariant, string> = {
 /**
  * Known tool name -> variant.
  *
- * `cordis_define` is deliberately absent: ui-cordis registers a keyed
- * `tool.call.toolview` entry for it, and a keyed hit REPLACES the generic row
- * (this table is only reached through GenericToolCard, the dispatch fallback in
- * ToolCallTree). An entry here would be unreachable, and a second title for the
- * same call would be a second answer to a question the card already owns.
+ * The names here have to be the ones the HOST registers, and a table cannot check that for itself — it is a list. It
+ * carried `cordis_package_inspect` and `cordis_runtime_inspect` for a long time, and this host registers neither: the
+ * inspect verbs are `cordis_inspect_list`, `cordis_inspect_query` and `cordis_inspect_self`, so the three real calls
+ * fell to the generic row while two entries could never match anything at all. They are named correctly now; the note
+ * above the titles says what the comment that used to stand here got wrong.
  */
 const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   bash: 'bash',
@@ -53,12 +53,14 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   write: 'write',
   edit: 'edit',
   run_code: 'code',
-  cordis_package_inspect: 'read',
-  cordis_runtime_inspect: 'read',
-  // The three run-control verbs take one package id and produce a receipt, so
-  // the generic row is the decided intent, not an unclassified default: there is
-  // no program to show (that is `cordis_define`'s card) and no file to open. The
-  // id lands in the summary slot, and the titles below name the act.
+  // The inspect verbs read: they report on the host's own registries, so they belong to the read row
+  // family and carry their own titles below.
+  cordis_inspect_list: 'read',
+  cordis_inspect_query: 'read',
+  cordis_inspect_self: 'read',
+  // The run-control verbs take one package id and produce a receipt, so the generic row is the decided
+  // intent, not an unclassified default: there is no program to show (that is `cordis_define`, titled
+  // below) and no file to open. The id lands in the summary slot.
   cordis_run: 'others',
   cordis_stop: 'others',
   cordis_undefine: 'others',
@@ -72,10 +74,17 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
  * process itself and never consults that registry, so without a name they all arrived as
  * "Tool call". A title at least names the act; the first two also get their own body in
  * ToolActivity, which is where a question's answers and a delivery's files belong.
+ *
+ * The same reasoning is why `cordis_define` is HERE. This file used to say that the keyed card for it
+ * made an entry unreachable — which is true of the product's own view and false of this one, because
+ * the reading view is the thing reading this table. Without an entry, the verb that DEFINES a plugin
+ * was the one cordis call with no name at all.
  */
 const TOOL_TITLES: Record<string, string> = {
-  cordis_package_inspect: 'Inspect',
-  cordis_runtime_inspect: 'Inspect',
+  cordis_inspect_list: 'List Inspect Providers',
+  cordis_inspect_query: 'Query Inspect Provider',
+  cordis_inspect_self: 'Inspect Session',
+  cordis_define: 'Define Cordis Plugin',
   cordis_run: 'Run Cordis Plugin',
   cordis_stop: 'Stop Cordis Plugin',
   cordis_undefine: 'Remove Cordis Plugin',
