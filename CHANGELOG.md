@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (the card's bottom stops trembling while it grows)
+## 0.4.1 (the card's bottom stops trembling while it grows)
 
 **读者确认「卡片底部不完整」已消失，但报了一个新症状：卡片**长高时**底部会微微颤动。**
 
@@ -9,7 +9,7 @@
 - 两条都是**独立成立**的（各自都有理由，不是碰运气），而且都是**我们自己的元素与代码**。若颤动仍在，下一步是探针采样（不再推断）✓。
 - 守护：那条 marker 与反向用例里的形状随之更新（`offsetHeight` → `getBoundingClientRect().height`）✓；反向自检 42 例全过 ✓。
 
-## Unreleased (the focus closes the tail gap it was granted in)
+## 0.4.1 (the focus closes the tail gap it was granted in)
 
 **焦点思考展开的第二次修复。读者的重述把机制钉死了，而且它和第一次不是同一个原因：第一次是"补偿量错了盒子"，这一次是"锚定的那个位置本身看不见"。**
 
@@ -21,7 +21,7 @@
 - 诚实的边界：机制是从读者的观察**推**出来的（药丸写最大值 ⇒ 缺口），不是量出来的。若症状仍在，下一个动作是探针直接采样 `卡片/底栏/滚动容器/输入框座席` 的 rect 与 `scrollTop/scrollHeight/clientHeight` ✓。
 - 守护：一条 marker（授予时的两步）与一个反向用例（把位置写成它自己，等于不关缺口）✓。反向自检表 41 → **42** 例。
 
-## Unreleased (the focused card keeps its own bottom edge, footer included)
+## 0.4.1 (the focused card keeps its own bottom edge, footer included)
 
 **修掉读者报的「焦点思考展开时卡片底部显示不完整、页面翻不到最下面」：补偿量的是**视口**的高度，而读者眼里的"卡片底部"在视口下方的**底栏**之后。**
 
@@ -32,7 +32,7 @@
 - 逐帧追的停止判据仍然是**视口**的高度（样式表缓动的是它），而补偿量是**卡片**的——两个不同的数，理由写在代码里：上限夹的是前者，底栏动的是后者 ✓。
 - 守护：三条 marker 随之改写（补偿量、每次 measure 的记录、授予前的记录），两个反向用例（把补偿改回量视口；去掉授予前的记录）✓。反向自检表 39 → **41** 例。**并记下一件构建事实**：这一区域的**注释会被构建剥掉**（别处的注释留着），所以这三条 marker 都钉**代码形状**而不是旁边的注释——这是"marker 要对产物拼写、不要对源码"的又一例 ✓。
 
-## Unreleased (a head-less document gets its bridge, and three audit verdicts)
+## 0.4.1 (a head-less document gets its bridge, and three audit verdicts)
 
 **三条"仍未核实"的审计条目核实完毕：一条真、两条不成立；真的那条修掉，两条不成立的证据留在代码旁边。**
 
@@ -41,7 +41,7 @@
 - **不成立 ②（B3："导航项身份随每个增量抖动"）**：上游 `items()` 返回**缓存数组**，`touch()` 只在项目**真的不同**时才换数组（逐字段比较），而项目里的 `response` 是**截断预览**（`preview(…, RESPONSE_PREVIEW_LIMIT)`）⇒ 抖动只在每条回答开头那约 120 字符内发生、之后稳定。机制真实、**有界**，而且是上游的发布行为 ⇒ 不改（我们的选择器消费它；为这点代价重做 rail 的选择器不划算）✓。
 - **A4 那条（`measure()` 里第二次 `text.offsetHeight`）**：核实后**保留并注释**——两次读之间有一次高度写入，它可能让端口的滚动条出现或消失，而滚动条改变文本的**宽度**、于是重新折行；比较对象是预览高度而不是端口高度，所以只有折行能改变这个答案。审计把它读成"多余的一次读"，它其实是那笔交易里便宜的一侧 ✓。
 
-## Unreleased (the focused card is eased into each new line when the reader asked for 滑行)
+## 0.4.1 (the focused card is eased into each new line when the reader asked for 滑行)
 
 **「焦点思考展开」的高度增长现在会缓入——但只在「跟随到最新」是「逐帧滑行」时，并且仍然受「动效」与系统 reduced-motion 管。**
 
@@ -53,7 +53,7 @@
 - 守护：原来那条断言「增长是瞬时的」而**被这次改动正确地拦下**（这正是守护该做的事），现在改成断言三道闸门与缓动规则本身；另新增一条断言逐帧追的两个退出条件（目标 / 期限）。两个反向用例：把三闸门换成无条件、把追帧关掉，都能让它失败 ✓。反向自检表 36 → **38** 例。
 - 两个 README（中／英）的「跟随到最新」与「焦点思考展开」两条也随之写明：滑行的选择现在也体现在**卡片自身的长高**上 ✓。
 
-## Unreleased (a tool row reads the file vocabulary, and the wallpaper column is looked up once)
+## 0.4.1 (a tool row reads the file vocabulary, and the wallpaper column is looked up once)
 
 **两条审计条目，改之前都先读了源码；形状相同——某样东西被读或被测得比它变化的次数更勤。**
 
@@ -63,7 +63,7 @@
 - **同一次审计里还有两条结论不成立，一并留档免得重查**：① "`settledBy = duration + maxDelay` 里那 240ms 是浪费，真实需要只有 350"——`word-motion` 用 `animation.startTime = born` **回填**动画起点，所以一个词的窗口确实是 `born + duration`，但那 240ms 是**保险**：元素由一次 React commit 挂载、可能晚于 `born`，而 `born` 本身可能在未来（最多 `batchMs`）。把游标推进过一个还在动画中的词会**卸载**它，读者看到的是"啪"地出现 ⇒ 数值保留，理由写在旁边 ✓。② "`STREAM_TIMING.revealMs` 无人读"——这条**成立**，已删：一个词动画多久由 `WORD_MOTION.duration` 决定（在拥有动效的那个模块里），在只决定"何时释放文本"的模块里放同一数字的第二份，是等着漂移的数 ✓。
 - **`hydrate` 的前向兼容洞现在写清楚了**：本 build 不认识的键在入口被忽略，然后在下一次变更后**从宿主文件里消失**（整份记录被替换），所以新 build 写的键会被旧 build 销毁。这是**有意**的：这份记录属于一个读者自己、实例目录按 harness 版本隔离（`homes/<version>`），会丢设置的降级路径没人走；要保留就得在 store 里带一个"未知键口袋"再回传，那是为读者不会运行的 build 造机械 ✓。
 
-## Unreleased (the host half bounds what it reads, and answers what it refuses)
+## 0.4.1 (the host half bounds what it reads, and answers what it refuses)
 
 **修掉我们插件 host half 自己的三个洞——同一个文件、同一条规则，其中两个是"设置路由有上限，旁边的路由没有"。**
 
@@ -73,7 +73,7 @@
 - 客户端那句警告也跟着改：原来写 "refused (HTTP n)"，只对 400 成立；现在写 "was not stored (HTTP n)"，因为对读者来说两者是同一件事 ✓。
 - **一条操作性事实**：host half 的改动**要重启 Host 才生效**（client half 走 HMR，这一个不会）——写在这里，免得以后照 client 的习惯以为已经生效。
 
-## Unreleased (a panel lands the way a turn lands, and no ref is written during render)
+## 0.4.1 (a panel lands the way a turn lands, and no ref is written during render)
 
 **修掉两条审计条目（改之前都先读了源码核实），外加一个我自己上一步弄错的名字。**
 
@@ -83,7 +83,7 @@
 - 守护新增一条：断言 `scrollIntoView` 的**调用**不存在、而共享的 `landTurn` 存在；反向自检里有一个把它加回来的用例 ✓。
 - **同一次审计里还有一条被判为"非问题"，记在这里免得重查**：`WaitClock` 的 250ms 定时器确实是无条件的（依赖列表为空），但该组件只在 `wait !== null`（真的在等模型）时挂载、并且按"交接点"重新挂载；阈值前的空转是每次等待约 12 次返回 null 的渲染，而 250ms 之后本来就必须开始计数。机制描述对，影响不成立 ⇒ 没有为它加第二条定时器路径（那是无收益的复杂度）。
 
-## Unreleased (the tool table names the cordis verbs this host really registers)
+## 0.4.1 (the tool table names the cordis verbs this host really registers)
 
 **修掉一张表里的两个死名字，以及一段把"产品自己的视图"当成"本视图"的说法。**
 
@@ -91,7 +91,7 @@
 - `cordis_define` 是另一半：本文件原来断言它的缺席是刻意的，理由是 ui-cordis 为它注册了 keyed `tool.call.toolview` 卡片、而 keyed 命中会**替换**通用行 ✗。那对**产品自己的视图**成立，对本视图不成立——本阅读视图自己渲染过程、从不查那张注册表，而这句话在同一文件下方三行的注释里本来就这么写着。定义插件的那个动词，成了唯一没有名字的 cordis 调用 ⇒ 现在有名字了 ✓。
 - 守护一条：三个真名与新标题必须作为**条目**存在，两个死名必须**不存在**——而且按**条目形状**断言而不是子串，因为表上方的注释故意提到旧名（作为这次错误的来历），子串断言会禁止说明错在哪里 ✓。
 
-## Unreleased (say so when the host refuses the settings record)
+## 0.4.1 (say so when the host refuses the settings record)
 
 **修掉「读取失败」的另一半：写入被拒原来完全不发声。**
 
@@ -99,7 +99,7 @@
 - **每会话只报一次**是刻意的：拒绝不是抖动，宿主是在说"这份记录我不会留着"，那么从这一刻起读者改的任何东西都不会被存——这值得一行，而不是每次改动一行（拖一次滑块是每秒上百次写入，把控制台刷满本身就是另一种沉默）✓。**网络失败不报**：下次变更本来就会重试，断网会把控制台刷满。
 - 测试钉住两半：两次被拒只产生**一条**警告；被拒的写入**不通知订阅者**——否则应用级背景会显示一个重启后并不存在的状态 ✓。
 
-## Unreleased (ask the selection once, and say what that 8 was)
+## 0.4.1 (ask the selection once, and say what that 8 was)
 
 **三处卫生问题，都不是读者会报的行为，而是"读起来就是错的"东西。**
 
@@ -108,7 +108,7 @@
 - **那个裸 `8`**：两个调用点都往一个叫 `slack`、毫无文档的参数里传 `8` ⇒ 现在是有名字、有解释的常量（后来因为与 `conversation-scroll.ts` 的 24 撞名又改名，见上面那条）✓。
 - **一条过程教训，以及这条教训自己的更正**：我先把两个源文件用 PowerShell `Get-Content`/`Set-Content` 往返改，随后读 `git diff` 时看到满屏替换字符，判定"文件没坏、只是控制台渲染不出 CJK"，于是回滚了两个文件——**这个判断是错的，回滚才是对的**。实测（本机 shell 是 Windows PowerShell 5.1 Desktop）：`Get-Content -Raw` 把无 BOM 的 UTF-8 当 ANSI 读、`Set-Content` 再按 ANSI 写，往返**有损**——25 字节的样张变成 26 字节、SHA256 不同、`—`(`e2 80 94`) 变成 `‿`(`e2 80 3f`)。`git diff` 当时把那些行报成"已修改"，那本身就是字节真的变了，不是显示问题。仓库原有的那条教训**成立且现在有实测支撑**：**不要用 `Get-Content`/`Set-Content` 往返改这个仓库的文件**，用编辑工具 ✓。
 
-## Unreleased (a jump into loaded history lands from the commit that rendered it)
+## 0.4.1 (a jump into loaded history lands from the commit that rendered it)
 
 **修掉「跳到还没载入的轮次时，有时候什么也不发生」：跳转在 `loadThrough` 之后等一个猜的 50ms，然后调用一个不回答任何东西的 `reveal`。**
 
@@ -117,7 +117,7 @@
 - 顺带退休了本文件最后一个"计时器形状的猜测"：两个闪烁定时器已在上一提交补上卸载清理，而这一个连清理都没有（回调可能落在已经不存在的组件上）✓。
 - 守护一条 marker 同时钉住重试、回答（`if (!targetRow) return false;`）与请求被记录——三者缺一，跳转仍然什么都不做 ✓；反向自检里有一个把重试中和掉的用例 ✓。
 
-## Unreleased (the process button is a button again, and the running turn is not rescanned per delta)
+## 0.4.1 (the process button is a button again, and the running turn is not rescanned per delta)
 
 **修掉两件：关闭流程后 150ms 内再点一次是「再关闭」而不是重新展开；以及每个流式增量都遍历全部轮次。**
 
@@ -125,7 +125,7 @@
 - `liveTurn` 原来写在 `useChat` 选择器里，而选择器**每次 store 通知都跑**、文本是一个增量一次通知 ⇒ 每个流式块都走一遍全部轮次，成本随历史增长，而它的答案只可能在轮次/步骤**边界**变 ✗⇒✓。现在是挂在 `timeline` 上的 memo：跨增量身份不变、边界时才被替换，memo 是白拿的。这是本文件同一族问题的第三处，marker 因此同时断言 memo 形状与"选择器里不再有那个扫描" ✓。
 - 两个闪烁定时器（产物 chip 的 1600ms、"打开工作区文件夹"的 1600ms）原来卸载时不清理；后者连 ref 都没有，第二次点击会叠上第二个定时器 ✗⇒✓。
 
-## Unreleased (four claims that were not true)
+## 0.4.1 (four claims that were not true)
 
 **一轮对本仓自己代码的审计翻出来的四处"说法与代码不符"——每条都是一行或一条规则，所以放在一起。**
 
@@ -136,7 +136,7 @@
 - **同一轮审计里有两条结论不成立，一并记下来免得以后重查**：① "`native/upstream.json` 六个 sha256 里有三个对不上"——同目录 `markdown/upstream.json` 把这个字段命名为 `sha256BeforeAdaptation`，**对不上正说明该文件被适配过**，而那三个恰好就是 `adaptations` 列表点名的导入改写，另三个逐字未改所以对得上 ✓；② "`data-expanded=true` 的 `max-height` 规则是死的"——焦点那条规则要求 `data-focus=true`，而要求完整高度会释放焦点，所以对"已展开且未聚焦"这个正常状态只有它生效，规则是活的（重复的数字是真的）。
 - 守护三条 marker + 三个反向用例 ✓；CSS 那条**按形状**匹配而不是按源码字面量——构建会把 `animation` 简写重排、把关键帧名加哈希，产物里是 `animation:1s ease-in-out infinite alternate <hash>_markBusyPulse`，这正是本仓历史上让 marker 悄悄失效过的那类拼写变化 ✓。
 
-## Unreleased (a settings read that failed is not a record that is empty)
+## 0.4.1 (a settings read that failed is not a record that is empty)
 
 **修掉一条会毁配置的路径：读取失败被当成"什么都没存"，于是客户端把本浏览器的整份状态推上去——在新端口上那就是默认值——覆盖掉它没能读到的记录。**
 
@@ -146,7 +146,7 @@
 - 旧测试把 `{settings:{}}` 与"fetch 被拒"断言成**同一个**期望值：它不是漏掉了差别，而是把歧义写进了断言 ✗⇒✓。现在三种结果都钉住。
 - 守护断的是**顺序**：失败分支必须在 `settingsLoaded.current = true` **之前**——先 arm 再判断，正是那条破坏性推送回来的方式（分支提前 return 后，变更驱动的 effect 两行后照样把状态发出去）✓。
 
-## Unreleased (the shared record carries preferences, not this session's reading)
+## 0.4.1 (the shared record carries preferences, not this session's reading)
 
 **修掉一条会静默停掉全部设置的棘轮：`expanded`（哪几轮的流程被打开过）被写进**所有会话共享**、上限 64KB、超限**整份拒绝**的设置文件里，而且它只增不减。**
 
@@ -156,7 +156,7 @@
 - 迁移不需要任何手动步骤：从宿主记录 hydrate 之后会立刻把过滤后的记录推回去。**在读者真实的文件上验到**：2000 字节、39 个 `turn:` 键 ⇒ 542 字节、0 个，21 个偏好键全部完好 ✓。
 - 这条也是"类型检查排在 sync 前面"的一次收获：第一版参数写成 `Record<string, unknown>`，而 `ReaderState` 是 interface、没有索引签名 ⇒ tsc 直接拦下，没被拷贝到任何地方 ✓。
 
-## Unreleased (the panel's choice rows have a style, and a checker for classes that have none)
+## 0.4.1 (the panel's choice rows have a style, and a checker for classes that have none)
 
 **修掉「五个 `<select>` 是浏览器自带的灰控件」：`css.settingsSelect` 被引用五次、任何样式表里都没有规则——而 CSS-module 类名缺失会编译成 `undefined`，React 照渲染、什么都不会失败。**
 
@@ -166,7 +166,7 @@
 - 顺带两个**不存在的宿主 token**：`--dsw-alias-line-secondary`（逐字照搬上游）——简写里的未定义 `var()` 会让**整条声明**在计算值阶段失效，所以那条分隔线从来没有画出来过，现在用本仓到处在用的 `-border-l2` ✓；以及等待时钟超时徽标的 `--dsw-alias-state-warning-primary`（宿主拼作 `-warn-primary`），`#d8862c` 兜底把它盖住了，于是文字与 16% 底色一直没跟着主题走 ✓。
 - **一条更正**：本条所在的提交（`16471aa`）正文的 Verified 行写着 `sync COPIED 8`，**实际是 7**。这里更正而不去改写历史：那次改写会让其后的 19 个提交全部换哈希，而其中三个（`f2394c9`、`ccbb262`、`220e949`）正被别的提交正文按哈希引用 —— 修一个数字换来三处指空与 19 个新哈希，不划算；把这个数字留在这里，读者看到的就是对的 ✓。
 
-## Unreleased (the focused card is charged for the height it got)
+## 0.4.1 (the focused card is charged for the height it got)
 
 **修掉「焦点思考展开」里的两个错：一个错的数、一个和跟随器同族的顺序错。**
 
@@ -176,7 +176,7 @@
 - 同文件顺手：`start()` 用同名局部变量重读了 `lineHeight`，遮蔽了它自己注释里承诺的缓存；两条与代码矛盾的注释（焦点文档说释放"只在跟随最新"，而下面那个 effect 在所有模式都释放；空闲观察器的文档说"每秒两次"，而定时器是 300ms）✗⇒✓。
 - **没有改**、并且值得记下来免得被当成死代码：`.reasonCard[data-expanded=true] .reasonViewport` 与焦点规则写着同一个 `min(60vh, 560px)`，但它不是不可达的——对"已展开且未聚焦"（也就是「展开阅读」的正常状态）只有它这一条生效。重复的数字是真的，规则是活的 ✓。
 
-## Unreleased (the publication clock outlives the effect that reads it)
+## 0.4.1 (the publication clock outlives the effect that reads it)
 
 **修掉节奏闸门问错的问题——而且这个问题随着模型写得越快而越糟。**
 
@@ -186,7 +186,7 @@
 - 改法是把时钟放进 ref：只在一处取种，之后只在**真的发布**时写入（节流分支与隐藏页面的 flush）✓。现在它名副其实——最多一个步长一次发布，而上一次已经超过一个步长时立刻就是下一次（停顿或新回答不必先付一个步长的延迟）✓。
 - 守护：原来钉 tick 块的是一条字符串，而一条字符串表达不了"这个 ref 存在**且**那个局部变量不存在"；现在是合取式，因为**局部变量的缺席就是修复本身** ✓。反向自检里那条"发布闸门改回每帧发布"的用例还因为形状移动先报了 SKIP——那正是这张表的用处 ✓。
 
-## Unreleased (the suspension is current where the observer reads it)
+## 0.4.1 (the suspension is current where the observer reads it)
 
 **修掉上一提交留下的同一族的最后一处：把 `liveRef`/`endedAt` 挪进 layout effect 时，一行之下的 `suspendedRef` 留在了被动 effect 里。**
 
@@ -195,7 +195,7 @@
 - 顺带修掉一个不变量：`writeTop` 的注释承诺记下的数是"浏览器实际会持有的数"，但五处调用里有**两处**（第一帧、观察器的直贴模式）写 `scrollHeight` 却把它原样记下——一个元素永远不可能持有的位置，于是那条"这是我们自己滑的、不是读者在滚"的判据在恰好这两条路径上永不命中 ✗⇒✓。`limit` 现在是**必填参数**，五处全部夹取 ✓。
 - 第二条**没有构造出症状**，值得说出来：穿透后会走普通规则、在底部重新得出 `following = true`，所以那条死掉的判据没有可观察代价。修它是因为不变量才是那条判据有意义的原因，不是因为有人报过 ✓。
 
-## Unreleased (the turn's own rows are followed by asking whether it is still producing)
+## 0.4.1 (the turn's own rows are followed by asking whether it is still producing)
 
 **修掉「尾部有时候停在回答最后一行」：交付物、度量、动作行是在回答最后一个字之后才排版的，而那时跟随已经关了。**
 
@@ -205,7 +205,7 @@
 - 同一次收窄：`typingInside()` 不再把输入框当作"别动"的理由（输入框是宿主钉在阅读视图底部自己的元素，滚转录打扰不到它）——一个答案还在来时点进输入框的读者，原来会眼看着答案结束而跟随冻住 ✗⇒✓。
 - **两处敞口当时就写进了提交正文，状态也照实记在这里**：`[data-composer-seat]` 这条排除既没有 marker 也没有单测（仍敞着）；反向自检里有一个用例名不副实（标签说"又回到被动 effect"，mutation 改的却是尾窗表达式）——后者本轮已修，那条现在真的去撤销 layout effect ✓。
 
-## Unreleased (a suspended follow is not a reader takeover)
+## 0.4.1 (a suspended follow is not a reader takeover)
 
 **修掉「焦点卡折起后页面不再跟随」：挂起期间，挂在旁边的叙述或回答继续让转录变长，而打开的距离被普通规则读成"读者滚走了"。**
 
@@ -213,14 +213,14 @@
 - 改法是不再把两件事混为一谈：`useReadingScroll` 把挂起当成自己的状态，并且**只有向后移动的滚动才算接管**——这个 hook 与焦点卡写的每一次位置都是向前的 ✓。`resume()` 也因此不再要求"在尾部余量之内"，因为余量正是挂起会破坏的东西 ✓。
 - 同一次收窄（**不是**这个 bug）：跟随器原来在阅读视图里**任何**东西有焦点时都不动，而一个溢出的思考卡是可聚焦的（为滚动情形给了 `tabIndex`）⇒ 点一下卡片就能永久停掉跟随 ✗⇒✓。判据改成键盘处理器本来就在用的那条：只有真正接收按键的目标（`textarea`/`input`/`contenteditable`）才拦住跟随 ✓。
 
-## Unreleased (the fold at the answer's start, added and withdrawn)
+## 0.4.1 (the fold at the answer's start, added and withdrawn)
 
 **「回答开始时收起流程」被加过、又被撤掉；撤掉的理由值得留档，而且它顺带修的三处留了下来。**
 
 - 撤掉的理由：它要判定的那一刻是"回答开始"，而流式进行中一段**中途叙述**和一个**回答**在形态上无法区分（同一个形状的文本块，还没有工具调用）⇒ 没有可信的标记 ✗。唯一权威的标记 `turn-tail.closing.step` 要到 `turn/end` 才出现，那时"回答开始"早已过去 ✓。开关、`answeringTurn`、那个参数与 latch、以及相关 marker 与反向用例一并删除 ✓。
 - 保留下来的三处各自独立成立：折叠**等一个节拍**再落下（让要折叠的元素是曾经以展开状态挂载过的，见上面「流程按钮重新是个按钮」那条）；页面跟随在轮次结束后多留一小段（那几行——度量、动作行、交付物——是在状态翻转之后才排版的，后来被"问轮次是否还在产出"取代，见上面那条）；以及焦点结束时**显式**把跟随交还（`resume()`），而不是指望下一次增长把它带回来 ✓。
 
-## Unreleased (the shipped defaults are the reader's own settings)
+## 0.4.1 (the shipped defaults are the reader's own settings)
 
 **把这一批设置的出厂值换成读者自己当前那一套 —— 新装的人打开，就是现在这个样子。**
 
@@ -232,7 +232,7 @@
 - 守护与单测同步更新：五条"默认值/回退方向"断言 + 一处理性读取的断言 ✓；反向自检 ✓ 十七个用例全过 ✓。
 - 顺带说明：读者记录里那个已删除开关 `foldWhileAnswering` 的旧键会被忽略 ✓（`hydrate` 只搬 store 自己拥有的键 ✓），无害 ✓。
 
-## Unreleased (the reveal is the reader's choice)
+## 0.4.1 (the reveal is the reader's choice)
 
 **新增八项设置，都在「功能」页：「正文更新节奏」两选一（**默认「固定 60 次/秒」**）、「逐词显现的模糊」开关、「逐词显现」开关、「跟随到最新」两选一、「自动收起更早流程」开关、「思考卡自动跟随」三选一、「自动滚动速度」四选一、「焦点思考展开」开关（除节奏外默认都保持现状）。**
 
@@ -298,7 +298,7 @@
 
 - 八条设置各自的断言（选项数组与其顺序 / 默认即固定 60 次/秒 / 回退方向 / 发布闸门与"隐藏页仍立即 flush" / 关闭模糊时无 filter / 动画确实用了这个选择 / 逐词关掉时两处闸门都在 / 跟随方式两处闸门都在 / 自动收起的两处问法与清选择闸门 / 思考卡三模式与整行量化 / 模式与行速进了依赖里 / 焦点按行增长、上限留在样式表、展开阅读优先、唯一持有、页面暂停贴底 / 设置页三组顺序与两个小设置的闸门 / 各项默认与防御式读取）与反向自检脚本 `_tmp/negcheck-shape-markers.mjs`（表驱动，十七个用例）：把产物回退成旧形状或写回陷阱形状 ⇒ 对应断言全部失败 ✓，产物逐字节还原 ✓。
 
-## Unreleased (a streamed character no longer re-renders every turn)
+## 0.4.1 (a streamed character no longer re-renders every turn)
 
 **修掉「正文大量出现就卡」的主因：一个字符到达时整份对话都在重渲染——所以对话越长、已有回答越多，每字越贵。**
 
@@ -315,7 +315,7 @@
 - 顺带修掉一条**已被证伪的注释**：它声称 `groups` 每个流式增量都会重建；实际上它依赖的三个来源跨增量身份不变，只有结构发布时才重建。
 - 守护：三条断言从「钉那一行的字面写法」改为**连记忆化一起钉**；二分与键控空白各加了形状断言。反向自检脚本 `_tmp/negcheck-shape-markers.mjs`（表驱动，含两组用例）：把产物回退成旧形状 ⇒ 对应断言全部失败 ✓，产物逐字节还原 ✓。
 
-## Unreleased (thinking streams without the jank)
+## 0.4.1 (thinking streams without the jank)
 
 **修掉「流程进入思考时到处都卡」：滑动整页卡、滑动正在增长的思考卡片内部也卡（调工具时不卡）。**
 
@@ -328,7 +328,7 @@
 - 同一轮里还修掉三处**零效果损失**的重复开销：① `Reader.tsx` 的滚动 spy 原本依赖 `[groups]`（`groups` 每个 chunk 都是新对象）⇒ 每个 chunk 拆掉并重跑一次强制测量 + 两次 `setState`；改为依赖"行的集合"（`groups.map(group => group.turn).join('|')`）—— 某轮变长**不会移动它上方的行**，而那是阅读线量度所依据的行，位置变化本就由 scroll 监听与 scroller 的 `ResizeObserver` 送达。② 思考卡 follower 每帧 `new DOMMatrixReadOnly(...)` 只为取一个 `translateY` ⇒ 改为解析 2D matrix 的第五/六个数（非 matrix 时才回落 DOM API），数值完全相同。③ 页面 follower 每帧"写完再读回 `scrollTop`"只为记住去重值（写后读 = 强制布局）⇒ 改为在 JS 侧夹取并记录同一个数值。④ 思考卡的帧循环每帧都**无条件**调 `setOverflow`/`setEdges`：React 对同值更新会 bail out，但更新仍被排进队列、组件仍要渲染一次才发现无事可做 ⇒ 先在 ref 里比较再调（两个状态只由这一个函数写入 ⇒ 渲染结果逐字相同），流式时每次少 1–2 次渲染调度。
 - 还剩一处**没动**，理由记在这里：卡内 follower 每帧那次 `getComputedStyle(scrollTrack).transform` 是"看浏览器自己的插值"，它只决定渐隐三态与步进结束判据。要去掉只能自己复算缓动（会绕过 `prefers-reduced-motion` 对 transition 的覆盖 ⇒ 属于效果改动）或按"这一步两端边缘判定相同就不读"预测（可证等价，但那段循环刚修过 bug，收益又小）⇒ 先留原样。
 
-## Unreleased (the tail stops chasing an idle transcript)
+## 0.4.1 (the tail stops chasing an idle transcript)
 
 **修掉阅读页底部两个同源的手感问题：在底部向下滚时正文轻微上下抽动、且「回到最新」按钮不断出现又消失；以及**没有进行中的轮次**时仍会被自动吸附回底部。**
 
@@ -339,7 +339,7 @@
 - 守护新增一条形状断言：帧循环与 resize 观察器**两处**都要闸（只闸一处，另一条路径照样吸附）。反向自检：把 `wheelAtBottom` 那次判定去掉 ⇒ **MISS**，产物逐字节还原。
 - 顺带记录一个仓库机制：`verify-build` 用 `git ls-files` 复制**被跟踪**的文件到临时目录 ⇒ **新增源文件必须先 `git add`**（不必提交），否则守护的重建会报 `UNRESOLVED_IMPORT`。
 
-## Unreleased (the motion switch reaches every collapse animation)
+## 0.4.1 (the motion switch reaches every collapse animation)
 
 **修掉「动效」开关只关掉「收起」按钮一部分动画的问题：关掉动效后，`全部` 的淡入滑动、双箭头的进场、以及那条分隔线的淡入都还会跑。**
 
