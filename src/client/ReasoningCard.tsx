@@ -38,6 +38,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const resize = useRef<Animation | null>(null);
   const previousExpanded = useRef(expanded);
   const stopFollow = useRef<() => void>(() => {});
+  /**
+   * The compensation, reachable from the effects outside the follower's own.
+   *
+   * The grant has to do two things BEFORE the browser paints — close the page's tail gap, and take the ceiling jump it
+   * causes out of the space above the card — and the second one lives inside the follower's effect, whose closers are
+   * not visible here. A ref is how this file already hands `stopFollow` out to the same kind of caller.
+   */
+  const compensateNow = useRef<() => void>(() => {});
   /** The focus, readable from the frame loop's closure without putting it in that effect's dependencies. */
   const focusedRef = useRef(false);
   /** The ceiling the focus has published — what the card last ASKED to be. */
@@ -128,10 +136,28 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    */
   useLayoutEffect(() => {
     focusedRef.current = focused;
-    if (focused) return;
-    focusHeight.current = 0;
-    focusRendered.current = 0;
-    viewport.current?.style.removeProperty('height');
+    if (!focused) {
+      focusHeight.current = 0;
+      focusRendered.current = 0;
+      viewport.current?.style.removeProperty('height');
+      return;
+    }
+    /**
+     * The frame the focus is granted: close the page's tail gap, then take the ceiling jump out of the space above.
+     *
+     * Both before paint, and both here rather than on the next measure, because the reader's report pins exactly this:
+     * the card's bottom was cut off, no 「回到最新」 appeared, clicking that pill (which writes the maximum scroll
+     * position) made the bottom "just exactly complete", and there was still room to scroll afterwards. That is the tail
+     * GAP: the focus is only granted while the reader is within `isNearTail`'s 72px of the tail, the page's follow is
+     * then suspended for as long as the card holds it, and nothing ever closed those pixels — so the card's bottom, the
+     * reading row included, sat behind the composer's edge by up to that much. The grant is the one moment where closing
+     * it is exactly what the reader asked for: they are at the bottom, by the precondition of this very call.
+     */
+    const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
+    if (scroller !== null && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight;
+    // The card has already grown in this commit (the ceiling changed with the focus), and the height recorded before the
+    // request is what that jump has to be measured against.
+    compensateNow.current();
   }, [focused]);
   // A card that unmounts while focused must hand the focus back, or the follower below would stay suspended forever.
   useEffect(() => () => { onFocusChange(focusKey, false); }, [focusKey, onFocusChange]);
@@ -396,6 +422,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       if (recordHeight && !resize.current) lastHeight.current = port.clientHeight;
     };
     stopFollow.current = () => { cancel(); manual(); measure(false); };
+    // Handed out so the grant can take the ceiling jump out of the space above BEFORE the browser paints (see the focused
+    // effect): on the next measure would be one painted frame of the card hanging below the fold.
+    compensateNow.current = compensateHeight;
     const canFollow = () => allowed && alive && !document.hidden && !hasSelection();
     const schedule = () => {
       if (!canFollow() || frame || timer !== undefined) return;
@@ -526,6 +555,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       document.removeEventListener('selectionchange', onSelection);
       document.removeEventListener('visibilitychange', onVisibility);
       stopFollow.current = () => {};
+      compensateNow.current = () => {};
     };
   }, [allowed, pause, reasoningMode, rate]);
 

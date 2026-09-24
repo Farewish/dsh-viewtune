@@ -726,6 +726,14 @@ const markers = [
     // both of the things this function exists for. What is pinned is the INJECTION: reverting to `return trimmed;` takes
     // this call out of the artifact and fails here.
     bundle.includes('trimmed.replace(/<html([^>]*)>/i,')],
+  ['…and the grant closes the tail gap and takes the ceiling jump out of the space above, both before paint', () =>
+    // The reader's report pins this one: while a card holds the focus the page's follow is suspended, so the slack
+    // `isNearTail` allows (72px) was never closed and the card's bottom — reading row included — sat behind the
+    // composer's edge; clicking 回到最新, which writes the maximum, made it "just exactly complete". The ceiling jump of
+    // that same commit was also painted one frame before it was compensated, which is why both happen in a layout effect.
+    bundle.includes('scroller.scrollTop = scroller.scrollHeight;')
+    && bundle.includes('compensateNow.current = compensateHeight;')
+    && bundle.includes('compensateNow.current();')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
