@@ -94,13 +94,17 @@ export function firstRowWhere<T>(rows: ArrayLike<T>, passes: (row: T, index: num
 }
 
 /**
- * How far below the scrollport's own top edge the "reading line" sits, in pixels.
+ * How far below the scrollport's own top edge the anchor's reading line sits, in pixels.
  *
- * Both readers of it (`capture`'s anchor and `currentTurnOf`) used to pass a bare `8` at the call site and the parameter
- * they passed it to was named `slack` without saying what it was for. It is a small bias past the very top edge, so a
- * row whose bottom has just crossed into the viewport counts as read rather than being missed by a sub-pixel.
+ * Both readers of it (`capture`'s anchor and `currentTurnOf`) used to pass a bare `8` to a parameter named `slack`,
+ * documented nowhere. Deliberately NOT the same number as `conversation-scroll.ts`'s `READING_LINE_OFFSET_PX` (24),
+ * which is where a row is placed when something LANDS on it: this one only decides which row counts as "at the reading
+ * line" for the spy and the anchor, and it is a small bias past the very top edge so a row whose bottom has just
+ * crossed into the viewport counts as read rather than being missed by a sub-pixel. The two are separate names on
+ * purpose — an earlier version of this one was called `READING_LINE_OFFSET_PX` too, which made two different lines
+ * look like one.
  */
-export const READING_LINE_OFFSET_PX = 8;
+export const ANCHOR_LINE_OFFSET_PX = 8;
 
 /**
  * The index of the first row whose bottom edge has passed a line, or `rows.length` when none has.
@@ -118,7 +122,7 @@ export const READING_LINE_OFFSET_PX = 8;
  *
  * @param rows - The block rows in document order.
  * @param viewportTop - The scrollport's own top edge, in the same viewport coordinates as the rows' rects.
- * @param lineOffset - How far below that edge the reading line sits; see `READING_LINE_OFFSET_PX`.
+ * @param lineOffset - How far below that edge the reading line sits; see `ANCHOR_LINE_OFFSET_PX`.
  */
 export function firstRowPastIndex(
   rows: ArrayLike<{ getBoundingClientRect(): { bottom: number } }>,

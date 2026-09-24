@@ -30,7 +30,7 @@ import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
-import { READING_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
+import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -708,14 +708,14 @@ export function currentTurnOf(
   // whose bottoms are not monotone can have a match BEFORE that point and the scan starts past it (`[false, true,
   // false, true]` resolves to index 3 where the walk returns 1). Monotonicity is the premise, and it holds because
   // turn sections are document-order block rows that do not overlap.
-  for (let index = firstRowPastIndex(list, viewportTop, READING_LINE_OFFSET_PX); index < list.length; index += 1) {
+  for (let index = firstRowPastIndex(list, viewportTop, ANCHOR_LINE_OFFSET_PX); index < list.length; index += 1) {
     const element = list[index]!;
     // `data-reader-turn` is the turn number, or the literal 'unresolved' for a group the
     // snapshot cannot place; only a real turn can own a process.
     const label = element.dataset.readerTurn;
     const turnNumber = label === undefined ? Number.NaN : Number(label);
     if (!Number.isInteger(turnNumber)) continue;
-    if (element.getBoundingClientRect().bottom > viewportTop + READING_LINE_OFFSET_PX) return turnNumber;
+    if (element.getBoundingClientRect().bottom > viewportTop + ANCHOR_LINE_OFFSET_PX) return turnNumber;
   }
   return null;
 }

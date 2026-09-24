@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { DiffBlock, diffTotals } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { DiffHunk } from '@deepseek-ai/dsh-client-ui-primitives';
 import { diffBlockLabels } from './primitive-labels.js';
+import { landTurn, scrollerOf } from './conversation-scroll.js';
 import css from './Reader.module.css';
 
 /** The disclosure's own motion language, so opening this reads as the same gesture. */
@@ -62,18 +63,22 @@ function Panel({ open, motion, children, onSettled, onClosed }: {
 /**
  * Keeps a newly opened panel on screen.
  *
- * Opening grows the row downward, so a badge near the fold reveals its card below the viewport and
- * the reader has to chase it. The scroll container is not known here, so the nearest scrollable
- * ancestor is found and the card's head is brought to the top of it — the same thing a
- * jump-to-anchor does. A panel that is already fully visible is left alone.
+ * Opening grows the row downward, so a badge near the fold reveals its card below the viewport and the reader has to
+ * chase it. The card's head is brought to the reading line of the CONVERSATION scroller, through the same helper the
+ * rail's jumps use, so "where does a row land" has one answer.
+ *
+ * It used to hunt for the nearest ancestor whose content is taller than its box, which is not the same question: an
+ * `overflow: visible` ancestor passes that test and cannot scroll, so the write was a silent no-op and the card stayed
+ * where it was with the reveal having "succeeded". Its fallback called `scrollIntoView`, which walks ancestor scrollers
+ * and can lift the sticky composer off the bottom — the exact behaviour `conversation-scroll.ts` bans by name. A panel
+ * already fully inside the viewport is left alone.
  */
 function revealPanel(element: HTMLElement): void {
-  let port: HTMLElement | null = element.parentElement;
-  while (port && port.scrollHeight <= port.clientHeight + 1) port = port.parentElement;
-  if (!port) { element.scrollIntoView({ block: 'nearest' }); return; }
-  const gap = element.getBoundingClientRect().top - port.getBoundingClientRect().top;
-  if (gap >= 0 && element.getBoundingClientRect().bottom <= port.getBoundingClientRect().bottom) return;
-  port.scrollTop += gap - 8;
+  const port = scrollerOf(element);
+  const box = port.getBoundingClientRect();
+  const head = element.getBoundingClientRect();
+  if (head.top >= box.top && head.bottom <= box.bottom) return;
+  landTurn(element, port);
 }
 
 /**

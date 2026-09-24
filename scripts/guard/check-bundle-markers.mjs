@@ -671,6 +671,13 @@ const markers = [
     bundle.includes('if (revealTurn(pendingReveal)) setPendingReveal(null);')
     && bundle.includes('setPendingReveal(item.turn);')
     && bundle.includes('if (!targetRow) return false;')],
+  ['nothing in this view scrolls by walking ancestor boxes', () =>
+    // `conversation-scroll.ts` bans `Element.scrollIntoView` by name: it walks ancestor scrollers and can lift the
+    // sticky composer off the bottom of the viewport. The one call site that survived the ban lived in DiffPanel's
+    // fallback, behind a test for "nearest ancestor whose content is taller than its box" — which an `overflow: visible`
+    // ancestor passes while being unable to scroll. Both are gone; this keeps them gone.
+    !bundle.includes('scrollIntoView({')
+    && bundle.includes('landTurn(element, port);')],
   ['the tool table names the cordis verbs this host actually registers', () =>
     // A table of wire names cannot check itself against the host, which is how it carried two names this host does not
     // register for a long time while the three real inspect verbs fell to the generic row. The absent half is asserted

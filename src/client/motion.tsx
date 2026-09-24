@@ -9,9 +9,9 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
  * The follower's policy lives in its own module (see `reading-scroll.ts`), imported here because the follower uses it
  * and re-exported because this is where every reader of these names looks for them.
  */
-import { READING_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 import type { FollowMode } from './reading-scroll.js';
-export { FOLLOW_TAIL_PX, FOLLOW_MODES, READING_LINE_OFFSET_PX, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+export { ANCHOR_LINE_OFFSET_PX, FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
 export function useMotionAllowed(enabled: boolean): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -417,7 +417,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // holds their own place, and the two scans in this file were measured together at 10k–16k rect reads per second.
       // The NodeList is measured directly — the walk's `Array.from` was another whole-list allocation per call.
       const anchors = content.querySelectorAll<HTMLElement>('[data-reader-anchor]');
-      const index = firstRowPastIndex(anchors, top, READING_LINE_OFFSET_PX);
+      const index = firstRowPastIndex(anchors, top, ANCHOR_LINE_OFFSET_PX);
       const candidate = index < anchors.length ? anchors[index]! : undefined;
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
     };

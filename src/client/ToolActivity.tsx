@@ -200,8 +200,17 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const model = useMemo(() => activitySummary(entry), [entry.block, entry.draft]);
   const phase = activityPhase(entry, turnClosed);
   const heldPreview = useRef({ entry, model, phase });
-  if (!selected) heldPreview.current = { entry, model, phase };
-  const preview = heldPreview.current;
+  useEffect(() => { if (!selected) heldPreview.current = { entry, model, phase }; }, [selected, entry, model, phase]);
+  /**
+   * While the reader has a selection in this panel the preview stays FROZEN — it is the thing they are reading, and
+   * rewriting it under them would move the text out from under the highlight. Otherwise it is this render's own values.
+   *
+   * It used to be `heldPreview.current` either way, written during RENDER (`if (!selected) heldPreview.current = ...`),
+   * which is what made the freeze work and also what React forbids: a render that is thrown away — concurrent
+   * rendering is allowed to discard one — would leave the ref holding values from a commit that never happened.
+   * Deriving it here is equivalent for everything that is displayed, and the ref is now only written from an effect.
+   */
+  const preview = selected ? heldPreview.current : { entry, model, phase };
   useEffect(() => {
     const track = () => {
       const selection = document.getSelection();
