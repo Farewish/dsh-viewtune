@@ -14,6 +14,31 @@
 export const READER_SETTINGS_PATH = '/better-display/settings';
 
 /**
+ * The part of the reader's state the HOST record is allowed to carry: the preferences, and nothing else.
+ *
+ * `expanded` is what one session's reading looks like — which turns' processes the reader had opened — keyed by bare
+ * turn identifiers (`turn:236:closed:completed`) and never pruned. It went into the same shared file as the
+ * preferences, which cost three things: a second session inherited the first one's choices for the same key (turn
+ * numbering restarts at 1 in every session, so `turn:5` collides trivially), the map grew for as long as the reader
+ * kept opening things, and once it pushed the file past the host's ceiling (`SETTINGS_MAX_BYTES`) the host would refuse
+ * the WHOLE record and this module's write would report nothing — so the first symptom of that growth would have been
+ * every setting silently ceasing to persist, across restarts, with nothing anywhere saying so.
+ *
+ * A function of its own rather than a filter at the call sites, so the record's shape is stated once and can be tested
+ * without a server. The browser's OWN copy is deliberately left alone (`localStorage` through the store): it is keyed
+ * by origin and this GUI is served on an ephemeral port, so it is born and dies with one page — and inside one page's
+ * lifetime, restoring the expansion choices is exactly what the reader wants.
+ */
+export function hostRecordOf<T extends object>(state: T): Record<string, unknown> {
+  const record: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(state)) {
+    if (key === 'expanded') continue;
+    record[key] = value;
+  }
+  return record;
+}
+
+/**
  * How long a settled state waits before it is sent.
  *
  * Long enough to swallow a drag, short enough that a reader who changes something and immediately quits

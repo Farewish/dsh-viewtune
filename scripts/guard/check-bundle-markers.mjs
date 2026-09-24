@@ -625,6 +625,13 @@ const markers = [
   ['every write to the tail records a position the scroller can hold, so the guard can recognise our own frame', () =>
     (bundle.match(/writeTop\(scroll\.scrollHeight, scroll\.scrollHeight - scroll\.clientHeight\)/g) ?? []).length === 2
     && bundle.includes('const writeTop = (top, limit) => {')],
+  ['the host record carries the preferences, never the per-turn expansion choices', () =>
+    // Both directions are pinned. Outward: the whole state minus `expanded` is what goes to the host, or the map grows
+    // without bound inside a record the host refuses WHOLE past 64 KiB — silently, which is how every setting would
+    // stop persisting. Inward: the copy the reader gets is never allowed to take `expanded` from that record, whose
+    // keys are bare turn numbers that another session is free to mean something else by.
+    (bundle.match(/settingsWriter\.push\(hostRecordOf\(readerState\)\)/g) ?? []).length === 2
+    && (bundle.match(/if \(key === "expanded"\) continue;/g) ?? []).length === 2],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

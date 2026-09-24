@@ -25,7 +25,7 @@ import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
 import { applyWindowScope, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
 import { applyScrollbarFill, scrollbarFillOf } from './scrollbar.js';
-import { createSettingsWriter, loadHostSettings } from './settings-sync.js';
+import { createSettingsWriter, hostRecordOf, loadHostSettings } from './settings-sync.js';
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
@@ -779,13 +779,13 @@ export function Reader(props: ReaderProps) {
       if (hostRecord !== undefined) props.actions.hydrate(hostRecord);
       // Nothing stored yet: THIS browser's copy becomes the record. That is also the migration for
       // settings a reader made before the host kept any.
-      else settingsWriter.push(readerState);
+      else settingsWriter.push(hostRecordOf(readerState));
     });
     return () => { cancelled = true; };
     // Once per activation: the record is read on the way in, and every later change flows the other way.
   }, []);
   useEffect(() => {
-    if (settingsLoaded.current) settingsWriter.push(readerState);
+    if (settingsLoaded.current) settingsWriter.push(hostRecordOf(readerState));
   }, [settingsWriter, readerState]);
   // Flushed on the way out, and on `pagehide` as well: a reader who changes something and closes the tab
   // inside the debounce window would otherwise lose precisely the change they just made.

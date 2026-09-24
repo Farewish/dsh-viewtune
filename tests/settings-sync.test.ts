@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { READER_SETTINGS_PATH as HOST_PATH } from '../src/dsh-viewtune.ts';
 import {
-  READER_SETTINGS_PATH, createSettingsWriter, loadHostSettings,
+  READER_SETTINGS_PATH, createSettingsWriter, hostRecordOf, loadHostSettings,
 } from '../src/client/settings-sync.ts';
 
 test('the client reads and writes the route the host actually registers', () => {
@@ -37,6 +37,23 @@ test('a settled change lands on its own, without an explicit flush', async () =>
   writer.push({ wallpaper: 'x.jpg' });
   await new Promise(resolve => { setTimeout(resolve, 20); });
   assert.deepEqual(saved, [{ wallpaper: 'x.jpg' }]);
+});
+
+test('the record sent to the host is the preferences, never the per-turn expansion choices', () => {
+  const state = {
+    motion: true,
+    expanded: { 'turn:5:closed:completed': true, 'turn:9:open:pending': false },
+    wallpaperDim: 51,
+  };
+  const record = hostRecordOf(state);
+  assert.deepEqual(record, { motion: true, wallpaperDim: 51 });
+  assert.equal(Object.hasOwn(record, 'expanded'), false);
+  // The state itself is left alone: the browser's own copy keeps the choices for the session it is in.
+  assert.deepEqual(state.expanded, { 'turn:5:closed:completed': true, 'turn:9:open:pending': false });
+  // Nothing session-shaped to remove is also fine, and the result is a record, not the input by reference.
+  const plain = hostRecordOf({ motion: false });
+  assert.deepEqual(plain, { motion: false });
+  assert.notEqual(plain, hostRecordOf({ motion: false }));
 });
 
 test('a failed write is swallowed, and the next change still goes out', async () => {

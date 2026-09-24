@@ -253,6 +253,10 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       hydrate: (draft, value) => {
         const target = draft as unknown as Record<string, unknown>;
         for (const key of Object.keys(value)) {
+          // The per-turn expansion choices are never taken from the shared record. They are this session's memory of
+          // what the reader opened, keyed by bare turn numbers that another session is free to mean something else by,
+          // and the host record is one file for every session at once. `hostRecordOf` keeps them out on the way back.
+          if (key === 'expanded') continue;
           if (Object.prototype.hasOwnProperty.call(target, key)) target[key] = value[key];
         }
       },
