@@ -239,28 +239,6 @@ export function formatReceiptPrompt(params: Record<string, unknown>, title?: str
 }
 
 /**
- * Finds the DSH composer textarea. The page can contain multiple (hidden)
- * textareas, so prefer a visible, enabled one carrying the input-bar
- * `data-phase` marker; fall back to the tallest visible, then any enabled.
- */
-export function findComposerTextarea(doc?: Document): HTMLTextAreaElement | null {
-  const d = doc ?? (typeof document !== 'undefined' ? document : undefined);
-  if (!d) return null;
-  const areas = Array.from(d.querySelectorAll('textarea'));
-  if (areas.length === 0) return null;
-  const visible = areas.filter((el) => !el.disabled && (el as HTMLElement).offsetParent !== null);
-  const pool = visible.length > 0 ? visible : areas.filter((el) => !el.disabled);
-  const candidates = pool.length > 0 ? pool : areas;
-  const phased = candidates.find((el) => el.hasAttribute('data-phase'));
-  if (phased) return phased;
-  let best = candidates[0];
-  for (const el of candidates) {
-    if (((el as HTMLElement).offsetHeight || 0) > ((best as HTMLElement).offsetHeight || 0)) best = el;
-  }
-  return best;
-}
-
-/**
  * DOM fallback for composer fill: types into the Lexical contenteditable
  * surface (`[data-composer-input]`) via execCommand insertText so the editor
  * adopts the change as a genuine user edit. Returns true when accepted.

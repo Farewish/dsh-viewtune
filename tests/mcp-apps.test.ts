@@ -8,7 +8,6 @@ import {
   ensureHtmlDocument,
   extractHtmlTitle,
   formatReceiptPrompt,
-  findComposerTextarea,
   fillComposerDom,
 } from '../src/client/mcp-app.js';
 import { parseGfmWithMath } from '../src/client/markdown/parse.js';
@@ -146,10 +145,6 @@ test('ensureHtmlDocument injects theme bridge and auto-height reporter into comp
   // Auto-height reporter must observe the body and emit SEP-1865 resize events.
   assert.ok(processed.includes('ResizeObserver'));
   assert.ok(processed.includes('ui/resize'));
-});
-
-test('findComposerTextarea is importable and null-safe without a DOM', () => {
-  assert.equal(findComposerTextarea(undefined as unknown as Document), null);
 });
 
 test('fillComposerDom refuses without a DOM instead of throwing', () => {
