@@ -35,6 +35,7 @@ const GUARDS = [
   ['check-pill-scope.mjs', 'the steps pill uses no identifier it does not declare'],
   ['selftest-pill-scope.mjs', 'that checker is able to fail (it is fed a known-bad bundle)'],
   ['check-stylesheet-classes.mjs', 'every CSS-module class the sources use has a rule, and the checker is able to fail'],
+  ['check-settings-fallbacks.mjs', 'every boolean setting default and its defensive reader agree, bar the declared inversions'],
   ['verify-session-changes.mjs', 'the reading-view changes survive compilation'],
   ['compare-source-and-bundle.mjs', 'source and artifact agree on every decision this fork made'],
   ['audit-source-edits.mjs', 'no dead branches, leftovers, or drift between the two'],
