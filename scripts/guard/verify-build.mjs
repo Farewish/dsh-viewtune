@@ -141,6 +141,23 @@ compare(
   [],
 );
 
+/**
+ * …and the whole marker checker has to pass against the REBUILT artifact, which the shipped one cannot prove.
+ *
+ * This is the other half of the path-dependence above, and the reason it is checked rather than argued: a marker that
+ * spells a hashed class name verbatim (`.WGoHxG_reasonCard…`) passes in the directory the artifact was built in and
+ * fails in every other one — including a fresh clone that ran the documented `npm run build`. Running the checker in the
+ * scratch directory is what makes "the markers are hash-agnostic" a measurement: the scratch path differs, so its class
+ * hashes differ, and the checker reads the rebuilt bundle from its own root.
+ */
+const markers = spawnSync(process.execPath, [join(scratch, 'scripts', 'guard', 'check-bundle-markers.mjs')], {
+  cwd: scratch,
+  stdio: 'inherit',
+});
+const markersOk = markers.status === 0;
+if (!markersOk) bad += 1;
+console.log(`${markersOk ? 'ok  ' : 'DIFF'} the marker checker passes against the artifact rebuilt at another path (exit ${String(markers.status)})`);
+
 if (!keep) {
   rmSync(join(scratch, 'node_modules'), { force: true });
   rmSync(scratch, { recursive: true, force: true });
@@ -155,7 +172,22 @@ if (!keep) {
  * CSS literals, and every stylesheet rule with the build-specific naming normalised away — and that is what a rebuild
  * has to reproduce.
  */
-console.log(`\nbyte lengths: shipped ${String(shipped.length)} chars | rebuilt ${String(rebuilt.length)} chars — NOT compared byte for byte: the class hash in the stylesheet comes from the artifact's own path, so the two files cannot be identical and pretending otherwise hid what this check actually covers.`);
+/**
+ * The class hash each artifact carries, printed so the claim above is a measurement rather than a sentence.
+ *
+ * Same source, same compiler, two directories, two hashes: which is why the marker checker had to be made
+ * hash-agnostic, and why the run below (against the scratch build) means something.
+ */
+const classHashOf = (text) => {
+  try {
+    return /\.([A-Za-z0-9_]+)_reasonCard(?![\w-])/.exec(moduleCssLiteral(text, 'Reader.module.css'))?.[1] ?? '(none)';
+  } catch {
+    return '(unreadable)';
+  }
+};
+console.log(`class hash: shipped ${classHashOf(shipped)} | rebuilt ${classHashOf(rebuilt)}`);
+console.log(`byte lengths: shipped ${String(shipped.length)} chars | rebuilt ${String(rebuilt.length)} chars — NOT compared byte for byte: the class hash in the stylesheet comes from the artifact's own path, so the two files cannot be identical, and pretending otherwise hid what this check actually covers.`);
+
 console.log(bad === 0
   ? 'REBUILD REPRODUCES THE SHIPPED SHAPE (registration id, require() specifiers, exports, CSS literals, tagIds, and every stylesheet rule — with build-specific naming normalised)'
   : `REBUILD DIVERGES: ${String(bad)} difference(s)`);

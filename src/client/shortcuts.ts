@@ -34,6 +34,13 @@ export interface ShortcutBinding {
 /** The part of a keyboard event this module needs; native and React events both satisfy it. */
 export interface ShortcutEvent {
   readonly key: string;
+  /**
+   * The PHYSICAL key (`KeyC`, `Digit1`), which the layout does not compose.
+   *
+   * Optional so a hand-made event object is still a valid one (nothing else needs it), and read only where `key` cannot
+   * answer — see {@link keyOfEvent}.
+   */
+  readonly code?: string;
   readonly altKey: boolean;
   readonly ctrlKey: boolean;
   readonly metaKey: boolean;
@@ -62,6 +69,34 @@ export function normaliseKey(key: string): string | null {
   if (key === '' || MODIFIER_KEYS.has(key)) return null;
   if (key === ' ') return 'Space';
   return key.length === 1 ? key.toUpperCase() : key;
+}
+
+/**
+ * The letter or digit a key event stands for, with the macOS Option problem taken out.
+ *
+ * On macOS, Option is the platform's own dead-key modifier: Option+C does not report `key: 'C'`, it reports the character
+ * Option composes, `ç` (and Option+Shift+C reports `Ç`). So the shipped `Alt+C` binding never matched there — while
+ * RE-RECORDING one worked, because it stored `Alt+Ç`. That is the worst shape a bug can take: the panel says 「已绑定」,
+ * the key does nothing, and recording it again appears to fix it.
+ *
+ * `code` names the physical key (`KeyC`) and is untouched by the layout's composition, so it is the fallback exactly
+ * when the composed key is not something a binding could have been stored as — a single character outside A–Z / 0–9.
+ * Two deliberate limits keep this narrow:
+ *   - only a MODIFIED event falls back (`Alt`/`Meta` held). Without a modifier nothing is a binding anyway, and a
+ *     layout whose own key really is `ç` (French AZERTY puts it on `Digit9`) must keep matching what it recorded;
+ *   - the fallback is the physical key, which for that AZERTY `ç` is `Digit9` — so a reader who recorded `Alt+Ç` there
+ *     records it again as `Alt+9`. Consistent (recording and matching use this same function) and rare, which is why it
+ *     is written down rather than engineered around.
+ */
+function keyOfEvent(event: ShortcutEvent): string | null {
+  const composed = normaliseKey(event.key);
+  if (composed !== null && /^[A-Z0-9]$/.test(composed)) return composed;
+  if (event.altKey || event.metaKey) {
+    const code = typeof event.code === 'string' ? event.code : '';
+    const physical = /^Key([A-Z])$/.exec(code)?.[1] ?? /^Digit([0-9])$/.exec(code)?.[1];
+    if (physical !== undefined) return physical;
+  }
+  return composed;
 }
 
 /** The canonical string for a binding: modifiers in the attribute's order, the key last. */
@@ -106,7 +141,9 @@ export function parseShortcut(text: string | undefined): ShortcutBinding | null 
  * and a bare key would be swallowed wherever the reader is typing.
  */
 export function bindingFromEvent(event: ShortcutEvent): string | null {
-  const key = normaliseKey(event.key);
+  // `keyOfEvent`, not `normaliseKey`: recording must agree with matching, or recording Option+C on macOS stores a
+  // combination the very same listener can never see again (see `keyOfEvent`).
+  const key = keyOfEvent(event);
   if (key === null) return null;
   if (!event.altKey && !event.ctrlKey && !event.metaKey) return null;
   return formatShortcut({ key, alt: event.altKey, control: event.ctrlKey, meta: event.metaKey, shift: event.shiftKey });
@@ -116,7 +153,7 @@ export function bindingFromEvent(event: ShortcutEvent): string | null {
 export function matchesShortcut(event: ShortcutEvent, text: string | undefined): boolean {
   const binding = parseShortcut(text);
   if (binding === null) return false;
-  const key = normaliseKey(event.key);
+  const key = keyOfEvent(event);
   return key === binding.key
     && event.altKey === binding.alt
     && event.ctrlKey === binding.control

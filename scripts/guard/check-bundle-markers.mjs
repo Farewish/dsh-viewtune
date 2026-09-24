@@ -112,6 +112,26 @@ const readerCss = (() => {
 })();
 const sel = (local) => classSel(readerCss, local);
 const cssDecls = (selector, declarations) => readerCss !== '' && hasDecls(readerCss, selector, declarations);
+/**
+ * The body of one at-rule, by its prelude — braces counted, because the rules inside it are braced too.
+ *
+ * Needed wherever a marker has to say not only WHICH rule but WHERE it sits: the no-preference gate on the eased height
+ * is the rule that makes the easing opt-in, so a marker that finds the declaration anywhere in the stylesheet would pass
+ * with the media query removed.
+ */
+function atRuleBody(css, prelude) {
+  const at = css.indexOf(`${prelude}{`);
+  if (at === -1) return '';
+  let depth = 0;
+  for (let index = at; index < css.length; index += 1) {
+    if (css[index] === '{') depth += 1;
+    else if (css[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return css.slice(at, index + 1);
+    }
+  }
+  return '';
+}
 
 const markers = [
   ['short-thinking-frame', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]`, ['background:var(--dsw-alias-bg-module-platform)', 'border-color:var(--dsw-alias-border-l2)', 'border-radius:12px'])],
@@ -492,7 +512,7 @@ const markers = [
   ['…and a setting that only applies under another one is gated by it', () =>
     bundle.includes('"data-inactive": !revealWords') && bundle.includes('"data-inactive": reasoningFollow !== "auto"')],
   ['…with the hairline that makes the grouping visible', () =>
-    /\.WGoHxG_settingsGroup\{[^}]*border-top:\.5px solid var\(--dsw-alias-border-l2\)/.test(bundle)],
+    cssDecls(sel('settingsGroup'), ['border-top:.5px solid var(--dsw-alias-border-l2)'])],
   // The 视效 page is divided the same way but WITHOUT captions: 磨砂玻璃 and 壁纸 each open with the switch that names them,
   // so the two hairlines are the whole of it — and there are exactly two, before the skin and before the wallpaper.
   ['the visual page is divided by the same hairline, without captions', () =>
@@ -526,9 +546,18 @@ const markers = [
     // with three gates on it, because the reader's 逐帧滑行 is what asks for it, 动效关 must still stop it, and so must the
     // system's reduced-motion request. Both are spelled in the selector (`:not([data-motion=off])`) or in the media
     // query's `no-preference` because this rule is MORE specific than the gates further down, which would otherwise lose.
-    bundle.includes('.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}')
-    && bundle.includes('@media (prefers-reduced-motion:no-preference){[data-reader-follow-mode=glide]:not([data-motion=off]) .WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{transition:height .16s var(--reason-ease,ease-out)}}')
-    && bundle.includes('.WGoHxG_reasonCard:not([data-focus=true]) .WGoHxG_reasonViewport{transition:max-height .3s var(--reason-ease,ease-out)}')],
+    //
+    // Every class name here comes from `sel()`, which reads the hash out of the artifact's own stylesheet. The verbatim
+    // `.WGoHxG_…` spellings these replaced passed only while the checkout lived at one path: lightningcss derives that
+    // hash from the CSS file's ABSOLUTE path, so a clone in another directory that ran the documented `npm run build`
+    // would have failed four markers for a reason that has nothing to do with the decision they guard.
+    cssDecls(`${sel('reasonCard')}[data-focus=true]:not([data-expanded=true]) ${sel('reasonViewport')}`, ['max-height:min(60vh,560px)', 'transition:none'])
+    && hasDecls(
+      atRuleBody(readerCss, '@media (prefers-reduced-motion:no-preference)'),
+      `[data-reader-follow-mode=glide]:not([data-motion=off]) ${sel('reasonCard')}[data-focus=true]:not([data-expanded=true]) ${sel('reasonViewport')}`,
+      ['transition:height .16s var(--reason-ease,ease-out)'],
+    )
+    && cssDecls(`${sel('reasonCard')}:not([data-focus=true]) ${sel('reasonViewport')}`, ['transition:max-height .3s var(--reason-ease,ease-out)'])],
   ['…and the compensation chases that easing frame by frame, ending on the target, on a still layout, or on a deadline', () =>
     // A transitioned height has not moved yet at the moment of the write, so a single read would see no growth at all;
     // charging the whole request instead would lead the box and wobble its bottom edge. The chase ends on the target
@@ -539,7 +568,11 @@ const markers = [
     && bundle.includes('heightChase = 0;\n\t\t\t\t\tcompensateHeight();\n\t\t\t\t\tif (port.offsetHeight === target) return;')
     && bundle.includes('if (++still >= CHASE_STILL_FRAMES) return;')
     && bundle.includes('if (performance.now() > deadline) return;\n\t\t\t\t\t\theightChase = requestAnimationFrame(step);')],
-  ['…with the motion switch dropping those transitions', () => bundle.includes('[data-motion=off] .WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport,') && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(bundle)],
+  ['…with the motion switch dropping those transitions', () =>
+    // Hash-agnostic like the rule above: the selector is built from the artifact's own class names, and the
+    // reduced-motion half matches on the LOCAL name (`[^}]*reasonCard`), which no build rewrites.
+    readerCss.includes(`[data-motion=off] ${sel('reasonCard')}[data-focus=true] ${sel('reasonViewport')},`)
+    && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(readerCss)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
   ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
   ['…with the newest request winning, so exactly one card can hold it', 'focused ? key : current === key ? null : current'],
@@ -1236,6 +1269,14 @@ const markers = [
     // tooltip say what the numbers are.
     bundle.includes('\u5dee\u5f02\u89c6\u56fe\uff1a\u65b0\u5185\u5bb9')
     && bundle.includes('\u884c\u6570\u6309\u4e24\u4fa7\u5168\u6587\u7edf\u8ba1')],
+  ['a macOS Option combination reaches the binding it was recorded as', () =>
+    // Option is macOS's dead-key modifier, so Option+C reports `key: 'ç'` and the shipped `Alt+C` never matched — while
+    // re-recording appeared to fix it by storing `Alt+Ç`. The physical key (`code`) is not composed, so it is the
+    // fallback exactly when the composed key is outside A–Z / 0–9, and only for a modified event (so a layout whose own
+    // key really is `ç` still matches what it recorded).
+    bundle.includes('function keyOfEvent(event) {')
+    && bundle.includes('if (event.altKey || event.metaKey) {')
+    && bundle.includes('/^Key([A-Z])$/.exec(code)?.[1] ?? /^Digit([0-9])$/.exec(code)?.[1]')],
 ];
 
 const forbidden = [

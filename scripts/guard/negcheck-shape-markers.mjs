@@ -102,8 +102,8 @@ const cases = [
   },
   {
     label: 'the focus height allowed to fight an explicit 展开阅读',
-    search: '.WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}',
-    replace: '.WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport{max-height:min(60vh,560px);transition:none}',
+    search: '%SEL:reasonCard%[data-focus=true]:not([data-expanded=true]) %SEL:reasonViewport%{max-height:min(60vh,560px);transition:none}',
+    replace: '%SEL:reasonCard%[data-focus=true] %SEL:reasonViewport%{max-height:min(60vh,560px);transition:none}',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
@@ -126,8 +126,8 @@ const cases = [
   },
   {
     label: 'the grouping hairlines dropped, leaving one undivided list of ten rows',
-    search: '.WGoHxG_settingsGroup{border-top:.5px solid var(--dsw-alias-border-l2)',
-    replace: '.WGoHxG_settingsGroup{border-top:0',
+    search: '%SEL:settingsGroup%{border-top:.5px solid var(--dsw-alias-border-l2)',
+    replace: '%SEL:settingsGroup%{border-top:0',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
@@ -188,8 +188,8 @@ const cases = [
   },
   {
     label: 'the focused height eased for every reader again, ignoring the 贴底 choice and the two motion gates',
-    search: '@media (prefers-reduced-motion:no-preference){[data-reader-follow-mode=glide]:not([data-motion=off]) .WGoHxG_reasonCard[data-focus=true]:not([data-expanded=true]) .WGoHxG_reasonViewport{transition:height .16s var(--reason-ease,ease-out)}}',
-    replace: '.WGoHxG_reasonCard[data-focus=true] .WGoHxG_reasonViewport{transition:height .16s}',
+    search: '@media (prefers-reduced-motion:no-preference){[data-reader-follow-mode=glide]:not([data-motion=off]) %SEL:reasonCard%[data-focus=true]:not([data-expanded=true]) %SEL:reasonViewport%{transition:height .16s var(--reason-ease,ease-out)}}',
+    replace: '%SEL:reasonCard%[data-focus=true] %SEL:reasonViewport%{transition:height .16s}',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
@@ -358,25 +358,46 @@ const cases = [
     bundle: HOST,
     guards: ['scripts/guard/check-host-markers.mjs'],
   },
+  {
+    label: 'the macOS Option fallback removed again, so Option+C stops reaching Alt+C',
+    search: 'if (event.altKey || event.metaKey) {',
+    replace: 'if (false) {',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
 ];
 
 let failed = 0;
+/**
+ * Fill `%SEL:<local>%` with the class name this artifact actually carries.
+ *
+ * The CSS cases below rewrite RULES, and a rule's selector contains the hash lightningcss derived from this checkout's
+ * absolute path — so a case written with one build's hash passes here and `SKIP`s on every other machine, which this
+ * script counts as a failure. The token is resolved from the artifact under test instead; an unresolvable token is left
+ * in place on purpose, so the case skips loudly rather than mutating something it did not mean to.
+ */
+const fillSelectors = (text, artifact) => text.replace(/%SEL:([\w-]+)%/g, (whole, local) => {
+  const hash = new RegExp(`\\.([A-Za-z0-9_]+)_${local}(?![\\w-])`).exec(artifact)?.[1];
+  return hash === undefined ? whole : `.${hash}_${local}`;
+});
+
 for (const item of cases) {
   const file = item.bundle ?? BUNDLE;
   const original = readFileSync(file);
   const text = original.toString('utf8');
-  if (!text.includes(item.search)) {
+  const search = fillSelectors(item.search, text);
+  const replace = fillSelectors(item.replace, text);
+  if (!text.includes(search)) {
     console.log(`SKIP — artifact does not contain the fixed shape for: ${item.label}`);
     failed += 1;
     continue;
   }
-  if (text.includes(item.replace) && item.replace.length > 20) {
+  if (text.includes(replace) && replace.length > 20) {
     console.log(`SKIP — the reverted shape is already present for: ${item.label}`);
     failed += 1;
     continue;
   }
   try {
-    writeFileSync(file, text.replaceAll(item.search, item.replace));
+    writeFileSync(file, text.replaceAll(search, replace));
     for (const guard of item.guards) {
       // stdio: 'inherit' on purpose — this sandbox cannot capture a child's piped output, and
       // the exit code is the whole signal this check needs.

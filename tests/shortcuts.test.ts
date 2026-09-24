@@ -6,8 +6,8 @@ import {
 } from '../src/client/shortcuts.ts';
 
 /** A key event with everything released except what the case sets. */
-const press = (key: string, modifiers: Partial<Record<'alt' | 'control' | 'meta' | 'shift', boolean>> = {}) => ({
-  key, altKey: modifiers.alt === true, ctrlKey: modifiers.control === true,
+const press = (key: string, modifiers: Partial<Record<'alt' | 'control' | 'meta' | 'shift', boolean>> = {}, code?: string) => ({
+  key, ...(code === undefined ? {} : { code }), altKey: modifiers.alt === true, ctrlKey: modifiers.control === true,
   metaKey: modifiers.meta === true, shiftKey: modifiers.shift === true,
 });
 
@@ -84,4 +84,22 @@ test('the number of keys is not fixed: any modifier stack, either action', () =>
   assert.equal(shortcutProblem('Alt+K', 'Alt+Shift+C'), null, 'a shorter binding may replace the longer default');
   assert.equal(shortcutProblem('Alt+Control+Shift+K', 'Alt+C'), null, 'and a longer one may replace the shorter');
   assert.equal(shortcutLabel('Alt+Control+Shift+K'), 'Alt + Ctrl + Shift + K');
+});
+
+test('macOS Option+C reaches a binding recorded as Alt+C', () => {
+  // The platform composes a character for Option (it is its dead-key modifier), so the event's own `key` is `ç` — and the
+  // shipped default never matched, while re-recording appeared to fix it by storing `Alt+Ç`. `code` is the physical key
+  // and is not composed.
+  assert.equal(matchesShortcut(press('ç', { alt: true }, 'KeyC'), 'Alt+C'), true);
+  assert.equal(matchesShortcut(press('Ç', { alt: true, shift: true }, 'KeyC'), 'Alt+Shift+C'), true);
+  // Recording agrees with matching, so re-recording now stores the binding the listener can see again.
+  assert.equal(bindingFromEvent(press('ç', { alt: true }, 'KeyC')), 'Alt+C');
+  assert.equal(bindingFromEvent(press('Ç', { alt: true, shift: true }, 'KeyC')), 'Alt+Shift+C');
+  // The fallback does not invent keys: the modifiers still have to line up.
+  assert.equal(matchesShortcut(press('ç', { alt: true }, 'KeyC'), 'Alt+Shift+C'), false);
+  assert.equal(matchesShortcut(press('ç', { alt: true }, 'KeyV'), 'Alt+C'), false, 'a different physical key is a miss');
+  // …and it is not reached without a modifier. A layout whose own key really is `ç` (French AZERTY: Digit9) keeps
+  // matching what it recorded rather than being rewritten to the physical key underneath it.
+  assert.equal(matchesShortcut(press('ç', {}, 'Digit9'), 'ç'), true);
+  assert.equal(bindingFromEvent(press('ç', { alt: true }, 'Digit9')), 'Alt+9', 'the physical key, which is what a modifier stack combines with');
 });
