@@ -594,10 +594,20 @@ const markers = [
     && bundle.includes('motion, live')
     && bundle.includes('producingRef.current = liveRef.current || now - endedAt.current < OUTPUT_TAIL_MS;')
     // …and the state it reads is written in a LAYOUT effect, so it is current for the commit that caused the growth
-    // rather than one paint later. That ordering was the bug: a passive effect let the observer run first.
+    // rather than one paint later. That ordering was the bug: a passive effect let the observer run first. BOTH refs
+    // are pinned, because the first pass at this fixed `live` and left `suspended` on a passive effect one line below —
+    // the same race, in the same reader, with only the glide's second look inside `follow` hiding it.
     && bundle.includes('(0, react.useLayoutEffect)(() => {\n\t\t\t\tliveRef.current = live;')
+    && bundle.includes('(0, react.useLayoutEffect)(() => {\n\t\t\t\tsuspendedRef.current = suspended;')
     && bundle.includes('function wheelAtBottom(deltaY, gap)')
     && bundle.includes('if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY))')],
+  // The follower compares the scroller's position against the last number it WROTE, to tell its own frames apart from
+  // the reader moving. That only works while the number written is one the element can actually hold: `scrollHeight`
+  // is not, so the two writes straight to the tail have to clamp it to the ceiling like the frame loop does with its
+  // gap. Both sites are counted, because fixing one and forgetting the other is exactly the shape of the mistake.
+  ['every write to the tail records a position the scroller can hold, so the guard can recognise our own frame', () =>
+    (bundle.match(/writeTop\(scroll\.scrollHeight, scroll\.scrollHeight - scroll\.clientHeight\)/g) ?? []).length === 2
+    && bundle.includes('const writeTop = (top, limit) => {')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
