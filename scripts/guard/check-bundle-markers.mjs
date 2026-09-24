@@ -558,7 +558,15 @@ const markers = [
   // The cadence a fresh install opens with, pinned on its own: the steady one, because per-frame publication is what
   // makes the reveal's work follow the display's refresh rate — the option the panel labels as a cost.
   ['…which is the cadence a fresh install opens with', 'textCadence: "steady"'],
-  ['the publication gate asks the cadence, and a hidden page still flushes', 'if (document.hidden) {\n\t\t\t\t\t\tcurrent.flush();\n\t\t\t\t\t\tpublish();\n\t\t\t\t\t\tpublishedAt = now;\n\t\t\t\t\t} else if (publishDue(now, publishedAt, cadence)) {\n\t\t\t\t\t\tcurrent.advance(now);\n\t\t\t\t\t\tpublish();\n\t\t\t\t\t\tpublishedAt = now;\n\t\t\t\t\t}'],
+  // …and the clock it asks about is a REF held across effect runs, not a local seeded at the top of one. The effect
+  // re-runs per streamed delta, so a local measures the time since the last ARRIVAL: deltas closer together than the
+  // step keep re-seeding it, `publishDue` never answers yes, `advance` is never called and the reveal stops until a
+  // pause or the backlog guard. That was the shape shipped with the cadence, and it is a stall, so the absence of the
+  // local is asserted as loudly as the presence of the ref.
+  ['the publication gate asks the cadence, and a hidden page still flushes', () =>
+    bundle.includes('const publishedAt = (0, react.useRef)(0);')
+    && !bundle.includes('let publishedAt = performance.now();')
+    && bundle.includes('if (document.hidden) {\n\t\t\t\t\t\tcurrent.flush();\n\t\t\t\t\t\tpublish();\n\t\t\t\t\t\tpublishedAt.current = now;\n\t\t\t\t\t} else if (publishDue(now, publishedAt.current, cadence)) {\n\t\t\t\t\t\tcurrent.advance(now);\n\t\t\t\t\t\tpublish();\n\t\t\t\t\t\tpublishedAt.current = now;\n\t\t\t\t\t}')],
   // …and the switch is real in both directions: the reading view publishes it on its own root (one occurrence) and the
   // listener reads it there (the other) — two spellings of one string, which is why the count is asserted rather than
   // the presence of either. The gate is asserted as the LINE it compiles to, because where it sits is the property
