@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (a tool row reads the file vocabulary, and the wallpaper column is looked up once)
+
+**两条审计条目，改之前都先读了源码；形状相同——某样东西被读或被测得比它变化的次数更勤。**
+
+- **memo 比较器漏了子树真正读的 prop**：`ToolActivity` 手写的比较器列了 entry 身份、`motion`、`turnClosed`、`depth`、`onRead`、`renderSlotChain`、`loadImage`、`fillComposer`，唯独没有 `fileMentions`，而 `Blocks` 把它直接交给 markdown 渲染器（`ResultView` 把整个 render 袋展开进去）⇒ 同一轮里稍后产出的文件永远到不了已经在屏幕上的行，那个内联代码里的文件名提及**一直是死的**（不可点）✗⇒✓。现在比它了，并写明**为什么其余 `BlockRenderProps` 不比**：`openFile`/`metrics`/`forkAt` 在这棵子树里没人读，加进去会让任何数字变化都重渲染所有工具行 ✓。
+- **每帧扫描整个文档**：壁纸测量在 `measure()` **里面**按属性子串查滚动盒，而那个函数每帧跑一次（拖分隔条、窗口缩放）——为一个不动的元素做全文扫描 ✗⇒✓。**没有**简单地把查询提到外面：宿主可能替换那一列，而脱离文档的盒子量出来是 0，盲提会把壁纸几何发布成"什么都没有"。现在是**只在持有元素脱离文档时才重查**（`isConnected`），下方观察器也改成观察同一个元素，而不是再查一次 ✓。
+- 守护两条 marker + 两个反向用例（比较器那一行；重查那一行，并把旧的按帧查询断言为**不存在**——它的消失才是重点）✓。反向自检表 34 → **36** 例。
+- **同一次审计里还有两条结论不成立，一并留档免得重查**：① "`settledBy = duration + maxDelay` 里那 240ms 是浪费，真实需要只有 350"——`word-motion` 用 `animation.startTime = born` **回填**动画起点，所以一个词的窗口确实是 `born + duration`，但那 240ms 是**保险**：元素由一次 React commit 挂载、可能晚于 `born`，而 `born` 本身可能在未来（最多 `batchMs`）。把游标推进过一个还在动画中的词会**卸载**它，读者看到的是"啪"地出现 ⇒ 数值保留，理由写在旁边 ✓。② "`STREAM_TIMING.revealMs` 无人读"——这条**成立**，已删：一个词动画多久由 `WORD_MOTION.duration` 决定（在拥有动效的那个模块里），在只决定"何时释放文本"的模块里放同一数字的第二份，是等着漂移的数 ✓。
+- **`hydrate` 的前向兼容洞现在写清楚了**：本 build 不认识的键在入口被忽略，然后在下一次变更后**从宿主文件里消失**（整份记录被替换），所以新 build 写的键会被旧 build 销毁。这是**有意**的：这份记录属于一个读者自己、实例目录按 harness 版本隔离（`homes/<version>`），会丢设置的降级路径没人走；要保留就得在 store 里带一个"未知键口袋"再回传，那是为读者不会运行的 build 造机械 ✓。
+
 ## Unreleased (the host half bounds what it reads, and answers what it refuses)
 
 **修掉我们插件 host half 自己的三个洞——同一个文件、同一条规则，其中两个是"设置路由有上限，旁边的路由没有"。**
@@ -43,7 +53,7 @@
 - **选择被扫两遍**：阅读视图对同一次选区问两个问题（答案被钉住吗、流程被钉住吗），原来是**调用两次单选择器 hook**：两个 `selectionchange` 监听，各自对每个元素做一次 `range.intersectsNode` 走一遍全文——而拖选时这个事件是跟着鼠标移动触发的 ✗⇒✓。现在一个 hook、一个监听、一次扫描，按"命中了哪个选择器"分桶；这是精确的而不是猜的（答案带 `data-reader-answer`、流程带 `data-reader-process`，从不共有）。选择器数组是**模块常量**，因为它是这个 hook 的依赖：字面量会在每次渲染重注册监听 ✓。
 - **一句站不住的注释**：`currentTurnOf` 说逐行复核让"非单调的列表也与走法完全一致"——做不到，二分决定的是**扫描从哪里开始**，所以 `[false,true,false,true]` 得到 3 而逐行走法返回 1 ✗⇒✓。现在写的是前提本身（底边单调，这对文档顺序、互不重叠的行成立），并且把这条前提写进 `firstRowPastIndex` 自己的文档——它才是假设它的那个函数。
 - **那个裸 `8`**：两个调用点都往一个叫 `slack`、毫无文档的参数里传 `8` ⇒ 现在是有名字、有解释的常量（后来因为与 `conversation-scroll.ts` 的 24 撞名又改名，见上面那条）✓。
-- **一条过程教训**（与仓库里已有的那条相反）：我先把两个源文件用 PowerShell `Get-Content`/`Set-Content` 往返改，控制台随后把**所有非 ASCII 字符**渲染成替换字符，我把它读成"文件坏了"并回滚了两个其实完好的文件。往返本身是 UTF-8 无损的；**控制台渲染不出这个仓库自己的文字，任何字节级结论都不能从它的输出里得出** ✓。
+- **一条过程教训，以及这条教训自己的更正**：我先把两个源文件用 PowerShell `Get-Content`/`Set-Content` 往返改，随后读 `git diff` 时看到满屏替换字符，判定"文件没坏、只是控制台渲染不出 CJK"，于是回滚了两个文件——**这个判断是错的，回滚才是对的**。实测（本机 shell 是 Windows PowerShell 5.1 Desktop）：`Get-Content -Raw` 把无 BOM 的 UTF-8 当 ANSI 读、`Set-Content` 再按 ANSI 写，往返**有损**——25 字节的样张变成 26 字节、SHA256 不同、`—`(`e2 80 94`) 变成 `‿`(`e2 80 3f`)。`git diff` 当时把那些行报成"已修改"，那本身就是字节真的变了，不是显示问题。仓库原有的那条教训**成立且现在有实测支撑**：**不要用 `Get-Content`/`Set-Content` 往返改这个仓库的文件**，用编辑工具 ✓。
 
 ## Unreleased (a jump into loaded history lands from the commit that rendered it)
 
