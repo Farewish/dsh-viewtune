@@ -16,7 +16,10 @@
   gap: 2px;
   margin: 8px 0 0;
   padding-top: 8px;
-  border-top: 1px solid var(--dsw-alias-line-secondary);
+  /* `--dsw-alias-line-secondary` came with the upstream copy and does not exist in this host's token set. An undefined
+     `var()` inside a shorthand invalidates the WHOLE declaration at computed-value time, so this separator has never
+     been drawn. `-border-l2` is the hairline this fork uses everywhere else. */
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
 .field {

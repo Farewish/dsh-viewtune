@@ -95,8 +95,9 @@ export interface ReaderState {
    * the newest line), or 手动滚动 (never move on its own).
    *
    * Independent of 「焦点思考展开」: it governs the card as it is NOW, small card included, so a reader who never turns
-   * the expansion on still chooses how the text moves. Read through `reasoningFollowModeOf`, which answers `auto` for
-   * anything unrecognised — the pace this card has always followed.
+   * the expansion on still chooses how the text moves. Read through `reasoningFollowModeOf`, which answers `latest` for
+   * anything unrecognised — 跟随最新 is the default, so an unrecognised value lands on the default rather than on a mode
+   * nobody chose. (This sentence said `auto` until the defaults were flipped; the code has answered `latest` since.)
    */
   reasoningFollow: ReasoningFollowMode;
   /** The reading pace in lines per second, from `REASONING_RATES`; only 自动滚动 reads it. */

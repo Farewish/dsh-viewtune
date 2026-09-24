@@ -107,8 +107,8 @@
   font-feature-settings: "tnum"; color: var(--dsw-alias-label-caption, #86909c);
   min-width: calc(2ch + 1em); }
 .waitOvertime { margin-left: 8px; padding: 0 6px; font-size: 11px; line-height: 16px; border-radius: 5px;
-  color: var(--dsw-alias-state-warning-primary, #d8862c);
-  background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #d8862c) 16%, transparent); }
+  color: var(--dsw-alias-state-warn-primary, #d8862c);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #d8862c) 16%, transparent); }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* Transitions.dev — Thinking states, supplied by the user. Native DSH colors;
    the hidden sizer shares this font and the short phases share a left edge. */
@@ -617,6 +617,14 @@
 .settingsRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .settingsCopy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .settingsLabel { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+/* The rows that offer a choice rather than a switch. `.settingsSelect` was referenced from the panel and declared
+   nowhere, so these five controls were the browser's own: a platform-grey box in the middle of a themed panel, and the
+   only place in it where a value is picked rather than toggled. Measured like `.shortcutKey`, which is the same idiom
+   one page over. The width cap keeps a long option name from squeezing the label it belongs to. */
+.settingsSelect { padding: 3px 8px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; max-width: 46%; }
+.settingsSelect:hover { border-color: var(--dsw-alias-border-l3); }
+.settingsSelect:disabled { opacity: .5; cursor: default; }
+.settingsSelect:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 /* A line the row has to say for itself: state the reader is acting on — the switch being overridden
    by the system, what to press while recording, why a combination was refused. Descriptions are the
    row's `title` instead, so this only ever renders when there is something to say. */
