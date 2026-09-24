@@ -257,6 +257,14 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
        * decided here: every preference already has a defensive reader (`wallpaperNameOf`, `glassValues`,
        * the `=== true` on `glass`, …) that has to cope with the same thing coming out of the browser's
        * own copy.
+       *
+       * WHAT HAPPENS TO A KEY THIS BUILD DOES NOT KNOW, stated because the loop above makes it invisible: it is
+       * ignored on the way in, and then it is GONE from the host's file, because the next change pushes this store's
+       * whole state and the host replaces the record wholesale. So a key written by a newer build is destroyed by an
+       * older one, not preserved. Kept that way on purpose: this plugin's record is one reader's own, in an instance
+       * home scoped to one harness version (`homes/<version>`), so the downgrade it would take to lose a setting is
+       * not a path anyone is on. Preserving them would mean carrying a pass-through bag of unknown keys through the
+       * store and re-sending it, which is machinery to protect a reader from a build they do not run.
        */
       hydrate: (draft, value) => {
         const target = draft as unknown as Record<string, unknown>;

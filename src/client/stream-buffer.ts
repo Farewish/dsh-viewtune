@@ -9,8 +9,10 @@ export const STREAM_TIMING = {
   catchUpMs: 520,
   maxQueuedMs: 600,
   finishMs: 96,
-  revealMs: 350,
   minimumRate: 260,
+  // No reveal length here. This table used to carry `revealMs: 350`, read by nothing at all: how long a revealed word
+  // animates for is `WORD_MOTION.duration`, in the module that owns the motion, and a second copy of the same number
+  // in a module that only decides how text is RELEASED was a number waiting to drift.
   /** Weight of the newest arrival sample in the smoothed source rate. */
   rateWeight: 0.35,
   /** A longer gap is a pause between runs, not a slow model: keep the estimate. */

@@ -7,7 +7,13 @@ export const WORD_MOTION = {
   maxDelay: 240,
   /** Floor for the per-word cadence once a batch is compressed. */
   minGap: 3,
-  /** One paint's words should land inside this window, however many arrive. */
+  /**
+   * One paint's words should land inside this window, however many arrive.
+   *
+   * ~5 frames at 60 Hz. A batch compressed to fit here cannot visibly outrun the paint that carries it, and capping
+   * `born` at `now + batchMs` is also what stops a queue from forming: the clock can never run further ahead than one
+   * window past the newest text.
+   */
   batchMs: 90,
 } as const;
 
@@ -78,7 +84,16 @@ export class WordTimeline {
       // `Intl.Segmenter` and rebuilt as N `<Word>` elements sixty times a second. That is the jank: a reasoning stream
       // publishes text every frame, while a tool call flushes once and stops the loop, which is why only thinking
       // stuttered. `born` never decreases and the table is append-only, so a cursor is enough to find the boundary.
-      const settledBy = now - (WORD_MOTION.duration + WORD_MOTION.maxDelay);
+      /**
+   * The cursor waits `duration + maxDelay`, and the extra term is deliberate.
+   *
+   * `word-motion.tsx` back-dates each reveal (`animation.startTime = born`), so a word's own window really is
+   * `born + duration` — but the element carrying it is mounted by a React commit that can land later than `born`, and
+   * `born` itself can be up to `batchMs` in the future. The slack is therefore insurance, not arithmetic: advancing
+   * the floor past a word that is still animating UNMOUNTS it mid-fade, which a reader sees as the word appearing
+   * abruptly. Paying for that with a wider live window (more `<Word>` identities per frame) is the right way round.
+   */
+  const settledBy = now - (WORD_MOTION.duration + WORD_MOTION.maxDelay);
       while (this.settled < this.births.length) {
         const entry = this.births[this.settled]!;
         if (entry.born !== null && entry.born > settledBy) break;
