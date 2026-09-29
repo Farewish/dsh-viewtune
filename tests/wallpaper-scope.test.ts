@@ -86,6 +86,17 @@ test('the stylesheet is gated, and every copy of the IMAGE is viewport-anchored'
   const chromeRule = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome')) ?? '';
   assert.ok(chromeRule.includes('[class*="_sidebarCol"]'));
   assert.ok(!chromeRule.includes('--viewtune-wallpaper-image'));
+  // The top bar is named by the hook the conversation package PUBLISHES on its own leading cell, not by a
+  // direct-child test on a build-minted class. 0.2.0 moved the title row behind the `conversation.session.header`
+  // slot, so `:has(> [class*="_titleRow"])` stopped matching and the top bar silently lost its scrim — the
+  // reader's report. The old shape is kept as an alternative for the 0.1.5 line, but the data hook is what has
+  // to be there, because a selector that matches nothing paints nothing and nothing fails.
+  assert.ok(chromeRule.includes('*:has(> [data-conversation-header-leading])'), 'the top bar must be named by its published hook');
+  assert.ok(chromeRule.includes('[class*="_header"]:has(> [class*="_titleRow"])'), 'the older platform shape must keep working');
+  // …and the Windows title-bar strip is chrome too: with `[data-windows-titlebar]` the layout paints that strip
+  // ABOVE the frame's own background, from the sidebar-fill token this file makes transparent, so it showed the
+  // photograph with no scrim at all until it was given one.
+  assert.ok(css.includes('[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before'), 'the title-bar strip needs the chrome scrim');
   // …and it is the one carrier that must NOT be viewport-anchored: attachment:fixed is only ever needed to
   // line an image up with the viewport, and on a flat colour it buys nothing while putting the paint in the
   // compositor. That is where the reader's bug lived — the scrim stayed missing on a fresh load until that

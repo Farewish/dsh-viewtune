@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.2 (the top bar gets its scrim back: 0.2.0 moved the title row behind a slot)
+
+**读者报告：0.2.0 里「界面遮罩」不再影响顶栏，顶栏始终是 0 遮罩。原因是一句在 0.1.5 上精确、在 0.2.0 上匹配不到任何元素的直接子代选择器——不匹配就不画，不画也不报错。**
+
+- **0.2.0 把顶栏的标题行搬进了一个 slot**。它对 header 的渲染是：`children: [headerLeading, sessionId === undefined ? <div class=X_titleRow> : renderSlot("conversation.session.header", …)]`——也就是**只要选着会话（正常情况），第二个孩子就是 slot 的产物**，而 `_titleRow` 落在 slot 的内部。这个插件那半边的遮罩规则写的是 `${SCOPED} [class*="_header"]:has(> [class*="_titleRow"])`，`:has(> …)` 要求它是**直接子代** ⇒ 0.2.0 上永远不匹配，顶栏于是没有任何遮罩，而且**没有任何东西会失败** ✓⇒✓。
+- **改法用宿主自己发布的钩子，而不是另一个类名**：0.2.0 的 header 在它的 leading 单元格上发布了 `data-conversation-header-leading`，所以顶栏就是"以它为直接子代的那个元素"——`*:has(> [data-conversation-header-leading])`。这是宿主对**自己的树**的陈述，不是随构建变的哈希类名，和本文件早就用 `:has([class*="_titleRow"])` 找会话根是同一个理由 ✓。0.1.5 的那条直接子代写法**保留在同一组选择器里**：在那边命中就继续命中，在 0.2.0 上多余但无害 ✓。
+- **顺手补上同一块 chrome 的第二个洞：Windows 标题栏条**。0.2.0 的布局在 `[data-windows-titlebar]` 下把一条 drag strip 画在**框架自己的背景之上**，用的正是 `--dsw-specific-sidebar-fill`——而这个文件为了让侧栏透出壁纸**把那个 token 设成了 transparent**，于是这条 strip 显示的是**没有任何遮罩的照片**。它是 chrome，所以也给它 chrome 遮罩：`${SCOPED}[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before` ✓（该属性不出现时这条规则完全惰性）。
+- **`nudgeChromePaint` 的选择器与遮罩规则保持同一组**：它的作用是"值变了以后逼这些元素重新解析绘制"，只 nudge 旧类名的话，读者抱怨的那个元素恰好是唯一没被 nudge 的那个 ✓。
+- **测试与守护**：`wallpaper-scope.test.ts` 新增三条断言（顶栏必须由发布的钩子命名、0.1.5 的形状仍须在、标题栏条必须有遮罩），守护里那条"窗口背景板是受门控的、每份图像都锚定视口"的 marker 一并加上两条新选择器，反向自检表新增 1 例（把新选择器去掉 ⇒ 要求该 marker 失败）✓。反向自检表 61 → **62** 例。
+- **验证**：`build`、`verify-types`、**23/23** 不变式、**36/36** 测试文件、**62/62** 反向用例全过 ✓。诊断依据是 0.2.0 自己的客户端 bundle（`ConversationRoot` 的 header JSX、`dsh-client-ui-layout` 的 frame/sidebarCol 结构与 `[data-windows-titlebar]` 规则），以及 0.2.0 里**仍然存在**的 `_sidebarCol`（所以侧栏的遮罩没坏，读者也只报了顶栏）✓。
+- **未验证的部分照实说**：我没有浏览器，所以"改完看起来对"仍需读者的眼睛确认；上面能证明的是"选择器现在指向宿主真实发布的那棵树"，而不是"像素已经变好"。
+
 ## 0.5.1 (the platform rebase: DSH 0.2.0-rc.2)
 
 **这是一次平台改版适配，不是功能改动：0.2.0-rc.2 动了我们直接依赖的六处契约，每一处都是"类型会报错、但只在页面里才看得见"的那一类。**

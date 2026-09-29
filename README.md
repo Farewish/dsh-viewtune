@@ -20,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # 或从本地目录 / tarball 安装
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.5.1.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.2.tgz
 ```
 
 **同一台机器上装了多个 Harness 版本时**，有两条会咬人的细节（本仓库在 0.1.5 与 0.2.0 并存的环境里装过一次）：

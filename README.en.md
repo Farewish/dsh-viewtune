@@ -20,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # or from a local directory / tarball
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.5.1.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.2.tgz
 ```
 
 **With more than one Harness version on the machine**, two details bite (this repository installed once into an environment where 0.1.5 and 0.2.0 coexist):

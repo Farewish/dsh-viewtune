@@ -880,7 +880,14 @@ const markers = [
       // The token's name lives in a constant and is interpolated into its rule, so the bundle has the
       // declaration rather than a spelled-out declaration line.
       && bundle.includes('const SIDEBAR_FILL = "--dsw-specific-sidebar-fill"')
-      && bundle.includes('[class*="_header"]:has(> [class*="_titleRow"])');
+      // The chrome is named in BOTH platform generations. 0.1.5's direct-child test is kept (harmless, and it
+      // holds there); 0.2.0 needs the published hook, because it moved the title row behind the
+      // `conversation.session.header` slot — which is exactly how the top bar lost its scrim silently.
+      && bundle.includes('[class*="_header"]:has(> [class*="_titleRow"])')
+      && bundle.includes('*:has(> [data-conversation-header-leading])')
+      // …and the Windows title-bar strip, which the layout paints above the frame from the token this file makes
+      // transparent: chrome, so it carries the chrome scrim.
+      && bundle.includes('[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before');
   }],
   // The conversation column BELOW the header belongs to the reading view in either scope. Gating the
   // scroller, the gutter or the composer's fade band on the window scope is exactly what left two black

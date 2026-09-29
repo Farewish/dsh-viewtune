@@ -182,8 +182,27 @@ export function windowScopeCss(): string {
     `   fresh load until that part of the page happened to repaint, which is the signature of a composited`,
     `   layer the property change never invalidated. A colour has nothing to line up and nothing to go`,
     `   stale. */`,
+    `/* Which elements are the chrome, in BOTH platform generations this line has run on.`,
+    `   0.1.5 rendered the top bar's title row as a DIRECT child of the header, so`,
+    `   \`[class*="_header"]:has(> [class*="_titleRow"])\` was exact and still is on that build. 0.2.0 changed`,
+    `   the header's second child into a SLOT (\`conversation.session.header\`, whose occupant renders its own`,
+    `   title row inside whatever wrapper the slot registry gives it): the direct-child test stops matching,`,
+    `   and the reader's report is exactly that — 顶栏 not scrimmed, silently, because a selector that matches`,
+    `   nothing paints nothing and nothing fails.`,
+    `   So the top bar is named by the hook the conversation package PUBLISHES on its own leading cell`,
+    `   (\`data-conversation-header-leading\`), and the header is the element that has it as a direct child.`,
+    `   That is a fact the host states about its tree rather than a build-minted class name, which is the same`,
+    `   reason this file uses \`:has([class*="_titleRow"])\` for the conversation root further down. The old`,
+    `   shape stays in the rule list: harmless when it matches, and it keeps the 0.1.5 line working.`,
+    `   The title-bar strip is the last piece: with \`[data-windows-titlebar]\` the layout paints the strip`,
+    `   ABOVE the frame's own background from the sidebar-fill token (which this file makes transparent),`,
+    `   so that strip showed the photograph with no scrim at all. It is chrome, so it gets the chrome scrim. */`,
     `${SCOPED} [class*="_sidebarCol"],`,
+    `${SCOPED} *:has(> [data-conversation-header-leading]),`,
     `${SCOPED} [class*="_header"]:has(> [class*="_titleRow"]) {`,
+    `  background-image: ${scrim('--viewtune-wallpaper-chrome', 55)} !important;`,
+    `}`,
+    `${SCOPED}[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before {`,
     `  background-image: ${scrim('--viewtune-wallpaper-chrome', 55)} !important;`,
     `}`,
     `/* One scoped token is what the left column paints from; making it see-through is the whole of`,
@@ -288,7 +307,7 @@ export function applyWindowScope(doc: Document, values: WindowScopeValues | null
 }
 
 /**
- * Make the two scrimmed surfaces re-resolve their paint after their values changed.
+ * Make the scrimmed surfaces re-resolve their paint after their values changed.
  *
  * The reader reported the chrome scrim missing on a fresh load until that part of the page happened to
  * repaint — the signature of a style change that never became a paint for those elements. The scrim no
@@ -296,10 +315,14 @@ export function applyWindowScope(doc: Document, values: WindowScopeValues | null
  * colour), and this is the belt to that braces. Reading one layout property per element flushes style and
  * layout, which is exactly what marks them dirty for paint — two reads per settings change, and a no-op on
  * a document that has no such elements (the fakes the tests use have no `querySelectorAll` at all).
+ *
+ * The selector is the SAME SET the scrim rule paints, and it has to be kept that way: the top bar is
+ * `*:has(> [data-conversation-header-leading])` from 0.2.0 on, and nudging only the `_header` class here
+ * would leave the very element the reader complained about waiting for its own repaint.
  */
 function nudgeChromePaint(doc: Document): void {
   if (typeof doc.querySelectorAll !== 'function') return;
-  for (const element of doc.querySelectorAll('[class*="_sidebarCol"], [class*="_header"]')) {
+  for (const element of doc.querySelectorAll('[class*="_sidebarCol"], [class*="_header"], *:has(> [data-conversation-header-leading])')) {
     void (element as HTMLElement).offsetHeight;
   }
 }

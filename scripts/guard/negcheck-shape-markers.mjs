@@ -411,6 +411,20 @@ const cases = [
     replace: 'provenance.role',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
+  {
+    label: 'the top bar’s scrim moved onto the leading CELL instead of the bar itself, which is the shape a `:has(>)` mix-up produces',
+    search: '*:has(> [data-conversation-header-leading])',
+    // A replacement that does NOT contain the needle: the first cut appended a comment to it, so the marker still found
+    // its string and the case passed the guard it was supposed to fail — a self-defeating mutation, caught by the run.
+    replace: '*:is([data-conversation-header-leading])',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the Windows title-bar strip’s scrim moved to the wrong pseudo-element',
+    search: '[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before',
+    replace: '[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::after',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
 ];
 
 let failed = 0;
