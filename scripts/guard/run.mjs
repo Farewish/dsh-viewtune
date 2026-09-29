@@ -39,6 +39,7 @@ const GUARDS = [
   ['check-stylesheet-classes.mjs', 'every CSS-module class the sources use has a rule, and the checker is able to fail'],
   ['check-settings-fallbacks.mjs', 'every boolean setting default and its defensive reader agree, bar the declared inversions'],
   ['check-host-markers.mjs', 'the HOST bundle keeps its own invariants (body caps, settle paths, revalidation)'],
+  ['check-platform-exports.mjs', 'every platform member the artifact reads off the installed packages actually exists'],
   ['verify-session-changes.mjs', 'the reading-view changes survive compilation'],
   ['compare-source-and-bundle.mjs', 'source and artifact agree on every decision this fork made'],
   ['audit-source-edits.mjs', 'no dead branches, leftovers, or drift between the two'],
