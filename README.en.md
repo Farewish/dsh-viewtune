@@ -23,6 +23,11 @@ dsh plugin --profile web add ./dsh-viewtune
 dsh plugin --profile web add ./dsh-viewtune-0.5.0.tgz
 ```
 
+**With more than one Harness version on the machine**, two details bite (this repository installed once into an environment where 0.1.5 and 0.2.0 coexist):
+
+- **`DSH_HOME` must point at the instance you are installing into.** If the shell already exports another instance's `DSH_HOME` (for example because you are running a 0.1.5 session), calling the 0.2.0 `dsh` installs the plugin into **the instance that is running**. Override it explicitly first: `$env:DSH_HOME='D:\DSH\homes\0.2.0-rc.2'` (Windows PowerShell).
+- **`pnpm` may not be on PATH**, while the desktop launcher ships one: add its `tools` directory (e.g. `D:\DSH\in.dsh-plug.dsh-launcher\tools`) to `PATH`. Without it the CLI only says `'pnpm' is not recognized`; the detailed diagnostics land in `<profile>\.plugin-manager\logs\operation-*\pnpm.log`.
+
 **Restart the Host** and reload the page afterwards: `dsh plugin add` only writes the profile, it does not hot-mount a running process.
 
 Remove it with:

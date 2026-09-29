@@ -20,6 +20,14 @@
 - **验证**：`build`、`verify-types`（对着 0.2.0-rc.2 的真实声明）、**23/23** 不变式（含在临时目录重建后再跑一遍整套 marker）、**36/36** 测试文件、**61/61** 反向用例全过 ✓——`turn-reading` 的新测试就是第 36 个文件。
 - **还没做（明确留下）**：**真机验证**。以上全部是"对着 0.2.0-rc.2 的包与声明"的静态验证；本会话跑在 0.1.5-rc.2 上（`DSH_HOME=D:\DSH\homes\0.1.5-rc.2`），而 0.2.0 的 profile 里还没有这个插件。**图标的视觉配对（`…14→Medium` / `…16→Regular`）按描边与尺寸的补偿关系推断，未在真机上比对**；`dsh.client.inject` 的清单内容、以及桌面版（Electron 走 `file://` + IPC，`dsh-host-webserver` 的注释里写明了）下 `/better-display/*` 三条路由是否可达，同样待真机确认。这三条都写在 README 与这里，没有当成已完成。
 
+**装机（0.2.0-rc.2 的 web profile）——已装、未启动**
+
+- 0.5.0 已用 **0.2.0 自带的 `dsh` CLI** 装进 `D:\DSH\homes\0.2.0-rc.2\profiles\web`：`package.json` 里多出 `"dsh-viewtune": "file:…/dsh-viewtune-0.5.0.tgz"` 与 bundles 里的 `dsh-viewtune`，`node_modules/dsh-viewtune` 是 **0.5.0**，其 `lib/client.js` / `lib/dsh-viewtune.js` 与本次验证过的产物**逐字节相同** ✓。**没有启动任何进程**（读者选择自己启动）；0.1.5 的 profile 与被服务副本**一个字节都没动**（`profiles/web/package.json` 的哈希前后一致）✓。
+- **两条操作事实，写给下一次装/升级的人**（踩过一次）：
+  1. **`DSH_HOME` 必须指向目标实例**。这个会话的 shell 里导出了 `DSH_HOME=D:\DSH\homes\0.1.5-rc.2`，直接跑 0.2.0 的 `dsh` 会把它装进**正在运行的那个实例**的 profile。命令前显式覆盖成 `D:\DSH\homes\0.2.0-rc.2` ✓。
+  2. **`pnpm` 不在 PATH 上**（`dsh plugin add` 需要它），而启动器自带一份：`D:\DSH\in.dsh-plug.dsh-launcher\tools\pnpm.cmd`（v11.27.0）。把它加到 `PATH` 再跑，安装才成功；否则 CLI 只会报 `'pnpm' is not recognized`，诊断日志落在 `<profile>\.plugin-manager\logs\operation-*\pnpm.log`。
+- **顺带发现一处 0.2.0 的 profile 变化**：0.1.5 的 profile 里有 `"patchReload": "live"`（由 `dsh-app-boot` 读取），**0.2.0 的包里已经没有这个字段**，新装的 0.2.0 profile 也不带它。这一点只作为事实记录：那个字段当年开启的行为在 0.2.0 里**变成了什么、是否默认开启，我没有测**，也没有手工往 0.2.0 的 profile 里补这个字段（补一个平台已不认的键只会制造假象）。
+
 ## 0.4.1 (the diff the row promised and the pane did not show, plus the host's small stuff)
 
 **§3.6 里那条被当作"架构观察"记下的东西，其实是一个和 M4 同类的真缺陷；顺手做掉 §5.5 的三条小项，并把 §5.1 / §5.2 的代价写进 README。**

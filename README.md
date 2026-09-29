@@ -23,6 +23,11 @@ dsh plugin --profile web add ./dsh-viewtune
 dsh plugin --profile web add ./dsh-viewtune-0.5.0.tgz
 ```
 
+**同一台机器上装了多个 Harness 版本时**，有两条会咬人的细节（本仓库在 0.1.5 与 0.2.0 并存的环境里装过一次）：
+
+- **`DSH_HOME` 必须指向要装进去的那个实例。** 如果 shell 里已经导出了别的实例的 `DSH_HOME`（例如你正跑在 0.1.5 会话里），直接调用 0.2.0 的 `dsh` 会把插件装进**正在运行的那个实例**。装之前显式覆盖：`$env:DSH_HOME='D:\DSH\homes\0.2.0-rc.2'`（Windows PowerShell）。
+- **`pnpm` 可能不在 PATH 上**，而桌面启动器自带一份，把它加进 `PATH` 再跑即可（例如 `D:\DSH\in.dsh-plug.dsh-launcher\tools`）。缺少时 CLI 只会说 `'pnpm' is not recognized`，详细诊断写在 `<profile>\.plugin-manager\logs\operation-*\pnpm.log`。
+
 装完**重启 Host** 再刷新页面：`dsh plugin add` 只写 profile，不会热挂正在运行的进程。
 
 卸载：
