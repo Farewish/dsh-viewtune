@@ -100,15 +100,19 @@ for (const [name, inSource, inBundle] of pairs) {
   }
 }
 
-// Type-only declarations cannot appear in a compiled bundle, so they are checked on the
-// source side alone: declared once, and actually imported where it is used.
+// Type-only declarations cannot appear in a compiled bundle, so they are checked on the source side alone.
+//
+// This row used to pin a LOCAL `export interface TurnProcessChatData` in `types.ts`, which was the honest shape while
+// 0.1.5 did not publish the record type. 0.2.0 does publish it, so the row now pins the opposite decision: the view
+// re-exports the platform's type and no longer carries a private copy that could drift field-by-field from the host's.
 {
-  const declared = source.types.includes("export interface TurnProcessChatData");
-  const imported = source.reader.includes("TurnProcessChatData");
-  const used = source.reader.includes("as TurnProcessChatData");
-  const ok = declared && imported && used;
+  const reExported = source.types.includes("export type { TurnProcessChatData }");
+  const fromPlatform = source.types.includes("from '@deepseek-ai/dsh-client-ui-chat/client'");
+  const noLocalCopy = !source.types.includes('interface TurnProcessChatData');
+  const used = source.reader.includes('TurnProcessChatData');
+  const ok = reExported && fromPlatform && noLocalCopy && used;
   if (!ok) mismatched += 1;
-  console.log(`${ok ? "ok    " : "DRIFT "} types: process record declared, imported and used`);
+  console.log(`${ok ? "ok    " : "DRIFT "} types: the process record is the platform's, re-exported and used (no local copy)`);
 }
 
 // The bundle must not carry anything the source does not describe.

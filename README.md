@@ -6,7 +6,9 @@
 
 上游原版的「对话 / 轨迹」页签、输入框、模型选择、工具与审批全部保留，本插件只增加一个阅读视图。
 
-面向 DeepSeek Harness **0.1.5-rc.2**。只改展示，不碰 Agent 执行、SDK 或模型凭据。Node.js `^22.19.0 || >=24`。
+面向 DeepSeek Harness **0.2.0-rc.2**。只改展示，不碰 Agent 执行、SDK 或模型凭据。Node.js `^22.19.0 || >=24`。
+
+> **平台版本**：**0.5.0** 起对应 **0.2.0-rc.2**；**0.4.x** 那一条线对应 **0.1.5-rc.2**，两者**不能互换**。客户端半边是预编译产物，它在构建时就把平台包的导出写进了 bundle——0.2.0 把图标名从 `IconXxx16/14` 换成 `IconXxxRegular/Medium`、把 `useSessionPendingInteraction` 换成 `useSessionStatus`、把 `TurnTailChatData.tokensPerSecond/ttftMs` 移走，所以一份产物只服务一个平台版本：装在 0.1.5 上会用到一个已不存在的导出，装在 0.2.0 上会读一个已删除的字段。要留在 0.1.5 就继续用 0.4.x 的 tag 与 tarball。
 
 ## 安装
 
@@ -18,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # 或从本地目录 / tarball 安装
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.4.1.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.0.tgz
 ```
 
 装完**重启 Host** 再刷新页面：`dsh plugin add` 只写 profile，不会热挂正在运行的进程。
@@ -159,9 +161,11 @@ npm run typecheck           # tsc -p tsconfig.json --noEmit，对着真实声明
 
 用锁文件而不是裸 `npm install`：`tsdown` / `lightningcss` / `typescript` 都写在 `^` 区间上，只有锁文件能钉住**能复现当前 `lib/`** 的那套工具链——`npm run guard` 里的 `verify-build` 正是这么比的。只有动了依赖才用 `npm install` 回写锁文件。
 
-`--legacy-peer-deps` 是**上游包的 peer 区间互相打架**造成的，不是本仓库能改掉的东西：这个版本的各种 `@deepseek-ai/dsh-*` 开发依赖（以及它们的 peer）钉在 `0.1.5-rc.2`，而其中若干包把 peer 写成 `^0.1.5-rc.2`，注册表上现在解析到 `0.1.5-rc.3`，那个版本又要求 `@deepseek-ai/dsh-session@^0.1.5-rc.3`。于是裸 `npm ci` 会以 `ERESOLVE` 失败——锁文件本身是完整可解的（`lockfileVersion: 3`，21 个开发依赖与 9 个依赖全部在册，工具链版本与构建 `lib/` 的那棵树一致）。这个参数只是让 npm 不再拒绝这组 peer 声明。
+`--legacy-peer-deps` 是**上游包的 peer 声明**造成的，不是本仓库能改掉的东西。0.2.0 这一代 `@deepseek-ai/dsh-*` 的开发依赖（以及它们互相之间的 peer）都钉在 `0.2.0-rc.2`，而其中若干包把 peer 写成区间（`^0.2.0-rc.2`）——在 0.1.5 那一代，注册表把这种区间解析到了 `0.1.5-rc.3`，于是裸 `npm ci` 报 `ERESOLVE`；现在解析器接受这组声明了，但换成另一种失败：**peer 不在锁文件里**（`EUSAGE: Missing: @deepseek-ai/dsh-agent@0.2.0-rc.2 from lock file`，随后是几十条同样的 transitive peer）。
 
-上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器取 `externalClientBundle`，所以在克隆出来的仓库里跑不起来。本仓库把它的真身（官方预设的 `clientBundle()`，Harness tag `dsh-v0.1.5-rc.2`）移植成了 [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs)。产物契约不变，针对产物的断言依然有效。
+两条命令都实测过，结论写在这里：`npm ci --legacy-peer-deps --dry-run` **通过** ✓，裸 `npm ci --dry-run` **失败**（EUSAGE）✗。也就是说，本仓库安装的是**锁文件里的那棵树**：`tsdown` / `lightningcss` / `typescript` / `react` 与 13 个平台包，而 `--legacy-peer-deps` 让 npm 不去自动补装那批 peer。这棵树足够构建、类型检查与跑测试（三者都在 CI 里跑过），但它**不是** `npm install` 的默认结果——把 peer 全部拉进来会装出一个更大、且在本仓库里从未被验证过的树。要复现当前 `lib/`，就用上面这条命令。
+
+上游的 `tsdown.config.ts` 从一个不对外发布的 Harness 适配器取 `externalClientBundle`，所以在克隆出来的仓库里跑不起来。本仓库把它的真身（官方预设的 `clientBundle()`，Harness tag `dsh-v0.1.5-rc.2`）移植成了 [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs)。产物契约不变，针对产物的断言依然有效——**这一点在 0.2.0 上重新核对过**：0.2.0 的客户端模块系统仍然以 `window.__ModuleLoader__.load({ id, factory })` 注册、仍然用 `data-plugin` / `data-plugin-css` 认领自己注入的样式，与本仓库产物的形状逐项一致（0.2.0 的 `dsh-client-modules` 里读到的）。移植的预设**没有**因此改动，因为它决定的是产物形状，而形状没变。
 
 改完记得**同时提交 `lib/`**：别人拿到的是这份产物，而不是让他在本地构建。
 

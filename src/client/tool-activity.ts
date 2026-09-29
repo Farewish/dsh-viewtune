@@ -1,4 +1,4 @@
-import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { AssistantBlock, RunningToolCall, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { DiffHunk } from '@deepseek-ai/dsh-client-ui-primitives';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
@@ -92,11 +92,23 @@ export function inputFields(raw: string): Record<string, unknown> {
   return fields;
 }
 
+/**
+ * The name and raw arguments of a call, running or settled.
+ *
+ * 0.2.0 split the running half into a discriminated union: `phase: 'preparing'` carries no arguments at all (the model
+ * has not finished writing them) and `phase: 'start'` carries `argsRaw`. Reading `block.argsRaw` off the union stops
+ * compiling, which is the type system saying the same thing the rows have always assumed — a preparing call has no
+ * arguments to show yet, and the draft the reader is watching is the only source for them.
+ */
+function runningArgs(block: RunningToolCall | undefined): string | undefined {
+  return block?.phase === 'start' ? block.argsRaw : undefined;
+}
+
 export function toolIdentity(entry: Pick<ToolActivityEntry, 'block' | 'draft'>) {
   const block = entry.block;
   return {
     name: block ? 'kind' in block ? block.call?.name ?? entry.draft?.name ?? '工具调用' : block.name : entry.draft?.name ?? '工具调用',
-    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : block.argsRaw : entry.draft?.argsRaw ?? '',
+    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : runningArgs(block) ?? entry.draft?.argsRaw ?? '' : entry.draft?.argsRaw ?? '',
   };
 }
 

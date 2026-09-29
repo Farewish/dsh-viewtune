@@ -4,8 +4,20 @@ import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/clie
 import { toolRowModel } from '../src/client/native/tool-call-model.ts';
 import { activitySummary } from '../src/client/tool-activity.ts';
 
+/**
+ * A dispatched, still-running call.
+ *
+ * 0.2.0 split the running half of `ToolCallBlock` into a discriminated union — `phase: 'preparing'` (the model has not
+ * finished writing the arguments, so there are none) and `phase: 'start'` (`argsRaw` present) — so a fixture that carries
+ * `argsRaw` without a phase is a shape the host no longer emits, and the row now reads arguments only off `'start'`.
+ */
 const call = (name: string, args: unknown) => ({
-  callId: 'call-1', name, argsRaw: JSON.stringify(args), turn: 1, step: 1, time: 0, subCalls: [],
+  phase: 'start', callId: 'call-1', name, argsRaw: JSON.stringify(args), turn: 1, step: 1, time: 0, subCalls: [],
+}) as unknown as ToolCallBlock;
+
+/** A call the host has announced but whose arguments are not available yet. */
+const preparing = (name: string) => ({
+  phase: 'preparing', callId: 'call-2', name, turn: 1, step: 1, time: 0, subCalls: [],
 }) as unknown as ToolCallBlock;
 
 test('the calls the product renders with its own cards are named here, not called "Tool call"', () => {
@@ -47,6 +59,15 @@ test('a list payload with nothing to read falls back to the raw arguments', () =
   const empty = toolRowModel('todo_write', call('todo_write', { todos: [] }));
   assert.equal(empty.title, 'Todo');
   assert.equal(empty.summary, '{"todos":[]}');
+});
+
+test('a call whose arguments have not arrived yet is named by its id, not filled in from nothing', () => {
+  // The `preparing` half carries no `argsRaw` at all in 0.2.0, and this row must not invent one: the same fallback the
+  // row has always used (the call id) is what a preparing row shows, and `runningArgs` is the single place that decides.
+  const row = toolRowModel('todo_write', preparing('todo_write'));
+  assert.equal(row.title, 'Todo');
+  assert.equal(row.summary, 'call-2');
+  assert.equal(row.body, null);
 });
 
 test('each of those calls is its own kind of row, which is what the icon table keys off', () => {

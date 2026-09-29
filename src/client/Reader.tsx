@@ -8,6 +8,7 @@ import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } 
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
+import { stepReading, tokensPerSecondOf } from './turn-reading.js';
 import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
@@ -305,8 +306,12 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   </div>;
 });
 
-function GroupStatus({ group, sessionId, useChat, useSession, useSessionPendingInteraction, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSession' | 'useSessionPendingInteraction'> & { group: ReaderGroup; motion: boolean }) {
-  const pending = useSessionPendingInteraction(snapshot => snapshot.get(sessionId));
+function GroupStatus({ group, sessionId, useChat, useSession, useSessionStatus, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSession' | 'useSessionStatus'> & { group: ReaderGroup; motion: boolean }) {
+  // 0.2.0 replaced the per-session interaction map with one unified UI-status map: each Session's independent status
+  // facts (`running`, `pendingInteraction`, `completionUnread`) ride `useSessionStatus`, which is a GLOBAL standard prop
+  // rather than a session-scoped hook. Same question as before — "is this session waiting on the reader?" — and the
+  // optional chain is what keeps a session with no status yet from reading as "waiting".
+  const pending = useSessionStatus(snapshot => snapshot.get(sessionId)?.pendingInteraction);
   const text = useChat(snapshot => {
     const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
     if (turn?.status === 'closed') {
@@ -645,14 +650,22 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     return undefined;
   }, [group.keys, nodes, group.turn]);
   const runMs = turn?.start && turn?.end ? Math.max(0, turn.end.time - turn.start.time) : undefined;
+  /**
+   * The turn's throughput facts, derived rather than read off the tail record.
+   *
+   * 0.2.0 removed `tokensPerSecond` and `ttftMs` from `TurnTailChatData`; the numbers now come from the closing assistant
+   * node's own `timing` and `usage`, through the port in `turn-reading.ts` (the platform's helper is not reachable from a
+   * plugin — see that file). `undefined` is what the metrics bag already means by "not measured".
+   */
+  const reading = useMemo(() => tailData?.closing === null || tailData?.closing === undefined ? undefined : stepReading(tailData.closing.finalNode), [tailData]);
   const metrics = useMemo(() => ({
     usage: tailData?.tokenUsage,
     runMs,
-    tokensPerSecond: tailData?.tokensPerSecond,
-    ttftMs: tailData?.ttftMs,
+    tokensPerSecond: tokensPerSecondOf(reading),
+    ttftMs: reading?.ttftMs ?? undefined,
     endedAt: tailData?.closing?.time ?? turn?.end?.time,
     steps: turnProcess ? { data: turnProcess, totalSteps: turn?.steps.length } : undefined,
-  }), [tailData, runMs, turn?.end?.time, turnProcess, turn?.steps.length]);
+  }), [tailData, reading, runMs, turn?.end?.time, turnProcess, turn?.steps.length]);
   const forkSeq = forkAnchorSeq([tailData?.closing?.finalNode]);
   const shared = {
     useChat: props.useChat,
@@ -674,9 +687,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {turnUserKeys.map(userKey => <BlockBoundary key={userKey}><MainNode {...shared} boundary={boundary} nodeKey={userKey} /></BlockBoundary>)}
     {hasProcess && <Disclosure open={expanded} onToggle={() => setExpanded(!wantsProcess)} controls={flowId} buttonRef={processButton}
-      label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
+      label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
     {!hasProcess && boundary.status === 'open' && <div className={css.disclosure} data-reader-status-only>
-      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
+      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
@@ -739,7 +752,7 @@ export function Reader(props: ReaderProps) {
   const order = props.useChat(snapshot => snapshot.order);
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const timeline = props.useChat(snapshot => snapshot.timeline);
-  const pending = props.useSessionPendingInteraction(snapshot => snapshot.get(props.sessionId));
+  const pending = props.useSessionStatus(snapshot => snapshot.get(props.sessionId)?.pendingInteraction);
   const openError = props.useSession(snapshot => snapshot.openError);
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
@@ -1278,7 +1291,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.4.1" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.0" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}

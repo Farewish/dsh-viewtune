@@ -370,6 +370,47 @@ const cases = [
     replace: 'function diffHunksOf(meta, extra) {',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
+
+  // ===================== the 0.2.0-rc.2 adaptation =====================
+  // Each case puts one platform contract back to its 0.1.5 spelling. They are the "would this have been caught?" half of
+  // the adaptation: none of these reverts is a compile error at the artifact level, so without them a stale rebuild would
+  // reach the page and fail there — the icon names as a blank glyph, the tail fields as a missing number.
+  {
+    label: 'an icon put back to the drawn-size name 0.2.0 removed, which renders nothing at all',
+    search: 'IconBrowseOutlineRegular',
+    replace: 'IconBrowseOutline16',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the throughput derivation dropped, so the ported reading can be reverted to fields the record no longer has',
+    search: 'function tokensPerSecondOf(',
+    replace: 'function tokensPerSecondOfX(',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the retired per-session pending hook referenced again',
+    search: 'useSessionStatus',
+    replace: 'useSessionPendingInteraction',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the running-call narrowing removed, so a preparing call reads arguments it does not have',
+    search: 'phase === "start"',
+    replace: 'phase !== "start"',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the no-exit-code label dropped, which 0.2.0 requires of every terminal card',
+    search: 'noExitCode:',
+    replace: 'noExitCodeX:',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the context row reading the retired `provenance` field again',
+    search: 'producer.role',
+    replace: 'provenance.role',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
 ];
 
 let failed = 0;

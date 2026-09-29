@@ -1285,6 +1285,47 @@ const markers = [
     bundle.includes('function keyOfEvent(event) {')
     && bundle.includes('if (event.altKey || event.metaKey) {')
     && bundle.includes('/^Key([A-Z])$/.exec(code)?.[1] ?? /^Digit([0-9])$/.exec(code)?.[1]')],
+
+  // ===================== the 0.2.0-rc.2 adaptation =====================
+  // One marker per platform contract that changed under this fork. Each is written against the ARTIFACT, so a rebuild
+  // that quietly reverts the source to the 0.1.5 spelling fails here rather than at the user's next page load — which is
+  // the only place these would otherwise show up, because none of them is a compile error at the source level.
+  ['the icon set is 0.2.0’s: stroke-weight names, and none of the drawn-size ones', () =>
+    // 0.2.0 replaced `IconXxx14` / `IconXxx16` with `IconXxxMedium` (1.3px stroke) and `IconXxxRegular` (1px). The old
+    // names no longer exist, so a single leftover import is a component that renders nothing at all.
+    bundle.includes('IconBrowseOutlineRegular')
+    && bundle.includes('IconSettingsOutlineMedium')
+    && bundle.includes('IconSparkleRegular')
+    && !/Icon[A-Za-z]*?(14|16)\b/.test(bundle)],
+  ['the throughput numbers are derived from the closing node, not read off the tail record', () =>
+    // 0.2.0 removed `tokensPerSecond` / `ttftMs` from `TurnTailChatData`; its own derivation lives in a helper no plugin
+    // can import, so `turn-reading.ts` ports the formulas. Both clauses matter: the port exists, AND the removed fields
+    // are not being read from a record that no longer carries them (which would silently show nothing).
+    bundle.includes('function stepReading(')
+    && bundle.includes('function tokensPerSecondOf(')
+    && !/tailData\??\.tokensPerSecond\b/.test(bundle)],
+  ['the pending-interaction read is the unified session-status map', () =>
+    // `useSessionPendingInteraction` is gone; every session's independent status facts (`running`, `pendingInteraction`,
+    // `completionUnread`) now ride the GLOBAL `useSessionStatus`, and the optional chain is what keeps a session with no
+    // status yet from reading as "waiting on the reader".
+    bundle.includes('useSessionStatus')
+    && bundle.includes('.pendingInteraction')
+    && !bundle.includes('useSessionPendingInteraction')],
+  ['a running call reads its arguments only when the platform says they exist', () =>
+    // 0.2.0 split the running half into `phase: 'preparing'` (no arguments yet) and `phase: 'start'` (`argsRaw`), so the
+    // row narrows instead of reading a field that half the union does not have.
+    /phase === "start"/.test(bundle)],
+  ['every label 0.2.0 made required is supplied', () =>
+    // `ReadBlockLabels` and `DiffBlockLabels` now extend `CodeToolbarLabels` (language fallback + two wrap actions) and
+    // `TerminalBlockLabels` gained the no-exit-code pill. Missing one is not a hole in the UI, it is a build failure —
+    // but only because the types say so; the marker keeps it from being "fixed" by casting.
+    bundle.includes('codeLabel:')
+    && bundle.includes('wrapLabel:')
+    && bundle.includes('unwrapLabel:')
+    && bundle.includes('noExitCode:')],
+  ['the context row reads the platform’s `producer`, not the retired `provenance`', () =>
+    bundle.includes('producer.role')
+    && !bundle.includes('provenance.role')],
 ];
 
 const forbidden = [

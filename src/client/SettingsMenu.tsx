@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { IconSettingsOutline14, Switch, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives';
+// `IconSettingsOutline14` → `…Medium`: 0.2.0 renamed the icon set from drawn size to stroke weight (see ReferenceIcon).
+import { IconSettingsOutlineMedium, Switch, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives';
 import {
   bindingFromEvent, shortcutLabel, shortcutProblem,
 } from './shortcuts.js';
@@ -256,7 +257,7 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
     <button ref={buttonRef} type="button" className={`${css.textButton} ${css.settingsButton}`}
       aria-expanded={open} aria-controls={panelId} aria-label={BUTTON_HINT} title={BUTTON_HINT}
       onClick={toggle}>
-      viewtune<IconSettingsOutline14 size={12} />
+      viewtune<IconSettingsOutlineMedium size={12} />
     </button>
     {open && <div id={panelId} className={reveal ? `${css.settingsPanel} ${css.settingsPanelIn}` : css.settingsPanel} role="group" aria-label="viewtune 设置" data-ud-check="reader-settings">
       <div className={css.settingsTabs} role="tablist" aria-label="设置分类" data-ud-check="reader-settings-tabs" data-settings-page={page}

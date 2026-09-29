@@ -13,7 +13,17 @@ export const markdownLabels: MarkdownLabels = {
   footnotes: '脚注',
 };
 
+/**
+ * A code card's toolbar words, which 0.2.0 made a shared requirement.
+ *
+ * `ReadBlockLabels` and `DiffBlockLabels` now EXTEND `CodeToolbarLabels`, so the language fallback and the two wrapping
+ * actions have to be supplied by the owning render site in every code-shaped card. The wording matches the host's own
+ * Chinese for the one string that could be read out of it (`terminal.noExitCode` below); these three are ours.
+ */
+const codeToolbar = { codeLabel: '代码', wrapLabel: '自动换行', unwrapLabel: '不换行' } as const;
+
 export const readBlockLabels: ReadBlockLabels = {
+  ...codeToolbar,
   window: (shown, total) => `显示 ${shown} / ${total} 行`,
   copy: '复制', copied: '已复制', collapseAria: '收起文件内容',
   expandAria: hidden => `展开其余 ${hidden} 行`, collapse: '收起', expand: hidden => `展开其余 ${hidden} 行`,
@@ -21,15 +31,20 @@ export const readBlockLabels: ReadBlockLabels = {
 
 export const terminalBlockLabels: TerminalBlockLabels = {
   signal: signal => `信号 ${signal}`, exitCode: code => `退出码 ${code}`,
+  // 0.2.0 added this one: the pill for a command that settled without an exit code (killed by a signal the view does
+  // not know, or never started). The wording is the host's own Chinese for the same state.
+  noExitCode: '未正常退出',
   running: '执行中', failed: '失败', done: '已完成', copy: '复制', copied: '已复制',
   noOutput: '没有输出', collapseAria: '收起命令输出', collapse: '收起',
   expandAria: hidden => `展开其余 ${hidden} 行`, expand: hidden => `展开其余 ${hidden} 行`,
 };
 
 export const diffBlockLabels: DiffBlockLabels = {
+  ...codeToolbar,
   copy: '复制', copied: '已复制', collapseAria: '收起差异', collapse: '收起',
   expandAria: hidden => `展开其余 ${hidden} 行`, expand: hidden => `展开其余 ${hidden} 行`,
-  files: count => `${count} 个文件`,
+  // `files: count => …` was here until 0.2.0: `DiffBlockLabels` lost that field, and the card no longer draws a
+  // file-count line of its own — the row above it already names the file this panel is about.
 };
 
 export const searchBlockLabels: SearchBlockLabels = {

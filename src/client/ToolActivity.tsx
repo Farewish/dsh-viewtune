@@ -2,8 +2,8 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { DiffHunk, ReadBlockLine, SearchFileGroup } from '@deepseek-ai/dsh-client-ui-primitives';
 import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlock, WebBlock,
-  IconApiOutline14, IconBrowseOutline16, IconChecklistOutline14, IconEditOutline16,
-  IconQuestionOutline14, IconSearchOutline16, IconSkillOutline16, IconSparkle16, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
+  IconApiOutlineMedium, IconBrowseOutlineRegular, IconChecklistOutlineMedium, IconEditOutlineRegular,
+  IconQuestionOutlineMedium, IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
@@ -22,7 +22,7 @@ const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running
 // and todo glyphs are the product's own, and `read_image` belongs to the read family there too.
 // Delivery is deliberately absent: the product's present row leads with a state dot rather than a
 // glyph, this follows it, and the table's key type is what keeps that honest.
-const ICONS = { write: IconEditOutline16, read: IconBrowseOutline16, terminal: IconApiOutline14, search: IconSearchOutline16, web: IconSearchOutline16, question: IconQuestionOutline14, todo: IconChecklistOutline14, other: IconSparkle16 } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
+const ICONS = { write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineMedium, search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, question: IconQuestionOutlineMedium, todo: IconChecklistOutlineMedium, other: IconSparkleRegular } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
 
 /** The delivery row's leading mark: this view's phase mapped onto the dot's states. */
 const DOT_STATE = { preparing: 'ongoing', running: 'ongoing', returned: 'done', succeeded: 'done', failed: 'error', interrupted: 'warning' } as const satisfies Record<ToolPhase, StateDotState>;
@@ -212,7 +212,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
     return () => document.removeEventListener('selectionchange', track);
   }, []);
   const facts = executionFacts(entry.block);
-  const Icon = model.name === 'skill' ? IconSkillOutline16 : model.category === 'delivery' ? null : ICONS[model.category];
+  const Icon = model.name === 'skill' ? IconSkillOutlineRegular : model.category === 'delivery' ? null : ICONS[model.category];
   const block = entry.block;
   // What this call — and anything it ran underneath it — changed on disk. Empty for the calls that
   // changed nothing, which is most of them, so the counts leave an ordinary row alone.

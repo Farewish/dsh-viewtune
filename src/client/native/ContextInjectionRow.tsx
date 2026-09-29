@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ContextMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { DisclosureRow, IconBrowseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { DisclosureRow, IconBrowseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ReferenceIcon } from './ReferenceIcon.js'
 import { contextBody } from './ContextBody.js'
 import css from './ContextInjectionRow.module.css'
@@ -10,8 +10,14 @@ import css from './ContextInjectionRow.module.css'
 export interface ContextInjectionRowProps {
   content: ContextMessageNode['content']
   source: ContextMessageNode['source']
-  /** Role and producer name projected from the durable source. */
-  provenance: ContextMessageNode['provenance']
+  /**
+   * Role and producer name projected from the durable source.
+   *
+   * 0.2.0 renamed this record field from `provenance` to `producer` (same shape: `{ role, label }`), so the prop is
+   * renamed with it — the row is spread from the node's data, and a prop name that no longer matches what the node
+   * carries would simply be `undefined` at runtime while still typechecking through the spread.
+   */
+  producer: ContextMessageNode['producer']
   /** Producer-declared information form; null renders the opaque body. */
   form: ContextMessageNode['form']
   /** The owning view's locale seat, passed down as a plain prop. */
@@ -29,7 +35,7 @@ export interface ContextInjectionRowProps {
  * @param props - Durable content, its projected producer role/name and form, and the locale seat.
  * @returns A collapsed context row with a bounded, form-specific body.
  */
-export function ContextInjectionRow({ content, source, provenance, form, t }: ContextInjectionRowProps) {
+export function ContextInjectionRow({ content, source, producer, form, t }: ContextInjectionRowProps) {
   const [open, setOpen] = useState(false)
   // Resolved rather than declared: a form whose fields are unreadable renders
   // the opaque body, and the marker must say what the row actually shows.
@@ -38,18 +44,18 @@ export function ContextInjectionRow({ content, source, provenance, form, t }: Co
   return (
     <DisclosureRow
       className={css.root}
-      icon={provenance.role === 'recall'
+      icon={producer.role === 'recall'
         ? <span data-context-recall-icon><ReferenceIcon kind="session" /></span>
-        : <IconBrowseOutline16 size={14} />}
+        : <IconBrowseOutlineRegular size={14} />}
       chevronClassName={css.chevron}
-      title={t(provenance.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
-      collapsedContent={provenance.label === null ? undefined : (
+      title={t(producer.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
+      collapsedContent={producer.label === null ? undefined : (
         /* ToolRow's separator shape: an aria-hidden dot, so the accessible name
            stays the two readable parts and the two disclosure rows expose one
            name shape. A source that names no producer drops the dot with it. */
         <>
           <span className={css.sep} aria-hidden />
-          <span className={css.source} data-context-source>{provenance.label}</span>
+          <span className={css.source} data-context-source>{producer.label}</span>
           {summary !== null && (
             <>
               <span className={css.sep} aria-hidden />

@@ -282,7 +282,10 @@ function deriveBody(variant: ToolRowVariant, argsRaw: string): string | null {
 export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: string, home?: string): ToolRowModel {
   const variant = classifyTool(toolName)
   const done = 'kind' in block
-  const argsRaw = (done ? block.call?.argsRaw : block.argsRaw) ?? ''
+  // `block.argsRaw` off the running union stops compiling in 0.2.0: a `phase: 'preparing'` call carries no arguments yet,
+  // and only `phase: 'start'` does — which is the same thing this row has always shown (a preparing row has no summary
+  // text to derive, so it fell back to the call id either way).
+  const argsRaw = (done ? block.call?.argsRaw : block.phase === 'start' ? block.argsRaw : undefined) ?? ''
   const state: ToolRowState = !done ? 'running'
     : block.error?.code === 'interrupted' ? 'stopped'
       : block.isError ? 'error' : 'ok'

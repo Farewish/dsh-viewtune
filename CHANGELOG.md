@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0 (the platform rebase: DSH 0.2.0-rc.2)
+
+**这是一次平台改版适配，不是功能改动：0.2.0-rc.2 动了我们直接依赖的六处契约，每一处都是"类型会报错、但只在页面里才看得见"的那一类。**
+
+- **范围先说清楚：一份产物只服务一个平台版本。** 客户端半边是预编译 bundle，构建时就把平台包的导出名字写进去了，所以 0.5.0 对 **0.2.0-rc.2**、0.4.x 对 **0.1.5-rc.2**，两者不能互换（README 两个语言版本都写了这段）。这次把依赖区间写成 `>=0.1.5-rc.2 <0.3.0`、开发依赖钉在 `0.2.0-rc.2`：区间只是声明"这段 API 家族"，**编译依据**是后者，而产物只能跟着后者走。
+- **图标名换了语义（10 个引用）**：0.2.0 把 `IconXxx16` / `IconXxx14` 换成 `IconXxxRegular`（1px 描边）/ `IconXxxMedium`（1.3px）——不是改名，是**从"画多大"改成"描多重"**。旧名字在 0.2.0 里**不存在**，所以一个漏改的引用不是"图标变小"，而是**什么都不画**。映射按尺寸↔描边的补偿关系取：原来的 `…16` → `…Regular`，`…14` → `…Medium`，显式传的 `size` 保持不变 ✓。这条**只做了代码级判断，视觉待真机确认**（见下面"还没做"）。
+- **`useSessionPendingInteraction` 没了**：0.1.5 里它是"这个会话在等我吗"的选择器；0.2.0 把它换成**全局**的 `useSessionStatus`（`ReadonlyMap<SessionId, SessionStatus>`，每条状态带 `running` / `pendingInteraction` / `completionUnread`）。三处读取（两处 `GroupStatus` 调用点 + 阅读视图自己那处）改成 `sessionStatus.get(id)?.pendingInteraction`——可选链是**必须**的：没有状态的会话读到 `undefined`，而旧代码若照抄会让"没有状态"变成"有交互" ✗⇒✓。
+- **`TurnTailChatData` 移走了两个数字**：`tokensPerSecond` 与 `ttftMs` 都不在记录里了，平台把推导搬进了 `assistantStepReading()`——而那个 helper **不在包的公开入口**（`client/index.d.ts` 没有导出它，包的 `exports` 也不允许深路径导入）。所以这里只有两条路：不显示吞吐，或自己按同样的公式推导。新增 [`src/client/turn-reading.ts`](src/client/turn-reading.ts) 走第二条，公式与守卫**逐字**照抄平台（TTFT = `firstTokenTime - stepStartTime`，解码时长 = `completedTime - firstTokenTime`，速率 = `outputTokens / (decodeMs / 1000)` 且要求 `decodeMs > 0`，缺一项就是 `null` 而不是 0），并在文件头写明"这是抄本、抄的是谁、为什么必须抄" ✓。配了 4 组测试（未记录的部分、零长度解码窗口、负/非数 token、时钟回拨）✓。
+- **运行中的工具调用被拆成联合类型**：`phase: 'preparing'`（模型还没写完参数，**没有** `argsRaw`）与 `phase: 'start'`（有）。两处 `block.argsRaw` 改成按 `phase` 收窄：`tool-activity.ts` 里新增一个 `runningArgs()` 作为唯一入口，`tool-call-model.ts` 就地收窄。行为与 0.1.5 相同（preparing 本来就没有可推导的摘要，回退到 callId），但**现在是类型保证的**，而不是"那半个联合恰好有字段" ✓。测试夹具同步改成 `phase: 'start'`，并**新增**一个 `preparing` 用例钉住"参数没到就不编" ✓。
+- **三处标签契约变严**：`ReadBlockLabels` 与 `DiffBlockLabels` 现在都继承 `CodeToolbarLabels`（`codeLabel` / `wrapLabel` / `unwrapLabel`，语言回退与两个换行动作），`TerminalBlockLabels` 多了一个 `noExitCode`（既不是信号也不是退出码的结局）。三条都补上；`DiffBlockLabels` 的 `files` **被平台删掉了**（卡片自己不再画文件数行），本地那条随之删除 ✓。`noExitCode` 用的是平台自己的中文「未正常退出」（从 0.2.0 的 `dsh-client-ui-conversation` 中文词典里读出来的），另外三条是本仓库的措辞 ✓。
+- **`ContextMessageNode.provenance` → `producer`**：形状完全一样（`{ role: 'inject' | 'recall', label: string | null }`），只是改了名。组件与 prop 一起改名——**这一点很要紧**：那一行是 `{...node.data}` 展开进来的，prop 名字不对不会报错，只会在运行时读到 `undefined`、让每一行上下文都退化成"没有生产者" ✓。
+- **`TurnProcessChatData` 现在由平台发布**：0.1.5 里它不在任何包的导出里，本仓库因此在 `types.ts` 里自己声明了一份（全字段可选）。0.2.0 发布了它（九个字段，全部必需），于是**删掉本地副本、改为 re-export 平台类型** ✓；守护里那条"process record declared, imported and used"随之改写成"是平台的、被 re-export、没有本地副本"——它守的方向正好反过来，且更值钱：一份本地副本会随时间字段级漂移 ✓。
+- **`ctx.remote` 属性没了**：0.2.0 的客户端上下文不声明这个属性（`remote` / `remote.session` 是**服务**，`ctx.get` 拿）。两处 `ctx.remote` 访问删掉，只留服务查找链 ✓。核对过 0.2.0 自己的客户端插件：`inject = ["sessions","slots","locale","remote","remote.session","shortcuts","layout"]` —— `remote.session` 依旧是可注入的服务名，所以我们自己的 `inject` 列表**不用改** ✓。
+- **产物契约重新核对，结论是不用改**：0.2.0 的客户端模块系统仍然以 `window.__ModuleLoader__.load({ id, factory })` 注册、仍然用 `data-plugin` / `data-plugin-css` 认领注入的样式（读的是 0.2.0 自己的 `dsh-client-modules`）；本仓库产物的注册头与样式标记逐项一致，所以移植过来的 `clientBundle` 预设**没有改动**——它决定的是产物形状，而形状没变 ✓。Host 半边同样核对：`Context.webServer`、`register({ kind, path, handler })`、"pathname 不带尾斜杠"三条都与 0.2.0 的 `dsh-host-webserver` 声明一致 ✓。
+- **依赖与安装**：开发依赖与 peer 全部对齐 0.2.0-rc.2（cordis 4.0.4），锁文件重新生成（211 条，manifest 里的 13 个平台包与 9 个 runtime 依赖全部在册）。安装命令仍是 `npm ci --legacy-peer-deps`，但**失败原因变了、也实测了**：裸 `npm ci` 现在报 `EUSAGE: Missing: @deepseek-ai/dsh-agent@0.2.0-rc.2 from lock file`（随后几十条 transitive peer），而带参数的那条 `--dry-run` 通过 ⇒ 本仓库安装的是**锁文件里那棵树**，`--legacy-peer-deps` 让 npm 不去补装那批 peer。README 两个语言版本都改成这个事实 ✓。
+- **守护**：新增 6 条 marker（图标名集合、吞吐推导、会话状态读取、`phase` 收窄、四条必需标签、`producer` 而非 `provenance`）与 6 个反向用例（把每一处改回 0.1.5 的拼写，要求对应 marker 失败）✓。反向自检表 55 → **61** 例 ✓。
+- **验证**：`build`、`verify-types`（对着 0.2.0-rc.2 的真实声明）、**22/22** 不变式（含在临时目录重建后再跑一遍整套 marker）、**36/36** 测试文件、**61/61** 反向用例全过 ✓——`turn-reading` 的新测试就是第 36 个文件。
+- **还没做（明确留下）**：**真机验证**。以上全部是"对着 0.2.0-rc.2 的包与声明"的静态验证；本会话跑在 0.1.5-rc.2 上（`DSH_HOME=D:\DSH\homes\0.1.5-rc.2`），而 0.2.0 的 profile 里还没有这个插件。**图标的视觉配对（`…14→Medium` / `…16→Regular`）按描边与尺寸的补偿关系推断，未在真机上比对**；`dsh.client.inject` 的清单内容、以及桌面版（Electron 走 `file://` + IPC，`dsh-host-webserver` 的注释里写明了）下 `/better-display/*` 三条路由是否可达，同样待真机确认。这三条都写在 README 与这里，没有当成已完成。
+
 ## 0.4.1 (the diff the row promised and the pane did not show, plus the host's small stuff)
 
 **§3.6 里那条被当作"架构观察"记下的东西，其实是一个和 M4 同类的真缺陷；顺手做掉 §5.5 的三条小项，并把 §5.1 / §5.2 的代价写进 README。**

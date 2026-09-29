@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
+// 0.2.0 renamed the icon set: the old names carried a drawn size (`…16` / `…14`), the new ones carry a
+// STROKE WEIGHT (`…Regular` = 1px, `…Medium` = 1.3px), and the two sizes map onto the two weights. So a
+// `…16` glyph becomes `…Regular` and a `…14` one becomes `…Medium`, keeping the size we pass explicitly.
 import {
-  IconBrowseOutline16, IconFolderClose16,
+  IconBrowseOutlineRegular, IconFolderCloseRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /** Reference domains with distinct composer and transcript glyphs. */
@@ -29,7 +32,7 @@ export function ReferenceIcon({ kind, size = 16, className }: ReferenceIconProps
           />
         </svg>
       )
-    case 'file': return <IconBrowseOutline16 size={size} className={className} />
-    case 'folder': return <IconFolderClose16 size={size} className={className} />
+    case 'file': return <IconBrowseOutlineRegular size={size} className={className} />
+    case 'folder': return <IconFolderCloseRegular size={size} className={className} />
   }
 }

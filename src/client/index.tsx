@@ -150,10 +150,12 @@ export function apply(ctx: Context): void {
               ? (address: string) => { sidebar.openResource!(address); }
               : undefined;
             const openExternal = async (absolutePath: string) => {
-              const remote = ctx.remote as unknown as { session?: RemoteSessionFace } | undefined;
-              const remoteSession = remote?.session
-                ?? (ctx.get?.('remote.session') as unknown as RemoteSessionFace | undefined)
-                ?? ((ctx.get?.('remote') as unknown as { session?: RemoteSessionFace } | undefined)?.session);
+              // `remote` and `remote.session` are services in 0.2.0 (`ctx.get`), and the plugin already declares both in
+              // its `inject` list. What is gone is the typed `ctx.remote` PROPERTY 0.1.5 exposed: reading it as a
+              // property is what the compiler rejects, and the two lookups below are the same service either way.
+              const remote = ctx.get?.('remote') as unknown as { session?: RemoteSessionFace } | undefined;
+              const remoteSession = (ctx.get?.('remote.session') as unknown as RemoteSessionFace | undefined)
+                ?? remote?.session;
               if (remoteSession?.openWorkspacePath) {
                 const result = await remoteSession.openWorkspacePath({ path: absolutePath });
                 if (!result?.ok) {
@@ -198,11 +200,9 @@ export function apply(ctx: Context): void {
 
             // 2. Fallback to official opener with parent directory
             const parentDir = dirname(targetPath);
-            const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
-            const remoteSession = remote?.session
-              ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined);
-            if (remoteSession?.openWorkspacePath) {
-              await remoteSession.openWorkspacePath({ path: parentDir });
+            const remote = ctx.get?.('remote.session') as unknown as RemoteSessionFace | undefined;
+            if (remote?.openWorkspacePath) {
+              await remote.openWorkspacePath({ path: parentDir });
             }
           } catch (error) {
             console.warn('[dsh-better-display] revealFile error:', error);

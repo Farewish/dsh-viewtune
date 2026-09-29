@@ -1,5 +1,6 @@
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { TurnProcessChatData } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -9,24 +10,15 @@ import type { createReaderStore } from './store.js';
 import type { DeliverableOpenMode } from './open-file.js';
 
 /**
- * The host's turn-process record, as published on the `turn-process` node.
+ * The host's turn-process record.
  *
- * Declared here rather than imported: the host package does not export this type
- * (its field names appear only inside the implementation). The field set matches
- * what the host's own record comparison uses, so a change there is a real change
- * here. `answerStep` counts from 1 and is the step the final answer landed on.
+ * This used to be declared HERE, with every field optional, because 0.1.5 did not export the type and its field names
+ * appeared only inside the implementation. 0.2.0 publishes it (`TurnProcessChatData` from the chat package's client
+ * entry) with the same nine fields, all required — so the local copy is gone and the platform's type is re-exported
+ * under the name the rest of this view already imports. `TurnMetrics`/`StepsPill` keep their defensive reads: the fields
+ * are required in the TYPE, and a record that arrives without one is still a record this view must not crash on.
  */
-export interface TurnProcessChatData {
-  readonly turn?: number;
-  readonly controlAnchorSeq?: number;
-  readonly processStartSeq?: number;
-  readonly answerAnchorSeq?: number | null;
-  readonly answerStep?: number | null;
-  readonly inlineReasoning?: boolean;
-  readonly messageCount?: number;
-  readonly toolCallCount?: number;
-  readonly subagentCount?: number;
-}
+export type { TurnProcessChatData };
 
 export interface ReaderBlockOwner {
   block: AssistantBlock;

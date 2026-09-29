@@ -6,7 +6,9 @@ A **reading** tab for DeepSeek Harness: while a turn runs you can see the proces
 
 Upstream's Chat / Trajectory tabs, the composer, the model picker, tools and approvals are all untouched; this plugin adds a reading view alongside them.
 
-Targets DeepSeek Harness **0.1.5-rc.2**. Display only — it does not change agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`.
+Targets DeepSeek Harness **0.2.0-rc.2**. Display only — it does not change agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`.
+
+> **Platform version**: **0.5.0** and later target **0.2.0-rc.2**; the **0.4.x** line targets **0.1.5-rc.2**, and the two are **not interchangeable**. The browser half is a pre-built artifact, and it bakes the platform packages' exports into the bundle — 0.2.0 renamed the icons from `IconXxx16/14` to `IconXxxRegular/Medium`, replaced `useSessionPendingInteraction` with `useSessionStatus`, and moved `TurnTailChatData.tokensPerSecond/ttftMs` away. So one artifact serves one platform version: on 0.1.5 it would import an export that no longer exists, and on 0.2.0 it would read a field that has been removed. Staying on 0.1.5 means staying on the 0.4.x tag and tarball.
 
 ## Install
 
@@ -18,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # or from a local directory / tarball
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.4.1.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.0.tgz
 ```
 
 **Restart the Host** and reload the page afterwards: `dsh plugin add` only writes the profile, it does not hot-mount a running process.
@@ -159,9 +161,11 @@ npm run typecheck           # tsc -p tsconfig.json --noEmit, against the real de
 
 Use the lockfile rather than a bare `npm install`: `tsdown`, `lightningcss` and `typescript` are all on `^` ranges, and only the lockfile pins the toolchain that **reproduces the committed `lib/`** — which is exactly what `verify-build` does inside `npm run guard`. Reach for `npm install` only when a dependency changed, to rewrite the lockfile.
 
-`--legacy-peer-deps` is forced by **upstream packages whose peer ranges disagree with each other**, which this repository cannot fix: the `@deepseek-ai/dsh-*` dev dependencies (and the peers those pull in) are pinned at `0.1.5-rc.2`, while several of them declare `^0.1.5-rc.2` peers, which the registry now resolves to `0.1.5-rc.3` — a version that in turn requires `@deepseek-ai/dsh-session@^0.1.5-rc.3`. A bare `npm ci` therefore fails with `ERESOLVE`, although the lockfile itself is complete and resolvable (`lockfileVersion: 3`; all 21 dev dependencies and 9 dependencies are present, at the versions the committed `lib/` was built with). The flag only stops npm from refusing that set of peer declarations.
+`--legacy-peer-deps` is forced by **the upstream packages' own peer declarations**, which this repository cannot fix. The 0.2.0 generation of `@deepseek-ai/dsh-*` dev dependencies (and their peers) are pinned at `0.2.0-rc.2`, and several of them declare their peers as ranges (`^0.2.0-rc.2`). On the 0.1.5 generation the registry resolved such a range to `0.1.5-rc.3`, so a bare `npm ci` failed with `ERESOLVE`; the resolver now accepts that set, and the failure has merely changed shape — **the peers are not in the lockfile**: `EUSAGE: Missing: @deepseek-ai/dsh-agent@0.2.0-rc.2 from lock file`, followed by dozens of the same for transitive peers.
 
-Upstream's `tsdown.config.ts` takes `externalClientBundle` from a Harness adapter that is not published, so it cannot run in a clone. This repository ports its real implementation (the official preset's `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2`) into [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs). The artifact contract is unchanged, so every assertion about the artifact still holds.
+Both commands were measured, so the conclusion is stated rather than guessed: `npm ci --legacy-peer-deps --dry-run` **passes** ✓ and a bare `npm ci --dry-run` **fails** (EUSAGE) ✗. What this repository installs is therefore **the tree in its lockfile** — `tsdown`, `lightningcss`, `typescript`, `react` and the 13 platform packages — with the flag telling npm not to auto-install the peers on top. That tree is enough to build, typecheck and test (all three run in the chain), but it is **not** what a default `npm install` produces: pulling every peer in installs a larger tree that has never been verified here. To reproduce the committed `lib/`, use the command above.
+
+Upstream's `tsdown.config.ts` takes `externalClientBundle` from a Harness adapter that is not published, so it cannot run in a clone. This repository ports its real implementation (the official preset's `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2`) into [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs). The artifact contract is unchanged, so every assertion about the artifact still holds — and **that was re-checked against 0.2.0**: its client module system still registers bundles as `window.__ModuleLoader__.load({ id, factory })` and still claims its injected styles through `data-plugin` / `data-plugin-css`, matching this repository's artifact shape item by item (read out of 0.2.0's own `dsh-client-modules`). The ported preset was therefore left alone: it decides the artifact's shape, and the shape did not change.
 
 Remember to **commit `lib/` with the source**: what other people install is that artifact, not a local build.
 
