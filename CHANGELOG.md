@@ -40,6 +40,12 @@
 - **图标的配对用平台的用法定案**（并据此改了三处，见上）：把 0.2.0 的 **171 个客户端 bundle** 全扫一遍，数每个图标变体的使用点与尺寸。`IconApiOutlineRegular`（10 处，`dsh-client-ui-tool` 14px）、`IconBrowseOutlineRegular`（19 处，tool 行 14px）、`IconEditOutlineRegular`（33 处，14px ×25）、`IconChecklistOutlineRegular` / `IconQuestionOutlineRegular`（各 8 处，tool/conversation 行）——**这四个在平台里从来没有 Medium 的使用点**；只有 `IconSettingsOutlineMedium`（6 处，设置页 16px）压过 `Regular`（2 处，轨迹页 13px）。同时把 0.1.5 与 0.2.0 的图稿对照了一遍：**新图稿与旧图稿几乎不共用任何 path 数据**（10 对里只有 `Question` / `Skill` 有部分重合），所以"按图稿认亲"不可能，只能按平台的用法与尺寸对齐 ✓。
 - **仍未被任何人看过的东西**：阅读页在 0.2.0 里的**实际观感**（图标在那个上下文里是否协调、卡片/壁纸/玻璃是否如常）。这一步需要浏览器里的眼睛，我没有替你打开页面；除此之外，上面那些只读测量已经覆盖了"能不能加载、加载的是不是我们的字节、宿主路由是否工作"。**桌面版（Electron/`file://`）下 `/better-display/*` 是否可达**同样待测——注意 `revealFile` 有 `remote.session` 兜底，而壁纸与设置没有兜底，桌面壳里它们是"要么可用要么静默不可用"。
 
+**真机验证续（客户端半边确实跑起来了，以及桌面壳的加载方式）**
+
+- **客户端半边在 0.2.0 里挂载并落盘了**：`D:\DSH\homes\0.2.0-rc.2\viewtune-settings.json` 出现了（559 字节、21 个键、写入时间 20:18:44）。这条链只有"阅读视图挂载 → 客户端半边执行 → `loadHostSettings()` 读到空记录 → 按设计把本浏览器的状态 PUT 上去 → 宿主半边写盘"全部成立才会产生 ✓。记录内容也核对过：**没有 `expanded` 键**（正是 `hostRecordOf` 与 H4 那两条决策要的结果），取值是真实偏好（`motion: true` / `glass: true` / `wallpaper: sample-gradient.png` / `wallpaperDim: 35` / `followMode: glide` / `focusExpand: true`）。与 0.1.5 的记录相比有 6 个键不同——说明**在 0.2.0 里设置面板被真的用过**（不只是被动迁移），而不是只有默认值。
+- **桌面壳走的是 HTTP，不是 `file://`**：这台设备上的桌面外壳 `in.dsh-plug.dsh-launcher` 用 **WebView2** 承载界面，它的实例目录 `webview/i-37b38de2-…`（0.2.0 实例）里，编码缓存明确记录了两条 URL：`http://127.0.0.1:51610/` 与 **`http://127.0.0.1:51610/plugins/??dsh-viewtune/client.js&rev=5244b73bce41`**——即**桌面壳自己通过 loopback HTTP 取走了我们的客户端 bundle** ✓。也就是说 `/better-display/*` 三条路由与界面**同源**（同一台 `dsh-host-webserver`），在这个桌面壳里可达；`dsh-host-webserver` 注释里写的"Electron 用 file:// + IPC"是**另一种**嵌入方式，本设备的壳不是那样，因此那条风险在本设备上不成立。同一个目录里 0.1.5 实例的记录有 **557** 条指向本插件 bundle 的 URL（跨多个会话/端口），说明这条 HTTP 路径一直是通的。
+- 结论：**机械上能验的都验了**——加载、字节、路由、桌面壳的加载方式、客户端半边端到端落盘。剩下的只有"好不好看"这一件，它需要人的眼睛，也是唯一需要读者确认的项。
+
 **装机（0.2.0-rc.2 的 web profile）——已装、未启动**
 
 - 0.5.1 已用 **0.2.0 自带的 `dsh` CLI** 装进 `D:\DSH\homes\0.2.0-rc.2\profiles\web`：`package.json` 里多出 `"dsh-viewtune": "file:…/dsh-viewtune-0.5.1.tgz"` 与 bundles 里的 `dsh-viewtune`，`node_modules/dsh-viewtune` 是 **0.5.1**，其 `lib/client.js` / `lib/dsh-viewtune.js` 与本次验证过的产物**逐字节相同** ✓。**没有启动任何进程**（读者自己启动的实例见下一节）；0.1.5 的 profile 与被服务副本**一个字节都没动**（`profiles/web/package.json` 的哈希前后一致）✓。
