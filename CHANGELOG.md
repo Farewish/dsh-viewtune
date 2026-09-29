@@ -20,6 +20,13 @@
 - **验证**：`build`、`verify-types`（对着 0.2.0-rc.2 的真实声明）、**23/23** 不变式（含在临时目录重建后再跑一遍整套 marker）、**36/36** 测试文件、**61/61** 反向用例全过 ✓——`turn-reading` 的新测试就是第 36 个文件。
 - **还没做（明确留下）**：**真机验证**。以上全部是"对着 0.2.0-rc.2 的包与声明"的静态验证；本会话跑在 0.1.5-rc.2 上（`DSH_HOME=D:\DSH\homes\0.1.5-rc.2`），而 0.2.0 的 profile 里还没有这个插件。**图标的视觉配对（`…14→Medium` / `…16→Regular`）按描边与尺寸的补偿关系推断，未在真机上比对**；`dsh.client.inject` 的清单内容、以及桌面版（Electron 走 `file://` + IPC，`dsh-host-webserver` 的注释里写明了）下 `/better-display/*` 三条路由是否可达，同样待真机确认。这三条都写在 README 与这里，没有当成已完成。
 
+**装机后补做的三条静态核对（把上面那份"待真机"清单收窄了三条中的两条）**
+
+- **Host 半边只依赖 `node:` 内建**：从**装好的** `profiles/web/node_modules/dsh-viewtune/lib/dsh-viewtune.js` 里读出全部 specifier——`node:child_process` / `node:fs` / `node:fs/promises` / `node:os` / `node:path` / `node:url`，**没有任何平台包**。也就是说宿主侧不存在"运行时装不上某个依赖"的可能；它需要的那条边是 `webServer`（另外核对过，0.2.0 的 `dsh-host-webserver` 仍然提供该服务，`register({ kind, path, handler })` 与"pathname 不带尾斜杠"都没变）✓。
+- **客户端半边 require 的那两个 id，0.2.0 的平台自己也这么用**：产物里是 `require("@deepseek-ai/dsh-client-store")` 与 `require("@deepseek-ai/dsh-client-ui-primitives")`，而这两个包**没有** `dsh.client` 声明、也没有 `./client` 导出——乍看像是"要一个没人注册的 id"。于是去数 0.2.0 自己的客户端 bundle：**92 个**平台 bundle require 前者、**109 个** require 后者（同样的裸 id、同样的 require 形式），而没有任何一个把这两个 id 通过 `__ModuleLoader__.load` 注册。结论：模块系统在 bundle 图之外提供这两个 id，我们的 externals 与平台自己的用法完全一致 ✓。这条是本轮最有价值的一次核对——如果平台是**内联**它们而不是 require，我们的产物就会在页面加载时抛错。
+- **清单的 `dsh.client` 形状与五个 inject 名字都合 0.2.0 的规则**：0.2.0 的 `dsh-client-modules` 会读 `dsh.client.platform`（**必须是字符串**）、`dsh.client.inject`（可选字符串数组）、`dsh.client.external`、`dsh.client.immediately`，并且**会校验形状**（非字符串直接 throw）。我们的 `platform: "web"` + 五个名字的数组正好合规则；五个名字（`dsh-api-session-controller`、`dsh-client-ui-chat`、`dsh-client-ui-conversation`、`dsh-client-ui-renderer`、`dsh-client-ui-session`）在 0.2.0 里**全部存在且都带 `dsh.client`**（版本 0.2.0-rc.2）✓。
+- 剩下的真机项只有两条：**图标的视觉配对**，以及**桌面版（Electron/file://）下 `/better-display/*` 三条路由是否可达**。
+
 **装机（0.2.0-rc.2 的 web profile）——已装、未启动**
 
 - 0.5.0 已用 **0.2.0 自带的 `dsh` CLI** 装进 `D:\DSH\homes\0.2.0-rc.2\profiles\web`：`package.json` 里多出 `"dsh-viewtune": "file:…/dsh-viewtune-0.5.0.tgz"` 与 bundles 里的 `dsh-viewtune`，`node_modules/dsh-viewtune` 是 **0.5.0**，其 `lib/client.js` / `lib/dsh-viewtune.js` 与本次验证过的产物**逐字节相同** ✓。**没有启动任何进程**（读者选择自己启动）；0.1.5 的 profile 与被服务副本**一个字节都没动**（`profiles/web/package.json` 的哈希前后一致）✓。
