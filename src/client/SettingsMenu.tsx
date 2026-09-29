@@ -1,6 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 // `IconSettingsOutline14` → `…Medium`: 0.2.0 renamed the icon set from drawn size to stroke weight (see ReferenceIcon).
+// This is the one place in the plugin that keeps the heavier variant, and for a reason that is measured rather than
+// stylistic: the platform's own settings surfaces (`dsh-client-ui-settings-general` / `-settings-account`) render
+// `IconSettingsOutlineMedium` at 16px, and this gear is 12px — at that size the 1.3px stroke on a 16-viewBox lands at
+// ~0.98px, which is exactly the weight of the `…Regular` glyph at the platform's 16px.
 import { IconSettingsOutlineMedium, Switch, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives';
 import {
   bindingFromEvent, shortcutLabel, shortcutProblem,

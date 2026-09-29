@@ -1291,7 +1291,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.0" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.1" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}

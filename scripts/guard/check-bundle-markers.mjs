@@ -1293,7 +1293,15 @@ const markers = [
   ['the icon set is 0.2.0’s: stroke-weight names, and none of the drawn-size ones', () =>
     // 0.2.0 replaced `IconXxx14` / `IconXxx16` with `IconXxxMedium` (1.3px stroke) and `IconXxxRegular` (1px). The old
     // names no longer exist, so a single leftover import is a component that renders nothing at all.
+    //
+    // The variants are pinned as the PLATFORM uses them, which is what settled the port: its own tool rows
+    // (`dsh-client-ui-tool`) render these glyphs as `…Regular` at 14px and never as `…Medium`, so every tool-row and
+    // content-row icon here is Regular; the settings gear is the one Medium, matching the platform's own settings
+    // surfaces at 16px (the 1.3px stroke on a 16-viewBox is ~0.98px at this view's 12px, i.e. the Regular weight).
     bundle.includes('IconBrowseOutlineRegular')
+    && bundle.includes('IconApiOutlineRegular')
+    && bundle.includes('IconChecklistOutlineRegular')
+    && bundle.includes('IconQuestionOutlineRegular')
     && bundle.includes('IconSettingsOutlineMedium')
     && bundle.includes('IconSparkleRegular')
     && !/Icon[A-Za-z]*?(14|16)\b/.test(bundle)],

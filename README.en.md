@@ -8,7 +8,7 @@ Upstream's Chat / Trajectory tabs, the composer, the model picker, tools and app
 
 Targets DeepSeek Harness **0.2.0-rc.2**. Display only — it does not change agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`.
 
-> **Platform version**: **0.5.0** and later target **0.2.0-rc.2**; the **0.4.x** line targets **0.1.5-rc.2**, and the two are **not interchangeable**. The browser half is a pre-built artifact, and it bakes the platform packages' exports into the bundle — 0.2.0 renamed the icons from `IconXxx16/14` to `IconXxxRegular/Medium`, replaced `useSessionPendingInteraction` with `useSessionStatus`, and moved `TurnTailChatData.tokensPerSecond/ttftMs` away. So one artifact serves one platform version: on 0.1.5 it would import an export that no longer exists, and on 0.2.0 it would read a field that has been removed. Staying on 0.1.5 means staying on the 0.4.x line: tag **`v0.4.1`** and the repository's **`dsh-viewtune-0.4.1.tgz`** (measured byte-identical to each other, with `main` parked on that same commit).
+> **Platform version**: **0.5.x** and later target **0.2.0-rc.2**; the **0.4.x** line targets **0.1.5-rc.2**, and the two are **not interchangeable**. The browser half is a pre-built artifact, and it bakes the platform packages' exports into the bundle — 0.2.0 renamed the icons from `IconXxx16/14` to `IconXxxRegular/Medium`, replaced `useSessionPendingInteraction` with `useSessionStatus`, and moved `TurnTailChatData.tokensPerSecond/ttftMs` away. So one artifact serves one platform version: on 0.1.5 it would import an export that no longer exists, and on 0.2.0 it would read a field that has been removed. Staying on 0.1.5 means staying on the 0.4.x line: tag **`v0.4.1`** and the repository's **`dsh-viewtune-0.4.1.tgz`** (measured byte-identical to each other, with `main` parked on that same commit).
 
 ## Install
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # or from a local directory / tarball
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.5.0.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.1.tgz
 ```
 
 **With more than one Harness version on the machine**, two details bite (this repository installed once into an environment where 0.1.5 and 0.2.0 coexist):

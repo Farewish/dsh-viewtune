@@ -2,8 +2,8 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { DiffHunk, ReadBlockLine, SearchFileGroup } from '@deepseek-ai/dsh-client-ui-primitives';
 import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlock, WebBlock,
-  IconApiOutlineMedium, IconBrowseOutlineRegular, IconChecklistOutlineMedium, IconEditOutlineRegular,
-  IconQuestionOutlineMedium, IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
+  IconApiOutlineRegular, IconBrowseOutlineRegular, IconChecklistOutlineRegular, IconEditOutlineRegular,
+  IconQuestionOutlineRegular, IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
@@ -22,7 +22,13 @@ const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running
 // and todo glyphs are the product's own, and `read_image` belongs to the read family there too.
 // Delivery is deliberately absent: the product's present row leads with a state dot rather than a
 // glyph, this follows it, and the table's key type is what keeps that honest.
-const ICONS = { write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineMedium, search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, question: IconQuestionOutlineMedium, todo: IconChecklistOutlineMedium, other: IconSparkleRegular } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
+//
+// All `…Regular` (1px stroke), which is what 0.2.0's OWN tool rows use at this same 14px: measured across the platform's
+// client bundles, `dsh-client-ui-tool` renders `IconApiOutlineRegular` / `IconBrowseOutlineRegular` at size 14 and never
+// uses the `…Medium` variant of any of these glyphs. The 0.1.5 names carried a drawn size (`…16` / `…14`) rather than a
+// weight, so the port first guessed "smaller glyph → heavier stroke"; the platform's own usage says otherwise, and it is
+// the closer evidence for what these rows should look like.
+const ICONS = { write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineRegular, search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, question: IconQuestionOutlineRegular, todo: IconChecklistOutlineRegular, other: IconSparkleRegular } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
 
 /** The delivery row's leading mark: this view's phase mapped onto the dot's states. */
 const DOT_STATE = { preparing: 'ongoing', running: 'ongoing', returned: 'done', succeeded: 'done', failed: 'error', interrupted: 'warning' } as const satisfies Record<ToolPhase, StateDotState>;

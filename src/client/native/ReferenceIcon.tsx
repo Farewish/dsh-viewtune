@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
-// 0.2.0 renamed the icon set: the old names carried a drawn size (`…16` / `…14`), the new ones carry a
-// STROKE WEIGHT (`…Regular` = 1px, `…Medium` = 1.3px), and the two sizes map onto the two weights. So a
-// `…16` glyph becomes `…Regular` and a `…14` one becomes `…Medium`, keeping the size we pass explicitly.
+// 0.2.0 renamed the icon set: the old names carried a drawn size (`…16` / `…14`), the new ones carry a STROKE WEIGHT
+// (`…Regular` = 1px, `…Medium` = 1.3px). The artwork was redesigned along with the names — measured against the 0.1.5
+// package, the new drawings share no path data with the old ones — so the pairing cannot be settled by comparing art.
+// What settled it is the platform's own usage: `dsh-client-ui-tool` and `dsh-client-ui-chat` render these glyphs as
+// `…Regular` at the same sizes this view uses (14–16px), and never as `…Medium`. So: Regular here, and everywhere else in
+// this plugin except the 12px settings gear, where `…Medium` at 1.3px on a 16-viewBox reproduces the platform's own
+// 16px settings glyph (its effective stroke at 12px is ~0.98px, i.e. the Regular weight) — see SettingsMenu.
 import {
   IconBrowseOutlineRegular, IconFolderCloseRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'

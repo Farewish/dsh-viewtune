@@ -8,7 +8,7 @@
 
 面向 DeepSeek Harness **0.2.0-rc.2**。只改展示，不碰 Agent 执行、SDK 或模型凭据。Node.js `^22.19.0 || >=24`。
 
-> **平台版本**：**0.5.0** 起对应 **0.2.0-rc.2**；**0.4.x** 那一条线对应 **0.1.5-rc.2**，两者**不能互换**。客户端半边是预编译产物，它在构建时就把平台包的导出写进了 bundle——0.2.0 把图标名从 `IconXxx16/14` 换成 `IconXxxRegular/Medium`、把 `useSessionPendingInteraction` 换成 `useSessionStatus`、把 `TurnTailChatData.tokensPerSecond/ttftMs` 移走，所以一份产物只服务一个平台版本：装在 0.1.5 上会用到一个已不存在的导出，装在 0.2.0 上会读一个已删除的字段。要留在 0.1.5 就继续用 0.4.x 那一条线：tag **`v0.4.1`** 与仓库里的 **`dsh-viewtune-0.4.1.tgz`**（实测两者逐字节一致，`main` 也停在同一个提交上）。
+> **平台版本**：**0.5.x** 起对应 **0.2.0-rc.2**；**0.4.x** 那一条线对应 **0.1.5-rc.2**，两者**不能互换**。客户端半边是预编译产物，它在构建时就把平台包的导出写进了 bundle——0.2.0 把图标名从 `IconXxx16/14` 换成 `IconXxxRegular/Medium`、把 `useSessionPendingInteraction` 换成 `useSessionStatus`、把 `TurnTailChatData.tokensPerSecond/ttftMs` 移走，所以一份产物只服务一个平台版本：装在 0.1.5 上会用到一个已不存在的导出，装在 0.2.0 上会读一个已删除的字段。要留在 0.1.5 就继续用 0.4.x 那一条线：tag **`v0.4.1`** 与仓库里的 **`dsh-viewtune-0.4.1.tgz`**（实测两者逐字节一致，`main` 也停在同一个提交上）。
 
 ## 安装
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # 或从本地目录 / tarball 安装
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.5.0.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.1.tgz
 ```
 
 **同一台机器上装了多个 Harness 版本时**，有两条会咬人的细节（本仓库在 0.1.5 与 0.2.0 并存的环境里装过一次）：

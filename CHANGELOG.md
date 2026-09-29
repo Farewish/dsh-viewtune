@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.5.0 (the platform rebase: DSH 0.2.0-rc.2)
+## 0.5.1 (the platform rebase: DSH 0.2.0-rc.2)
 
 **这是一次平台改版适配，不是功能改动：0.2.0-rc.2 动了我们直接依赖的六处契约，每一处都是"类型会报错、但只在页面里才看得见"的那一类。**
 
+> **为什么是 0.5.1 而不是 0.5.0**：图标映射的第一版是猜的（`…14→Medium`），装进 0.2.0 之后被平台自己的用法推翻（见下），于是同一个未发布的 0.5.0 被改了三处。**同一个版本号不能指两份不同的字节**——`pnpm` 也按 `file:` 路径与完整性键控，`Already up to date` 根本不会替换它——所以修正版另起 0.5.1，0.5.0 的 tarball 已删除，仓库里不留两份同名不同货的东西。
+
 - **范围先说清楚：一份产物只服务一个平台版本。** 客户端半边是预编译 bundle，构建时就把平台包的导出名字写进去了，所以 0.5.0 对 **0.2.0-rc.2**、0.4.x 对 **0.1.5-rc.2**，两者不能互换（README 两个语言版本都写了这段）。这次把依赖区间写成 `>=0.1.5-rc.2 <0.3.0`、开发依赖钉在 `0.2.0-rc.2`：区间只是声明"这段 API 家族"，**编译依据**是后者，而产物只能跟着后者走。
-- **图标名换了语义（10 个引用）**：0.2.0 把 `IconXxx16` / `IconXxx14` 换成 `IconXxxRegular`（1px 描边）/ `IconXxxMedium`（1.3px）——不是改名，是**从"画多大"改成"描多重"**。旧名字在 0.2.0 里**不存在**，所以一个漏改的引用不是"图标变小"，而是**什么都不画**。映射按尺寸↔描边的补偿关系取：原来的 `…16` → `…Regular`，`…14` → `…Medium`，显式传的 `size` 保持不变 ✓。这条**只做了代码级判断，视觉待真机确认**（见下面"还没做"）。
+- **图标名换了语义（10 个引用）**：0.2.0 把 `IconXxx16` / `IconXxx14` 换成 `IconXxxRegular`（1px 描边）/ `IconXxxMedium`（1.3px）——不是改名，是**从"画多大"改成"描多重"**。旧名字在 0.2.0 里**不存在**，所以一个漏改的引用不是"图标变小"，而是**什么都不画**。**第一版的映射是猜的，而且是错的**：按"小字号配粗描边"的补偿关系写成 `…16→Regular` / `…14→Medium`。真机跑起来之后去量平台自己的用法（见下面"真机验证"一节），证据把其中三处推翻了——**除了设置齿轮，全部用 `Regular`**。现在 `ICONS` 表（工具行，渲染尺寸 14px）里 `Api` / `Checklist` / `Question` 都是 `Regular`，与 0.2.0 自己的 `dsh-client-ui-tool` 在同尺寸下的选择一致；只有 `SettingsMenu` 那个 12px 齿轮留 `Medium`，理由是平台自己的设置页用 `Medium`@16px，而 1.3px 描边画在 16-viewBox 上、渲染到 12px 时有效描边约 0.98px，正是 `Regular`@16px 的重量 ✓。这条决策现在**有测量支撑**，不再是推断。
 - **`useSessionPendingInteraction` 没了**：0.1.5 里它是"这个会话在等我吗"的选择器；0.2.0 把它换成**全局**的 `useSessionStatus`（`ReadonlyMap<SessionId, SessionStatus>`，每条状态带 `running` / `pendingInteraction` / `completionUnread`）。三处读取（两处 `GroupStatus` 调用点 + 阅读视图自己那处）改成 `sessionStatus.get(id)?.pendingInteraction`——可选链是**必须**的：没有状态的会话读到 `undefined`，而旧代码若照抄会让"没有状态"变成"有交互" ✗⇒✓。
 - **`TurnTailChatData` 移走了两个数字**：`tokensPerSecond` 与 `ttftMs` 都不在记录里了，平台把推导搬进了 `assistantStepReading()`——而那个 helper **不在包的公开入口**（`client/index.d.ts` 没有导出它，包的 `exports` 也不允许深路径导入）。所以这里只有两条路：不显示吞吐，或自己按同样的公式推导。新增 [`src/client/turn-reading.ts`](src/client/turn-reading.ts) 走第二条，公式与守卫**逐字**照抄平台（TTFT = `firstTokenTime - stepStartTime`，解码时长 = `completedTime - firstTokenTime`，速率 = `outputTokens / (decodeMs / 1000)` 且要求 `decodeMs > 0`，缺一项就是 `null` 而不是 0），并在文件头写明"这是抄本、抄的是谁、为什么必须抄" ✓。配了 4 组测试（未记录的部分、零长度解码窗口、负/非数 token、时钟回拨）✓。
 - **运行中的工具调用被拆成联合类型**：`phase: 'preparing'`（模型还没写完参数，**没有** `argsRaw`）与 `phase: 'start'`（有）。两处 `block.argsRaw` 改成按 `phase` 收窄：`tool-activity.ts` 里新增一个 `runningArgs()` 作为唯一入口，`tool-call-model.ts` 就地收窄。行为与 0.1.5 相同（preparing 本来就没有可推导的摘要，回退到 callId），但**现在是类型保证的**，而不是"那半个联合恰好有字段" ✓。测试夹具同步改成 `phase: 'start'`，并**新增**一个 `preparing` 用例钉住"参数没到就不编" ✓。
@@ -18,7 +20,7 @@
 - **守护**：新增 6 条 marker（图标名集合、吞吐推导、会话状态读取、`phase` 收窄、四条必需标签、`producer` 而非 `provenance`）与 6 个反向用例（把每一处改回 0.1.5 的拼写，要求对应 marker 失败）✓。反向自检表 55 → **61** 例 ✓。
 - **新增第 23 条不变式 `check-platform-exports.mjs`**：这次适配暴露出一个此前**没有任何检查覆盖**的面——**产物从平台包里读的那些名字是否真的存在**。类型检查读的是 `src/`，而浏览器加载的是 `lib/client.js`，它按名字向平台模块取值；一个没跟上的产物（0.2.0 把图标名从 `IconBrowseOutline16` 改成 `…Regular`）**类型检查全过**，然后在页面上渲染出一片空白。这条断言把产物里每个 `require("@deepseek-ai/…")` 的绑定与它读到的每个成员，对着**已安装包的真实导出表**核一遍（包里有 `.css`、无法在 Node 里执行，所以读的是它构建产物末尾的 ESM `export { … }` 列表，**读不到导出表本身也是失败**，不是跳过）✓。实测：产物引用的 **25** 个 primitives 成员与 `defineStore` **全部存在** ✓。自带 self-test（缺一个成员、包不可解析、导出表读不出来三种都必须被报出）✓。
 - **验证**：`build`、`verify-types`（对着 0.2.0-rc.2 的真实声明）、**23/23** 不变式（含在临时目录重建后再跑一遍整套 marker）、**36/36** 测试文件、**61/61** 反向用例全过 ✓——`turn-reading` 的新测试就是第 36 个文件。
-- **还没做（明确留下）**：**真机验证**。以上全部是"对着 0.2.0-rc.2 的包与声明"的静态验证；本会话跑在 0.1.5-rc.2 上（`DSH_HOME=D:\DSH\homes\0.1.5-rc.2`），而 0.2.0 的 profile 里还没有这个插件。**图标的视觉配对（`…14→Medium` / `…16→Regular`）按描边与尺寸的补偿关系推断，未在真机上比对**；`dsh.client.inject` 的清单内容、以及桌面版（Electron 走 `file://` + IPC，`dsh-host-webserver` 的注释里写明了）下 `/better-display/*` 三条路由是否可达，同样待真机确认。这三条都写在 README 与这里，没有当成已完成。
+- **还没做（明确留下）**：静态验证已尽，剩下的在下面"真机验证"一节里逐条交代——本文档不把未测的东西写成已完成。
 
 **装机后补做的三条静态核对（把上面那份"待真机"清单收窄了三条中的两条）**
 
@@ -27,9 +29,20 @@
 - **清单的 `dsh.client` 形状与五个 inject 名字都合 0.2.0 的规则**：0.2.0 的 `dsh-client-modules` 会读 `dsh.client.platform`（**必须是字符串**）、`dsh.client.inject`（可选字符串数组）、`dsh.client.external`、`dsh.client.immediately`，并且**会校验形状**（非字符串直接 throw）。我们的 `platform: "web"` + 五个名字的数组正好合规则；五个名字（`dsh-api-session-controller`、`dsh-client-ui-chat`、`dsh-client-ui-conversation`、`dsh-client-ui-renderer`、`dsh-client-ui-session`）在 0.2.0 里**全部存在且都带 `dsh.client`**（版本 0.2.0-rc.2）✓。
 - 剩下的真机项只有两条：**图标的视觉配对**，以及**桌面版（Electron/file://）下 `/better-display/*` 三条路由是否可达**。
 
+**真机验证（0.2.0 实例已经跑起来了，于是全部只读地量了一遍）**
+
+读者自己启动了 0.2.0 实例（`127.0.0.1:51610`，启动时间 20:09:25）。**我没有启动任何进程**，只是对着它跑起来的这个进程做只读请求；URL 与 token 取自启动器自己的日志（`logs\i-*.log` 里的 `dsh web: http://…/?token=…`——第一次不带 token 取页面得到 `401`，这就是它记在那里的原因）。
+
+- **插件确实进了这一页的客户端图**：把启动 HTML（`__DSH_BOOT__` 的 66 条 client module 行）读下来，其中一条正是我们——`{"id":"dsh-viewtune","url":"plugins/??dsh-viewtune/client.js&rev=b6af9a6801e1"}`；而旧 id `dsh-better-display` **不在**任何一行里 ✓。也就是说宿主半边注册成功、客户端半边被排进了模块图，不是"装上了但没人加载"。
+- **它服务的字节就是我们的产物**：取回那条 URL（200，`text/javascript`，1,515,232 字符）与工作树的 `lib/client.js` 逐字符比较——**前 1,515,163 个字符完全相同**，差异是最后 34 个字符：服务端把本地的 `//# sourceMappingURL=client.js.map` 换成了它自己的 `//# sourceMappingURL=??dsh-viewtune/client.js.map&rev=…`。取回的字节里含 `IconBrowseOutlineRegular`（0.2.0 的名字）而**不含** `IconBrowseOutline16`（0.1.5 的名字），也含移植过来的 `function stepReading(` ✓。
+- **Host 半边的三条路由在 0.2.0 里全部应答**（带 token，只读）：`GET /better-display/settings` → `200 {"ok":true,"settings":{}}`（记录还空着，与 0.2.0 家目录里尚未出现 `viewtune-settings.json` 一致）；`GET /better-display/wallpapers` → 200，列出 `D:\DSH\homes\0.2.0-rc.2\wallpapers` 里的 `sample-gradient.png`（44011 字节）——**宿主半边挂载并落地了自带壁纸**；`GET /better-display/wallpaper/sample-gradient.png` → 200 `image/png` 44011 字节 ✓。
+- **壁纸路由的重新校验在真机上生效**：响应头是 `Cache-Control: private, no-cache`、`ETag: W/"44011-1790683462153"`、`Last-Modified`，带 `if-none-match` 再取一次得到 **304** ✓——这正是本次适配之前那轮（M6）加的机制，在 0.2.0 的宿主里照常工作。
+- **图标的配对用平台的用法定案**（并据此改了三处，见上）：把 0.2.0 的 **171 个客户端 bundle** 全扫一遍，数每个图标变体的使用点与尺寸。`IconApiOutlineRegular`（10 处，`dsh-client-ui-tool` 14px）、`IconBrowseOutlineRegular`（19 处，tool 行 14px）、`IconEditOutlineRegular`（33 处，14px ×25）、`IconChecklistOutlineRegular` / `IconQuestionOutlineRegular`（各 8 处，tool/conversation 行）——**这四个在平台里从来没有 Medium 的使用点**；只有 `IconSettingsOutlineMedium`（6 处，设置页 16px）压过 `Regular`（2 处，轨迹页 13px）。同时把 0.1.5 与 0.2.0 的图稿对照了一遍：**新图稿与旧图稿几乎不共用任何 path 数据**（10 对里只有 `Question` / `Skill` 有部分重合），所以"按图稿认亲"不可能，只能按平台的用法与尺寸对齐 ✓。
+- **仍未被任何人看过的东西**：阅读页在 0.2.0 里的**实际观感**（图标在那个上下文里是否协调、卡片/壁纸/玻璃是否如常）。这一步需要浏览器里的眼睛，我没有替你打开页面；除此之外，上面那些只读测量已经覆盖了"能不能加载、加载的是不是我们的字节、宿主路由是否工作"。**桌面版（Electron/`file://`）下 `/better-display/*` 是否可达**同样待测——注意 `revealFile` 有 `remote.session` 兜底，而壁纸与设置没有兜底，桌面壳里它们是"要么可用要么静默不可用"。
+
 **装机（0.2.0-rc.2 的 web profile）——已装、未启动**
 
-- 0.5.0 已用 **0.2.0 自带的 `dsh` CLI** 装进 `D:\DSH\homes\0.2.0-rc.2\profiles\web`：`package.json` 里多出 `"dsh-viewtune": "file:…/dsh-viewtune-0.5.0.tgz"` 与 bundles 里的 `dsh-viewtune`，`node_modules/dsh-viewtune` 是 **0.5.0**，其 `lib/client.js` / `lib/dsh-viewtune.js` 与本次验证过的产物**逐字节相同** ✓。**没有启动任何进程**（读者选择自己启动）；0.1.5 的 profile 与被服务副本**一个字节都没动**（`profiles/web/package.json` 的哈希前后一致）✓。
+- 0.5.1 已用 **0.2.0 自带的 `dsh` CLI** 装进 `D:\DSH\homes\0.2.0-rc.2\profiles\web`：`package.json` 里多出 `"dsh-viewtune": "file:…/dsh-viewtune-0.5.1.tgz"` 与 bundles 里的 `dsh-viewtune`，`node_modules/dsh-viewtune` 是 **0.5.1**，其 `lib/client.js` / `lib/dsh-viewtune.js` 与本次验证过的产物**逐字节相同** ✓。**没有启动任何进程**（读者自己启动的实例见下一节）；0.1.5 的 profile 与被服务副本**一个字节都没动**（`profiles/web/package.json` 的哈希前后一致）✓。
 - **两条操作事实，写给下一次装/升级的人**（踩过一次）：
   1. **`DSH_HOME` 必须指向目标实例**。这个会话的 shell 里导出了 `DSH_HOME=D:\DSH\homes\0.1.5-rc.2`，直接跑 0.2.0 的 `dsh` 会把它装进**正在运行的那个实例**的 profile。命令前显式覆盖成 `D:\DSH\homes\0.2.0-rc.2` ✓。
   2. **`pnpm` 不在 PATH 上**（`dsh plugin add` 需要它），而启动器自带一份：`D:\DSH\in.dsh-plug.dsh-launcher\tools\pnpm.cmd`（v11.27.0）。把它加到 `PATH` 再跑，安装才成功；否则 CLI 只会报 `'pnpm' is not recognized`，诊断日志落在 `<profile>\.plugin-manager\logs\operation-*\pnpm.log`。
