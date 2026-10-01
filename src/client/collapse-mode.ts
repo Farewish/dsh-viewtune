@@ -11,6 +11,11 @@
  * becomes unreachable. The single-action modes are for a reader who only ever uses one — and even then the
  * other action stays on its keyboard binding, because those bindings are bound to the ACTIONS, not to this
  * button (see shortcuts.ts).
+ *
+ * Its label is 「默认」, the reader's own word for it: the row used to say `二选一（收起 + 箭头）`, which described
+ * the SHAPE of the control on a line whose neighbours (`只收起本轮` / `只收起全部`) describe what it DOES. What it
+ * does is the shipped behaviour, so it reads as the default and the two single-action modes read as the
+ * departures from it.
  */
 export type CollapseMode = 'current' | 'all' | 'both';
 
@@ -18,7 +23,7 @@ export type CollapseMode = 'current' | 'all' | 'both';
 export const COLLAPSE_MODES: readonly { readonly id: CollapseMode; readonly label: string }[] = [
   { id: 'current', label: '只收起本轮' },
   { id: 'all', label: '只收起全部' },
-  { id: 'both', label: '二选一（收起 + 箭头）' },
+  { id: 'both', label: '默认' },
 ];
 
 /**

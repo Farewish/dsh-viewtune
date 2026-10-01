@@ -27,7 +27,7 @@ export interface WallpaperListing {
  */
 export const DEFAULT_WALLPAPER = 'sample-gradient.png';
 /** The scrim's shipped value: the reader's own setting, taken as the default so a fresh install looks like theirs. */
-export const WALLPAPER_DIM_INITIAL = 35;
+export const WALLPAPER_DIM_INITIAL = 50;
 export const WALLPAPER_DIM_MAX = 100;
 export const WALLPAPER_LIST_PATH = '/better-display/wallpapers';
 export const WALLPAPER_REVEAL_PATH = '/better-display/wallpapers/reveal';

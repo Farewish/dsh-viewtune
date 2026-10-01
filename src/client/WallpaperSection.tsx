@@ -5,7 +5,7 @@ import {
   wallpaperDimOf, wallpaperListingOf, wallpaperUrl,
 } from './wallpaper.js';
 import type { WallpaperEntry } from './wallpaper.js';
-import { WALLPAPER_CHROME_MAX, wallpaperChromeOf } from './wallpaper-scope.js';
+import { WALLPAPER_CHROME_BLUR_MAX, WALLPAPER_CHROME_MAX, wallpaperChromeBlurOf, wallpaperChromeOf } from './wallpaper-scope.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 import css from './Reader.module.css';
 
@@ -16,7 +16,10 @@ import css from './Reader.module.css';
  */
 const DIM_HINT = '越高越接近主题底色';
 const SCOPE_HINT = '打开后铺满整个窗口，而不只是阅读视图';
-const CHROME_HINT = '左侧栏与顶部栏的底色浓度';
+const CHROME_SIDEBAR_HINT = '左侧栏的底色浓度';
+const CHROME_HEADER_HINT = '顶部栏的底色浓度';
+/** The two scrims' frost rows. Same wording as the skin's own frost rows, so the panel teaches one idea once. */
+const CHROME_FROST_HINT = '0px 只有底色，往上才是磨砂';
 const SOLID_HINT = '「对话」页改用主题纯色底，输入框上方保留淡出';
 
 const LOADING = '正在读取文件夹…';
@@ -36,17 +39,27 @@ interface Listing {
  * what can be chosen is exactly what the folder holds. The folder is the reader's to fill — 「打开
  * 文件夹」 opens it, 「刷新」 re-reads it after they drop something in.
  */
-export function WallpaperSection({ name, dim, scope, chrome, solid, onPick, onDim, onScope, onChrome, onSolid }: {
+export function WallpaperSection({ name, dim, scope, chromeSidebar, chromeHeader, chromeSidebarBlur, chromeHeaderBlur, solid, onPick, onDim, onScope, onChromeSidebar, onChromeHeader, onChromeSidebarBlur, onChromeHeaderBlur, onSolid }: {
   name: string;
   dim: number;
   scope: WallpaperScope;
-  chrome: number;
+  /** How opaque the LEFT COLUMN stays over the image. */
+  chromeSidebar: number;
+  /** …and the TOP BAR's own scrim, which the reader can set to a different number. */
+  chromeHeader: number;
+  /** How much the LEFT COLUMN blurs the photograph behind it, in px. */
+  chromeSidebarBlur: number;
+  /** …and the TOP BAR's own. */
+  chromeHeaderBlur: number;
   /** Whether the CONVERSATION page is painted as a solid page of its own. */
   solid: boolean;
   onPick: (name: string) => void;
   onDim: (value: number) => void;
   onScope: (scope: WallpaperScope) => void;
-  onChrome: (value: number) => void;
+  onChromeSidebar: (value: number) => void;
+  onChromeHeader: (value: number) => void;
+  onChromeSidebarBlur: (value: number) => void;
+  onChromeHeaderBlur: (value: number) => void;
   onSolid: (next: boolean) => void;
 }) {
   const [listing, setListing] = useState<Listing>({ status: 'loading', dir: '', items: [] });
@@ -103,20 +116,57 @@ export function WallpaperSection({ name, dim, scope, chrome, solid, onPick, onDi
         <span className={css.settingsRangeValue}>{dimValue}%</span>
       </span>
     </div>}
-    {/* The window's own scrim, then the switch that reveals it: the reader asked for these two in this
-        order. Note what it costs — the scrim's row is gated on the window scope being ON, so it comes and
-        goes above the switch that turns that scope on. */}
-    {name !== '' && scope === 'window' && <div className={`${css.settingsRow} ${css.settingsSubRow}`} title={CHROME_HINT}
-      data-ud-check="reader-settings-wallpaper-chrome">
-      <span className={css.settingsCopy}>
-        <span className={css.settingsLabel}>界面遮罩</span>
-      </span>
-      <span className={css.settingsRange}>
-        <input type="range" min={0} max={WALLPAPER_CHROME_MAX} step={5} value={wallpaperChromeOf(chrome)}
-          aria-label="左侧栏与顶部栏的遮罩浓度"
-          onChange={event => { onChrome(Number(event.currentTarget.value)); }} />
-        <span className={css.settingsRangeValue}>{wallpaperChromeOf(chrome)}%</span>
-      </span>
+    {/* The chrome's scrim was ONE row until the reader asked for the two surfaces to move apart: the sidebar stands
+        against the reading column and the top bar sits above everything, so one dial made moving one move the other.
+        One BOX per surface now, the same shape the skin's own surfaces use (name, then a named line per dial), because
+        these two carry a tint AND a frost as well. Both keep the old gate — an image AND the window scope — so they
+        come and go together with the switch below. */}
+    {name !== '' && scope === 'window' && <div className={css.settingsBox} data-ud-check="reader-settings-wallpaper-chrome-sidebar">
+      <span className={css.settingsBoxLabel} title={CHROME_SIDEBAR_HINT}>侧栏遮罩</span>
+      <div className={css.settingsDial} title={CHROME_SIDEBAR_HINT}>
+        <span className={css.settingsDialLabel}>透明度</span>
+        <span className={css.settingsRange}>
+          <input type="range" min={0} max={WALLPAPER_CHROME_MAX} step={5} value={wallpaperChromeOf(chromeSidebar)}
+            aria-label="左侧栏遮罩的透明度"
+            onChange={event => { onChromeSidebar(Number(event.currentTarget.value)); }} />
+          <span className={css.settingsRangeValue}>{wallpaperChromeOf(chromeSidebar)}%</span>
+        </span>
+      </div>
+      {/* …and its own FROST, on its own line of the same box: the透明度 decides how much of the photograph the column
+          keeps out, the frost decides whether what it lets through is the image or a wash of it — the reader's
+          「只有玻璃，并不磨砂」. */}
+      <div className={css.settingsDial} title={CHROME_FROST_HINT}
+        data-ud-check="reader-settings-wallpaper-chrome-sidebar-blur">
+        <span className={css.settingsDialLabel}>模糊值</span>
+        <span className={css.settingsRange}>
+          <input type="range" min={0} max={WALLPAPER_CHROME_BLUR_MAX} step={1} value={wallpaperChromeBlurOf(chromeSidebarBlur)}
+            aria-label="左侧栏遮罩的模糊值"
+            onChange={event => { onChromeSidebarBlur(Number(event.currentTarget.value)); }} />
+          <span className={css.settingsRangeValue}>{wallpaperChromeBlurOf(chromeSidebarBlur)}px</span>
+        </span>
+      </div>
+    </div>}
+    {name !== '' && scope === 'window' && <div className={css.settingsBox} data-ud-check="reader-settings-wallpaper-chrome-header">
+      <span className={css.settingsBoxLabel} title={CHROME_HEADER_HINT}>顶栏遮罩</span>
+      <div className={css.settingsDial} title={CHROME_HEADER_HINT}>
+        <span className={css.settingsDialLabel}>透明度</span>
+        <span className={css.settingsRange}>
+          <input type="range" min={0} max={WALLPAPER_CHROME_MAX} step={5} value={wallpaperChromeOf(chromeHeader)}
+            aria-label="顶部栏遮罩的透明度"
+            onChange={event => { onChromeHeader(Number(event.currentTarget.value)); }} />
+          <span className={css.settingsRangeValue}>{wallpaperChromeOf(chromeHeader)}%</span>
+        </span>
+      </div>
+      <div className={css.settingsDial} title={CHROME_FROST_HINT}
+        data-ud-check="reader-settings-wallpaper-chrome-header-blur">
+        <span className={css.settingsDialLabel}>模糊值</span>
+        <span className={css.settingsRange}>
+          <input type="range" min={0} max={WALLPAPER_CHROME_BLUR_MAX} step={1} value={wallpaperChromeBlurOf(chromeHeaderBlur)}
+            aria-label="顶部栏遮罩的模糊值"
+            onChange={event => { onChromeHeaderBlur(Number(event.currentTarget.value)); }} />
+          <span className={css.settingsRangeValue}>{wallpaperChromeBlurOf(chromeHeaderBlur)}px</span>
+        </span>
+      </div>
     </div>}
     {name !== '' && <div className={`${css.settingsRow} ${css.settingsSubRow}`} title={SCOPE_HINT}
       data-ud-check="reader-settings-wallpaper-scope">

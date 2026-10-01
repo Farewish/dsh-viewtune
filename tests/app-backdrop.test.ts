@@ -10,12 +10,45 @@ import { test } from 'node:test';
 import { backdropOf, scrollbarFillFrom } from '../src/client/app-backdrop.ts';
 import { saveHostSettings, subscribeToHostSettings } from '../src/client/settings-sync.ts';
 import { WALLPAPER_DIM_INITIAL, DEFAULT_WALLPAPER } from '../src/client/wallpaper.ts';
-import { WALLPAPER_CHROME_INITIAL } from '../src/client/wallpaper-scope.ts';
+import { WALLPAPER_CHROME_BLUR_FALLBACK, WALLPAPER_CHROME_BLUR_MAX, WALLPAPER_CHROME_INITIAL } from '../src/client/wallpaper-scope.ts';
+import { GLASS_PARTS } from '../src/client/glass.ts';
 
 test('a record becomes exactly what the document element carries', () => {
+  // The chrome scrim is pinned here as the PRE-SPLIT single dial: this end reads a record without the store, so an
+  // old record has to mean the same thing at both ends (see `chromeScrimsOf`) — one number arriving as both surfaces
+  // rather than the reader's chrome opening at the shipped default after an upgrade.
   assert.deepEqual(
     backdropOf({ wallpaper: 'x.jpg', wallpaperDim: 30, wallpaperScope: 'window', wallpaperChrome: 10 }),
-    { scope: 'window', image: 'url("/better-display/wallpaper/x.jpg")', dim: 30, chrome: 10 },
+    { scope: 'window', image: 'url("/better-display/wallpaper/x.jpg")', dim: 30, chromeSidebar: 10, chromeHeader: 10, chromeSidebarBlur: 0, chromeHeaderBlur: 0 },
+  );
+  // …and the split's own keys are read as written, two different numbers included: that is the whole point of it.
+  assert.deepEqual(
+    backdropOf({ wallpaper: 'x.jpg', wallpaperChromeSidebar: 10, wallpaperChromeHeader: 80 }),
+    {
+      scope: 'window',
+      image: 'url("/better-display/wallpaper/x.jpg")',
+      dim: WALLPAPER_DIM_INITIAL,
+      chromeSidebar: 10,
+      chromeHeader: 80,
+      // The frosts are absent from that record — it predates them — so both come back at the shipped 0, which is the
+      // flat wash the scrims have always been rather than a frost nobody asked for.
+      chromeSidebarBlur: WALLPAPER_CHROME_BLUR_FALLBACK,
+      chromeHeaderBlur: WALLPAPER_CHROME_BLUR_FALLBACK,
+    },
+  );
+  // …and the frosts are read as written and CLAMPED like every other dial here: 999px of blur is not a look, it is a
+  // smear, and the ceiling is the same one the panel's slider stops at.
+  assert.deepEqual(
+    backdropOf({ wallpaper: 'x.jpg', wallpaperChromeSidebarBlur: 12, wallpaperChromeHeaderBlur: 999 }),
+    {
+      scope: 'window',
+      image: 'url("/better-display/wallpaper/x.jpg")',
+      dim: WALLPAPER_DIM_INITIAL,
+      chromeSidebar: WALLPAPER_CHROME_INITIAL,
+      chromeHeader: WALLPAPER_CHROME_INITIAL,
+      chromeSidebarBlur: 12,
+      chromeHeaderBlur: WALLPAPER_CHROME_BLUR_MAX,
+    },
   );
   // Anything unreadable falls back exactly as the reading view's own readers do — one record, two ends,
   // and the ends must not disagree about what a missing key means. The scope's fallback is the window now, because the
@@ -26,7 +59,10 @@ test('a record becomes exactly what the document element carries', () => {
       scope: 'window',
       image: 'url("/better-display/wallpaper/x.jpg")',
       dim: WALLPAPER_DIM_INITIAL,
-      chrome: WALLPAPER_CHROME_INITIAL,
+      chromeSidebar: WALLPAPER_CHROME_INITIAL,
+      chromeHeader: WALLPAPER_CHROME_INITIAL,
+      chromeSidebarBlur: WALLPAPER_CHROME_BLUR_FALLBACK,
+      chromeHeaderBlur: WALLPAPER_CHROME_BLUR_FALLBACK,
     },
   );
   // No wallpaper NAMED is the shipped one, which the host seeds into the reader's folder on activation: a fresh
@@ -36,7 +72,10 @@ test('a record becomes exactly what the document element carries', () => {
     scope: 'window',
     image: `url("/better-display/wallpaper/${DEFAULT_WALLPAPER}")`,
     dim: WALLPAPER_DIM_INITIAL,
-    chrome: WALLPAPER_CHROME_INITIAL,
+    chromeSidebar: WALLPAPER_CHROME_INITIAL,
+    chromeHeader: WALLPAPER_CHROME_INITIAL,
+    chromeSidebarBlur: WALLPAPER_CHROME_BLUR_FALLBACK,
+    chromeHeaderBlur: WALLPAPER_CHROME_BLUR_FALLBACK,
   });
   assert.equal(backdropOf({ wallpaper: '' }), null);
   assert.equal(backdropOf({ wallpaper: 42 })?.image, `url("/better-display/wallpaper/${DEFAULT_WALLPAPER}")`);
@@ -46,9 +85,12 @@ test('a record becomes exactly what the document element carries', () => {
 });
 
 test('the groove has a dial only while the skin is on', () => {
+  // Read off the part table rather than spelled out: the initials are one reading of the reader's settings file (the
+  // groove is at 20%), and a test that repeats a default is a test that has to be edited every time one moves.
+  const groove = `${String(GLASS_PARTS.find(part => part.id === 'scrollbar')?.initial ?? -1)}%`;
   assert.equal(scrollbarFillFrom({ glass: true, glassParts: { scrollbar: 10 } }), '10%');
   // A record that never moved the dial carries the shipped initial, which is the reader's own setting.
-  assert.equal(scrollbarFillFrom({ glass: true }), '15%');
+  assert.equal(scrollbarFillFrom({ glass: true }), groove);
   assert.equal(scrollbarFillFrom({ glass: false, glassParts: { scrollbar: 10 } }), '');
   // A record written before the skin existed, or a broken one: the host's own track, unchanged.
   assert.equal(scrollbarFillFrom({}), '');

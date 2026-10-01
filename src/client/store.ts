@@ -7,7 +7,7 @@ import type { TextCadence } from './text-cadence.js';
 import type { FollowMode } from './reading-scroll.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { DEFAULT_WALLPAPER, WALLPAPER_DIM_INITIAL } from './wallpaper.js';
-import { WALLPAPER_CHROME_INITIAL } from './wallpaper-scope.js';
+import { CHROME_HEADER_KEY, CHROME_LEGACY_KEY, CHROME_SIDEBAR_KEY, WALLPAPER_CHROME_HEADER_BLUR_INITIAL, WALLPAPER_CHROME_INITIAL, WALLPAPER_CHROME_SIDEBAR_BLUR_INITIAL, chromeScrimsOf } from './wallpaper-scope.js';
 import type { WallpaperScope } from './wallpaper-scope.js';
 
 export interface ReaderState {
@@ -24,6 +24,8 @@ export interface ReaderState {
   glass: boolean;
   /** The skin's per-surface opacities, recording only the ones the reader moved off their initial. */
   glassParts: Record<string, number>;
+  /** …and its per-surface FROST, in px, recorded the same way (see `glass.ts`). */
+  glassBlur: Record<string, number>;
   /**
    * Whether the skin also reaches the CONVERSATION view.
    *
@@ -141,8 +143,25 @@ export interface ReaderState {
   wallpaperDim: number;
   /** Whether the wallpaper stops at the reading view or carries the whole window. */
   wallpaperScope: WallpaperScope;
-  /** How opaque the sidebar and the top bar stay while the window scope is on. */
-  wallpaperChrome: number;
+  /** How opaque the LEFT COLUMN stays while the window scope is on. */
+  wallpaperChromeSidebar: number;
+  /**
+   * …and the TOP BAR's own scrim.
+   *
+   * Separate from the sidebar's since the reader asked for the two surfaces to move apart: they face different
+   * things (the column stands against the reading view, the bar above everything), so one number made moving one
+   * move the other. A record written before the split carries the single `wallpaperChrome` instead — see `hydrate`.
+   */
+  wallpaperChromeHeader: number;
+  /**
+   * How much each of those two scrims BLURS what is behind it — the frost of the same two surfaces.
+   *
+   * Separate numbers rather than one, for the reason the tints are: the column and the bar face different things, and
+   * the reader asked for them to move apart. 0 is where they open, which is the look they have always had (a scrim was
+   * a plain wash), so raising one is what frosts it. Read through `wallpaperChromeBlurOf`.
+   */
+  wallpaperChromeSidebarBlur: number;
+  wallpaperChromeHeaderBlur: number;
   shortcuts: Record<string, string>;
 }
 type ReaderActions = {
@@ -150,6 +169,7 @@ type ReaderActions = {
   setMotion: (draft: ReaderState, value: boolean) => void;
   setGlass: (draft: ReaderState, value: boolean) => void;
   setGlassPart: (draft: ReaderState, id: string, value: number) => void;
+  setGlassBlur: (draft: ReaderState, id: string, value: number) => void;
   setGlassConversation: (draft: ReaderState, value: boolean) => void;
   setConversationSolid: (draft: ReaderState, value: boolean) => void;
   setCollapseMode: (draft: ReaderState, value: CollapseMode) => void;
@@ -168,7 +188,10 @@ type ReaderActions = {
   setWallpaper: (draft: ReaderState, value: string) => void;
   setWallpaperDim: (draft: ReaderState, value: number) => void;
   setWallpaperScope: (draft: ReaderState, value: WallpaperScope) => void;
-  setWallpaperChrome: (draft: ReaderState, value: number) => void;
+  setWallpaperChromeSidebar: (draft: ReaderState, value: number) => void;
+  setWallpaperChromeHeader: (draft: ReaderState, value: number) => void;
+  setWallpaperChromeSidebarBlur: (draft: ReaderState, value: number) => void;
+  setWallpaperChromeHeaderBlur: (draft: ReaderState, value: number) => void;
   setShortcut: (draft: ReaderState, action: ShortcutAction, value: string) => void;
   hydrate: (draft: ReaderState, value: Record<string, unknown>) => void;
 };
@@ -186,7 +209,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
      * the same story again: `wallpaperNameOf` and `wallpaperDimOf` own its fallbacks.
      */
     init: (): ReaderState => ({
-      expanded: {}, motion: true, glass: true, glassParts: {}, deliverableOpenMode: 'external',
+      expanded: {}, motion: true, glass: true, glassParts: {}, glassBlur: {}, deliverableOpenMode: 'external',
       // The handles forward the wheel until a reader says otherwise; see the field's own note for why that is the
       // default rather than an opt-in.
       stripWheel: true,
@@ -204,19 +227,29 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       revealBlur: false,
       // …and the per-word reveal itself, which is what a fresh install (and an older record) opens with.
       revealWords: true,
-      // …and the follower's glide, for the same reason: it is how the reading view has always caught up with the tail.
-      followMode: 'glide',
-      // …and the earlier turns' processes stay as they are until a reader asks for them to be put away.
-      autoCollapseEarlier: false,
+      // …and the follower writes the bottom DIRECTLY rather than gliding to it: the reader's own setting, adopted with
+      // the rest (they measured the glide's per-frame `scrollTop` writes and took the quiet path).
+      followMode: 'snap',
+      // …and the earlier turns' processes are put away while something streams: the reader's setting, adopted here, so
+      // a fresh install opens the way they run it.
+      autoCollapseEarlier: true,
       // The reasoning card's own movement: the reader's setting — 跟随最新, i.e. stay on the newest line rather than
-      // walk down at a reading pace — at the standard pace for the mode that uses one.
-      reasoningFollow: 'latest', reasoningRate: 2,
+      // walk down at a reading pace — at the pace they chose (3 lines/s; `reasoningRateOf`'s own fallback stays at the
+      // old standard 2, which is what a record with an unusable value keeps).
+      reasoningFollow: 'latest', reasoningRate: 3,
       // …and the focused card grows, which is what the reader who asked for all of these opens with.
       focusExpand: true,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
-      wallpaperScope: 'window', wallpaperChrome: WALLPAPER_CHROME_INITIAL, shortcuts: {},
+      wallpaperScope: 'window',
+      // Both scrims open at the shipped value; the reader moves them apart from there (see the fields' notes).
+      wallpaperChromeSidebar: WALLPAPER_CHROME_INITIAL, wallpaperChromeHeader: WALLPAPER_CHROME_INITIAL,
+      // …and both scrims open FROSTED, at the two values the reader settled on (15px behind the sidebar, 5px behind
+      // the top bar): one number each, because they face different things.
+      wallpaperChromeSidebarBlur: WALLPAPER_CHROME_SIDEBAR_BLUR_INITIAL,
+      wallpaperChromeHeaderBlur: WALLPAPER_CHROME_HEADER_BLUR_INITIAL,
+      shortcuts: {},
     }),
     persist: 'dsh.reader.v1',
     actions: {
@@ -229,6 +262,12 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setGlassPart: (draft, id: string, value: number) => {
         if (draft.glassParts === undefined) draft.glassParts = {};
         draft.glassParts[id] = value;
+      },
+      // The frost's own record, with the same `??= {}` guard and for the same reason: persistence replaces the whole
+      // state, so a record written before this setting existed arrives with the key missing rather than empty.
+      setGlassBlur: (draft, id: string, value: number) => {
+        if (draft.glassBlur === undefined) draft.glassBlur = {};
+        draft.glassBlur[id] = value;
       },
       setGlassConversation: (draft, value: boolean) => { draft.glassConversation = value; },
       setConversationSolid: (draft, value: boolean) => { draft.conversationSolid = value; },
@@ -247,7 +286,10 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },
       setWallpaperDim: (draft, value: number) => { draft.wallpaperDim = value; },
       setWallpaperScope: (draft, value: WallpaperScope) => { draft.wallpaperScope = value; },
-      setWallpaperChrome: (draft, value: number) => { draft.wallpaperChrome = value; },
+      setWallpaperChromeSidebar: (draft, value: number) => { draft.wallpaperChromeSidebar = value; },
+      setWallpaperChromeHeader: (draft, value: number) => { draft.wallpaperChromeHeader = value; },
+      setWallpaperChromeSidebarBlur: (draft, value: number) => { draft.wallpaperChromeSidebarBlur = value; },
+      setWallpaperChromeHeaderBlur: (draft, value: number) => { draft.wallpaperChromeHeaderBlur = value; },
       setShortcut: (draft, action: ShortcutAction, value: string) => {
         if (draft.shortcuts === undefined) draft.shortcuts = {};
         draft.shortcuts[action] = value;
@@ -278,6 +320,18 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
           // and the host record is one file for every session at once. `hostRecordOf` keeps them out on the way back.
           if (key === 'expanded') continue;
           if (Object.prototype.hasOwnProperty.call(target, key)) target[key] = value[key];
+        }
+        // …and the ONE key this state no longer owns, MIGRATED rather than dropped. The chrome scrim was a single
+        // dial (`wallpaperChrome`) before the surfaces were split, so a record that carries it — and not the surface's
+        // own key — is a reader who had set both surfaces to that number. The loop above cannot carry it: the key is
+        // not a field of this state any more, so it would be ignored and both scrims would quietly open at the shipped
+        // default — a setting lost by an upgrade rather than by the reader, which is the kind of loss this store is
+        // built to avoid. Decided per surface, because a record may carry one of the two (see `chromeScrimsOf`).
+        const legacy = Object.prototype.hasOwnProperty.call(value, CHROME_LEGACY_KEY) ? value[CHROME_LEGACY_KEY] : undefined;
+        if (legacy !== undefined) {
+          const scrims = chromeScrimsOf(value);
+          if (!Object.prototype.hasOwnProperty.call(value, CHROME_SIDEBAR_KEY)) draft.wallpaperChromeSidebar = scrims.sidebar;
+          if (!Object.prototype.hasOwnProperty.call(value, CHROME_HEADER_KEY)) draft.wallpaperChromeHeader = scrims.header;
         }
       },
     },

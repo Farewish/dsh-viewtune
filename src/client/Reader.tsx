@@ -20,11 +20,11 @@ import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
 import { CollapseControl } from './CollapseControl.js';
 import { collapseModeOf } from './collapse-mode.js';
-import { glassProperties, glassValues } from './glass.js';
+import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf } from './open-file.js';
 import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
-import { applyWindowScope, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
+import { applyWindowScope, wallpaperChromeBlurOf, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
 import { applyScrollbarFill, scrollbarFillOf } from './scrollbar.js';
 import { createSettingsWriter, hostRecordOf, loadHostSettings } from './settings-sync.js';
 import { WaitClock } from './WaitClock.js';
@@ -126,10 +126,15 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, focused, onFocusChange, ...render }: SeatProps & {
+const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, focused, onFocusChange, onFocusPin, pageAtTail, ...render }: SeatProps & {
   motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
   reasoningFollow: ReasoningFollowMode; reasoningRate: number;
   focusExpand: boolean; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
+  /** Whether this card is pinning the focus it holds (the reader is reading inside it) — see the Reader's `pinnedCard`. */
+  onFocusPin: (key: string, pinned: boolean) => void;
+  /** Whether the READER is still at the page's tail: the focused card's compensation is gated on it, and the card
+   * cannot work it out on its own (its own `following` tracks its inner scroller). */
+  pageAtTail: boolean;
 }) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
@@ -141,7 +146,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
   return <>{parts.map((part, index) => part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
-      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} focusKey={nodeKey} focused={focused} onFocusChange={onFocusChange}>
+      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} focusKey={nodeKey} focused={focused} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && index === parts.length - 1 && data.blocks.at(-1)?.kind === 'reasoning'}
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
@@ -549,7 +554,7 @@ function DeliverablesRow({ deliverables, openFile, revealFile }: {
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -694,7 +699,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focused={focusedCard === item.nodeKey} onFocusChange={onFocusChange} /></BlockBoundary>
+        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focused={focusedCard === item.nodeKey} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
       </Fragment> : <Fragment key={item.key}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
@@ -775,6 +780,11 @@ export function Reader(props: ReaderProps) {
   // part's initial here, and handed to the stylesheet as custom properties on the root.
   const glassStored = props.useStore(state => state.glassParts);
   const glassValuesResolved = useMemo(() => glassValues(glassStored), [glassStored]);
+  // …and the same surfaces' FROST, in px: its own stored record, its own resolver, and one more property per surface
+  // on the root. A surface dialled to 0 has its property OMITTED rather than written as `0px`, which is what keeps a
+  // reader who never asked for frost from paying for a composited layer (see glassBlurProperties).
+  const glassBlurStored = props.useStore(state => state.glassBlur);
+  const glassBlurResolved = useMemo(() => glassBlurValues(glassBlurStored), [glassBlurStored]);
   // Where a delivered file opens. Read through the same fallback the skin uses: a record written
   // before this preference existed, or anything that is not `'sidebar'`, means the system app.
   const openInSidebar = props.useStore(state => deliverableOpenModeOf(state.deliverableOpenMode)) === 'sidebar';
@@ -794,14 +804,22 @@ export function Reader(props: ReaderProps) {
   // How the follower catches up with the tail. Read through its own fallback reader, so a record written before this
   // preference existed keeps the glide it was written with.
   const followMode = props.useStore(state => followModeOf(state.followMode));
-  const glassVars = useMemo(() => glassProperties(glassValuesResolved), [glassValuesResolved]);
+  const glassVars = useMemo(
+    () => ({ ...glassProperties(glassValuesResolved), ...glassBlurProperties(glassBlurResolved) }),
+    [glassValuesResolved, glassBlurResolved],
+  );
   // The wallpaper, read the same defensive way and handed over the same way: two custom properties
   // on the root, with the rest of the backdrop stated in the stylesheet. `wallpaperNameOf` is what
   // makes a record written before this preference existed mean "no wallpaper" rather than a crash.
   const wallpaperName = props.useStore(state => wallpaperNameOf(state.wallpaper));
   const wallpaperDim = props.useStore(state => wallpaperDimOf(state.wallpaperDim));
   const wallpaperScope = props.useStore(state => wallpaperScopeOf(state.wallpaperScope));
-  const wallpaperChrome = props.useStore(state => wallpaperChromeOf(state.wallpaperChrome));
+  const wallpaperChromeSidebar = props.useStore(state => wallpaperChromeOf(state.wallpaperChromeSidebar));
+  const wallpaperChromeHeader = props.useStore(state => wallpaperChromeOf(state.wallpaperChromeHeader));
+  // …and the two scrims' frost. Read through its own fallback reader like the tints above, so a record written before
+  // this setting existed means the shipped 0 — a wash, exactly as those surfaces have always looked.
+  const wallpaperChromeSidebarBlur = props.useStore(state => wallpaperChromeBlurOf(state.wallpaperChromeSidebarBlur));
+  const wallpaperChromeHeaderBlur = props.useStore(state => wallpaperChromeBlurOf(state.wallpaperChromeHeaderBlur));
   // The whole-window scope is the frame's job (see wallpaper-scope.ts): the same image on the reading
   // view's own root would be a SECOND copy under a second scrim, which is what makes one region
   // visibly darker than the one beside it. So the view paints its own backdrop only in view scope.
@@ -888,7 +906,10 @@ export function Reader(props: ReaderProps) {
         scope: wallpaperScope,
         image,
         dim: wallpaperDim,
-        chrome: wallpaperChrome,
+        chromeSidebar: wallpaperChromeSidebar,
+        chromeHeader: wallpaperChromeHeader,
+        chromeSidebarBlur: wallpaperChromeSidebarBlur,
+        chromeHeaderBlur: wallpaperChromeHeaderBlur,
         ...(geometry ?? {}),
       });
     };
@@ -935,7 +956,7 @@ export function Reader(props: ReaderProps) {
       if (observer !== null) observer.disconnect();
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [wallpaperName, wallpaperScope, wallpaperDim, wallpaperChrome]);
+  }, [wallpaperName, wallpaperScope, wallpaperDim, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur]);
 
   // The gutter's groove rides the skin's dial like the other surfaces, and like them it is published
   // only while the skin is on: with it off the host's own transparent track is left untouched, which is
@@ -943,6 +964,34 @@ export function Reader(props: ReaderProps) {
   useEffect(() => {
     applyScrollbarFill(document, glassPreference ? scrollbarFillOf(glassValuesResolved.scrollbar) : '');
   }, [glassPreference, glassValuesResolved]);
+  /**
+   * The FROST, published on the DOCUMENT ELEMENT as well as in this view's inline style.
+   *
+   * Two reasons, and the second one is the reader's own measurement. The surfaces on the CONVERSATION page read
+   * these properties from `<html>` (see `applyConversationGlass`), so the same dial has to reach both places — and in
+   * the reading view the inline style on this root turned out NOT to make the frost appear at all, while the two
+   * surfaces wired the other way (the conversation page's card and user bubble, whose properties are set here)
+   * plainly did. Publishing on the document element is the path that demonstrably works, so the frost uses it; the
+   * reading view's own root keeps carrying them for the tints' sake and any surface that reads them there.
+   *
+   * Nothing is written while the skin is off — `null` REMOVES every name rather than writing the shipped initials,
+   * because an unset property is what leaves `backdrop-filter` at `none` (see `glassBlurProperties`).
+   */
+  useEffect(() => {
+    const style = document.documentElement.style;
+    if (!glassPreference) {
+      applyGlassBlur(style, null);
+      for (const name of Object.keys(glassProperties(glassValuesResolved))) style.removeProperty(name);
+      return;
+    }
+    // The TINTS as well as the frost, for the same reason: if this view's inline style is not reaching the
+    // stylesheet, the tint dials are silently sitting on their CSS fallbacks (every tint read has one, which is
+    // exactly why that failure would be invisible), and publishing here is the path the conversation page proved.
+    // The values are identical to the ones the root carries, so this can only add a working path, never change a
+    // look.
+    for (const [name, value] of Object.entries(glassProperties(glassValuesResolved))) style.setProperty(name, value);
+    applyGlassBlur(style, glassBlurResolved);
+  }, [glassPreference, glassValuesResolved, glassBlurResolved]);
   const motion = useMotionAllowed(motionPreference);
   // The two collapse verbs and the bindings they answer to. A record written before the field
   // existed has no `shortcuts` at all, so the defaults are resolved here rather than assumed; a
@@ -966,7 +1015,11 @@ export function Reader(props: ReaderProps) {
   // The turn that is currently growing, if any — the same `status === 'open'` the status line and the wait clock read.
   // It answers three questions at once: whether the tail-follow has anything to keep up with (`live`), which turn
   // 「自动收起更早流程」 has to leave open, and when a NEW turn has started (which is when the earlier processes fold).
-  const autoCollapseEarlier = props.useStore(state => state.autoCollapseEarlier) === true;
+  // `!== false`, matching this field's shipped default (ON): a default of true means an ABSENT key is on, and a reader
+  // that asked for `=== true` would turn an unusable stored value — the one thing that reaches the reader as
+  // `undefined` — into OFF, which is not what the default says. The guard that pairs every default with its reader
+  // caught exactly this when the default was flipped (see check-settings-fallbacks).
+  const autoCollapseEarlier = props.useStore(state => state.autoCollapseEarlier) !== false;
   // A `useMemo` on `timeline`, NOT a selector: `useChat` runs its selector on every store notification, and text arrives
   // as one notification per delta, so scanning the turn map inside the selector meant walking every turn in the
   // conversation once per streamed chunk — work that grows with the history and can only ever change at a turn or step
@@ -1002,8 +1055,28 @@ export function Reader(props: ReaderProps) {
    * time is exactly the fight the reader's rule 1 forbids.
    */
   const [focusedCard, setFocusedCard] = useState<string | null>(null);
+  /**
+   * The card the reader has taken over — the pin that holds the focus where it is.
+   *
+   * 「焦点思考展开」's rule, as the reader settled it: scrolling INSIDE a card keeps it open (that is the reader reading
+   * it), and nothing takes the focus away while they do — not a newer card's request, not this card's idle beat.
+   * Scrolling the PAGE is the other case and is unchanged: the focus is kept and the handoff still runs. Only the
+   * reader's own return to the bottom ends a pin — by hand, or with the 「回到最新」 pill (see the edge below).
+   */
+  const [pinnedCard, setPinnedCard] = useState<string | null>(null);
+  /** Read inside `onFocusChange`, which is a stable callback and so cannot close over the state above. */
+  const pinRef = useRef<string | null>(null);
+  useLayoutEffect(() => { pinRef.current = pinnedCard; }, [pinnedCard]);
   const onFocusChange = useCallback((key: string, focused: boolean) => {
-    setFocusedCard(current => focused ? key : (current === key ? null : current));
+    // A grant is REFUSED while a card is pinned: "the newest request wins" holds unless the reader is reading inside
+    // one, which is the whole reason the pin travels up here.
+    if (focused) setFocusedCard(current => (pinRef.current === null ? key : current));
+    else setFocusedCard(current => (current === key ? null : current));
+    // …and a release takes the pin with it, whichever side asked (展开阅读, unmount, the card's own beat).
+    setPinnedCard(current => (current === key ? null : current));
+  }, []);
+  const onFocusPin = useCallback((key: string, pinned: boolean) => {
+    setPinnedCard(current => (pinned ? key : (current === key ? null : current)));
   }, []);
   //
   // And a NEW turn puts the earlier ones away by clearing their stored choices rather than overriding them: the
@@ -1156,6 +1229,25 @@ export function Reader(props: ReaderProps) {
   }, [turnSignature]);
   const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null);
   /**
+   * The reader coming back to the bottom ends a pin — and with it the focus that pin was holding.
+   *
+   * An EDGE, not a level: while the reader is reading inside a card the page is already at the bottom, so "the page is
+   * at the tail" is true the whole time and a level test would end the pin the instant it was set. What ends it is
+   * having LEFT the bottom and come back — by hand, or by the 「回到最新」 pill, which scrolls there.
+   *
+   * The focus is released only when there WAS a pin. Without one, coming back to the tail is the ordinary
+   * read-somewhere-else-and-return: the card keeps its focus and keeps growing, where releasing it would fold the card
+   * shut for a single commit and then let it ask again — a flicker with nothing behind it.
+   */
+  const wasDetached = useRef(false);
+  useEffect(() => {
+    const returned = wasDetached.current && !scroll.detached;
+    wasDetached.current = scroll.detached;
+    if (!returned || pinnedCard === null) return;
+    setPinnedCard(null);
+    setFocusedCard(null);
+  }, [scroll.detached, pinnedCard]);
+  /**
    * Hand the follow back the moment a focus ends.
    *
    * Suspending the tail-follow while a card holds the focus is not enough on its own: the follower resumes on the next
@@ -1291,7 +1383,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.2" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.4" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
@@ -1308,6 +1400,7 @@ export function Reader(props: ReaderProps) {
           conversationSolid={conversationSolid} onConversationSolid={props.actions.setConversationSolid}
           collapseMode={collapseMode} onCollapseMode={props.actions.setCollapseMode}
           glassParts={glassValuesResolved} onGlassPart={props.actions.setGlassPart}
+          glassBlur={glassBlurResolved} onGlassBlur={props.actions.setGlassBlur}
           openInSidebar={openInSidebar} onOpenInSidebar={on => { props.actions.setDeliverableOpenMode(on ? 'sidebar' : 'external'); }}
           stripWheel={stripWheel} onStripWheel={props.actions.setStripWheel}
           textCadence={textCadence} onTextCadence={props.actions.setTextCadence}
@@ -1320,8 +1413,14 @@ export function Reader(props: ReaderProps) {
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
-          wallpaperScope={wallpaperScope} wallpaperChrome={wallpaperChrome}
-          onWallpaperScope={props.actions.setWallpaperScope} onWallpaperChrome={props.actions.setWallpaperChrome}
+          wallpaperScope={wallpaperScope}
+          wallpaperChromeSidebar={wallpaperChromeSidebar} wallpaperChromeHeader={wallpaperChromeHeader}
+          wallpaperChromeSidebarBlur={wallpaperChromeSidebarBlur} wallpaperChromeHeaderBlur={wallpaperChromeHeaderBlur}
+          onWallpaperScope={props.actions.setWallpaperScope}
+          onWallpaperChromeSidebar={props.actions.setWallpaperChromeSidebar}
+          onWallpaperChromeHeader={props.actions.setWallpaperChromeHeader}
+          onWallpaperChromeSidebarBlur={props.actions.setWallpaperChromeSidebarBlur}
+          onWallpaperChromeHeaderBlur={props.actions.setWallpaperChromeHeaderBlur}
           shortcuts={{ collapseTurn: collapseTurnKey, collapseAll: collapseAllKey }} onShortcut={props.actions.setShortcut} buttonRef={settingsRef} />
       </div>
       {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
@@ -1331,7 +1430,7 @@ export function Reader(props: ReaderProps) {
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} />)}
+      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (

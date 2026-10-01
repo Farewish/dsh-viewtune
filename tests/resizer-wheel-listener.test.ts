@@ -19,6 +19,8 @@ import { installResizerWheel } from '../src/client/resizer-wheel.ts';
 const READER_ROOT = '[data-dsh-better-display]';
 const SCROLLER_SELECTOR = '_scrollBody';
 const COLUMN_SELECTOR = '_centerCol';
+/** The attribute the conversation panel publishes on its two width strips — the listener's whole target test. */
+const WIDTH_HANDLE = '[data-width-handle]';
 /** What the scroller starts at: far enough from the top that a jump to zero cannot be mistaken for a small step. */
 const START = 500;
 /** One notch, in pixels. */
@@ -31,7 +33,10 @@ class FakeWheelEvent {
 (globalThis as unknown as Record<string, unknown>).WheelEvent = FakeWheelEvent;
 
 interface NotchEvent {
+  /** How many times the listener claimed the notch from the browser's own handling. */
   prevented: number;
+  /** How many times it kept that notch from the shell's own `onWheel` on the same element. */
+  propagationStopped: number;
 }
 
 interface Harness {
@@ -51,7 +56,7 @@ interface Harness {
   dispose(): void;
 }
 
-function harness(options: { cursor?: string; motion?: string } = {}): Harness {
+function harness(options: { widthHandle?: boolean; motion?: string; stripWheel?: string } = {}): Harness {
   const writes: number[] = [];
   const announced: unknown[] = [];
   const listeners: ((event: unknown) => void)[] = [];
@@ -60,7 +65,11 @@ function harness(options: { cursor?: string; motion?: string } = {}): Harness {
   let nextFrame = 1;
   let position = START;
 
-  const handle = { cursor: options.cursor ?? 'col-resize' };
+  // The strip is identified the way the listener identifies it: through the attribute its owner publishes, asked for
+  // with `closest`. `widthHandle: false` models a notch anywhere else in the column — the transcript itself.
+  const handle: { closest: (selector: string) => unknown } = {
+    closest: (selector: string): unknown => (selector === WIDTH_HANDLE && options.widthHandle !== false ? handle : null),
+  };
   const column = { contains: (node: unknown): boolean => node === handle };
   const scroller = {
     clientHeight: 800,
@@ -81,13 +90,15 @@ function harness(options: { cursor?: string; motion?: string } = {}): Harness {
   };
   const root = {
     closest: (selector: string) => (selector.includes(SCROLLER_SELECTOR) ? scroller : null),
-    getAttribute: (name: string) => (name === 'data-motion' ? (options.motion ?? 'on') : null),
+    getAttribute: (name: string) =>
+      name === 'data-motion' ? (options.motion ?? 'on')
+        : name === 'data-reader-strip-wheel' ? (options.stripWheel ?? null)
+          : null,
   };
   const view = {
     Element: Object,
     performance: { now: () => clock.milliseconds },
-    getComputedStyle: (node: unknown) =>
-      node === handle ? { cursor: handle.cursor } : { cursor: 'auto', lineHeight: '16px' },
+    getComputedStyle: () => ({ cursor: 'auto', lineHeight: '16px' }),
     requestAnimationFrame: (callback: (stamp: number) => void): number => {
       const id = nextFrame++;
       frames.set(id, callback);
@@ -124,8 +135,12 @@ function harness(options: { cursor?: string; motion?: string } = {}): Harness {
         deltaY,
         deltaMode: 0,
         prevented: 0,
+        propagationStopped: 0,
         preventDefault(this: NotchEvent): void {
           this.prevented += 1;
+        },
+        stopPropagation(this: NotchEvent): void {
+          this.propagationStopped += 1;
         },
       };
       listeners[0](event);
@@ -183,13 +198,46 @@ test('the glide never reverses, and lands exactly on the target', () => {
 });
 
 test('a notch over the transcript itself is left to the browser', () => {
-  const h = harness({ cursor: 'auto' });
+  const h = harness({ widthHandle: false });
   try {
     const event = h.notch(NOTCH);
     assert.equal(event.prevented, 0, 'the browser keeps its notch');
+    assert.equal(event.propagationStopped, 0, 'and nothing here intervenes in its propagation');
     assert.equal(h.writes.length, 0, 'and nothing writes a scroll position');
     assert.equal(h.announced.length, 0);
     assert.equal(h.pendingFrames, 0);
+  } finally {
+    h.dispose();
+  }
+});
+
+test('the notch ours takes is kept from the shell’s own handler', () => {
+  // DSH 0.2.0's conversation panel forwards a strip wheel itself — an instant `scrollport.scrollBy` — and its listener
+  // is a React one on this very element. Two writers on one `scrollTop` is the bug pinned here: the App's jump would
+  // land first and our glide overwrite it a frame later, so the notch has to be claimed outright.
+  const h = harness();
+  try {
+    const event = h.notch(NOTCH);
+    assert.equal(event.prevented, 1, 'the browser does not also scroll for it');
+    assert.equal(event.propagationStopped, 1, 'and the shell never sees the notch');
+    assert.equal(h.writes.length, 0, 'the glide starts on its own frames, not on the notch');
+    assert.equal(h.announced.length, 1, 'the reading view is still told a wheel happened');
+  } finally {
+    h.dispose();
+  }
+});
+
+test('with the switch off, the notch is handed back to the App whole', () => {
+  // The switch no longer decides WHETHER the strips scroll — the App scrolls them either way — but HOW. Off is the
+  // App's own instant jump, and it only gets to be that if nothing here consumes the notch or writes a position.
+  const h = harness({ stripWheel: 'off' });
+  try {
+    const event = h.notch(NOTCH);
+    assert.equal(event.prevented, 0, 'the App keeps the notch it forwards');
+    assert.equal(event.propagationStopped, 0, 'and reaches its own handler');
+    assert.equal(h.writes.length, 0, 'nothing here writes a scroll position');
+    assert.equal(h.announced.length, 0, 'and no announcement is invented for a gesture we did not take');
+    assert.equal(h.pendingFrames, 0, 'no glide is started either');
   } finally {
     h.dispose();
   }

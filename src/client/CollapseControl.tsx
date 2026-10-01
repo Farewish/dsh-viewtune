@@ -83,7 +83,7 @@ export function CollapseControl({ mode, currentOpen, othersOpen, turnKey, allKey
         <span aria-hidden="true" className={css.collapseStage}>
           <span className={css.collapseAllWord}>全部</span>
           <span className={css.collapseKeeping}>收起</span>
-          <span className={css.collapseOneChevron}>˄</span>
+          <span className={css.collapseOneChevron}><CollapseChevron /></span>
         </span>
       </button>
       {/* The second control is a DIRECT action, not a menu (the reader asked for one click and for 收起全部's
@@ -95,8 +95,23 @@ export function CollapseControl({ mode, currentOpen, othersOpen, turnKey, allKey
         aria-keyshortcuts={both ? (allKey || undefined) : undefined}
         aria-label={allLabel} title={allLabel}
         onClick={() => { remember(); collapseAll(); }}>
-        <span aria-hidden="true" className={css.collapseChevrons}><span>˄</span><span>˄</span></span>
+        <span aria-hidden="true" className={css.collapseChevrons}><span><CollapseChevron /></span><span><CollapseChevron /></span></span>
       </button>
     </span>
   );
+}
+
+/**
+ * The caret the collapse controls wear: the SAME drawn chevron the process disclosure uses, turned to point up.
+ *
+ * It replaces the text glyph `˄` (U+02C4) this control used to spell out. That glyph is a modifier letter, not an
+ * arrow: it sits on the baseline of whatever font happens to be in force, so its weight, size and alignment were the
+ * font's business rather than ours — beside the disclosure's stroked chevron the two read as different marks, which is
+ * exactly what the reader saw. Reusing the disclosure's class gives this control the same 12px box, the same 1.4
+ * stroke, `stroke: currentColor` and the same round caps; the path is the mirror of the disclosure's, so 收起 points
+ * UP (the direction it folds) where an expanded disclosure points down. The disclosure's rotate-on-`data-open` rule
+ * never applies here: this control is an action, not a state, so it never carries that attribute.
+ */
+function CollapseChevron() {
+  return <svg className={css.chevron} viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m4 10 4-4 4 4" /></svg>;
 }

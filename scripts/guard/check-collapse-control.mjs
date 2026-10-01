@@ -91,7 +91,7 @@ want('the appendage keeps its place over the stage', '_collapseMore{width:20px',
 // one number — 2px is the geometric centre (2px of margin each side), 5px is the optical value the reader
 // settled on — and it is bounded by the left half's slack (36px − 32px = 4px), which is why wanting more of it
 // means widening that half rather than raising this number.
-want('the split shift is a whole pixel and carries the optical value', 'var(--reader-collapse-split-shift,5px)', 1);
+want('the split shift is a whole pixel and carries the optical value', 'var(--reader-collapse-split-shift,3px)', 1);
 // The divider PRIMITIVE plus the rule that fades it in: a pseudo-element is the whole reason it can appear in
 // place, since a border has no opacity of its own.
 want('the divider is a pseudo-element', '_collapseMore:before{content:', 1);
@@ -111,10 +111,13 @@ want('…with 全部 as its own segment', 'className: Reader_module_css_default.
 want('…and 收起 as its own', 'className: Reader_module_css_default.collapseKeeping', 1);
 want('…and the chevron as its own', 'className: Reader_module_css_default.collapseOneChevron', 1);
 want('the words reach assistive tech through the button', '"aria-label": title', 1);
-// Three ˄ in the markup: the main button's single one and the pair stacked on the appendage. The count is what
-// says the chevrons are still DRAWN rather than spelled — and that the main button carries ONE, because in
-// 「全部收起」 it is the chevron that fades away to free the fourth glyph's slot.
-want('chevrons: drawn in a stack, never spelled', 'children: "˄"', 3);
+// The chevrons are DRAWN now — the same stroked path the process disclosure wears, turned to point up — instead of
+// the modifier letter `˄` this control used to spell out, which sat on the font's baseline and read as a different
+// mark beside the disclosure's. Only the GLYPH's disappearance is asserted here: the path itself lives in a shared
+// component, so counting its literals in the bundle measures the minifier's inlining (two today, one tomorrow) rather
+// than the markup, and the slots that render it are already pinned by the assertion above. (This check's label said
+// "never spelled" long before the markup agreed with it; it does now.)
+want('the text glyph it replaced is gone', 'children: "˄"', 0);
 want('tooltip names the scope', '收起当前这一轮的过程', 1);
 // The motion preference moved into the settings panel: what has to hold now is that it still
 // reaches that panel and that the panel still writes the stored value.

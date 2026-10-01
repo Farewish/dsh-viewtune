@@ -10,7 +10,7 @@ import {
   bindingFromEvent, shortcutLabel, shortcutProblem,
 } from './shortcuts.js';
 import type { ShortcutAction, ShortcutProblem } from './shortcuts.js';
-import { GLASS_PARTS } from './glass.js';
+import { GLASS_BLUR_MAX, GLASS_PARTS } from './glass.js';
 import { COLLAPSE_MODES, collapseModeOf } from './collapse-mode.js';
 import type { CollapseMode } from './collapse-mode.js';
 import { TEXT_CADENCES, textCadenceOf } from './text-cadence.js';
@@ -56,8 +56,8 @@ const GLASS_HINT = '卡片、工具框与代码块透出壁纸；小标签悬停
 const GLASS_CONVERSATION_HINT = '「对话」页里的代码块与用户气泡也跟着变';
 /** Where a delivered file opens, as the row's `title` box. */
 const OPEN_MODE_HINT = '打开后点产物文件用右侧栏预览，而不是系统程序';
-/** What the toolbar's two column handles do with a wheel, as that row's `title` box. */
-const STRIP_WHEEL_HINT = '在阅读列两边的竖条上滚动，正文也会跟着滚动';
+/** What a wheel on the two strips does now that the App forwards it itself, as that row's `title` box. */
+const STRIP_WHEEL_HINT = '开启时用缓动带走正文，关闭时用 App 原生的即时滚动';
 /** What the two reveal cadences cost and buy, as that row's `title` box. */
 const CADENCE_HINT = '跟随屏幕刷新可能严重影响性能';
 /** What turning the reveal's blur off changes, as that row's `title` box. */
@@ -72,6 +72,8 @@ const REASONING_FOLLOW_HINT = '自动滚动按阅读速度走；跟随最新停�
 const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
 /** What the focused expansion does, as that row's `title` box. */
 const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到展开阅读那么高';
+/** The frost rows, one per surface. Short because the row above it already says which surface is meant. */
+const FROST_HINT = '0px 只有玻璃，往上才是磨砂';
 
 /**
  * A settings page grouped by subject: a hairline above the group, and a caption when the group's subject is not
@@ -122,7 +124,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChrome, onWallpaperScope, onWallpaperChrome, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -144,6 +146,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   glassParts: Readonly<Record<string, number>>;
   /** Move one surface's opacity. */
   onGlassPart: (id: string, value: number) => void;
+  /** …and its FROST, in px: how much that surface blurs what is behind it. */
+  glassBlur: Readonly<Record<string, number>>;
+  onGlassBlur: (id: string, value: number) => void;
   /** Whether a delivered file opens in the right sidebar rather than the system app. */
   openInSidebar: boolean;
   onOpenInSidebar: (next: boolean) => void;
@@ -174,10 +179,18 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onWallpaperDim: (value: number) => void;
   /** Whether the wallpaper carries the whole window, or only the reading view. */
   wallpaperScope: WallpaperScope;
-  /** How opaque the sidebar and the top bar stay while the window scope is on. */
-  wallpaperChrome: number;
+  /** How opaque the LEFT COLUMN stays while the window scope is on. */
+  wallpaperChromeSidebar: number;
+  /** …and the TOP BAR's own scrim, which is a separate dial. */
+  wallpaperChromeHeader: number;
+  /** The same two surfaces' FROST, in px: how much each scrim blurs the photograph behind it. */
+  wallpaperChromeSidebarBlur: number;
+  wallpaperChromeHeaderBlur: number;
   onWallpaperScope: (scope: WallpaperScope) => void;
-  onWallpaperChrome: (value: number) => void;
+  onWallpaperChromeSidebar: (value: number) => void;
+  onWallpaperChromeHeader: (value: number) => void;
+  onWallpaperChromeSidebarBlur: (value: number) => void;
+  onWallpaperChromeHeaderBlur: (value: number) => void;
   /** The bindings in force, defaults already resolved by the caller. */
   shortcuts: Readonly<Record<ShortcutAction, string>>;
   /** Record a new binding, or clear one with an empty string. */
@@ -311,19 +324,33 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 with the skin off, and six dead rows would push everything below the fold. Each dial
                 is one custom property on the root (see glass.ts), so the stylesheet stays
                 declarative — and 0 is "the reader paints nothing here", which is where the skin
-                starts for the surfaces that have no plate of their own anyway. */}
+                starts for the surfaces that have no plate of their own anyway.
+                ONE BOX PER SURFACE, which is the reader's own layout: the name on its own line, then a line per dial
+                with the dial NAMED on it (透明度 / 模糊值). It replaces the pair of rows this used to be, where the
+                second bar was labelled only 「模糊」 and which surface it belonged to had to be read off the row above.
+                A part with no frost (the scrollbar groove) gets one line, not two. */}
             {glass && GLASS_PARTS.map(part => (
-              <div key={part.id} className={`${css.settingsRow} ${css.settingsSubRow}`} title={part.hint}
-                data-ud-check={`reader-settings-glass-${part.id}`}>
-                <span className={css.settingsCopy}>
-                  <span className={css.settingsLabel}>{part.label}</span>
-                </span>
-                <span className={css.settingsRange}>
-                  <input type="range" min={0} max={100} step={5} value={glassParts[part.id] ?? part.initial}
-                    aria-label={`${part.label}的不透明度`}
-                    onChange={event => { onGlassPart(part.id, Number(event.currentTarget.value)); }} />
-                  <span className={css.settingsRangeValue}>{glassParts[part.id] ?? part.initial}%</span>
-                </span>
+              <div key={part.id} className={css.settingsBox} data-ud-check={`reader-settings-glass-${part.id}`}>
+                <span className={css.settingsBoxLabel} title={part.hint}>{part.label}</span>
+                <div className={css.settingsDial} title={part.hint}>
+                  <span className={css.settingsDialLabel}>透明度</span>
+                  <span className={css.settingsRange}>
+                    <input type="range" min={0} max={100} step={5} value={glassParts[part.id] ?? part.initial}
+                      aria-label={`${part.label}的透明度`}
+                      onChange={event => { onGlassPart(part.id, Number(event.currentTarget.value)); }} />
+                    <span className={css.settingsRangeValue}>{glassParts[part.id] ?? part.initial}%</span>
+                  </span>
+                </div>
+                {part.blur !== undefined && <div className={css.settingsDial} title={FROST_HINT}
+                  data-ud-check={`reader-settings-glass-blur-${part.id}`}>
+                  <span className={css.settingsDialLabel}>模糊值</span>
+                  <span className={css.settingsRange}>
+                    <input type="range" min={0} max={GLASS_BLUR_MAX} step={1} value={glassBlur[part.id] ?? part.blur.initial}
+                      aria-label={`${part.label}的模糊值`}
+                      onChange={event => { onGlassBlur(part.id, Number(event.currentTarget.value)); }} />
+                    <span className={css.settingsRangeValue}>{glassBlur[part.id] ?? part.blur.initial}px</span>
+                  </span>
+                </div>}
               </div>
             ))}
             <Group />
@@ -331,7 +358,10 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 one. It reads its list from the host half, so the row owns that fetch rather than
                 taking a list through props nobody else needs. */}
             <WallpaperSection name={wallpaper} dim={wallpaperDim} onPick={onWallpaper} onDim={onWallpaperDim}
-              scope={wallpaperScope} chrome={wallpaperChrome} onScope={onWallpaperScope} onChrome={onWallpaperChrome}
+              scope={wallpaperScope} chromeSidebar={wallpaperChromeSidebar} chromeHeader={wallpaperChromeHeader}
+              onScope={onWallpaperScope} onChromeSidebar={onWallpaperChromeSidebar} onChromeHeader={onWallpaperChromeHeader}
+              chromeSidebarBlur={wallpaperChromeSidebarBlur} chromeHeaderBlur={wallpaperChromeHeaderBlur}
+              onChromeSidebarBlur={onWallpaperChromeSidebarBlur} onChromeHeaderBlur={onWallpaperChromeHeaderBlur}
               solid={conversationSolid} onSolid={onConversationSolid} />
           </>
           : page === 'features'
@@ -360,6 +390,21 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>自动收起更早流程</span>
               </span>
               <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
+            </div>
+            {/* What the toolbar's collapse button DOES — a behaviour, so it sits with the other behaviours on this page.
+                It used to live on the SHORTCUTS page, next to the two bindings, where it read as one of them; the
+                bindings bind ACTIONS, not this button, and even a single-action mode here leaves the other action
+                reachable from its key (see collapse-mode.ts). The panel's only select, because the choice is three
+                named states rather than a degree — and the third of them is 「默认」, the reader's word for the shipped
+                behaviour. */}
+            <div className={css.settingsRow} data-ud-check="reader-settings-collapse-mode">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>收起按钮</span>
+              </span>
+              <select className={css.settingsSelect} value={collapseMode} aria-label="收起按钮的行为"
+                onChange={event => { onCollapseMode(collapseModeOf(event.currentTarget.value)); }}>
+                {COLLAPSE_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
             </div>
             <Group caption="正文显示" />
             <div className={css.settingsRow} title={REVEAL_WORDS_HINT} data-ud-check="reader-settings-reveal-words">
@@ -428,20 +473,6 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
             </div>
           </>
           : <>
-            {/* The collapse button's mode lives on the SHORTCUTS page rather than with the visual settings:
-                it is about the control, and its two actions are the two bindings right below it. A native
-                select because the choice is three named states, not a degree — and the one control here that
-                is not a switch or a dial. No `title`: the three options are their own description, and the
-                paragraph that used to ride here was an argument for merging the buttons in the first place. */}
-            <div className={css.settingsRow} data-ud-check="reader-settings-collapse-mode">
-              <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>收起按钮</span>
-              </span>
-              <select className={css.settingsSelect} value={collapseMode} aria-label="收起按钮的行为"
-                onChange={event => { onCollapseMode(collapseModeOf(event.currentTarget.value)); }}>
-                {COLLAPSE_MODES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
-              </select>
-            </div>
             <div className={css.settingsShortcuts} data-ud-check="reader-settings-shortcuts">
             {SHORTCUT_ROWS.map(({ action, label, note, other }) => {
               const binding = shortcuts[action] ?? '';

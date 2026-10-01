@@ -1,10 +1,17 @@
 /**
- * The wheel over the column handles still scrolls the transcript.
+ * The wheel over the reading column's strips: our glide, or the App's own jump.
  *
- * The two vertical strips that set the reading column's width belong to the SHELL, and they sit beside the scroller
- * rather than inside it: a notch over one of them has no scroll container above it, so the gesture simply died there
- * — the reader's 「卡手」. Nothing has to be guarded here, only forwarded to the reading view's own scroller, found
- * through this plugin's root.
+ * The two vertical strips that set the reading column's width belong to the SHELL, and they sit BESIDE the scroller
+ * rather than inside it, so a notch over one reaches no scroll container of its own. DSH 0.1.5 left it at that and the
+ * gesture died there — the reader's 「卡手」 — which is what this file was written for: the notch is forwarded to the
+ * reading view's own scroller, found through this plugin's root, and carried by the spring below.
+ *
+ * DSH 0.2.0 CLOSED THAT GAP ITSELF. The strips (`[data-width-handle]`, published by the conversation panel) now carry
+ * the panel's own `onWheel`: an instant `scrollport.scrollBy`. So the reader's switch is no longer "scroll from the
+ * strips at all, or not at all" — the App scrolls them either way — and what it decides now is HOW: on, our spring;
+ * off, the App's own jump, with the notch left completely alone. The two writers never share a notch, because when
+ * ours takes it, it also `stopPropagation`s: the panel's listener is a React one on that very element, so leaving
+ * propagation alone would land the App's `scrollBy` under our glide on every notch.
  *
  * WHY NOT THE OBVIOUS TWO ANSWERS.
  *
@@ -44,12 +51,13 @@
  * rather than landing between them, which is the tolerance that unevenness needs. Everything before a pace exists, and
  * everything after a pause, is the spring again.
  *
- * The handle is identified by its own PURPOSE — the resize cursor it shows — because its class name is a per-build
- * hash (`…_handle` in this build) and because that is exactly what the reader pointed at. Two further conditions keep
- * it to the right strip: the reading view has to be mounted at all, and the handle has to sit in the same column as
- * that scroller, so a resizer elsewhere in the shell — the sidebar's, say — is left alone.
+ * The strip is identified by the attribute its owner publishes for it — `[data-width-handle]` — rather than by its
+ * `col-resize` cursor, which two other resizers in the shell also show: the frame's sidebar and rightbar handles, and
+ * the trajectory panel's details handle. The attribute is also version-proof: 0.1.5 already published it, so one rule
+ * covers both. Two further conditions keep it to the right strip: the reading view has to be mounted at all, and the
+ * strip has to sit inside the same column as that scroller.
  */
-const HANDLE_CURSOR = 'col-resize';
+const WIDTH_HANDLE = '[data-width-handle]';
 
 /** The scroller the gesture is forwarded to: the reading view's own, reached through the plugin's root. */
 const READER_ROOT = '[data-dsh-better-display]';
@@ -155,13 +163,13 @@ const STREAM_HOLD_MIN_SECONDS = 0.12;
 const STREAM_HOLD_MAX_SECONDS = 0.2;
 
 /**
- * Whether a wheel belongs to the column handles.
+ * Whether a wheel belongs to the reading column's strips.
  *
- * Pure, and the whole judgement the listener makes: the pointer has to be showing the handle's own resize cursor AND
- * be inside the column the reading view's scroller lives in. Split out so the rule can be tested without a DOM.
+ * Pure, and the whole judgement the listener makes: the notch has to be on a width handle AND inside the column the
+ * reading view's scroller lives in. Split out so the rule can be tested without a DOM.
  */
-export function handleTakesWheel(cursor: string, insideColumn: boolean): boolean {
-  return insideColumn && cursor === HANDLE_CURSOR;
+export function handleTakesWheel(onWidthHandle: boolean, insideColumn: boolean): boolean {
+  return insideColumn && onWidthHandle;
 }
 
 /**
@@ -395,18 +403,21 @@ export function installResizerWheel(doc: Document): () => void {
     // down, and the scroller is reached through it.
     const root = doc.querySelector(READER_ROOT);
     if (root === null) return;
-    // Before anything else, so a disabled wheel is not merely ignored but never consumed: the notch is left to the
-    // browser exactly as it was before this file existed, and nothing here writes a position or swallows an event.
+    // Before anything else, and never consumed: OFF hands the notch to the shell's own instant `scrollBy`, which is
+    // what the reader asked the switch to mean — the App's jump instead of our glide, not silence.
     if (!stripWheelEnabled(root.getAttribute(STRIP_WHEEL_ATTRIBUTE))) return;
     const scroller = root.closest(SCROLLER);
     if (scroller === null) return;
     const column = scroller.closest(COLUMN);
     if (column === null) return;
-    const style = view.getComputedStyle(element);
-    if (!handleTakesWheel(style.cursor, column.contains(element))) return;
+    if (!handleTakesWheel(element.closest(WIDTH_HANDLE) !== null, column.contains(element))) return;
     const lineHeight = Number.parseFloat(view.getComputedStyle(scroller).lineHeight);
     const pixels = wheelPixels(event.deltaY, event.deltaMode, lineHeight, scroller.clientHeight);
     event.preventDefault();
+    // …and the notch is OURS whole. The panel's own `onWheel` sits on this very element, so leaving propagation alone
+    // would have both writers move the scroller on every notch: the App's jump landing first, our glide overwriting it
+    // a frame later. The announcement below is still ours to send, because that is what auto-follow listens for.
+    event.stopPropagation();
     // A wheel reaching the scroller is what tells the reading view the reader has taken over; ours never lands there
     // on its own, so the same gesture is announced — otherwise auto-follow would pull the glide back.
     scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: event.deltaY, deltaMode: event.deltaMode, bubbles: true }));

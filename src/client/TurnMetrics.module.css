@@ -45,6 +45,10 @@
 [data-reader-glass] .pillButton {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) var(--glass-pill, 20%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l1) var(--glass-pill, 20%), transparent);
+  /* The pill's frost, on the same dial as its tint. It opens at the 10px this capsule's own popover wears, so the
+     dial's initial is what the reader already sees rather than a new number. */
+  -webkit-backdrop-filter: blur(var(--glass-blur-pill));
+  backdrop-filter: blur(var(--glass-blur-pill));
 }
 
 [data-reader-glass] .pillButton:hover, [data-reader-glass] .pillButton[data-active=true] {

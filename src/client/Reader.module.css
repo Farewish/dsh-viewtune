@@ -503,14 +503,17 @@
 [data-motion=off] .collapseControl[data-reader-collapse=open] { animation: readerCollapseIn 0s ease-out; }
 [data-motion=off] .collapseControl[data-reader-collapse=idle] { animation: readerCollapseOut 0s ease-in both; transition: none; }
 @media (prefers-reduced-motion: reduce) { .collapseControl[data-reader-collapse=open] { animation: none; } }
-/* The stage: a FIXED interior — the two label slots plus the chevron's 8px, so 56px at 12px — with three
-   segments floating on it. Fixed because the pill's width is the sum of this and its padding, so scaling the
+/* The stage: a FIXED interior — the two label slots, a 2px SPACE, and the chevron's 8px, so 58px at 12px — with
+   three segments floating on it. Fixed because the pill's width is the sum of this and its padding, so scaling the
    type scales the control and nothing else can move it. The slots are the layout, not the states: 全部 at
-   0..2em, 收起 at 2..4em, the chevron after it — and each state merely TRANSLATES what it shows into place,
+   0..2em, 收起 at 2..4em, the chevron after the space — and each state merely TRANSLATES what it shows into place,
    which is why the label can grow to four glyphs without the box growing with it.
    The chevron's slot is 8px rather than .6em (7.2px) ON PURPOSE: every offset below then lands on a whole
    pixel. A fractional translate leaves CJK glyphs on a half pixel, which reads as blur — and the centring
-   correction in 「全部收起」 is exactly half this slot, so it has to be even to stay whole. */
+   correction in 「全部收起」 is exactly half this slot, so it has to be even to stay whole.
+   The 2px SPACE the reader asked for is made INSIDE the slot rather than by widening it: `padding-left: 4px` on the
+   chevron's span shifts its ink about 2px right while the stage keeps its width — so the pill's width is what it was,
+   the split state's bound and the 「全部收起」 centring still measure the same 8px slot, and only the ink moves. */
 .collapseStage { position: relative; display: inline-block; width: calc(4em + 8px); height: 20px; }
 .collapseStage > span { position: absolute; top: 0; bottom: 0; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; transition: opacity var(--reader-collapse-anim, 240ms) ease, transform var(--reader-collapse-anim, 240ms) ease; }
 /* State 收起 ˄ (the resting shape, and therefore the base): both segments sit 1em left of their slots, which
@@ -526,11 +529,14 @@
    The base rule is state 收起 ˄ (and the "leaving" half: a short fade-out, so 全部 is gone before 收起 slides in). */
 .collapseAllWord { left: 0; width: 2em; opacity: 0; transform: translateX(-1em); transition: opacity 80ms linear, transform var(--reader-collapse-anim, 240ms) ease; }
 .collapseKeeping { left: 2em; width: 2em; transform: translateX(-1em); }
-.collapseOneChevron { left: 4em; width: 8px; transform: translateX(-1em); }
+.collapseOneChevron { left: 4em; width: 8px; padding-left: 4px; transform: translateX(-1em); }
 /* State 全部收起: the chevron fades out to the RIGHT and the label slides back to its slot, while 全部 fades
    in from the left — the reader's own choreography, and also the only way four glyphs fit. Both segments then
-   carry the chevron's empty slot's half (4px) so the four glyphs are centred rather than 4px left of centre;
-   the reader asked for exactly that, and 4px is why the slot above is a whole number of pixels. */
+   carry the chevron's empty slot's half so the four glyphs are centred rather than left of centre: the empty slot is
+   the 8px the chevron occupies, so its half is 4px — the GEOMETRIC value, unchanged, because the only thing that ever
+   moved it was this control's stage being 2px wider for one round (the reader spotted that: 「如果按钮回到原宽度，
+   全部收起就不用移动」). The 2px the reader tried for 「收起 ˄」 lives in the RESTING transform instead, which is a
+   different state and a different number. */
 .collapseGroup[data-reader-collapse-action=all] .collapseAllWord { opacity: 1; transform: translateX(4px); transition: opacity var(--reader-collapse-word-fade, 160ms) ease var(--reader-collapse-more-exit, 120ms), transform var(--reader-collapse-anim, 240ms) ease var(--reader-collapse-more-exit, 120ms); }
 /* 收起 and its chevron wait for the appendage's exit before sliding: their arrival rules live beside the exit
    they wait on (see `--reader-collapse-more-exit`), which is why they are not here. */
@@ -543,11 +549,11 @@
    box inside it. At 5px the box ends 1px past the divider; the chevron's ink is inset inside its 8px slot, so
    it still clears the line. Wanting more than that is a request for a WIDER left half — a narrower chevron
    slot or a narrower appendage — not for a bigger shift. */
-.collapseGroup[data-reader-collapse-split=true] .collapseKeeping { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 5px))); }
-.collapseGroup[data-reader-collapse-split=true] .collapseOneChevron { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 5px))); }
+.collapseGroup[data-reader-collapse-split=true] .collapseKeeping { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 3px))); }
+.collapseGroup[data-reader-collapse-split=true] .collapseOneChevron { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 3px))); }
 /* …and 全部 rides the SAME transform here, because the pair is rigid: it is 收起's left neighbour at every instant,
    in this state too. (Its own rule is only about opacity in the states where it appears.) */
-.collapseGroup[data-reader-collapse-split=true] .collapseAllWord { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 5px))); }
+.collapseGroup[data-reader-collapse-split=true] .collapseAllWord { transform: translateX(calc(-2em + var(--reader-collapse-split-shift, 3px))); }
 /* The appendage: a DIRECT action, not a menu, laid OVER the right end of the stage so the pill stays one
    width. Its divider is a pseudo-element rather than a border, because a border cannot fade in place and the
    reader asked for the line to appear where it is.
@@ -582,8 +588,17 @@
    The exit animation deliberately has NO fill-forward: it ends at `-.5em` (up) and the element is invisible by
    then, so letting the property fall back to the resting `+.35em` below is free — and it is what lets the NEXT
    entry start from below instead of from wherever the exit stopped.
-   Its own X shift is one whole-pixel number, like the left half's. */
-.collapseChevrons { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 10px; font-size: 13px; line-height: .58; opacity: 0; transform: translate(var(--reader-collapse-more-shift, -1px), .35em); transition: opacity var(--reader-collapse-anim, 240ms) ease, transform var(--reader-collapse-anim, 240ms) ease; animation: readerChevronsOut var(--reader-collapse-more-exit, 120ms) ease-out; }
+   Its own X shift is one whole-pixel number, like the left half's.
+   Each of the two lines is an 8px SLOT now, not a line box: the children are drawn chevrons rather than text, so the
+   old `line-height: .58` no longer sets their distance — an SVG line box is as tall as the SVG. The reader asked for
+   the pair to sit closer, and the slot is what says how close: 8px against a 12px glyph, so the two overlap by 4px
+   and their ink lands about 5px apart. */
+.collapseChevrons { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 10px; font-size: 13px; line-height: 0; opacity: 0; transform: translate(var(--reader-collapse-more-shift, -1px), .35em); transition: opacity var(--reader-collapse-anim, 240ms) ease, transform var(--reader-collapse-anim, 240ms) ease; animation: readerChevronsOut var(--reader-collapse-more-exit, 120ms) ease-out; }
+.collapseChevrons > span { display: block; line-height: 0; }
+/* …and the SECOND line is pulled up rather than both being squeezed into shorter boxes: a 12px glyph in an 8px slot
+   overflows DOWNWARD, which pushed the whole stack below centre (the reader's 「右边的˄˄位置有点偏下了」). Keeping
+   each line its natural height and moving only the second one keeps the pair symmetric — 4px closer, no shift. */
+.collapseChevrons > span + span { margin-top: -4px; }
 .collapseGroup[data-reader-collapse-split=true] .collapseChevrons { opacity: 1; transform: translate(var(--reader-collapse-more-shift, -1px), 0); animation: none; transition: opacity var(--reader-collapse-more-exit, 120ms) ease var(--reader-collapse-anim, 240ms), transform var(--reader-collapse-more-exit, 120ms) ease var(--reader-collapse-anim, 240ms); }
 /* The half the label waits for: same duration as the exit above, so "the right half goes first" is one number. */
 .collapseGroup[data-reader-collapse-action=all] .collapseKeeping { transform: translateX(4px); transition-delay: 0s, var(--reader-collapse-more-exit, 120ms); }
@@ -699,6 +714,23 @@
    with its dials rather than seven equal preferences. The value is printed because a slider with no
    number on it is a guess. */
 .settingsSubRow { margin-left: 10px; }
+/* One BOX per surface, the reader's own layout: the name on a line of its own, then one indented line per dial, each
+   line NAMING its dial. It replaces the unnamed second row the panel used to carry (a bar labelled only 「模糊」, whose
+   surface you had to infer from the row above) and makes the two dials' belonging structural instead of positional. */
+.settingsBox { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; }
+.settingsBox:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.settingsBoxLabel { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+/* The dial line is laid out like every other row in this panel — `space-between`: the dial's name on the left, its
+   slider and readout hard against the SAME right edge the ordinary rows use (both live in a box with this panel's 8px
+   padding, so one right edge serves both kinds of row). That is what aligns these sliders with the other rows' sliders.
+   `padding-left` therefore only says WHERE THE LABEL STARTS — the reader moving the labels right (「滑动条更近一些」,
+   which the slider cannot do without losing that alignment) is this number and nothing else.
+   Its ceiling is arithmetic, not taste: the line occupies indent + 52 (label column) + 8 + 96 (slider) + 8 + 34
+   (readout) = indent + 198, and the panel's minimum width is 280px with 8px of padding on each side ⇒ the indent tops
+   out around 66px. 60 leaves a little slack at that narrowest panel. */
+.settingsDial { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 60px; }
+/* A fixed label column, so both sliders start at the same x — that alignment is what makes the pair read as ONE box. */
+.settingsDialLabel { flex: none; min-width: 52px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
 /* A settings page grouped by subject: a caption with a hairline above it, drawn at the same tier and weight as the
    toolbar's own divider, so the line reads as a separator rather than as another panel edge. The first caption has no
    line — it is the top of the page, not a boundary. A row whose setting only means something under another one carries
@@ -730,10 +762,24 @@
 .root[data-reader-glass] .toolbar {
   /* Every surface below is a mix of its own colour against transparency, driven by a custom property
      the reader owns (see glass.ts): 0% is "paint nothing here", 100% is the opaque plate this view
-     wears with the skin off. The fallbacks are the values the skin shipped with. */
+     wears with the skin off. The fallbacks are the values the skin shipped with.
+     …and each surface that CAN carry a `backdrop-filter` reads a SECOND property of the same family for its
+     FROST, in px: the tint decides how much of the wallpaper shows, the frost decides whether what shows is the
+     image or a wash of it — 「玻璃」 against 「磨砂玻璃」. The read has NO fallback on purpose: the property is only
+     published while that surface's frost is above zero, and an unset variable makes the declaration invalid at
+     computed-value time, which leaves `backdrop-filter` at `none`. Writing `blur(0px)` instead would NOT be
+     equivalent — any non-`none` value makes the element a stacking context, the containing block for its fixed
+     descendants, and a composited layer, which this plugin has already been bitten by (see the scrim's note in
+     wallpaper-scope.ts).
+     AND THE STANDARD PROPERTY IS WRITTEN **AFTER** ITS `-webkit-` TWIN, on purpose, everywhere below. The build's
+     CSS pipeline de-duplicates that pair and keeps the LAST declaration — so the familiar `backdrop-filter` first /
+     `-webkit-` second order ships modules whose rules carry ONLY the prefixed property, and the frost silently does
+     nothing, while the very same declaration in a plain injected stylesheet (which the pipeline never sees) works.
+     That is measured in the artifact rather than theorised, and it is exactly the shape the reader reported: frosted
+     on the conversation page's changed-files card and user bubble, dead on every surface of this file. */
   background: color-mix(in srgb, var(--dsw-alias-bg-base) var(--glass-lane, 25%), transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-lane));
+  backdrop-filter: blur(var(--glass-blur-lane));
   border: 0;
   box-shadow: none;
 }
@@ -745,19 +791,26 @@
 .root[data-reader-glass] .jump {
   background: color-mix(in srgb, var(--dsw-alias-bg-base) max(var(--glass-lane, 25%), 20%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l2, rgba(128,128,128,.22)) 70%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* The pill floats a step INSIDE the lane it belongs to: three quarters of the lane's frost, which is the 12px it
+     has always worn against the lane's own 16px. The ratio is what keeps one dial moving both without changing
+     either, and it is why the frost is published as a LENGTH rather than as a finished filter value. */
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur-lane) * 0.75));
+  backdrop-filter: blur(calc(var(--glass-blur-lane) * 0.75));
 }
 /* The user's own bubble becomes a translucent pill rather than a solid one. */
 .root[data-reader-glass] .user {
   background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0,0,0,.08)) var(--glass-user, 25%), transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-user));
+  backdrop-filter: blur(var(--glass-blur-user));
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.3)) 30%, transparent);
 }
 .root[data-reader-glass] .reasonCard {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.35)) 65%, transparent);
+  /* The card is the surface 「并不磨砂」 was most visibly about: a big plate that showed the photograph through it
+     sharply. Its dial opens at 0 — the look it has always had — and moving it up is what frosts it. */
+  -webkit-backdrop-filter: blur(var(--glass-blur-card));
+  backdrop-filter: blur(var(--glass-blur-card));
 }
 /* `.toolRaw` is deliberately NOT in this group, though it used to be: it has a rule of its own further down that dials
    it with `--glass-code` (it is the 「原始数据」 <pre>, a code plate), and with both selectors at the same specificity the
@@ -795,15 +848,19 @@
 .root[data-reader-glass] .toolDetails,
 .root[data-reader-glass] .toolPanel {
   --dsw-alias-bg-layer-1: color-mix(in srgb, var(--viewtune-layer-plate, rgba(127,127,127,.1)) var(--glass-code, 25%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-code));
+  backdrop-filter: blur(var(--glass-blur-code));
 }
 .root[data-reader-glass] .toolRaw {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-code, 25%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-code));
+  backdrop-filter: blur(var(--glass-blur-code));
 }
 .root[data-reader-glass] :global(.md-code-block) {
   background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent) !important;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-code));
+  backdrop-filter: blur(var(--glass-blur-code));
 }
 /* The block's header row is TWO plates, not one, and both are opaque in the base look: an outer sticky
    `.bannerWrap` strip painted with the theme's own background, and the `.banner` inside it, painted
@@ -830,9 +887,18 @@
    the card's. It rides 卡片与面板 rather than 代码块: it is a card whose body happens to be JSON. */
 .root[data-reader-glass] .jsonCard :global(button) {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
+  /* The frost goes on the element that CARRIES a plate — never on this card's wrapper. On the wrapper it blurred the
+     card's whole box while the visible plate was only the button (the reader's 「作用范围是一整行，而实际只是那一个
+     按钮」, the same shape as the composer's seat): a `backdrop-filter` blurs everything behind the element's entire
+     box, plate or no plate. One plate, one frost, on the same element. */
+  -webkit-backdrop-filter: blur(var(--glass-blur-card));
+  backdrop-filter: blur(var(--glass-blur-card));
 }
+/* The payload's own plate is this card's second surface, so it takes the same dial. */
 .root[data-reader-glass] .jsonCard :global(pre) {
   background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-card, 0%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-card));
+  backdrop-filter: blur(var(--glass-blur-card));
 }
 /* A diff block is the diff's own paper wherever it is drawn, so it follows the DIFF dial rather
    than the code one. It shows up twice: inside the panel, where the scroll area strips its plate to
@@ -842,13 +908,15 @@
 .root[data-reader-glass] :global([data-diff]) {
   background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-diff, 20%), transparent) !important;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-diff));
+  backdrop-filter: blur(var(--glass-blur-diff));
 }
 .root[data-reader-glass] .diffOverlay {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-diff, 20%), transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* The overlay is the same paper one step further out, and it has always floated a third heavier than the paper it
+     covers (16px against 12px), so it scales the one diff dial rather than reading it straight. */
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur-diff) * 4 / 3));
+  backdrop-filter: blur(calc(var(--glass-blur-diff) * 4 / 3));
 }
 .root[data-reader-glass] .diffScrollArea { background: transparent; }.root[data-reader-glass] .diffTab { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,.8)) var(--glass-diff, 25%), transparent); }
 /* The selected tab sits a step above the others on the same dial, so one control moves both. */
@@ -863,10 +931,16 @@
 .root[data-reader-glass] .deliverableChip {
   background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l2, rgba(128,128,128,.22)) var(--glass-chip, 0%), transparent);
+  /* The chip's frost opens at 0 like the card's: it has a plate, so it can carry a backdrop-filter, and whether it
+     should is the reader's call rather than this file's. */
+  -webkit-backdrop-filter: blur(var(--glass-blur-chip));
+  backdrop-filter: blur(var(--glass-blur-chip));
 }
 .root[data-reader-glass] .compactionPill {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) var(--glass-card, 0%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-card));
+  backdrop-filter: blur(var(--glass-blur-card));
 }
 /* Whatever the dial says, the pointer and the keyboard still get their outline. */
 .root[data-reader-glass] .compactionPill:hover,

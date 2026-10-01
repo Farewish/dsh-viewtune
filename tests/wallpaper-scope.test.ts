@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  WALLPAPER_CHROME_INITIAL, applyWindowScope, installWindowScope, wallpaperChromeOf, wallpaperScopeOf,
+  WALLPAPER_CHROME_INITIAL, applyWindowScope, chromeScrimsOf, installWindowScope, wallpaperChromeOf, wallpaperScopeOf,
   windowScopeCss,
 } from '../src/client/wallpaper-scope.ts';
 import { scrollbarFillOf, scrollbarStyleCss } from '../src/client/scrollbar.ts';
@@ -52,13 +52,46 @@ test('the scope and the chrome scrim fall back, and the scrim never leaves 0..10
   assert.equal(wallpaperChromeOf(500), 100);
 });
 
+test('the two scrims are read per surface, and a record from before the split still means what it meant', () => {
+  // The record the split replaced carried ONE number for both surfaces, so that number has to arrive as BOTH — losing
+  // it would open a reader's chrome at the shipped default, a setting taken away by an upgrade rather than by them.
+  assert.deepEqual(chromeScrimsOf({ wallpaperChrome: 10 }), { sidebar: 10, header: 10 }, 'the single dial set both surfaces');
+  // …while a record that carries the surfaces' own keys is read as written, including two different numbers: that is
+  // the whole point of the split.
+  assert.deepEqual(chromeScrimsOf({ wallpaperChromeSidebar: 10, wallpaperChromeHeader: 80 }), { sidebar: 10, header: 80 });
+  // Decided PER SURFACE, not once for the pair: a record that carries one of the two and the old key beside it is a
+  // reader who moved one surface after the split, and the other must keep the old number rather than fall to the
+  // default — that is the case a single "are both missing?" test would get wrong.
+  assert.deepEqual(
+    chromeScrimsOf({ wallpaperChrome: 10, wallpaperChromeSidebar: 20 }),
+    { sidebar: 20, header: 10 },
+    'one surface moved after the split, the other keeps the old value',
+  );
+  // A junk value for a surface is not a number the reader could have set, so it falls back to the legacy dial (and to
+  // the shipped default when there is none) — the same shape the single dial's own reader has always had.
+  assert.deepEqual(chromeScrimsOf({ wallpaperChrome: 10, wallpaperChromeHeader: 'nope' }), { sidebar: 10, header: 10 });
+  assert.deepEqual(
+    chromeScrimsOf({}),
+    { sidebar: WALLPAPER_CHROME_INITIAL, header: WALLPAPER_CHROME_INITIAL },
+    'a record that never chose one opens at the shipped value',
+  );
+  assert.deepEqual(
+    chromeScrimsOf(undefined),
+    { sidebar: WALLPAPER_CHROME_INITIAL, header: WALLPAPER_CHROME_INITIAL },
+    'and so does no record at all',
+  );
+  assert.deepEqual(chromeScrimsOf({ wallpaperChrome: 500 }), { sidebar: 100, header: 100 }, 'the legacy number is clamped like any other');
+});
+
 test('the stylesheet is gated, and every copy of the IMAGE is viewport-anchored', () => {
   const css = windowScopeCss();
   // Gated: nothing applies until the reader turns the scope on, so the rules can be installed eagerly.
   assert.ok(css.includes('html[data-viewtune-wallpaper="window"]'));
   // Every copy of the image rides a rule that anchors it to the viewport. That is the whole reason
   // several copies are safe: they line up as ONE image instead of layering scrims on each other.
-  const rules = css.split('}').filter(rule => rule.trim() !== '');
+  // Comments are stripped first: they are prose inside the same string, and counting a sentence that merely NAMES
+  // the declaration as a carrier is how this check came to compare four against three.
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '').split('}').filter(rule => rule.trim() !== '');
   const imageRules = rules.filter(rule => rule.includes('var(--viewtune-wallpaper-image)'));
   for (const rule of imageRules) {
     assert.ok(rule.includes('background-attachment: fixed'), `an image copy is not viewport-anchored:${rule}`);
@@ -83,25 +116,51 @@ test('the stylesheet is gated, and every copy of the IMAGE is viewport-anchored'
   // The chrome carries a scrim of its own — and NOT a second copy of the image. Found by its own
   // custom property rather than by the sidebar-column selector: that selector now also appears inside
   // the structural frame selector, so matching on it can pick up the wrong rule.
-  const chromeRule = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome')) ?? '';
-  assert.ok(chromeRule.includes('[class*="_sidebarCol"]'));
-  assert.ok(!chromeRule.includes('--viewtune-wallpaper-image'));
+  //
+  // TWO rules since the reader asked for the surfaces to move apart, and each is found by ITS OWN variable: the point
+  // of the split is that the sidebar's rule reads the sidebar's dial, so a rule wired to the other surface's value is
+  // exactly the mistake this pairing has to catch.
+  const sidebarChrome = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome-sidebar')) ?? '';
+  const headerChrome = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome-header')) ?? '';
+  assert.ok(sidebarChrome.includes('[class*="_sidebarCol"]'), 'the sidebar scrim paints the sidebar column');
+  assert.ok(!sidebarChrome.includes('*:has(> [data-conversation-header-leading])'), 'the sidebar rule must not paint the top bar');
+  assert.ok(!headerChrome.includes('[class*="_sidebarCol"]'), 'the top-bar rule must not paint the sidebar');
+  assert.ok(!sidebarChrome.includes('--viewtune-wallpaper-image') && !headerChrome.includes('--viewtune-wallpaper-image'), 'a scrim, never a second copy of the image');
   // The top bar is named by the hook the conversation package PUBLISHES on its own leading cell, not by a
   // direct-child test on a build-minted class. 0.2.0 moved the title row behind the `conversation.session.header`
   // slot, so `:has(> [class*="_titleRow"])` stopped matching and the top bar silently lost its scrim — the
   // reader's report. The old shape is kept as an alternative for the 0.1.5 line, but the data hook is what has
   // to be there, because a selector that matches nothing paints nothing and nothing fails.
-  assert.ok(chromeRule.includes('*:has(> [data-conversation-header-leading])'), 'the top bar must be named by its published hook');
-  assert.ok(chromeRule.includes('[class*="_header"]:has(> [class*="_titleRow"])'), 'the older platform shape must keep working');
+  assert.ok(headerChrome.includes('*:has(> [data-conversation-header-leading])'), 'the top bar must be named by its published hook');
+  assert.ok(headerChrome.includes('[class*="_header"]:has(> [class*="_titleRow"])'), 'the older platform shape must keep working');
+  // …and the top bar must NOT be a backdrop root or a stacking context of its own, because the host mounts its own
+  // INLINE popovers in this bar: the 「x 个后台任务运行」 panel (`.QsffPG_menu`, `position:absolute` off its own
+  // `.QsffPG_root{position:relative}`, `z-index:100`, plate `--dsw-specific-menu` + `backdrop-filter:
+  // var(--dsw-menu-backdrop-filter)` — the same plate as 「x 个子智能体」, which only escapes by being PORTALED).
+  // Measured on the reader's machine: with the scrim's frost above 0 that panel lost its blur (text overlapping what
+  // showed through) AND got covered by the reading view's sticky lane (`z-index:11`). So the frost lives on a
+  // pseudo-element (its own backdrop root, leaving the bar's descendants their backdrop), the bar isolates itself
+  // instead of filtering itself, and it carries a z-index above that lane.
+  assert.ok(headerChrome.includes('isolation: isolate'), 'the top bar isolates rather than filtering itself');
+  assert.ok(headerChrome.includes('z-index: 12'), 'and stays above the reading view’s lane (11), which covered the panel');
+  assert.ok(!headerChrome.includes('backdrop-filter:'), 'the frost must NOT sit on the bar itself: that would make it a backdrop root');
+  const headerFrost = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome-header-blur') && rule.includes('::before')) ?? '';
+  assert.ok(headerFrost.includes('backdrop-filter: blur(var(--viewtune-wallpaper-chrome-header-blur))'), 'the frost lives on the bar’s ::before');
+  assert.ok(headerFrost.includes('z-index: -1'), '…behind the bar’s content, which is what the isolate is for');
   // …and the Windows title-bar strip is chrome too: with `[data-windows-titlebar]` the layout paints that strip
   // ABOVE the frame's own background, from the sidebar-fill token this file makes transparent, so it showed the
-  // photograph with no scrim at all until it was given one.
+  // photograph with no scrim at all until it was given one. It sits at the TOP of the window, so it takes the
+  // HEADER's dial — reading the sidebar's would be a dial that moves the wrong strip.
+  const titlebarStrip = rules.find(rule => rule.includes('[data-windows-titlebar]') && rule.includes('::before')) ?? '';
   assert.ok(css.includes('[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before'), 'the title-bar strip needs the chrome scrim');
-  // …and it is the one carrier that must NOT be viewport-anchored: attachment:fixed is only ever needed to
-  // line an image up with the viewport, and on a flat colour it buys nothing while putting the paint in the
-  // compositor. That is where the reader's bug lived — the scrim stayed missing on a fresh load until that
-  // part of the page happened to repaint. Asserted positively so the day someone gives it one, this says why.
-  assert.equal(chromeRule.includes('background-attachment'), false, 'the chrome scrim must not be viewport-anchored');
+  assert.ok(titlebarStrip.includes('--viewtune-wallpaper-chrome-header'), 'the title-bar strip takes the top bar’s scrim');
+  assert.ok(!titlebarStrip.includes('--viewtune-wallpaper-chrome-sidebar'), 'and never the sidebar’s');
+  // …and neither scrim is viewport-anchored: attachment:fixed is only ever needed to line an image up with the
+  // viewport, and on a flat colour it buys nothing while putting the paint in the compositor. That is where the
+  // reader's bug lived — the scrim stayed missing on a fresh load until that part of the page happened to repaint.
+  // Asserted positively so the day someone gives one of them an attachment, this says why.
+  assert.equal(sidebarChrome.includes('background-attachment'), false, 'the sidebar scrim must not be viewport-anchored');
+  assert.equal(headerChrome.includes('background-attachment'), false, 'nor the top bar’s');
   // The token has to be overridden ON `body`, not merely inherited from the root: the theme defines
   // it in its own `body{…}` block, and a definition on an element beats an inherited value however
   // important the parent's rule is. Overriding only the root left the left column fully opaque.
@@ -141,29 +200,67 @@ test('the document element carries the scope and the values, clamps them, and lo
   const fake = fakeDocument();
   const doc = fake.document as unknown as Document;
 
-  applyWindowScope(doc, { scope: 'window', image: 'url("a.png")', dim: 45, chrome: 55 });
+  applyWindowScope(doc, { scope: 'window', image: 'url("a.png")', dim: 45, chromeSidebar: 55, chromeHeader: 20 });
   assert.equal(fake.attributes.get('data-viewtune-wallpaper'), 'window');
   assert.deepEqual([...fake.properties], [
     ['--viewtune-wallpaper-image', 'url("a.png")'],
     ['--viewtune-wallpaper-dim', '45%'],
-    ['--viewtune-wallpaper-chrome', '55%'],
+    // Two surfaces, two numbers on purpose: the split exists so the sidebar and the top bar can differ, and a single
+    // `chrome` value arriving here would make this list wrong rather than merely different.
+    ['--viewtune-wallpaper-chrome-sidebar', '55%'],
+    ['--viewtune-wallpaper-chrome-header', '20%'],
   ]);
 
   // The view scope still publishes: the conversation column below the header follows the wallpaper in
   // either scope, and the attribute's VALUE is what keeps the chrome out of it.
-  applyWindowScope(doc, { scope: 'view', image: 'url("a.png")', dim: 45, chrome: 55 });
+  applyWindowScope(doc, { scope: 'view', image: 'url("a.png")', dim: 45, chromeSidebar: 55, chromeHeader: 20 });
   assert.equal(fake.attributes.get('data-viewtune-wallpaper'), 'view');
 
   // Out-of-range values are clamped on the way in, so a bad record cannot paint a broken backdrop.
-  applyWindowScope(doc, { scope: 'window', image: 'url("a.png")', dim: 999, chrome: -4 });
+  applyWindowScope(doc, { scope: 'window', image: 'url("a.png")', dim: 999, chromeSidebar: -4, chromeHeader: 500 });
   assert.deepEqual([...fake.properties], [
     ['--viewtune-wallpaper-image', 'url("a.png")'],
     ['--viewtune-wallpaper-dim', '100%'],
-    ['--viewtune-wallpaper-chrome', '0%'],
+    ['--viewtune-wallpaper-chrome-sidebar', '0%'],
+    ['--viewtune-wallpaper-chrome-header', '100%'],
   ]);
 
   applyWindowScope(doc, null);
   assert.equal(fake.attributes.has('data-viewtune-wallpaper'), false);
+  assert.deepEqual([...fake.properties], []);
+});
+
+test('the two scrims’ FROST is published as a length, clamped, and REMOVED at zero', () => {
+  const fake = fakeDocument();
+  const doc = fake.document as unknown as Document;
+  // Clamped like the tints, and on the same ceiling the panel's slider stops at.
+  applyWindowScope(doc, {
+    scope: 'window', image: 'url("a.png")', dim: 45,
+    chromeSidebar: 55, chromeHeader: 20, chromeSidebarBlur: 12, chromeHeaderBlur: 999,
+  });
+  assert.deepEqual([...fake.properties], [
+    ['--viewtune-wallpaper-image', 'url("a.png")'],
+    ['--viewtune-wallpaper-dim', '45%'],
+    ['--viewtune-wallpaper-chrome-sidebar', '55%'],
+    ['--viewtune-wallpaper-chrome-header', '20%'],
+    ['--viewtune-wallpaper-chrome-sidebar-blur', '12px'],
+    ['--viewtune-wallpaper-chrome-header-blur', '40px'],
+  ]);
+  // …and at zero the property is REMOVED rather than written as `0px`: `backdrop-filter` is not a no-op at zero, it
+  // puts the paint in the compositor, and these two elements are exactly the ones that went stale on a fresh load
+  // because of that (see the rule's own note). A negative value is the same case as zero.
+  applyWindowScope(doc, {
+    scope: 'window', image: 'url("a.png")', dim: 45,
+    chromeSidebar: 55, chromeHeader: 20, chromeSidebarBlur: 0, chromeHeaderBlur: -3,
+  });
+  assert.equal(fake.properties.has('--viewtune-wallpaper-chrome-sidebar-blur'), false);
+  assert.equal(fake.properties.has('--viewtune-wallpaper-chrome-header-blur'), false);
+  // …and withdrawing the whole scope takes them with it.
+  applyWindowScope(doc, {
+    scope: 'window', image: 'url("a.png")', dim: 45,
+    chromeSidebar: 55, chromeHeader: 20, chromeSidebarBlur: 12, chromeHeaderBlur: 12,
+  });
+  applyWindowScope(doc, null);
   assert.deepEqual([...fake.properties], []);
 });
 
@@ -179,7 +276,7 @@ test('installing the stylesheet is one style element, and disposing removes it a
   assert.ok(style.textContent.includes('data-viewtune-wallpaper'));
 
   // Disposing has to undo BOTH halves: the sheet, and what the reading view left on the document.
-  applyWindowScope(doc, { image: 'url("a.png")', dim: 45, chrome: 55 });
+  applyWindowScope(doc, { image: 'url("a.png")', dim: 45, chromeSidebar: 55, chromeHeader: 20 });
   dispose();
   assert.equal(style.removed, true);
   assert.equal(fake.attributes.has('data-viewtune-wallpaper'), false);

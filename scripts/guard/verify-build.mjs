@@ -23,7 +23,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import {
-  closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync,
+  closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmdirSync, rmSync, symlinkSync,
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -159,7 +159,13 @@ if (!markersOk) bad += 1;
 console.log(`${markersOk ? 'ok  ' : 'DIFF'} the marker checker passes against the artifact rebuilt at another path (exit ${String(markers.status)})`);
 
 if (!keep) {
-  rmSync(join(scratch, 'node_modules'), { force: true });
+  // The junction goes first, and with `rmdirSync`: it removes the reparse point itself, where `rmSync` without
+  // `recursive` refuses a directory (EISDIR) and `recursive` is the follow-the-link risk this ordering exists against.
+  try {
+    rmdirSync(join(scratch, 'node_modules'));
+  } catch {
+    /* already gone */
+  }
   rmSync(scratch, { recursive: true, force: true });
 }
 /**

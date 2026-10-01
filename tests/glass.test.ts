@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GLASS_PARTS, glassProperties, glassValues, isGlassPart } from '../src/client/glass.ts';
+import { GLASS_BLUR_MAX, GLASS_PARTS, applyGlassBlur, glassBlurProperties, glassBlurPropertyNames, glassBlurValues, glassProperties, glassValues, isGlassPart } from '../src/client/glass.ts';
 
 test('every part falls back to its initial when the record has nothing to say', () => {
   // Persistence replaces the whole record, so a reader written before the skin existed sees `{}`,
@@ -52,5 +52,55 @@ test('the part ids are the closed set the settings rows and the store agree on',
     assert.ok(part.label.length > 0);
     assert.match(part.property, /^--glass-[a-z]+$/);
     if (part.hint !== undefined) assert.ok(part.hint.length > 0 && part.hint.length <= 28, part.hint);
+    // …and the frost's property, where a surface has one: a name of its own per part, so two surfaces cannot end up
+    // sharing a dial by accident.
+    if (part.blur !== undefined) assert.match(part.blur.property, /^--glass-blur-[a-z]+$/);
   }
+});
+
+test('the frost is a dial per surface, and a surface at 0 is left UNSET rather than written as zero', () => {
+  // Every surface that can carry a `backdrop-filter` has one; 「滚动条槽位」 deliberately does not, because its groove
+  // is a scrollbar pseudo-element where the property does nothing, and a row that moves nothing is worse than no row.
+  assert.deepEqual(
+    GLASS_PARTS.filter(part => part.blur !== undefined).map(part => part.id),
+    ['lane', 'user', 'card', 'code', 'diff', 'chip', 'pill', 'input'],
+  );
+  // A record that never moved one takes that surface's shipped blur, so an older record keeps the look it had. The
+  // 0-initial surface is the LANE now: the defaults are one reading of the reader's own settings file, and they run a
+  // crisp toolbar (frost 0) over frosted cards (8), chips (5) and an input (10) — the first cut of this feature had it
+  // the other way round, which is why the two examples below moved together with the table.
+  const blurred = glassBlurValues({ code: 20, card: 4 });
+  assert.equal(blurred.code, 20);
+  assert.equal(blurred.card, 4);
+  assert.equal(glassBlurValues({}).lane, GLASS_PARTS.find(part => part.id === 'lane')?.blur?.initial);
+  assert.equal(glassBlurValues({}).lane, 0);
+  // Clamped to the ceiling, floored at zero and rounded like every other dial in this file.
+  assert.equal(glassBlurValues({ lane: 999 }).lane, GLASS_BLUR_MAX);
+  assert.equal(glassBlurValues({ lane: -5 }).lane, 0);
+  assert.equal(glassBlurValues({ lane: 12.6 }).lane, 13);
+  assert.equal(glassBlurValues({ lane: Number.NaN }).lane, GLASS_PARTS.find(part => part.id === 'lane')?.blur?.initial);
+  // The properties: a px LENGTH where there is frost, and NO KEY AT ALL where there is none — because
+  // `backdrop-filter: blur(0px)` is not `none`, so writing it would make every un-frosted surface a stacking context
+  // and a composited layer, the construct this plugin has already been bitten by.
+  const properties = glassBlurProperties({ card: 8, chip: 0 });
+  assert.equal(properties['--glass-blur-card'], '8px');
+  // A surface the record does not mention takes its shipped frost (the user bubble's 3px), and the two surfaces whose
+  // shipped frost is 0 — the lane and the chip — are the ones that must NOT appear at all.
+  assert.equal(properties['--glass-blur-user'], '3px');
+  assert.equal(properties['--glass-blur-lane'], undefined);
+  assert.equal(properties['--glass-blur-chip'], undefined);
+  assert.equal(glassBlurPropertyNames().length, 8);
+  // …and the withdrawal REMOVES rather than re-resolves: `null` takes every name off, where an empty record would
+  // write the shipped initials back on. The conversation gate depends on that difference when it is switched off.
+  const style = {
+    values: new Map<string, string>(),
+    setProperty(name: string, value: string) { this.values.set(name, value); },
+    removeProperty(name: string) { this.values.delete(name); },
+  };
+  applyGlassBlur(style, { card: 8 });
+  assert.equal(style.values.get('--glass-blur-card'), '8px');
+  assert.equal(style.values.get('--glass-blur-user'), '3px');
+  assert.equal(style.values.get('--glass-blur-lane'), undefined);
+  applyGlassBlur(style, null);
+  assert.deepEqual([...style.values.keys()], []);
 });

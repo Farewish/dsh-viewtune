@@ -108,8 +108,11 @@ const cases = [
   },
   {
     label: 'the upward compensation dropped, so a growing card would push the newest line out of view',
-    search: 'if (scroller !== null) scroller.scrollTop += grew;',
-    replace: 'if (scroller !== null) scroller.scrollTop += 0;',
+    // The needle moved with the gate: the write is no longer a one-liner inside a null test — the reader's place is
+    // checked between the two now — so the mutation zeroes the write itself. Same shape under test ("the compensation
+    // is dropped"), and the marker still has to refuse it.
+    search: 'scroller.scrollTop += grew;',
+    replace: 'scroller.scrollTop += 0;',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
@@ -246,8 +249,13 @@ const cases = [
   },
   {
     label: 'the rail’s busy tick left looping forever with no gate for a reader who asked for less movement',
-    search: 'animation:1s ease-in-out infinite alternate',
-    replace: 'animation:9s ease-in-out infinite alternate',
+    // The mutation removes the GATE, not a timing value — which is what the label says and what the marker asserts. It
+    // used to nudge the duration (`1s` → `9s`), i.e. it tested the marker's pin on a number that is the minifier's and
+    // the designer's business; that needle is gone by design (it is what made the marker flake inside a full guard
+    // run), so the case now expresses the regression it names. `{animation:none}` appears in every reduced-motion
+    // block in the stylesheets, so this takes them all away at once.
+    search: '{animation:none}',
+    replace: '{animation:initial}',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
@@ -423,6 +431,56 @@ const cases = [
     label: 'the Windows title-bar strip’s scrim moved to the wrong pseudo-element',
     search: '[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before',
     replace: '[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::after',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'one of the two chrome scrims renamed out from under its rule, leaving that surface with no dial at all',
+    // The split's marker requires BOTH variables to survive, so the mutation is a rename nothing else follows — the
+    // shape a copy-paste between the two rules leaves behind. The replacement is deliberately a name the artifact does
+    // not contain: reusing the header's would already be present, and this script counts that `SKIP` as a failure.
+    search: '--viewtune-wallpaper-chrome-sidebar',
+    replace: '--viewtune-wallpaper-chrome-left',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the focused card’s page compensation ungated from the reader’s place, so it pulls the page back under their wheel',
+    // The gate is the whole fix for 「只有在卡片变高的时候」 the page being pulled back while reading further up: with it
+    // disabled the compensation writes on every line again, and the marker that requires the gate has to say so.
+    search: 'if (!pageAtTailRef.current) return;',
+    replace: 'if (false) return;',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the card’s own takeover turned back into a release, so scrolling inside a card folds it shut under the reader',
+    // The reader's rule in one line: reading INSIDE a card pins the focus; the release may only fire while the card is
+    // still following. Reverting it to the old `!following || !active` is exactly the regression the pin's marker exists
+    // to catch.
+    search: 'if (following && !active) onFocusChange(focusKey, false);',
+    replace: 'if (!following || !active) onFocusChange(focusKey, false);',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the changed-files card renamed out from under its rule, so 0.2.0’s card stays the one opaque surface',
+    // The hook is the whole handle: a rename nothing follows is what a copy-paste leaves behind, and the marker that
+    // requires the attribute has to refuse it.
+    search: '[data-changed-files]',
+    replace: '[data-changed-files-renamed]',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the portaled detail’s own copy of the diff row plates dropped, so its green and red bands stay solid',
+    // The override is stated twice on purpose — once in the column, once on the portaled card, which a column-scoped
+    // token cannot reach — so dropping ONE copy is the shape to catch, and its marker counts them.
+    search: '--dsw-alias-file-diff-added-bg: color-mix(',
+    replace: '--dsw-alias-file-diff-added-bg: color-mixX(',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'one surface’s frost property renamed in the part table, so a row moves a dial no stylesheet reads',
+    // The marker pairs every frosted surface's property with the stylesheet that reads it, so a rename in the table
+    // alone is exactly "the panel writes a name no surface reads" — the coupling that marker exists to protect.
+    search: '"--glass-blur-chip"',
+    replace: '"--glass-blur-chips"',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
 ];

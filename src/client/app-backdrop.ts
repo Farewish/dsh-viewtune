@@ -14,11 +14,11 @@
  * when it is the view that is open. Both ends run; the refinement adds a size and a place to the same
  * values rather than replacing them.
  */
-import { GLASS_PARTS, glassValues } from './glass.js';
+import { GLASS_PARTS, applyGlassBlur, glassBlurValues, glassValues } from './glass.js';
 import { applyScrollbarFill, scrollbarFillOf } from './scrollbar.js';
 import { loadHostSettings, subscribeToHostSettings } from './settings-sync.js';
 import { wallpaperDimOf, wallpaperNameOf, wallpaperUrl } from './wallpaper.js';
-import { applyWindowScope, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
+import { CHROME_HEADER_BLUR_KEY, CHROME_SIDEBAR_BLUR_KEY, applyWindowScope, chromeScrimsOf, wallpaperChromeBlurOf, wallpaperScopeOf } from './wallpaper-scope.js';
 import type { WindowScopeValues } from './wallpaper-scope.js';
 
 /**
@@ -32,11 +32,19 @@ import type { WindowScopeValues } from './wallpaper-scope.js';
 export function backdropOf(record: Record<string, unknown> | undefined): WindowScopeValues | null {
   const name = wallpaperNameOf(record?.wallpaper);
   if (name === '') return null;
+  // The two scrims come out together, migration included: `chromeScrimsOf` is where a record that predates the split
+  // is read, so this half and the store's `hydrate` cannot disagree about what an old record meant.
+  const scrims = chromeScrimsOf(record);
   return {
     scope: wallpaperScopeOf(record?.wallpaperScope),
     image: `url("${wallpaperUrl(name)}")`,
     dim: wallpaperDimOf(record?.wallpaperDim),
-    chrome: wallpaperChromeOf(record?.wallpaperChrome),
+    chromeSidebar: scrims.sidebar,
+    chromeHeader: scrims.header,
+    // The two frosts, read through the same defensive reader the rows use: a record written before this setting
+    // existed has no such key, and what it describes is the flat wash these scrims have always been.
+    chromeSidebarBlur: wallpaperChromeBlurOf(record?.[CHROME_SIDEBAR_BLUR_KEY]),
+    chromeHeaderBlur: wallpaperChromeBlurOf(record?.[CHROME_HEADER_BLUR_KEY]),
   };
 }
 
@@ -109,6 +117,7 @@ export function applyConversationGlass(doc: Document, record: Record<string, unk
   if (!conversationGlassOf(record)) {
     root.removeAttribute(CONVERSATION_GLASS_ATTRIBUTE);
     for (const [name] of CONVERSATION_GLASS_PROPERTIES) root.style.removeProperty(name);
+    applyGlassBlur(root.style, null);
     return;
   }
   const values = glassValues(record?.glassParts);
@@ -116,6 +125,11 @@ export function applyConversationGlass(doc: Document, record: Record<string, unk
   for (const [name, part] of CONVERSATION_GLASS_PROPERTIES) {
     root.style.setProperty(name, `${String(values[part])}%`);
   }
+  // …and the FROST of the same surfaces. It travels with the tint because this page's surfaces read the very
+  // properties the reading view's root carries (see conversation-glass.ts) — and it goes through the shared writer so
+  // that a surface dialled back to 0 has its property REMOVED rather than written as `0px`, which would keep the
+  // element compositing. Withdrawing the gate calls the same writer with nothing, which removes every one of them.
+  applyGlassBlur(root.style, glassBlurValues(record?.glassBlur));
 }
 
 /**
@@ -144,11 +158,16 @@ export function applyGlassGate(doc: Document, record: Record<string, unknown> | 
   const part = GLASS_PARTS.find(entry => entry.id === 'input');
   if (record?.glass !== true || part === undefined) {
     root.removeAttribute(GLASS_ATTRIBUTE);
-    if (part !== undefined) root.style.removeProperty(part.property);
+    if (part !== undefined) {
+      root.style.removeProperty(part.property);
+      applyGlassBlur(root.style, null);
+    }
     return;
   }
   root.setAttribute(GLASS_ATTRIBUTE, '');
   root.style.setProperty(part.property, `${String(glassValues(record?.glassParts)[part.id] ?? part.initial)}%`);
+  // …and its frost, which the composer's own rule reads from here (see composer-glass.ts).
+  applyGlassBlur(root.style, glassBlurValues(record?.glassBlur));
 }
 
 /**

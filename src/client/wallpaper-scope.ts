@@ -33,10 +33,47 @@ export type WallpaperScope = 'view' | 'window';
  * The chrome scrim's shipped value, and the scope a record that never chose one means.
  *
  * Both are the reader's own settings, taken as the defaults: the wallpaper carries the whole window and the sidebar
- * and top bar keep 35% of their colour over it, which is the look a fresh install now opens with.
+ * and top bar keep 25% of their colour over it, which is the look a fresh install now opens with.
  */
-export const WALLPAPER_CHROME_INITIAL = 35;
+export const WALLPAPER_CHROME_INITIAL = 25;
 export const WALLPAPER_CHROME_MAX = 100;
+
+/**
+ * The two scrims' FROST: how much they blur the photograph behind them, in px.
+ *
+ * TWO different fresh-install values, because the reader runs them apart — 15px behind the sidebar, 5px behind the top
+ * bar — and because their two surfaces face different things (the column stands against the reading view, the bar
+ * above everything). The FALLBACK is a third number, and deliberately not either of those: it is what an unusable
+ * value resolves to, and the honest answer for a value this build cannot read is the wash a scrim has always been,
+ * not a frost somebody chose for a different surface. An ABSENT key never reaches it — the store's own initial does.
+ * The ceiling deliberately matches the skin's own (`GLASS_BLUR_MAX`): past it the chrome's labels sit on a smear
+ * rather than on a frosted plate, and the two families of dial should not disagree about where that is.
+ */
+export const WALLPAPER_CHROME_SIDEBAR_BLUR_INITIAL = 15;
+export const WALLPAPER_CHROME_HEADER_BLUR_INITIAL = 5;
+export const WALLPAPER_CHROME_BLUR_FALLBACK = 0;
+export const WALLPAPER_CHROME_BLUR_MAX = 40;
+
+/**
+ * The chrome scrim's two dials, and the record keys that carry them.
+ *
+ * It was ONE number until the reader asked for the surfaces separately: the sidebar stands against the reading
+ * column and the top bar sits above everything, so a single dial made moving one move the other. One variable and
+ * one key per surface, and the rule that paints each surface reads its own — see `windowScopeCss` and
+ * `chromeScrimsOf`.
+ */
+export const CHROME_SIDEBAR_KEY = 'wallpaperChromeSidebar';
+export const CHROME_HEADER_KEY = 'wallpaperChromeHeader';
+/** …and the record keys of the same two surfaces' frost, read by `backdrop.ts` when it publishes the scope. */
+export const CHROME_SIDEBAR_BLUR_KEY = 'wallpaperChromeSidebarBlur';
+export const CHROME_HEADER_BLUR_KEY = 'wallpaperChromeHeaderBlur';
+/** The pre-split key, read only to migrate a record that still carries it. */
+export const CHROME_LEGACY_KEY = 'wallpaperChrome';
+const CHROME_SIDEBAR_VARIABLE = '--viewtune-wallpaper-chrome-sidebar';
+const CHROME_HEADER_VARIABLE = '--viewtune-wallpaper-chrome-header';
+/** …and the same two surfaces' frost, read by the `backdrop-filter` on each scrim rule below. */
+const CHROME_SIDEBAR_BLUR_VARIABLE = '--viewtune-wallpaper-chrome-sidebar-blur';
+const CHROME_HEADER_BLUR_VARIABLE = '--viewtune-wallpaper-chrome-header-blur';
 
 export function wallpaperScopeOf(value: unknown): WallpaperScope {
   return value === 'view' ? 'view' : 'window';
@@ -45,6 +82,38 @@ export function wallpaperScopeOf(value: unknown): WallpaperScope {
 export function wallpaperChromeOf(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return WALLPAPER_CHROME_INITIAL;
   return Math.min(WALLPAPER_CHROME_MAX, Math.max(0, Math.round(value)));
+}
+
+/** The two scrims' frost, read the same defensive way: an absent or unusable value is the shipped 0. */
+export function wallpaperChromeBlurOf(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return WALLPAPER_CHROME_BLUR_FALLBACK;
+  return Math.min(WALLPAPER_CHROME_BLUR_MAX, Math.max(0, Math.round(value)));
+}
+
+/** The two scrims, named by the surface each one keeps readable. */
+export interface ChromeScrims {
+  /** How opaque the LEFT COLUMN stays over the photograph. */
+  readonly sidebar: number;
+  /** …and the TOP BAR, the Windows title-bar strip above it included. */
+  readonly header: number;
+}
+
+/**
+ * Both scrims out of a record, MIGRATING the record that predates the split.
+ *
+ * The single dial was `wallpaperChrome`, and a record carrying it (and neither new key) is a reader who had set both
+ * surfaces to that one number, so that is what it reads as. Decided per surface rather than once for the pair: a
+ * record from an intermediate state may carry one of the two, and then only the missing one falls back — reading the
+ * legacy key for a surface that has its own would overwrite a choice the reader made after the split. With neither
+ * key present `wallpaperChromeOf(undefined)` answers the shipped default, which is what a fresh install wants.
+ */
+export function chromeScrimsOf(record: Record<string, unknown> | undefined): ChromeScrims {
+  const legacy = record?.[CHROME_LEGACY_KEY];
+  const scrimOf = (key: string): number => {
+    const own = record?.[key];
+    return typeof own === 'number' && Number.isFinite(own) ? wallpaperChromeOf(own) : wallpaperChromeOf(legacy);
+  };
+  return { sidebar: scrimOf(CHROME_SIDEBAR_KEY), header: scrimOf(CHROME_HEADER_KEY) };
 }
 
 /** The values the document element carries while a wallpaper is chosen. */
@@ -59,8 +128,14 @@ export interface WindowScopeValues {
   readonly image: string;
   /** How far the backdrop itself is mixed toward the theme's background, as a percentage. */
   readonly dim: number;
-  /** How opaque the sidebar and the top bar stay, so their labels read over a photograph. */
-  readonly chrome: number;
+  /** How opaque the LEFT COLUMN stays, so the sidebar's own labels read over a photograph. */
+  readonly chromeSidebar: number;
+  /** …and the TOP BAR's own, which is a separate choice: see `ChromeScrims`. */
+  readonly chromeHeader: number;
+  /** How much the LEFT COLUMN blurs what is behind it, in px — the scrim's frost. */
+  readonly chromeSidebarBlur: number;
+  /** …and the TOP BAR's own. */
+  readonly chromeHeaderBlur: number;
   /**
    * The image layer's size and place, as the reading view measured them. Absent means "cover, centred",
    * which is what window scope wants and the fallback before the image's natural size is known.
@@ -138,6 +213,17 @@ export function windowScopeCss(): string {
     `  background-image: ${scrim('--viewtune-wallpaper-dim', 45)}, var(--viewtune-wallpaper-image) !important;`,
     `  ${FIXED}`,
     `}`,
+    `/* NOTE FOR WHOEVER COMES NEXT: there was a \`${SCOPED} body::before\` rule here for one debugging round — a`,
+    `   fixed-position ELEMENT carrying a second copy of the wallpaper, on the theory that \`backdrop-filter\` cannot`,
+    `   sample a fixed-attachment background. The reader's own measurements disproved it (the conversation page's card`,
+    `   and bubble frosted over that very layer), and the real cause turned out to be a declaration the build's CSS`,
+    `   pipeline had de-duplicated away — see the note in Reader.module.css. It is gone rather than kept "just in case":`,
+    `   it painted a full-viewport image layer for nothing. (This note names the attachment in prose only: the`,
+    `   stylesheet test counts that declaration by TEXT, so spelling it out here would count as a carrier.) */`,
+    `/* Where the frost goes, it needs something to blur INSIDE its own backdrop root: the layer above is that thing`,
+    `   for every plate on the page. The reading view's own root is a query container (\`container-type\`), and the`,
+    `   transcript's column carries the motion transform — neither is a backdrop root on its own, but both make the`,
+    `   fixed BACKGROUND invisible to a descendant's \`backdrop-filter\`, which is the half this element fixes. */`,
     `/* The scrollbar gutter is NOT painted here: it belongs to the host's scroll container, and it
        now has a groove of its own with a dial behind it (see scrollbar.ts), which also carries the
        wallpaper layers so a wallpaper stays continuous across the gutter. */`,
@@ -197,13 +283,53 @@ export function windowScopeCss(): string {
     `   The title-bar strip is the last piece: with \`[data-windows-titlebar]\` the layout paints the strip`,
     `   ABOVE the frame's own background from the sidebar-fill token (which this file makes transparent),`,
     `   so that strip showed the photograph with no scrim at all. It is chrome, so it gets the chrome scrim. */`,
-    `${SCOPED} [class*="_sidebarCol"],`,
+    `/* ONE RULE PER SURFACE, and each names its own variable: the two scrims are separate dials, so a rule that`,
+    `   read the other surface's value would be a setting that quietly moves the wrong thing. The title-bar`,
+    `   strip belongs to the TOP of the window and takes the header's value, not the sidebar's. */`,
+    `${SCOPED} [class*="_sidebarCol"] {`,
+    `  background-image: ${scrim(CHROME_SIDEBAR_VARIABLE, 55)} !important;`,
+    `  /* The scrim's FROST, from its own dial. The read has no fallback on purpose: the property is published only`,
+    `     while that scrim's frost is above zero, and an unset variable leaves \`backdrop-filter\` at \`none\` — which`,
+    `     matters here more than anywhere, because a non-\`none\` value is what puts this element's paint in the`,
+    `     compositor and made the scrim go stale on a fresh load (see the note above). \`blur(0px)\` would bring that`,
+    `     back for everyone who never touches the dial. */`,
+    `  backdrop-filter: blur(var(${CHROME_SIDEBAR_BLUR_VARIABLE}));`,
+    `  -webkit-backdrop-filter: blur(var(${CHROME_SIDEBAR_BLUR_VARIABLE}));`,
+    `}`,
     `${SCOPED} *:has(> [data-conversation-header-leading]),`,
     `${SCOPED} [class*="_header"]:has(> [class*="_titleRow"]) {`,
-    `  background-image: ${scrim('--viewtune-wallpaper-chrome', 55)} !important;`,
+    `  background-image: ${scrim(CHROME_HEADER_VARIABLE, 55)} !important;`,
+    `  position: relative;`,
+    `  isolation: isolate;`,
+    `  z-index: 12;`,
+    `}`,
+    `/* …and the FROST on a pseudo-element, never on the bar itself. Two measured reasons, both about the host's own`,
+    `   INLINE popovers in this bar (the 「x 个后台任务运行」 panel: \`.QsffPG_menu{position:absolute;top:calc(100% + 5px);`,
+    `   left:0;z-index:100;background:var(--dsw-specific-menu);backdrop-filter:var(--dsw-menu-backdrop-filter)}\` — the very`,
+    `   same plate and blur as 「x 个子智能体」, which escapes all of this by being PORTALED):`,
+    `     1. \`backdrop-filter\` on the bar makes the bar a BACKDROP ROOT, so a descendant's own backdrop-filter can no`,
+    `        longer see the page — the panel's platform blur went dead and its text overlapped what showed through it`,
+    `        (「文字重叠看不清」). A pseudo-element's backdrop-filter is its own root and leaves the bar's descendants`,
+    `        alone.`,
+    `     2. it also makes the bar a STACKING CONTEXT, which confined that \`z-index:100\` to the bar's own subtree, so the`,
+    `        reading view's sticky LANE (\`z-index:11\`, a later sibling in the same context) covered and blurred it.`,
+    `        \`isolation: isolate\` keeps the stacking context the pseudo needs to sit behind the content — and it is NOT a`,
+    `        backdrop root — while \`z-index:12\` puts the bar back above that lane.`,
+    `   \`position: relative\` is safe here because the panel anchors to its OWN root, not to this bar:`,
+    `   \`.QsffPG_root{position:relative}\` and the menu is \`absolute; top: calc(100% + 5px); left: 0\` inside it. */`,
+    `${SCOPED} *:has(> [data-conversation-header-leading])::before,`,
+    `${SCOPED} [class*="_header"]:has(> [class*="_titleRow"])::before {`,
+    `  content: '';`,
+    `  position: absolute;`,
+    `  inset: 0;`,
+    `  z-index: -1;`,
+    `  backdrop-filter: blur(var(${CHROME_HEADER_BLUR_VARIABLE}));`,
+    `  -webkit-backdrop-filter: blur(var(${CHROME_HEADER_BLUR_VARIABLE}));`,
     `}`,
     `${SCOPED}[data-windows-titlebar] *:has(> [class*="_sidebarCol"])::before {`,
-    `  background-image: ${scrim('--viewtune-wallpaper-chrome', 55)} !important;`,
+    `  background-image: ${scrim(CHROME_HEADER_VARIABLE, 55)} !important;`,
+    `  backdrop-filter: blur(var(${CHROME_HEADER_BLUR_VARIABLE}));`,
+    `  -webkit-backdrop-filter: blur(var(${CHROME_HEADER_BLUR_VARIABLE}));`,
     `}`,
     `/* One scoped token is what the left column paints from; making it see-through is the whole of`,
     `   "the sidebar lets the backdrop through". It has to be named on BODY as well as on the root:`,
@@ -291,14 +417,25 @@ export function applyWindowScope(doc: Document, values: WindowScopeValues | null
     root.removeAttribute(WINDOW_SCOPE_ATTRIBUTE);
     root.style.removeProperty('--viewtune-wallpaper-image');
     root.style.removeProperty('--viewtune-wallpaper-dim');
-    root.style.removeProperty('--viewtune-wallpaper-chrome');
+    root.style.removeProperty(CHROME_SIDEBAR_VARIABLE);
+    root.style.removeProperty(CHROME_HEADER_VARIABLE);
+    root.style.removeProperty(CHROME_SIDEBAR_BLUR_VARIABLE);
+    root.style.removeProperty(CHROME_HEADER_BLUR_VARIABLE);
     nudgeChromePaint(doc);
     return;
   }
   root.setAttribute(WINDOW_SCOPE_ATTRIBUTE, values.scope);
   root.style.setProperty('--viewtune-wallpaper-image', values.image);
   root.style.setProperty('--viewtune-wallpaper-dim', `${String(wallpaperDimOf(values.dim))}%`);
-  root.style.setProperty('--viewtune-wallpaper-chrome', `${String(wallpaperChromeOf(values.chrome))}%`);
+  root.style.setProperty(CHROME_SIDEBAR_VARIABLE, `${String(wallpaperChromeOf(values.chromeSidebar))}%`);
+  root.style.setProperty(CHROME_HEADER_VARIABLE, `${String(wallpaperChromeOf(values.chromeHeader))}%`);
+  // The two frosts, written the same way the skin's own are: a LENGTH while it is above zero, and the property
+  // REMOVED at 0 — because `blur(0px)` is not `none`, and the scrim's own note above says what a composited layer
+  // costs here.
+  for (const [name, value] of [[CHROME_SIDEBAR_BLUR_VARIABLE, values.chromeSidebarBlur], [CHROME_HEADER_BLUR_VARIABLE, values.chromeHeaderBlur]] as const) {
+    if (wallpaperChromeBlurOf(value) > 0) root.style.setProperty(name, `${String(wallpaperChromeBlurOf(value))}px`);
+    else root.style.removeProperty(name);
+  }
   for (const [name, value] of [['--viewtune-wallpaper-size', values.size], ['--viewtune-wallpaper-position', values.position]] as const) {
     if (value === undefined) root.style.removeProperty(name);
     else root.style.setProperty(name, value);

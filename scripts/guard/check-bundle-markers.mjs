@@ -187,7 +187,7 @@ const markers = [
   // centring and the appendage's chevrons — so either can be nudged again without touching the arithmetic
   // around it. Both are whole pixels on purpose: a fractional translate leaves CJK glyphs on a half pixel.
   ['the collapse control\'s two optical shifts are single numbers', () =>
-    bundle.includes('var(--reader-collapse-split-shift,5px)')
+    bundle.includes('var(--reader-collapse-split-shift,3px)')
     && bundle.includes('var(--reader-collapse-more-shift,-1px)')],
   // …and the word 全部 is the LEFT HALF OF A RIGID PAIR with 收起, which is how the reader wanted it to move ("并排
   // 移动"): the slots already differ by exactly 全部's own width, so giving both the same transform keeps them
@@ -197,7 +197,12 @@ const markers = [
   ['the word 全部 rides 收起\'s transform instead of crossing it', () =>
     bundle.includes('var(--reader-collapse-word-fade,.16s)')
     && bundle.includes('transition:opacity 80ms linear')
-    && /_collapseAllWord\{[^}]*transform:translate\(-1em\)/.test(bundle)],
+    // The RESTING transform: `translateX(-1em)`, which the minifier emits as `translate(-1em)`. It is the SAME value
+    // for 全部 and 收起, which is the whole point of the marker — otherwise 全部 would slide relative to 收起 while it
+    // fades in. Back to the plain em after the reader watched both nudges (and both were artefacts of the button's
+    // width being 2px larger for one round).
+    && /_collapseAllWord\{[^}]*transform:translate\(-1em\)/.test(bundle)
+    && /_collapseKeeping\{[^}]*transform:translate\(-1em\)/.test(bundle)],
   // Ending the split, the right half goes FIRST and upward — the reader asked for it (「叠˄先向上淡出一半再后续
   // 动画」). The stack's exit is therefore an ANIMATION, not the entry reversed: a transition can only retrace its
   // own path, and the entry comes from below. Changing the animation-name is what starts it (the pill's own exit
@@ -264,9 +269,19 @@ const markers = [
   // split the reader reported (fast right and slow jerky at one stiffness, the reverse at another). Damping is derived
   // from whichever stiffness is in force, so neither end can bounce. The gesture is also announced to the scroller, so
   // the reading view's auto-follow lets go of it, and the reader's own motion switch skips the glide entirely.
-  ['the column handles hand the wheel to the transcript', () =>
+  // …and WHOSE NOTCH IT IS, which changed with the platform. DSH 0.2.0's conversation panel forwards a wheel over the
+  // strips itself, with an instant `scrollport.scrollBy`, and its listener is a React one on that very element — so a
+  // notch the plugin takes has to be kept from it (`stopPropagation`), or both writers move the scroller on every
+  // notch. The reader's switch therefore chooses between our glide and the App's own jump, not between scrolling and
+  // silence, and the OFF branch must not consume the notch at all. The strip is identified by the attribute its owner
+  // publishes (`data-width-handle`, which 0.1.5 publishes too) rather than by the `col-resize` cursor, because the
+  // frame's two handles and the trajectory panel's details handle show that same cursor and are not ours.
+  ['the width strips hand the wheel to the transcript, and keep it', () =>
     bundle.includes('handleTakesWheel(')
-    && bundle.includes('"col-resize"')
+    // Unquoted on purpose: the constant's own quotes are the bundler's business, and what has to survive is the
+    // attribute the rule is keyed on.
+    && bundle.includes('data-width-handle')
+    && bundle.includes('stopPropagation(')
     && bundle.includes('wheelPixels(')
     && bundle.includes('springStep(')
     && bundle.includes('stiffnessForGap(')
@@ -532,6 +547,14 @@ const markers = [
     && bundle.includes('const rendered = card?.getBoundingClientRect().height ?? 0;')
     && bundle.includes('const grew = rendered - focusRendered.current;')
     && bundle.includes('if (!focusedRef.current || grew <= 0) return;')
+    // …and ONLY while the reader is still at the page's tail. The focus is deliberately kept when they scroll up (the
+    // card must not shrink under them), so without this gate the compensation keeps writing on every line of reasoning
+    // while they read somewhere else — reported as 「只有在卡片变高的时候」 the page being pulled back under an otherwise
+    // fine upward scroll. The state cannot be worked out inside the card: its own `following` tracks ITS inner
+    // scroller, which a wheel over the transcript never reaches, so it arrives as the `pageAtTail` prop and is read
+    // through a ref (the compensation runs from closures the prop cannot re-create).
+    && bundle.includes('if (!pageAtTailRef.current) return;')
+    && bundle.includes('pageAtTailRef.current = pageAtTail;')
     && bundle.includes('scroller.scrollTop += grew')],
   ['…recording it on every measure, so growth from a LATER commit is taken too', () =>
     // The reading row is React state set from `measure`, so it lands one commit after the height write; and the focus
@@ -574,8 +597,25 @@ const markers = [
     readerCss.includes(`[data-motion=off] ${sel('reasonCard')}[data-focus=true] ${sel('reasonViewport')},`)
     && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(readerCss)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
-  ['…and hands it back on takeover, on 展开阅读, at the end of a 跟随最新 stream, on unmount, and when this card stops growing', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
-  ['…with the newest request winning, so exactly one card can hold it', 'focused ? key : current === key ? null : current'],
+  ['…and hands it back when it stops being written into, on 展开阅读, and on unmount — but NOT when the reader takes the CARD over', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
+  ['…with the newest request winning unless a card is pinned, so exactly one card can hold the focus', 'pinRef.current === null ? key : current'],
+  // The reader's own rule for 「焦点思考展开」, settled after the card's takeover turned out to be the wrong release: scrolling
+  // INSIDE a card is READING it, so the card stays open under them, no newer card's request takes the focus away, and the
+  // idle beat cannot end it either (that effect returns early while the card is not following). The card publishes the pin,
+  // the Reader refuses grants while one is held, and the release below clears it with the focus.
+  ['…and reading INSIDE a card pins the focus it holds, where no newer card and no idle beat can take it', () =>
+    bundle.includes('const pin = focused && !following;')
+    && bundle.includes('onFocusPin(focusKey, pin)')
+    // …which is why the card's own takeover is no longer a release: this one now needs the card to still be following.
+    && bundle.includes('if (following && !active) onFocusChange(focusKey, false);')],
+  // …and only the reader ends a pin: coming back to the bottom of the page by hand, or the 「回到最新」 pill, which scrolls
+  // there. An EDGE rather than a level, because while the reader is inside the card the page is already at the bottom — a
+  // level test would end the pin the instant it was set. The focus goes only when there WAS a pin: without one, returning
+  // to the tail is the ordinary read-and-return, and releasing would fold the card shut for one commit before it asked
+  // again.
+  ['…and a pin ends when the reader comes back to the bottom of the page', () =>
+    bundle.includes('const returned = wasDetached.current && !scroll.detached;')
+    && bundle.includes('if (!returned || pinnedCard === null) return;')],
   ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live, followMode, focusedCard !== null)'],
   ['…because a suspension only yields to a scroll that moved BACKWARDS, which is what a reader taking over does', 'if (suspendedRef.current && scroll.scrollTop >= lastSuspendedTop) {'],
   ['…with the expansion ON unless a record says otherwise', 'focusExpand: true'],
@@ -584,7 +624,7 @@ const markers = [
   ['跟随最新 aims at the newest line rather than at a step', 'reasoningMode === "latest"'],
   ['and 自动滚动 realises the pace as a whole-line step', 'reasoningTarget(from, text.offsetHeight, port.clientHeight, lineHeight, stepLines(rate))'],
   ['a pace is rounded to whole lines and never to zero', 'return Math.max(1, Math.round(rate * holdMs / 1e3));'],
-  ['…with the defaults being the reader’s own mode at the standard pace', () => bundle.includes('reasoningFollow: "latest"') && bundle.includes('reasoningRate: 2')],
+  ['…with the defaults being the reader’s own mode at the pace they chose', () => bundle.includes('reasoningFollow: "latest"') && bundle.includes('reasoningRate: 3')],
   ['…both read defensively', () => bundle.includes('reasoningFollowModeOf(state.reasoningFollow)') && bundle.includes('reasoningRateOf(state.reasoningRate)')],
   ['…and a change to either reaches the follower that is already running', () => /reasoningMode,\s*rate\s*\]\)/.test(bundle)],
   // 自动收起更早流程, pinned at every end that has to agree. The fold itself (only a turn with `status === "open"` stays
@@ -593,8 +633,8 @@ const markers = [
   // new turn put the earlier processes away (gated by the same two conditions the fold uses).
   ['自动收起更早流程 folds every turn but the growing one', 'if (foldEarlier && boundary.status !== "open") return false;'],
   ['…and the toolbar asks the same rule, so it agrees with the screen', () => (bundle.match(/processExpanded\(choice, boundary, foldEarlier\)/g) ?? []).length === 2],
-  ['…with the switch off unless a record says otherwise', 'autoCollapseEarlier: false'],
-  ['…and that record read the defensive way', 'state.autoCollapseEarlier) === true'],
+  ['…with the switch ON unless a record says otherwise', 'autoCollapseEarlier: true'],
+  ['…and that record read the defensive way', 'state.autoCollapseEarlier) !== false'],
   ['…and a new turn clearing the stored choices, so the earlier ones fold by themselves', () => {
     const gated = (bundle.match(/autoCollapseEarlier && liveTurn !== null/g) ?? []).length;
     return gated === 2 && bundle.includes('clearExpanded');
@@ -605,7 +645,9 @@ const markers = [
   ['the direct tail write is gated in the frame loop and in the resize observer', () =>
     (bundle.match(/followMode === "snap"/g) ?? []).length === 2
     && bundle.includes('const FOLLOW_MODES = [{\n\t\t\tid: "glide",\n\t\t\tlabel: "逐帧滑行"\n\t\t}, {\n\t\t\tid: "snap",\n\t\t\tlabel: "直接贴底"\n\t\t}];')],
-  ['…with the glide unless a record says otherwise', 'followMode: "glide"'],
+  // The INIT is the reader's own setting (snap); the READER's own fallback stays the glide, which is what a record
+  // carrying an unusable value keeps — the two are deliberately different numbers, so both halves are pinned.
+  ['…with the direct write unless a record says otherwise', () => bundle.includes('followMode: "snap"') && bundle.includes('? "snap" : "glide"')],
   ['…and that record read the defensive way', 'followModeOf(state.followMode)'],
   // The per-word reveal switch, pinned at the point where the work is: with it off the timeline is not STARTED in
   // either path (two `begin` calls become two gates), and the reasoning text renders as the plain string it is while
@@ -646,14 +688,17 @@ const markers = [
   // …and the switch is real in both directions: the reading view publishes it on its own root (one occurrence) and the
   // listener reads it there (the other) — two spellings of one string, which is why the count is asserted rather than
   // the presence of either. The gate is asserted as the LINE it compiles to, because where it sits is the property
-  // that matters: before the notch is consumed, so a disabled wheel leaves the event exactly as it found it rather
-  // than swallowing it and doing nothing.
+  // that matters: before the notch is consumed, so a wheel with the switch off leaves the event exactly as it found it
+  // — neither `preventDefault` nor `stopPropagation` — which is what hands the App's own instant `scrollBy` its notch.
+  // The last clause is the other half of that: when ours DOES take the notch it must claim it outright, because the
+  // panel's `onWheel` is a React listener on that same element and would otherwise write the position too.
   ['the strip wheel switch reaches the listener, which stops before consuming the notch', () => {
     const attribute = (bundle.match(/data-reader-strip-wheel/g) ?? []).length;
     const gate = bundle.indexOf('if (!stripWheelEnabled(root.getAttribute(STRIP_WHEEL_ATTRIBUTE))) return;');
     return attribute === 2
       && gate !== -1
-      && gate < bundle.indexOf('handleTakesWheel(view.getComputedStyle(element)', gate);
+      && gate < bundle.indexOf('handleTakesWheel(element.closest(WIDTH_HANDLE)', gate)
+      && bundle.indexOf('event.stopPropagation();', gate) !== -1;
   }],
   // The shortcut page is where a reader changes the two bindings; it holds the recorder.
   ['the shortcut page records new bindings', '"data-ud-check": "reader-settings-shortcuts"'],
@@ -712,12 +757,15 @@ const markers = [
   ['the two looping indicators are gated for a reader who asked for less movement', () =>
     // The rail's busy tick and the running-tool dot in the MCP frame. `Reader.module.css` gates every animation it owns
     // on this query; these two stylesheets shipped with an endless one and no gate at all. Both halves are pinned,
-    // because the gate is only worth having for an animation that never ends — and both are matched by SHAPE rather
-    // than by the literal the source wrote: the build reorders the `animation` shorthand and hashes the keyframe name,
-    // so the artifact reads `animation:1s ease-in-out infinite alternate <hash>_markBusyPulse`.
-    /animation:1s ease-in-out infinite alternate \w+_markBusyPulse\}/.test(bundle)
+    // because the gate is only worth having for an animation that never ends — and both are matched by SHAPE: neither
+    // the shorthand's member ORDER nor the timing VALUES are asserted, because those are the minifier's business and
+    // the scratch rebuild inside `verify-build` produces slightly different bytes run to run. Pinning them is what
+    // made this marker flake once (it went red inside a full guard run while passing three times standalone); what
+    // must hold is the SEMANTICS — an endlessly looping animation whose keyframes belong to that module, plus a
+    // reduced-motion block that stops it.
+    /animation:[^;}]*infinite[^;}]*\w+_markBusyPulse\}/.test(bundle)
     && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_markBusy \.\w+_tick\{animation:none\}\}/.test(bundle)
-    && /animation:1\.5s ease-in-out infinite \w+_pulse\}/.test(bundle)
+    && /animation:[^;}]*infinite[^;}]*\w+_pulse\}/.test(bundle)
     && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_pulseDot\{animation:none\}\}/.test(bundle)],
   ['the steps pill never claims a denominator it does not have', '`${answer} 步`'],
   ['…and the 动效 switch is read the defensive way, like every other switch that is on unless a record says otherwise', 'state.motion) !== false'],
@@ -857,16 +905,47 @@ const markers = [
   }],
   ['wallpaper thumbnails come from the plugin route, keyed by the file', () =>
     bundle.includes('better-display/wallpaper/') && bundle.includes('?v=${')],
-  // The whole-window scope, whose mechanism the runtime probes established. Five claims: the two
-  // settings rows exist; the stylesheet is GATED on an attribute, so nothing applies until the reader
-  // opts in; every copy of the IMAGE rides a viewport-anchored rule (that is what lets several copies
-  // be safe — they line up as one image instead of layering scrims, which is what made one region
-  // visibly darker than its neighbour in the first probe); the chrome carries a scrim and no second
-  // copy; and the reading view steps aside while the scope is the window, for the same reason. The
-  // gate is pinned through the `SCOPED` interpolations rather than a spelled-out selector, because
-  // the selector is built from the attribute constant at runtime.
+  // The whole-window scope, whose mechanism the runtime probes established. Five claims: the settings rows
+  // exist; the stylesheet is GATED on an attribute, so nothing applies until the reader opts in; every copy of
+  // the IMAGE rides a viewport-anchored rule (that is what lets several copies be safe — they line up as one
+  // image instead of layering scrims, which is what made one region visibly darker than its neighbour in the
+  // first probe); the chrome carries a scrim per surface and no second copy; and the reading view steps aside
+  // while the scope is the window, for the same reason. The gate is pinned through the `SCOPED` interpolations
+  // rather than a spelled-out selector, because the selector is built from the attribute constant at runtime.
   ['the settings panel offers the window-wide wallpaper', '"data-ud-check": "reader-settings-wallpaper-scope"'],
-  ['the window scope has its own chrome scrim dial', '"data-ud-check": "reader-settings-wallpaper-chrome"'],
+  // The chrome's scrim has a dial PER SURFACE since the reader asked the sidebar and the top bar to move apart.
+  // Which rule reads which variable is pinned rule by rule in `wallpaper-scope.test.ts` (a regex over a minified
+  // bundle cannot say it reliably); what is asserted here is that both dials and both variables survive.
+  ['the chrome scrim has one dial per surface', () => {
+    // The top bar's own rules, cut out of the SOURCE FORM the bundle carries (every line of `windowScopeCss` is a
+    // template literal, and the declaration `background-image: ${scrim(…)}` has a `}` of its own — so a `{…}`-shaped
+    // regex cannot span these rules). The slice runs from the `${SCOPED} *:has(…)` line to the line that closes the
+    // rule; the comment that explains this hook higher up spells the selector WITHOUT the `${SCOPED} ` prefix, so this
+    // anchor is unambiguous.
+    const sliceFrom = (anchor) => {
+      const start = bundle.indexOf(anchor);
+      const end = start === -1 ? -1 : bundle.indexOf('`}`,', start);
+      return start === -1 || end === -1 ? '' : bundle.slice(start, end);
+    };
+    const bar = sliceFrom('${SCOPED} *:has(> [data-conversation-header-leading]),');
+    const frost = sliceFrom('${SCOPED} *:has(> [data-conversation-header-leading])::before,');
+    return bundle.includes('"data-ud-check": "reader-settings-wallpaper-chrome-sidebar"')
+      && bundle.includes('"data-ud-check": "reader-settings-wallpaper-chrome-header"')
+      && bundle.includes('--viewtune-wallpaper-chrome-sidebar')
+      && bundle.includes('--viewtune-wallpaper-chrome-header')
+      // The bar itself must NOT be a backdrop root or a stacking context of its own: the host mounts its own INLINE
+      // popovers here (the 「后台任务」 panel anchors to its own `.QsffPG_root{position:relative}` and carries
+      // `z-index:100`, plate `--dsw-specific-menu` + `backdrop-filter: var(--dsw-menu-backdrop-filter)` — the same
+      // plate as 「子智能体」, which escapes all of this only by being PORTALED). A `backdrop-filter` on the bar killed
+      // that panel's own blur (text overlapping what showed through) and confined its `z-index:100`, so the reading
+      // view's sticky lane (`z-index:11`) covered and blurred it. So: `isolation` + `z-index: 12` on the bar, the frost
+      // on a `::before` behind the bar's content, and no filter on the bar.
+      && bar.includes('isolation: isolate;')
+      && bar.includes('z-index: 12;')
+      && !bar.includes('backdrop-filter')
+      && frost.includes('z-index: -1;')
+      && frost.includes('backdrop-filter: blur(var(${CHROME_HEADER_BLUR_VARIABLE}));');
+  }],
   ['the window backdrop is gated, and every copy of the IMAGE is viewport-anchored', () => {
     const images = (bundle.match(/var\(--viewtune-wallpaper-image\)/g) ?? []).length;
     const anchored = (bundle.match(/\$\{FIXED\}/g) ?? []).length;
@@ -876,6 +955,8 @@ const markers = [
       // attachment:fixed only ever lines an image up with the viewport, and on a flat colour it buys nothing
       // while putting the paint in the compositor, which is where the reader's missing-scrim bug lived. A
       // relation, not a count: adding a carrier must not be able to pass by quietly adjusting two numbers.
+      // (A fixed-position ELEMENT carrying a copy briefly lived here; it is gone again — see the note its rule left
+      // behind in wallpaper-scope.ts.)
       && images === anchored
       // The token's name lives in a constant and is interpolated into its rule, so the bundle has the
       // declaration rather than a spelled-out declaration line.
@@ -1023,10 +1104,54 @@ const markers = [
   ['every adjustable surface reads its own dial', () => {
     // Searched across the WHOLE bundle, not the reading view's literal: the gutter's groove lives in
     // its own always-installed stylesheet, because the element it styles is not inside this view.
-    const props = [...bundle.matchAll(/var\((--glass-[a-z]+)/g)].map(match => match[1]);
+    // The FROST family is excluded here and has its own marker below: these nine are the TINTS, while a frost
+    // property is spelled `--glass-blur-<part>` — which this regex reads as the single name `--glass-blur`.
+    const props = [...bundle.matchAll(/var\((--glass-(?!blur)[a-z]+)/g)].map(match => match[1]);
     return new Set(props).size === 9
       && ['--glass-lane', '--glass-user', '--glass-card', '--glass-code', '--glass-diff', '--glass-chip', '--glass-scrollbar', '--glass-pill', '--glass-input']
         .every(name => props.includes(name) && bundle.includes(`"${name}"`));
+  }],
+  // …and the same coupling for the FROST: one property per surface that can carry a `backdrop-filter`, read by a
+  // stylesheet and written by the part table, so a surface whose frost no row can move (or a row whose property no
+  // stylesheet reads) fails here. Two deliberate absences, both asserted rather than assumed: 「滚动条槽位」 has no
+  // frost at all (a scrollbar pseudo-element cannot carry the property, and a row that moved nothing would be worse
+  // than no row), and the two SCRIMS are not glass parts — they are named for their surface and live in
+  // wallpaper-scope.ts, so they are checked by name here instead of by the table.
+  ['every surface that can be frosted has its own blur dial', () => {
+    const props = [...bundle.matchAll(/var\((--glass-blur-[a-z]+)/g)].map(match => match[1]);
+    const frosted = ['lane', 'user', 'card', 'code', 'diff', 'chip', 'pill', 'input'];
+    return new Set(props).size === frosted.length
+      && frosted.every(id => props.includes(`--glass-blur-${id}`) && bundle.includes(`"--glass-blur-${id}"`))
+      && !bundle.includes('--glass-blur-scrollbar')
+      // …and the frost is read with NO fallback, which is what makes an unwritten property mean `none` rather than a
+      // blur nobody asked for — the whole reason a dial at 0 is left out instead of written as `0px`.
+      && /blur\(var\(--glass-blur-card\)\)/.test(bundle)
+      && bundle.includes('--viewtune-wallpaper-chrome-sidebar-blur')
+      && bundle.includes('--viewtune-wallpaper-chrome-header-blur')
+      // …and every scrim rule reads it through `var(…)`. Pinned because getting it wrong is invisible in the source
+      // and fatal in the artifact: `blur(${VAR})` interpolates to `blur(--viewtune-…)`, which is not a length, so the
+      // declaration is dropped and the dial moves nothing — which is exactly how the two scrim frosts shipped dead.
+      && bundle.includes('blur(var(${CHROME_SIDEBAR_BLUR_VARIABLE}))')
+      && bundle.includes('blur(var(${CHROME_HEADER_BLUR_VARIABLE}))')
+      && !bundle.includes('blur(${CHROME_SIDEBAR_BLUR_VARIABLE})')
+      && !bundle.includes('blur(${CHROME_HEADER_BLUR_VARIABLE})');
+  }],
+  // The frost's declaration ORDER in the reading view's stylesheet is a correctness property, not a style one: the
+  // build's CSS pipeline de-duplicates `backdrop-filter` against its `-webkit-` twin and keeps the LAST declaration,
+  // so the standard property has to be written second or the shipped rule carries only the prefixed one — which is
+  // the state in which the reader saw frosted conversation cards and a dead reading view. Pinned by shape, per
+  // surface, against the MINIFIED stylesheet the view actually loads.
+  ['the reading view ships the STANDARD backdrop-filter, not a lone -webkit- prefix', () => {
+    // The surfaces whose rule lives in this view's own stylesheet…
+    const surfaces = ['lane', 'user', 'card', 'code', 'diff', 'chip'];
+    return surfaces.every(id => new RegExp(`backdrop-filter:blur\\(var\\(--glass-blur-${id}\\)\\)`).test(readerCss))
+      // …and the pill, whose rule ships from TurnMetrics.module.css — a different module, so a different stylesheet,
+      // and the same order rule applies to it (it is not in `readerCss` at all).
+      && /backdrop-filter:blur\(var\(--glass-blur-pill\)\)/.test(bundle)
+      // …and the prefixed twin is what the pipeline dropped, so it is absent rather than merely later.
+      && !/-webkit-backdrop-filter:blur\(var\(--glass-blur-card\)\)/.test(readerCss)
+      // …while the plain sheets, which the pipeline never sees, still carry both spellings.
+      && /-webkit-backdrop-filter: blur\(var\(--glass-blur-card\)\)/.test(bundle);
   }],
   // Three surfaces the skin shipped without, each on the dial it was decided to belong to. They are one
   // marker because they are one mistake — a plate that kept its base look through the skin — and each
@@ -1168,6 +1293,38 @@ const markers = [
     && bundle.includes('var(--viewtune-code-plate, transparent) var(--glass-diff')
     // Both switches, in one expression: see conversationGlassOf.
     &&/record\?\.glass === true && record\?\.glassConversation === true/.test(bundle)],
+  // …and the two surfaces 0.2.0 added, or that the earlier skin simply never reached: the 「已编辑 x 个文件」 card
+  // every answer body now ends with (it paints from a LAYER token, so none of the dials above touched it) and the
+  // host's own 「回到底部」 button (it paints from --dsw-alias-button-floating-fill — 「一直没加上」). Both are dialled
+  // by NAME — a published attribute for the card, the local class name for the button, since the host publishes none
+  // — rather than by sweeping a layer token that half the page paints from.
+  ['…and the changed-files card and the host’s to-bottom button are dialled by name', () =>
+    bundle.includes('[data-changed-files]')
+    && bundle.includes('--viewtune-layer-plate: var(--dsw-alias-bg-layer-1)')
+    // The card's hover DETAIL is handed to the primitives' HoverCard, which PORTALS it to the body: the rule is
+    // gated but not scoped to the column, and it names both candidate boxes because the plate is on the hook's own
+    // element or on its container — the hook is the part that is certain.
+    && bundle.includes('[data-changes-hover-preview]')
+    && bundle.includes('*:has(> [data-changes-hover-preview])')
+    // …and the button carries our own pill's floor, so the dial can never hide an affordance the reader needs.
+    && bundle.includes('button[class*="_toBottom"]')
+    && bundle.includes('max(var(--glass-lane, 20%), 20%)')
+    // …and the host's 「思考」 row, which paints itself opaque from the theme's BASE colour once its group is expanded
+    // (a sticky covering plate, like the code block's banner wrap): dialled on the card family it belongs to.
+    && bundle.includes('[data-expanded] [data-open] [data-disclosure-row]')
+    // The card's HEADER is the half that stayed solid: it paints from a STATIC neutral the host hands down as
+    // `--changes-fill` — theme-independent, so no token of ours could ever reach it. Read on the bar (where the card's
+    // value is inherited), written as a background: read, not redefined, so it is not the cycle the snapshot avoids.
+    && bundle.includes('[data-changed-files] [class*="_header"]')
+    && bundle.includes('var(--changes-fill, var(--viewtune-layer-plate, transparent))')
+    // …and the diff paper's ROWS are four plates of their own, none of which anything here dialled: the reader's
+    // 「增减的绿红底色还是不透明」. All four ride the DIFF dial, like the paper itself — in the column, and again on the
+    // portaled detail, which a column-scoped token override cannot reach.
+    && bundle.includes('--viewtune-diff-added: var(--dsw-alias-file-diff-added-bg)')
+    && (bundle.match(/--dsw-alias-file-diff-added-bg: color-mix\(/g) ?? []).length === 2
+    && (bundle.match(/--dsw-alias-file-diff-deleted-gutter: color-mix\(/g) ?? []).length === 2
+    // The + and - GLYPH colours are legibility, not plate, and are deliberately untouched.
+    && !bundle.includes('--dsw-alias-file-diff-added-marker:')],
   // The conversation page can also be asked to be a SOLID page — the trajectory view's own recipe applied
   // to the view that has none: the theme's base colour, the gutter's wallpaper names withdrawn (the groove
   // lives on that same scroller, so leaving them would paint a strip of photograph down a one-colour page),

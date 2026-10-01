@@ -20,7 +20,7 @@ dsh plugin --profile web add github:Farewish/dsh-viewtune
 
 # or from a local directory / tarball
 dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.5.2.tgz
+dsh plugin --profile web add ./dsh-viewtune-0.5.4.tgz
 ```
 
 **With more than one Harness version on the machine**, two details bite (this repository installed once into an environment where 0.1.5 and 0.2.0 coexist):
@@ -73,31 +73,33 @@ Opened by 「viewtune ⚙」, with **three pages** (arrows, Home and End move be
 
 - **视效** (look): motion, the frosted glass, its nine dials, and the wallpaper.
 - **功能** (behaviour): what this plugin does to the app, in three groups separated by a hairline — **小功能**: the **strip wheel**, **产物用右侧栏打开**, **自动收起更早流程**; **正文显示**: the **per-word reveal**, its **blur**, the **reveal cadence**; **流程展示设置**: the **follow mode**, the **reasoning card's follow mode**, its **pace**, and **焦点思考展开**. A setting that only means something under another one (the blur, the pace) is indented under it and greyed out while it does not apply.
-- **快捷键**: what the collapse button does, plus recording for this plugin's two bindings (click a key to record, Escape cancels, clearing drops it; combinations without a modifier, or ones the browser already owns, are refused).
+- **快捷键**: recording for this plugin's two bindings (click a key to record, Escape cancels, clearing drops it; combinations without a modifier, or ones the browser already owns, are refused). What the collapse button DOES is a behaviour, so it lives on 功能 instead, under 小功能 (its third option is 「默认」, the shipped behaviour).
 
 One layout rule: a preference is a row and a new subject is a page, so the lane never grows a control wider; and **only an option whose label does not say it all carries a description**, which rides the row's `title` — the browser's own hover box, the same mechanism the button and 收起 use — so it takes no space. Genuine **state** (a system override, a recording in progress, a refused combination) is written in the row instead.
 
-**The defaults are this plugin's shipped ones** (see below: the skin on, the wallpaper shipped with it, the window scope, and a reveal cadence fixed at 60 per second). A stored record only carries the keys a reader **changed**; anything missing falls back to those defaults.
+**The defaults are this plugin's shipped ones, written from the reader's own tuned settings** (see below: the skin on, the wallpaper shipped with it, the window scope, a reveal cadence fixed at 60 per second, **cards frosted and the toolbar crisp**). A stored record only carries the keys a reader **changed**; anything missing falls back to those defaults.
 
 ### Frosted glass
 
-With it on, the toolbar, cards, tool frames and code blocks stop painting plates of their own and let the wallpaper and the host's skin through; labels like paths and counts stay transparent until hovered or focused. **Nine dials under the switch** set each surface's opacity:
+With it on, the toolbar, cards, tool frames and code blocks stop painting plates of their own and let the wallpaper and the host's skin through; labels like paths and counts stay transparent until hovered or focused. **Nine dials under the switch** set each surface's opacity, and eight of them carry a second dial for FROST:
 
-| Dial | What it moves |
-| --- | --- |
-| 工具栏 | the top lane's plate, and the 「回到最新」 pill floating over the prose |
-| 用户气泡 | your own message's background |
-| 卡片与面板 | reasoning cards, tool frames, the system prompt, note boxes |
-| 代码块 | fenced code blocks |
-| 差异面板 | the diff panel, its file tabs, and inline diffs in a tool's result |
-| 滚动条槽位 | the rightmost scrollbar's track |
-| 产物标签 | the product-file chips at the end of a turn |
-| 用量与步骤胶囊 | the two counters, 「用量 … tok」 and 「… 个步骤」 |
-| 输入框 | the host composer's plate (both the reading page and the conversation page) |
+| Dial | What it moves | Frost (initial) |
+| --- | --- | --- |
+| 工具栏 | the top lane's plate, the 「回到最新」 pill floating over the prose, and the host's own 「回到底部」 button on the conversation page | 0px (no frost; the pill and the button ride three quarters of it, so they are 0 too) |
+| 用户气泡 | your own message's background | 3px |
+| 卡片与面板 | reasoning cards, tool frames, the system prompt, note boxes, the changed-files card | 8px |
+| 代码块 | fenced code blocks | 25px |
+| 差异面板 | the diff panel and its add/remove row tints (gutters included), its file tabs, inline diffs in a tool's result, and the conversation page's 「已编辑 x 个文件」 card with its header and hover detail | 25px |
+| 滚动条槽位 | the rightmost scrollbar's track | — (the groove is a scrollbar pseudo-element, where `backdrop-filter` does nothing, so there is no such dial) |
+| 产物标签 | the product-file chips at the end of a turn | 5px |
+| 用量与步骤胶囊 | the two counters, 「用量 … tok」 and 「… 个步骤」 | 2px |
+| 输入框 | the host composer's plate (both the reading page and the conversation page) | 10px |
 
 `0%` paints nothing at all there; `100%` is the opaque plate of the skin-off look. Surfaces are grouped by what they **are** rather than where they sit (diff paper follows the diff dial wherever it is drawn), and **only surfaces that already have a plate get a dial** — the tool-state label and the `+N -M` count have no resting background, so they are wired to none.
 
-The same skin can reach the **conversation page** (its own switch): the code blocks and user bubbles there follow these dials. A third, independent switch makes the **conversation page a solid page** (the theme's base colour plus a fade above the composer).
+**Each surface is one box with two dials inside it**: the box's first line is the surface's name, and the two lines under it **name their own dial** — 「透明度」 decides how much of the wallpaper shows through, 「模糊值」 decides whether what shows is the photograph or a wash of it (`0px` is glass only; above that it is 磨砂). The column in the table is the **shipped** value, and it is the reader's own tuned look: out of the box the cards, code blocks, diff paper and the composer **are** frosted while the toolbar stays crisp — so the name "frosted glass" is true the first time you open this plugin, with nothing to dial first. Turning a frost dial to 0 has the plugin **remove the property** rather than write `0px`: `backdrop-filter: blur(0px)` is not `none`, so writing it would create a stacking context and put the paint in the compositor for nothing.
+
+The same skin can reach the **conversation page** (its own switch): the code blocks and user bubbles there follow these dials, and so do 0.2.0's 「已编辑 x 个文件」 card (with the change detail that pops up on hover) and the host's own 「回到底部」 button — they are painted from tokens this skin never dialled, which is why they used to ignore it. A third, independent switch makes the **conversation page a solid page** (the theme's base colour plus a fade above the composer). 「回到底部」 shares the pill's **floor**: dialled all the way down it still does not disappear.
 
 ### Wallpaper
 
@@ -107,7 +109,7 @@ The plugin **ships a default wallpaper** (`assets/sample-gradient.png`), which t
 - **The browser is never told where that folder is**: it asks for a name, and the host half answers only for image extensions inside that one folder (no svg).
 - A **压暗** dial mixes the image toward the theme's background so prose stays readable on top; with the skin on, the cards blur exactly this image.
 - The **scope** defaults to the **whole window**: the left column and the top bar show it too (their own plates step aside), and the colours around the composer follow. Turning 「铺满整个窗口」 off restricts it to the reading column, where the image **fills the reading page** (the MAX ratio of image ÷ target, centred, overflow cropped, small images scaled up). The window scope fills with `cover`.
-- A **界面遮罩** dial, in the window scope, sets how opaque those two columns stay over their copy of the image — they carry nothing but text, so `0%` is prose straight on a photograph. The image is painted once and the scrim counted once for the window, so the reading area is never darker than the columns beside it.
+- A **界面遮罩** box, in the window scope, sets how opaque those two columns stay over their copy of the image — they carry nothing but text, so `0%` is prose straight on a photograph. The image is painted once and the scrim counted once for the window, so the reading area is never darker than the columns beside it. Each of the two surfaces is its own box with 「透明度」 and 「模糊值」: they ship at **25% + 15px** (sidebar) and **25% + 5px** (top bar), two separate frosts because the two faces look at different things.
 - The **fade band above the composer** turns the host's opaque gradient into a mask over the same backdrop, so content still fades out smoothly — just into your picture instead of into a colour. All three pages (reading, conversation, trajectory) use the same lift.
 
 ### The reveal
@@ -117,10 +119,10 @@ Three choices govern how a streaming message grows:
 - **Reveal cadence** (default: **a fixed 60 per second**). One publication is one whole render of the growing node: the Markdown tail re-parsed, word identities rebuilt, new word elements mounted, and then the layout every follower below measures. Following the display's refresh rate means **four times** that work on a 240Hz screen, with a pace that depends on whatever the last frame cost. **Following the screen refresh** is therefore the explicit option, and its cost is stated in that row's own description; both cadences drive the **same reveal trajectory** (the advance is a function of the clock), so the fixed one merely samples it less often. Measured on one machine and one page streaming the same kind of long answer: **3430 → 4435–4568 frames per 20s (≈171 → 222–228fps), dropped frames 4 → 2, long tasks 0**, with an idle page back at 4800 (240Hz).
 - **Reveal blur** (default **off**): the reference recipe fades each word in while resolving a 1px blur, and `filter` is **not a property the compositor can animate on its own** — so every animating word repaints its own area on every frame, and with a 350ms reveal and ~50 words per second arriving, a dozen of those repaints overlap. Off, only the fade remains (crisp appearance rather than clearing up).
 - **Per-word reveal** (default on): off, the text simply appears, and **no word identities or timeline are built at all** (not just the animation: the segmentation and the birth table go too, and the Markdown path drops its reveal hooks entirely). The pace still comes from the stream buffer, so it still writes itself out.
-- **Follow mode** (default: **the per-frame glide**). The glide writes the scroll position on every frame, and every one of those writes fires a scroll event — which is what wakes the scroll spy, the anchor compensation and every measurement around it. Writing the tail directly instead writes once per growth, so all of those go quiet; the cost is that content jumps to the newest line rather than sliding to it. The choice now reaches the CARD'S OWN growth too: with the glide, a 「焦点思考展开」 card EASES into each new line instead of stepping to it, and its bottom edge stays where it was (the compensation chases that easing frame by frame); with the direct write the height lands at once, as it always did — as it also does with 「动效」 off or under a reduced-motion preference.
-- **自动收起更早流程** (default **off**). On, and while a turn is streaming, only the turn that is growing keeps its process open: every other turn starts folded — including one that ended without completing, and including the ones you had opened yourself, because a newly started turn clears the stored expansion choices. A folded process **unmounts** its content rather than hiding it, so with this on the other processes take no part in rendering or layout. Opening one yourself still holds until the next turn starts.
+- **Follow mode** (default: **the direct write**). Writing the tail directly writes once per growth, so the scroll spy, the anchor compensation and every measurement around it are never woken by a per-frame write — that is the reader's own choice and it is what ships. Switching to **the per-frame glide** trades that for a slide instead of a jump: a write every frame, each one firing a scroll event. The choice reaches the CARD'S OWN growth too: with the glide, a 「焦点思考展开」 card EASES into each new line instead of stepping to it, and its bottom edge stays where it was (the compensation chases that easing frame by frame); with the direct write — the shipped default — the height lands at once, as it always did — as it also does with 「动效」 off or under a reduced-motion preference.
+- **自动收起更早流程** (default **on**). On, and while a turn is streaming, only the turn that is growing keeps its process open: every other turn starts folded — including one that ended without completing, and including the ones you had opened yourself, because a newly started turn clears the stored expansion choices. A folded process **unmounts** its content rather than hiding it, so with this on the other processes take no part in rendering or layout. Opening one yourself still holds until the next turn starts. This is the reader's own setting, adopted as the shipped default.
 - **The reasoning card's own follow mode** (default **跟随最新**). Inside the card the movement has always been one fixed cadence: two lines every 840ms, gliding for 500ms (about 2.4 lines/second, roughly a reading pace, which is why it deliberately falls behind a burst). 自动滚动 keeps exactly that (the 840ms hold, and its rest after each step). 跟随最新 does NOT: it aims at the newest line with a short 180ms step and no rest, because the target is recomputed only when a step begins — inheriting the long hold would mean a latency of one hold plus one step rather than one step. 手动滚动 never moves the card on its own. Takeover, the edge fades and the follow/manual handoff are identical in all three.
-- **Its pace** (default **2 lines/second**), four presets. The pace is quantised to whole lines, and the default one works out to exactly the two-line step this card has always taken — so nobody who leaves it alone sees any change.
+- **Its pace** (default **3 lines/second**), four presets. The pace is quantised to whole lines, so each preset's step lands on a whole line under the 840ms cadence (3 lines/second is about 2.5 lines per step, which is the step you see); the shipped preset is the reader's own, and a record with no such key falls back to the **standard 2 lines/second** — the step this card has always taken.
 - **焦点思考展开** (default **on**). On, and the reasoning card that is being written into grows to show its content, up to the ceiling 展开阅读 reaches (`min(60vh, 560px)`). A card asks for the focus while it is the one being written into and you are sitting at the bottom of the transcript; scrolling back up does NOT release it, and only taking the card over, asking for the full height with 展开阅读, or — in 跟随最新 only — the thinking ending returns it to the small card (the other two modes keep their height). Exactly one card holds it, the newest request wins, and while it does the PAGE stops following the tail — but the focus follows the CARD'S OWN growth: when its own text stops and narration or a tool card starts streaming, the focus is handed back at once and the page resumes following. The growth is quantised to whole lines, so the layout below it changes per line rather than per publication; with the per-frame glide each line EASES in, and with the direct write it lands at once (see the follow-mode row); the ceiling stays in the stylesheet, and an expanded card draws no edge masks at all.
 
 ### The follow, and 回到最新

@@ -25,12 +25,14 @@ function settleFrames(stiffness: number): number {
   return frames;
 }
 
-test('only the reading column’s own resize cursor forwards the wheel', () => {
-  assert.equal(handleTakesWheel('col-resize', true), true, 'the handle beside the transcript');
-  assert.equal(handleTakesWheel('col-resize', false), false, 'a resizer elsewhere in the shell is left alone');
-  assert.equal(handleTakesWheel('auto', true), false, 'the transcript itself scrolls natively');
-  assert.equal(handleTakesWheel('pointer', true), false, 'and so does anything else in the column');
-  assert.equal(handleTakesWheel('', false), false, 'nothing at all when both conditions fail');
+test('only the reading column’s own width strips forward the wheel', () => {
+  // The strips are the SHELL's, published as `[data-width-handle]`, and the shell shows two more resizers that are not
+  // ours: the frame's sidebar and rightbar handles (outside the column) and the trajectory panel's details handle
+  // (inside it). Both conditions below are what tell them apart — the attribute, and the column.
+  assert.equal(handleTakesWheel(true, true), true, 'a width strip beside the transcript');
+  assert.equal(handleTakesWheel(true, false), false, 'a width strip in another column is left alone');
+  assert.equal(handleTakesWheel(false, true), false, 'the transcript itself, and every other resizer in the column');
+  assert.equal(handleTakesWheel(false, false), false, 'nothing at all when both conditions fail');
 });
 
 test('the strip wheel is on unless the reader has switched it off', () => {

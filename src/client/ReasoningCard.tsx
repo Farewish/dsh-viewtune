@@ -32,10 +32,20 @@ const HEIGHT_CHASE_MS = 400;
 const CHASE_STILL_FRAMES = 4;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, focusKey, focused, onFocusChange }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, focusKey, focused, onFocusChange, onFocusPin, pageAtTail }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
   reasoningMode: ReasoningFollowMode; rate: number;
   focusExpand: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
+  /** Whether this card is PINNING the focus it holds — the reader is reading inside it (see the pin effect). */
+  onFocusPin: (key: string, pinned: boolean) => void;
+  /**
+   * Whether the READER is still at the page's tail — the follower's own `detached`, inverted.
+   *
+   * Needed by the focus compensation and for nothing else, and it cannot be worked out here: this card's own
+   * `following` tracks ITS inner scroller, so a wheel over the transcript moves the reader away without the card
+   * ever noticing (see the compensation's gate).
+   */
+  pageAtTail: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -59,6 +69,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const compensateNow = useRef<() => void>(() => {});
   /** The focus, readable from the frame loop's closure without putting it in that effect's dependencies. */
   const focusedRef = useRef(false);
+  /**
+   * Whether the reader is still at the page's tail, readable from the same closures.
+   *
+   * A ref for the same reason `focusedRef` is one: the compensation runs from the observer's and the chase loop's
+   * closures, which are not re-created when this prop changes. Seeded true, because a card that has not seen a scroll
+   * event yet has not seen the reader leave — and the focus it is about to ask for requires being at the tail anyway.
+   */
+  const pageAtTailRef = useRef(true);
   /** The ceiling the focus has published — what the card last ASKED to be. */
   const focusHeight = useRef(0);
   /**
@@ -103,7 +121,12 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // height, that suspends the page's tail-follow, and a card that has finished thinking must not keep the page
       // pinned off the bottom until it unmounts: that is what made a reader who was plainly at the bottom see no
       // following at all, with 「回到最新」 as the only way back (it writes one scroll position; the suspension stayed).
-      if (!following || !active) onFocusChange(focusKey, false);
+      // …EXCEPT WHILE THE READER IS INSIDE THIS CARD. Taking its own scroller over (`!following`) used to be a
+      // release; it is a PIN now, and that is the reader's own rule: scrolling inside a card is READING it, so the card
+      // stays open under them, no newer card's request takes the focus away, and the idle beat below cannot end it
+      // either (that effect returns early while the card is not following). Only the reader ends a pin — coming back to
+      // the bottom of the page, or the 「回到最新」 pill, both of which the Reader watches for.
+      if (following && !active) onFocusChange(focusKey, false);
       return;
     }
     if (!active || !following) return;
@@ -173,6 +196,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   // A card that unmounts while focused must hand the focus back, or the follower below would stay suspended forever.
   useEffect(() => () => { onFocusChange(focusKey, false); }, [focusKey, onFocusChange]);
   /**
+   * The reader's position on the page, in a LAYOUT effect like the focus above it.
+   *
+   * Read by the compensation, which the observer calls in the same commit as a growth — so this has to be current for
+   * that commit rather than one paint later, exactly like `focusedRef`.
+   */
+  useLayoutEffect(() => { pageAtTailRef.current = pageAtTail; }, [pageAtTail]);
+  /**
    * The focus follows this card's OWN writing, not the step it happens to sit in.
    *
    * The request effect above cannot see growth: its dependencies are the card's states, and the whole point of the
@@ -201,6 +231,17 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     }, 300);
     return () => window.clearInterval(check);
   }, [active, following, expanded, focusExpand, focused, focusKey, onFocusChange]);
+
+  /**
+   * Publish the pin: the reader has taken THIS card's own scroller over while it holds the focus.
+   *
+   * The Reader needs it, because the focus is singular and its default rule is "the newest request wins" — which would
+   * hand the focus to a newer card while the reader is reading inside this one, folding this card shut under them. A
+   * pinned card refuses that, so the pin travels up beside the grant. Derived rather than stored: `focused &&
+   * !following` is exactly "the reader is reading inside the card that holds the focus".
+   */
+  const pin = focused && !following;
+  useEffect(() => { onFocusPin(focusKey, pin); }, [pin, focusKey, onFocusPin]);
 
   const pause = useCallback(() => {
     stopFollow.current();
@@ -349,7 +390,22 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       focusRendered.current = rendered;
       if (!focusedRef.current || grew <= 0) return;
       const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
-      if (scroller !== null) scroller.scrollTop += grew;
+      if (scroller === null) return;
+      /**
+       * …AND ONLY WHILE THE READER IS STILL WATCHING THE TAIL.
+       *
+       * The focus is deliberately kept when they scroll up — the card must not shrink under them (see the request
+       * effect) — but this write must not be kept with it. What it is for is holding the card's BOTTOM EDGE still for
+       * someone watching it grow; for someone reading further up the transcript it is a tug of war with their own
+       * wheel, one line per line of reasoning: reported as 「只有在卡片变高的时候」 the page being pulled back under a
+       * scroll that is otherwise fine. The card cannot see this on its own — its own `following` tracks ITS inner
+       * scroller — which is why the page's tail state arrives as a prop.
+       *
+       * The recorded height above still advances on every measure, so coming back to the tail does not charge the
+       * growth that happened while they were away (one jump), and it resumes on the next line.
+       */
+      if (!pageAtTailRef.current) return;
+      scroller.scrollTop += grew;
     };
     const chaseHeight = (target: number): void => {
       cancelAnimationFrame(heightChase);

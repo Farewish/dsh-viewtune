@@ -49,6 +49,18 @@ test('publishing sets the gate and just the two dials, and withdrawing takes the
   // than repeating the number here.
   applyConversationGlass(doc, { glass: true, glassConversation: true });
   assert.equal(doc.properties.get('--glass-user'), `${String(GLASS_PARTS.find(part => part.id === 'user')?.initial ?? -1)}%`);
+  // …and the FROST travels with the tint, with the same two rules: a surface the reader moved is written as px, and a
+  // surface whose frost is 0 is NOT written at all — `blur(0px)` is not `none`, so writing it would put a composited
+  // layer on a surface nobody asked to frost (see glassBlurProperties).
+  applyConversationGlass(doc, { glass: true, glassConversation: true, glassBlur: { card: 18 } });
+  assert.equal(doc.properties.get('--glass-blur-card'), '18px');
+  // A surface nobody moved falls back to its shipped frost, read off the table (the user bubble's 3px)…
+  assert.equal(doc.properties.get('--glass-blur-user'), `${String(GLASS_PARTS.find(part => part.id === 'user')?.blur?.initial ?? -1)}px`);
+  // …and the 0-initial surface — the LANE, since the defaults are one reading of the reader's settings file; it used to
+  // be the card and the chip — is the one that must not be written at all.
+  assert.equal(doc.properties.get('--glass-blur-lane'), undefined);
+  // …and withdrawing the gate takes every one of them back off, the initial-frost ones included: a withdrawn gate is
+  // not the same thing as a record that omits the key.
   applyConversationGlass(doc, { glass: true, glassConversation: false });
   assert.equal(doc.attributes.has(CONVERSATION_GLASS_ATTRIBUTE), false);
   assert.deepEqual([...doc.properties.keys()], []);
@@ -94,7 +106,65 @@ test('the page claims code paper and the user bubble, and no other dial', () => 
   assert.ok(css.includes('.md-code-block > :first-child'));
   // The diff paper is code-shaped but rides the DIFF dial, in both views: one kind of paper, one control.
   assert.ok(/\[data-diff\]\s*\{[^}]*--glass-diff/.test(css));
-  // Three dials, and no fourth: anything else here would mean the document resolves a property this page
-  // has no business painting.
-  assert.equal(/--glass-(?!code|diff|user)/.test(css), false, 'only the dials this page reads');
+  // Five dials now, and no sixth: code paper, the diff paper, the bubble, the changed-files card family, and the
+  // chrome that floats over this page. Anything else here would mean the document resolves a property this page has
+  // no business painting — the `blur-` family excepted, because those are the SAME five surfaces' frost, published by
+  // the same two switches and named `--glass-blur-<part>`.
+  assert.equal(/--glass-(?!code|diff|user|card|lane|blur-)/.test(css), false, 'only the dials this page reads');
+});
+
+test('the changed-files card, its portaled detail, and the host’s to-bottom button are dialled by NAME', () => {
+  const css = conversationGlassCss();
+  const lines = css.split('\n');
+  // The card 0.2.0 appends to every answer body: one published attribute, no class name and no token sweep. It paints
+  // from a LAYER token, which is exactly why the skin never reached it. Asserted across the selector/declaration line
+  // break, because these rules are written one declaration per line.
+  assert.ok(/\[data-changed-files\]\s*\{[^}]*--glass-diff/.test(css), 'the changed-files card rides the DIFF dial');
+  // …and its hover DETAIL, which the deliverables package hands to the primitives' HoverCard: that card is PORTALED to
+  // the body, so it is outside the column and the column scope cannot reach it. Three lines, because the plate and the
+  // frost are stated on the two candidate boxes separately: the tint/frost pair on the content and its container, and
+  // then the DIFF frost on the content alone (the detail is a diff), so whichever box turns out to be the plate, one
+  // of them carries a frost.
+  const preview = lines.filter(line => line.includes('[data-changes-hover-preview]'));
+  assert.equal(preview.length, 3, `the portaled detail names both candidates: ${preview.join(' | ')}`);
+  for (const line of preview) {
+    assert.ok(line.startsWith(`html[${CONVERSATION_GLASS_ATTRIBUTE}]`), `the detail rule is gated: ${line}`);
+    assert.ok(!line.includes('[data-chat-flow]'), `the portaled detail is not inside the column: ${line}`);
+  }
+  assert.ok(css.includes('*:has(> [data-changes-hover-preview])'), 'the container is one of the two candidates');
+  assert.ok(css.includes('--viewtune-layer-plate: var(--dsw-alias-bg-layer-1);'), 'the plate it mixes is snapshotted');
+  // The host's own 「回到底部」, which publishes NO attribute: found by its local class name inside the conversation
+  // scroller (where the host renders it), and given the same FLOOR our own pill uses — an affordance that can be
+  // dialled out of sight is a trap, and this one appears exactly when the reader may need it.
+  const button = /button\[class\*="_toBottom"\]\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+  assert.ok(button.includes('--glass-lane'), `the to-bottom button rides the lane dial: ${button}`);
+  assert.ok(button.includes('max(var(--glass-lane, 20%), 20%)'), 'the affordance cannot be dialled out of sight');
+  // …and its frost is the LANE's, at the three quarters our own 「回到最新」 pill wears: the two are the same
+  // affordance on the two pages, so one lane dial moves both by the same rule.
+  assert.ok(button.includes('blur(calc(var(--glass-blur-lane) * 0.75))'), 'and it blurs what is behind it, like the pill');
+  assert.ok(css.includes('button[class*="_toBottom"]:hover'), 'its hover state is dialled too, not left opaque');
+  // The card's HEADER bar, the half that stayed solid after the body was dialled: the host paints it from a STATIC
+  // neutral (theme-independent, so there is no token to dial) that it hands down as `--changes-fill`. Read on the bar,
+  // where that value is inherited — read, never redefined, so it is not the cycle the snapshot avoids.
+  const header = /\[data-changed-files\] \[class\*="_header"\]\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+  assert.ok(header.includes('var(--changes-fill'), `the card header is dialled from the host's own fill: ${header}`);
+  assert.ok(header.includes('--glass-diff'), `…and rides the same diff dial as the body it belongs to: ${header}`);
+  assert.ok(css.includes('[data-changed-files] [class*="_header"]:hover'), 'its hover keeps giving feedback');
+  // The diff paper's ROWS: four plates of their own, all on the DIFF dial, in the column AND again on the portaled
+  // detail (a token override on the column cannot reach a card portaled to the body). Paired explicitly, because the
+  // two band tokens end in `-bg` and the two gutters do not.
+  const rows: readonly (readonly [string, string])[] = [
+    ['--viewtune-diff-added', '--dsw-alias-file-diff-added-bg'],
+    ['--viewtune-diff-deleted', '--dsw-alias-file-diff-deleted-bg'],
+    ['--viewtune-diff-added-gutter', '--dsw-alias-file-diff-added-gutter'],
+    ['--viewtune-diff-deleted-gutter', '--dsw-alias-file-diff-deleted-gutter'],
+  ];
+  for (const [snapshot, alias] of rows) {
+    const overrides = css.split('\n').filter(line => line.includes(`${alias}:`));
+    assert.equal(overrides.length, 2, `${alias} is dialled in both scopes, saw ${String(overrides.length)}`);
+    for (const line of overrides) assert.ok(line.includes('--glass-diff'), `the row plate rides the diff dial: ${line}`);
+    assert.ok(css.includes(`${snapshot}: var(${alias})`), `and its theme value is snapshotted: ${snapshot}`);
+  }
+  // The marker colours (the + and - glyphs) are legibility, not plate: dialling them would dim the signs themselves.
+  assert.equal(css.includes('file-diff-added-marker'), false, 'the + and - glyph colours are left alone');
 });
