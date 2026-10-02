@@ -23,7 +23,7 @@ import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllo
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow } from './deliverables.js';
-import type { DeliverableDisplay } from './deliverables.js';
+import type { CommitRecord, DeliverableDisplay } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
@@ -594,7 +594,7 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
  * own width change, because a narrower column wraps sooner.
  */
 function DeliverablesBox({ region, open, onToggle, children }: {
-  region: { id: string; label: string; hint: string; paths: readonly string[] };
+  region: { id: string; label: string; hint: string; count: number };
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
@@ -610,11 +610,11 @@ function DeliverablesBox({ region, open, onToggle, children }: {
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => { observer.disconnect(); };
-  }, [region.paths, open]);
+  }, [region.count, open]);
   return (
     <div className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
       {/* The heading is a BUTTON because the reader has a use for it later; no click behaviour yet. */}
-      <button type="button" className={css.deliverablesBoxLabel}>共 {region.paths.length} 项{region.label}</button>
+      <button type="button" className={css.deliverablesBoxLabel}>共 {region.count} 项{region.label}</button>
       <div ref={lane} className={css.deliverablesBoxLane} title={region.hint}>{children}</div>
       {overflowing && (
         <button type="button" className={css.deliverablesToggle} aria-expanded={open} onClick={onToggle}>
@@ -626,7 +626,7 @@ function DeliverablesBox({ region, open, onToggle, children }: {
 }
 
 function DeliverablesRow({ groups, display, openFile, revealFile }: {
-  groups: { edited: readonly string[]; added: readonly string[] };
+  groups: { commits: readonly CommitRecord[]; edited: readonly string[] };
   display: DeliverableDisplay;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
@@ -649,18 +649,17 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
     }
   };
 
-  // 简略档保持原来的形状（最近 8 个 + `+N 个文件` + 文件夹按钮），但内容修好了：它以前只看"改动过的文件"，因为读取端
-  // 读的是一个本版本根本不存在的字段 —— 交付的文件（分享包）因此从不出现。现在两类都在，交付的排在前面。
-  const flat = [...groups.added, ...groups.edited];
-  const total = groups.edited.length + groups.added.length;
-  // 两个区域的含义按宿主**实际发布的两份数据**来（在它自己的包里量到的：`{ changes, presented }`）：「编辑」= 这一轮
-  // 改动过的文件（`changes` + 工具流程兜底）；「新增」= 助手**明确交付**的文件（`presented`，读者那个分享包就在这里）
-  // 加上工具明说"创建"的文件（`str_replace_editor create`、`apply_patch` 的 `*** Add File:`）。交付过的文件只算新增，
-  // 不会在「编辑」里重复。
+  // 简略档保持原来的形状（最近 8 个 + `+N 个文件` + 文件夹按钮），内容是**所有这一轮动过的文件** —— 因为读者核对真实
+  // 记录后确认「新增」与「编辑」在文件上分不出来（宿主的改动公告覆盖全部写入，而 `write` 新建与覆盖是同一个调用），
+  // 于是按读者的决定合并成一个「编辑」列表 ✓。
+  const flat = groups.edited;
+  const total = groups.edited.length;
+  // 两个区域：**编辑**（这一轮动过的文件）与**提交**（这一轮做过的提交 —— 这是客户端能真正分辨的另一类事）。区域只有
+  // 在有条目时才渲染。
   const regions = [
-    { id: 'edited', label: '编辑', hint: '这一轮改过的文件', paths: groups.edited },
-    { id: 'added', label: '新增', hint: '这一轮交付或新建的文件', paths: groups.added },
-  ] as const;
+    { id: 'edited', label: '编辑', hint: '这一轮改过的文件', kind: 'files' as const, count: groups.edited.length },
+    { id: 'commits', label: '提交', hint: '这一轮做过的提交', kind: 'commits' as const, count: groups.commits.length },
+  ];
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
 
@@ -702,12 +701,20 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
              一般只显示两行，点展开后显示全部 —— 封顶高度是 28px 气泡 + 6px 行距 = 62px 正好两行，第三行整行
              被裁掉，不会露出半行。 */
           <div className={css.deliverablesBoxes}>
-            {regions.filter(region => region.paths.length > 0).map(region => {
+            {regions.filter(region => region.count > 0).map(region => {
               const open = boxOpen[region.id] === true;
               return (
                 <DeliverablesBox key={region.id} region={region} open={open}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
-                  {chips(region.paths)}
+                  {region.kind === 'files'
+                    ? chips(groups.edited)
+                    // A commit is not a file: it has no path to open or reveal, so it is a plain bubble carrying the short
+                    // hash (what a reader recognises) with the message's first line as its title box.
+                    : groups.commits.map((commit, index) => (
+                      <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
+                        {commit.hash ?? commit.subject}
+                      </span>
+                    ))}
                 </DeliverablesBox>
               );
             })}
@@ -720,13 +727,19 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
               <button type="button" className={css.deliverablesToggle} aria-expanded={!folded}
                 onClick={() => { setFolded(value => !value); }}>{folded ? '展开' : '收起'}</button>
             </div>
-            {!folded && regions.filter(region => region.paths.length > 0).map(region => (
+            {!folded && regions.filter(region => region.count > 0).map(region => (
               <div key={region.id} className={css.deliverablesRegion} data-region={region.id} title={region.hint}>
                 <span className={css.deliverablesRegionLabel}>
                   {region.label}
-                  <span className={css.deliverablesRegionCount}>{region.paths.length}</span>
+                  <span className={css.deliverablesRegionCount}>{region.count}</span>
                 </span>
-                <div className={css.deliverablesRow}>{chips(region.paths)}</div>
+                <div className={css.deliverablesRow}>{region.kind === 'files'
+                  ? chips(groups.edited)
+                  : groups.commits.map((commit, index) => (
+                    <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
+                      {commit.hash ?? commit.subject}
+                    </span>
+                  ))}</div>
               </div>
             ))}
             {!folded && <div className={css.deliverablesLane}>{folderButton(total)}</div>}
@@ -895,7 +908,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow groups={deliverableGroups} display={deliverableDisplay} openFile={openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} display={deliverableDisplay} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });

@@ -71,7 +71,80 @@ export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths
  * build artifact, anything a shell command wrote — because the plugin sees only tool calls and the host's published
  * lists, and the reader's own `.tgz` was in neither (shell-written and gitignored). Said plainly in the CHANGELOG.
  */
-export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { added: readonly string[]; edited: readonly string[] } {
+/** One commit a turn made, as much as a client can honestly know about it. */
+export interface CommitRecord {
+  /** The short hash git printed, when the tool's result was readable. */
+  readonly hash?: string;
+  /** The message's first line, from the command's own `-m`, or a plain 「一次提交」. */
+  readonly subject: string;
+}
+
+/** The message of a `git commit`, from the first `-m`/`--message` argument the command carries. */
+function commitSubject(command: string): string {
+  const quoted = /(?:^|\s)-{1,2}m(?:essage)?[= ](?:"([^"]+)"|'([^']+)'|([^\s"'&|;]+))/m.exec(command);
+  const subject = (quoted?.[1] ?? quoted?.[2] ?? quoted?.[3] ?? '').split('\n')[0]?.trim() ?? '';
+  return subject === '' ? '一次提交' : subject;
+}
+
+/** The short hash git prints on its own summary line (`[main 1a2b3c4] subject`), out of a tool result. */
+function commitHash(text: string): string | undefined {
+  return /^\s*\[[^\]\s]+ ([0-9a-f]{7,40})\]/m.exec(text)?.[1];
+}
+
+/**
+ * The commits a turn made: every tool call whose ARGUMENTS carry a `git commit` command.
+ *
+ * There is no host list for these — a commit is something the turn DID, not a file it touched — so they are read off the
+ * calls, and only from the arguments: a document *mentioning* `git commit` arrives as a tool RESULT, never as a call's
+ * arguments, so a command field cannot mistake prose for a commit. The hash comes from the result when there is one (git
+ * prints it), and the subject from the command's own `-m`, which is the line the reader recognises.
+ */
+export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitRecord[] {
+  const commits: CommitRecord[] = [];
+  const seen = new Set<string>();
+  if (!flow) return commits;
+  for (const item of flow) {
+    if (item.kind !== 'tool' || !item.block) continue;
+    if ('isError' in item.block && item.block.isError) continue;
+    const block = item.block as unknown as {
+      name?: string;
+      argsRaw?: string;
+      call?: { name?: string; argsRaw?: string };
+      content?: readonly { text?: string; type?: string }[];
+    };
+    const raw = block.call?.argsRaw ?? block.argsRaw ?? '';
+    if (raw === '') continue;
+    const args = inputFields(raw);
+    // ONLY a command-shaped field counts. Searching the whole argument text would count a `write` whose CONTENT happens to
+    // mention `git commit` — this very plugin's CHANGELOG does — and a false commit is worse than a missed one.
+    const command = stringValue(args, 'command', 'cmd', 'script', 'input');
+    // …and the phrase must be in COMMAND position, not quoted inside another command's pattern: `git log --grep="git
+    // commit"` mentions a commit without making one, and the plugin's own tests caught exactly that false positive.
+    if (command === undefined || !/(?:^|[;&|]|\bthen\b)\s*git\s+commit\b/.test(command)) continue;
+    const result = (block.content ?? []).map(part => typeof part?.text === 'string' ? part.text : '').join('\n');
+    const hash = commitHash(result);
+    const subject = commitSubject(command);
+    const key = `${hash ?? ''}\u0000${subject}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    commits.push(hash === undefined ? { subject } : { hash, subject });
+  }
+  return commits;
+}
+
+/**
+ * The turn's work, in the two lists the row shows — a shape the READER's own call decided.
+ *
+ * They asked for 新增/编辑 to be told apart, checked it against a real turn, and found the client cannot: the host's
+ * change announcement covers everything the turn wrote, and a plain `write` creates and overwrites with the same call.
+ * So the two file lists are MERGED under 「编辑」 (their instruction), and the second box records what the client
+ * genuinely CAN tell apart: the turn's commits.
+ *
+ * `edited` is therefore every file the turn is known to have touched — the host's `changes` list, its `presented`
+ * deliveries (the share package the reader saw on the conversation page: a file the turn made is a file it made), and the
+ * fallback's reading of the write/edit calls. `commits` is read from the calls themselves (`turnCommits`).
+ */
+export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { commits: readonly CommitRecord[]; edited: readonly string[] } {
   const changed: string[] = [];
   const delivered: string[] = [];
   const touched: string[] = [];
@@ -149,35 +222,25 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
       }
     }
   }
-  // A delivered file is also a NEW file (it was made this turn), so it leads the 新增 list and is never repeated under
-  // 编辑. The tool-flow creation evidence joins it, and whatever remains is what the turn changed — each list deduped,
-  // both orders first-seen.
-  const addedAll: string[] = [];
-  const addedSet = new Set<string>();
-  for (const path of [...delivered, ...added]) {
-    if (path === '' || addedSet.has(path)) continue;
-    addedSet.add(path);
-    addedAll.push(path);
-  }
-  const editedAll: string[] = [];
+  // Host entries first — the deliveries the conversation page shows, then the change announcement — and only then what
+  // the calls knew. All four lists are ONE list now (the reader's call: which file is 「新增」 cannot be told apart), and
+  // the same path can arrive from several of them, so it is deduped here, first occurrence winning.
+  const editedList: string[] = [];
   const seenEdited = new Set<string>();
-  for (const path of [...changed, ...touched]) {
-    if (path === '' || addedSet.has(path) || seenEdited.has(path)) continue;
+  for (const path of [...delivered, ...changed, ...touched]) {
+    if (path === '' || seenEdited.has(path)) continue;
     seenEdited.add(path);
-    editedAll.push(path);
+    editedList.push(path);
   }
-  return { added: addedAll, edited: editedAll };
+  return { commits: turnCommits(flow), edited: editedList };
 }
 
 /**
- * The one list the rest of this plugin asks for — inline file mentions, and whether the row appears at all — as the
- * union of both, deliveries first. It has to be the union: the delivered file is exactly the one the reader wants to be
- * able to click, and a turn that only delivered something (no change announcement, no write tool call the fallback can
- * see) would otherwise show no row at all.
+ * The files the rest of this plugin asks for — inline file mentions, and the flat list behind them. Commits are not
+ * files, so they are not in it; the row's own gate asks about both (see the reader).
  */
 export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): readonly string[] {
-  const { added, edited } = getTurnDeliverableGroups(turn, flow);
-  return [...added, ...edited];
+  return getTurnDeliverableGroups(turn, flow).edited;
 }
 
 /** The three ways this view can show a turn's files — 「产物展示」. */

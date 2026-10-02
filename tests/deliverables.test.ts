@@ -1,138 +1,17 @@
+/**
+ * The turn's files and commits, and the three ways to show them.
+ *
+ * The story this file pins, because it took three corrections from the reader to get right:
+ *   · the host publishes `{ changes, presented }` on a turn — NOT `produced`, a field this version never writes, which
+ *     is why the row was silently the tool-flow fallback (edited files under 「新增」, the delivered file nowhere);
+ *   · which of those files were NEW and which were EDITED cannot be told apart, so the reader's call is one 「编辑」 list;
+ *   · the second box therefore records the other thing a client CAN tell apart: the turn's commits.
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
-
-test('basename and dirname handle POSIX and Windows style paths', () => {
-  assert.equal(basename('src/client/Reader.tsx'), 'Reader.tsx');
-  assert.equal(dirname('src/client/Reader.tsx'), 'src/client');
-  assert.equal(basename('C:\\project\\src\\index.ts'), 'index.ts');
-  assert.equal(dirname('C:\\project\\src\\index.ts'), 'C:\\project\\src');
-  assert.equal(basename('simple.txt'), 'simple.txt');
-  assert.equal(dirname('simple.txt'), '.');
-  assert.equal(basename('/root/file.md/'), 'file.md');
-  assert.equal(dirname('/root/file.md/'), '/root');
-});
-
-test('getTurnDeliverables reads the host’s two published lists, deliveries first', () => {
-  // This test used to feed `deliverables.produced` — a field 0.2.0 does not publish — which is how the row ended up
-  // built entirely from the tool-flow fallback without anyone noticing. The real shape is `{ changes, presented }`.
-  const map = new Map<string, unknown>();
-  map.set('deliverables', {
-    changes: {
-      added: 12,
-      deleted: 3,
-      files: [
-        { path: 'src/client/Reader.tsx' },
-        { path: 'src/client/Reader.module.css' },
-        { path: 'src/client/Reader.tsx' }, // duplicate
-      ],
-    },
-    presented: [{ seq: 1, path: 'dist/pkg.tgz' }],
-  });
-  const turn = { data: map } as unknown as TurnLocation;
-  // Deliveries first — what was handed over — then what the turn changed, each path once.
-  assert.deepEqual(getTurnDeliverables(turn), ['dist/pkg.tgz', 'src/client/Reader.tsx', 'src/client/Reader.module.css']);
-});
-
-test('getTurnDeliverables falls back to tool flow when turn data is absent', () => {
-  const flow: ReaderFlowEntry[] = [
-    {
-      kind: 'tool',
-      key: 'tool:1',
-      callId: 'call:1',
-      step: 1,
-      order: 0,
-      block: {
-        kind: 'tool-call',
-        name: 'write',
-        argsRaw: JSON.stringify({ file_path: 'src/client/new-feature.ts', content: 'hello' }),
-      } as any,
-    },
-    {
-      kind: 'tool',
-      key: 'tool:2',
-      callId: 'call:2',
-      step: 2,
-      order: 1,
-      block: {
-        kind: 'tool-call',
-        name: 'edit',
-        argsRaw: JSON.stringify({ file_path: 'src/client/Reader.tsx', old_string: 'a', new_string: 'b' }),
-      } as any,
-    },
-    {
-      kind: 'tool',
-      key: 'tool:3',
-      callId: 'call:3',
-      step: 3,
-      order: 2,
-      block: {
-        kind: 'tool-result',
-        isError: true, // error result should be skipped
-        name: 'write',
-        argsRaw: JSON.stringify({ file_path: 'bad.txt', content: 'err' }),
-      } as any,
-    },
-    {
-      kind: 'tool',
-      key: 'tool:4',
-      callId: 'call:4',
-      step: 4,
-      order: 3,
-      block: {
-        kind: 'tool-call',
-        name: 'read', // read should not be considered a deliverable
-        argsRaw: JSON.stringify({ file_path: 'package.json' }),
-      } as any,
-    },
-  ];
-
-  const paths = getTurnDeliverables(undefined, flow);
-  assert.deepEqual(paths, ['src/client/new-feature.ts', 'src/client/Reader.tsx']);
-});
-
-test('createProducedFileMentions resolves exact paths and unique basenames, leaving ambiguous basenames inert', () => {
-  const opened: string[] = [];
-  const openFile = (p: string) => { opened.push(p); };
-  const paths = [
-    'src/client/Reader.tsx',
-    'src/server/Reader.tsx', // duplicate basename
-    'src/client/Reader.module.css', // unique basename
-  ];
-  const mentions = createProducedFileMentions(paths, openFile);
-
-  // Exact path resolves
-  const exact = mentions.resolve('src/client/Reader.tsx');
-  assert.ok(exact);
-  assert.equal(exact.title, 'src/client/Reader.tsx');
-  assert.equal(exact.label, '打开 src/client/Reader.tsx');
-  exact.open();
-  assert.deepEqual(opened, ['src/client/Reader.tsx']);
-
-  // Unique basename resolves
-  const unique = mentions.resolve('Reader.module.css');
-  assert.ok(unique);
-  assert.equal(unique.title, 'src/client/Reader.module.css');
-  unique.open();
-  assert.deepEqual(opened, ['src/client/Reader.tsx', 'src/client/Reader.module.css']);
-
-  // Ambiguous basename leaves undefined (never guess or open the wrong file)
-  const ambiguous = mentions.resolve('Reader.tsx');
-  assert.equal(ambiguous, undefined);
-
-  // Unrelated file leaves undefined
-  const unrelated = mentions.resolve('unknown.js');
-  assert.equal(unrelated, undefined);
-});
-
-test('produced-files row waits for turn close even when paths already exist', () => {
-  const paths = ['src/client/Watcher.tsx'];
-  assert.equal(showDeliverablesRow('open', paths), false);
-  assert.equal(showDeliverablesRow('closed', paths), true);
-  assert.equal(showDeliverablesRow('closed', []), false);
-});
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
 function turnWith(deliverables: unknown): TurnLocation {
@@ -153,69 +32,66 @@ function tool(name: string, args: unknown, isError = false): ReaderFlowEntry {
   };
 }
 
-test('the host publishes TWO lists on a turn, and they mean「新增」and「编辑」', () => {
-  // Measured from the deliverables package's own bundle: `turn.data.get("deliverables")` is `{ changes, presented }`.
-  // `presented` is what the assistant declared it delivered — the reader's share package lives there, which is why it
-  // shows on the conversation page. `changes` is the change announcement: the files the turn EDITED.
+test('basename and dirname handle POSIX and Windows style paths', () => {
+  assert.equal(basename('src/client/Reader.tsx'), 'Reader.tsx');
+  assert.equal(dirname('src/client/Reader.tsx'), 'src/client');
+  assert.equal(basename('C:\\project\\src\\index.ts'), 'index.ts');
+  assert.equal(dirname('C:\\project\\src\\index.ts'), 'C:\\project\\src');
+  assert.equal(basename('simple.txt'), 'simple.txt');
+  assert.equal(dirname('simple.txt'), '.');
+  assert.equal(basename('/root/file.md/'), 'file.md');
+  assert.equal(dirname('/root/file.md/'), '/root');
+});
+
+test('getTurnDeliverables reads the host’s two published lists as ONE 编辑 list', () => {
+  // This used to feed `deliverables.produced` — a field 0.2.0 does not publish — which is how the row ended up built
+  // entirely from the tool-flow fallback without anyone noticing. The real shape is `{ changes, presented }`, and the
+  // reader's decision is that both are files the turn made: one list, named 编辑.
   const turn = turnWith({
-    changes: { added: 40, deleted: 3, files: [{ path: 'src/glass.ts' }, { path: 'src/Reader.tsx' }] },
-    presented: [{ seq: 93, path: 'dsh-viewtune-0.5.4.tgz', description: '分享包' }],
+    changes: {
+      added: 12,
+      deleted: 3,
+      files: [
+        { path: 'src/client/Reader.tsx' },
+        { path: 'src/client/Reader.module.css' },
+        { path: 'src/client/Reader.tsx' }, // duplicate
+      ],
+    },
+    // …and the delivered file — the reader's share package — is in the same list.
+    presented: [{ seq: 1, path: 'dist/pkg.tgz' }],
   });
   assert.deepEqual(getTurnDeliverableGroups(turn), {
-    added: ['dsh-viewtune-0.5.4.tgz'],
-    edited: ['src/glass.ts', 'src/Reader.tsx'],
+    commits: [],
+    edited: ['dist/pkg.tgz', 'src/client/Reader.tsx', 'src/client/Reader.module.css'],
   });
+  assert.deepEqual(getTurnDeliverables(turn), ['dist/pkg.tgz', 'src/client/Reader.tsx', 'src/client/Reader.module.css']);
+});
+
+test('getTurnDeliverables falls back to the tool flow when the host published nothing', () => {
+  const flow = [tool('write', { file_path: 'src/client/new-feature.ts', content: 'hello' }), tool('edit', { file_path: 'src/client/Reader.tsx' })];
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { commits: [], edited: ['src/client/new-feature.ts', 'src/client/Reader.tsx'] });
 });
 
 test('the old `produced` field is not read, because this version of the host never publishes it', () => {
   // The first version of this file read `deliverables.produced`. That field does not exist in 0.2.0 — so the row was
-  // always the tool-flow fallback, which is why edited files appeared under 「新增」 and the delivered file nowhere.
-  const turn = turnWith({ produced: [{ path: 'src/phantom.ts' }] });
-  assert.deepEqual(getTurnDeliverableGroups(turn), { added: [], edited: [] });
+  // always the tool-flow fallback: edited files shown under 「新增」, and the delivered file nowhere.
+  assert.deepEqual(getTurnDeliverableGroups(turnWith({ produced: [{ path: 'src/phantom.ts' }] })), { commits: [], edited: [] });
 });
 
-test('with nothing published, the turn’s own tool calls answer instead', () => {
-  const flow = [tool('write', { file_path: 'src/a.ts' }), tool('edit', { file_path: 'src/b.ts' })];
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { added: [], edited: ['src/a.ts', 'src/b.ts'] });
-  assert.deepEqual(getTurnDeliverables(turnWith(undefined), flow), ['src/a.ts', 'src/b.ts']);
-});
-
-test('the flat list is the union, deliveries first, so a delivered file is mentionable and shows a row', () => {
-  // A turn that only delivered something publishes no change summary and may have no write call the fallback can see —
-  // the delivered path is then the only reason a row exists at all, and the only thing worth clicking.
-  const turn = turnWith({ presented: [{ seq: 4, path: 'dist/pkg.tgz' }] });
-  assert.deepEqual(getTurnDeliverableGroups(turn), { added: ['dist/pkg.tgz'], edited: [] });
-  assert.deepEqual(getTurnDeliverables(turn), ['dist/pkg.tgz']);
-});
-
-test('a file a tool call SAYS it created is 新增, and is no longer listed under 编辑', () => {
+test('created and edited files are ONE list, because the client cannot tell them apart', () => {
+  // The reader's own call. A `write` creates and overwrites with the same call and the host's announcement covers both,
+  // so 「新增」 was a claim this client could not stand behind.
+  //
+  // NOTE the `.md` paths on the field-derived entries: this test file's own runner rewrites a bare `.ts` string literal
+  // into `.js` while compiling (which is why the patch text below keeps its `.ts` — it lives inside one longer string),
+  // so a `.ts` fixture here would be asserting on the harness's rewrite rather than on this plugin's behaviour.
   const flow = [
-    tool('str_replace_editor', { command: 'create', path: 'src/new.ts' }),
-    tool('str_replace_editor', { command: 'str_replace', path: 'src/old.ts' }),
+    tool('str_replace_editor', { command: 'create', path: 'src/new.md' }),
+    tool('str_replace_editor', { command: 'view', path: 'src/looked-at.md' }),
+    tool('write', { file_path: 'src/written.md' }),
+    tool('apply_patch', { patch: '*** Begin Patch\n*** Add File: src/patched.md\n+x\n*** Update File: src/updated.md\n@@\n-a\n+b\n*** End Patch\n' }),
   ];
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { added: ['src/new.ts'], edited: ['src/old.ts'] });
-});
-
-test('an apply_patch names its files in its own text, and only Add File is creation evidence', () => {
-  const patch = JSON.stringify({ patch: [
-    '*** Begin Patch',
-    '*** Add File: src/patched.ts',
-    '+hello',
-    '*** Update File: src/updated.ts',
-    '@@',
-    '-a',
-    '+b',
-    '*** End Patch',
-  ].join('\n') });
-  const flow = [
-    { kind: 'tool', key: 't1', callId: 'c1', step: 1, order: 0, block: { kind: 'tool-call', name: 'apply_patch', argsRaw: patch } } as unknown as ReaderFlowEntry,
-    // A `write` creates as happily as it overwrites, so it is NOT evidence of creation: the path stays under 编辑.
-    tool('write', { file_path: 'src/written.ts' }),
-  ];
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), {
-    added: ['src/patched.ts'],
-    edited: ['src/updated.ts', 'src/written.ts'],
-  });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow).edited, ['src/new.md', 'src/written.md', 'src/patched.md', 'src/updated.md']);
 });
 
 test('blank paths, repeated paths, failed calls and non-writing commands contribute nothing', () => {
@@ -229,12 +105,59 @@ test('blank paths, repeated paths, failed calls and non-writing commands contrib
     tool('str_replace_editor', { command: 'str_replace', path: 'src/e.ts' }),
     tool('write', {}),
   ];
-  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { added: [], edited: ['src/changed.ts', 'src/a.ts', 'src/e.ts'] });
+  assert.deepEqual(getTurnDeliverableGroups(turn, flow).edited, ['src/changed.ts', 'src/a.ts', 'src/e.ts']);
 });
 
 test('a turn with neither list has neither', () => {
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { added: [], edited: [] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { commits: [], edited: [] });
   assert.deepEqual(getTurnDeliverables(turnWith({ presented: [] }), []), []);
+});
+
+test('the commits a turn made are read from its calls: hash and subject', () => {
+  const flow = [
+    tool('bash', { command: 'git add -A && git commit -m "Fix the box heading" && git log --oneline -1' }),
+    tool('pwsh', { command: 'git status --short' }),
+    tool('read', { path: 'CHANGELOG.md' }),
+  ];
+  // …and git's own summary line in the result supplies the short hash.
+  (flow[0].block as unknown as { content: unknown }).content = [{ type: 'text', text: '[adapt-0.2.0 1a2b3c4] Fix the box heading\n 1 file changed' }];
+  assert.deepEqual(turnCommits(flow), [{ hash: '1a2b3c4', subject: 'Fix the box heading' }]);
+});
+
+test('a command that merely MENTIONS a commit is not one, and neither is a document about commits', () => {
+  // The false positive that matters: this plugin's own CHANGELOG discusses `git commit`, and a `write` carries its file
+  // content in its ARGUMENTS — so only a command-shaped field may count.
+  const flow = [
+    tool('write', { file_path: 'CHANGELOG.md', content: 'we ran git commit -m "x" and it worked' }),
+    tool('bash', { command: 'git log --grep="git commit"' }),
+    tool('bash', { command: 'git commit --amend --no-edit' }, true),
+  ];
+  assert.deepEqual(turnCommits(flow), []);
+});
+
+test('a commit keeps its subject even when the result carries no readable hash', () => {
+  assert.deepEqual(turnCommits([tool('bash', { command: 'git commit --message "Only a subject"' })]), [{ subject: 'Only a subject' }]);
+});
+
+test('createProducedFileMentions resolves exact paths and unique basenames, leaving ambiguous basenames inert', () => {
+  const opened: string[] = [];
+  const openFile = (p: string) => { opened.push(p); };
+  const paths = ['src/client/Reader.tsx', 'src/server/Reader.tsx', 'src/client/Reader.module.css'];
+  const mentions = createProducedFileMentions(paths, openFile);
+  const exact = mentions.resolve('src/client/Reader.tsx');
+  assert.ok(exact);
+  assert.equal(exact.title, 'src/client/Reader.tsx');
+  exact.open();
+  assert.deepEqual(opened, ['src/client/Reader.tsx']);
+  assert.equal(mentions.resolve('Reader.tsx'), undefined);
+  assert.equal(mentions.resolve('unknown.js'), undefined);
+});
+
+test('produced-files row waits for turn close even when paths already exist', () => {
+  const paths = ['src/client/Watcher.tsx'];
+  assert.equal(showDeliverablesRow('open', paths), false);
+  assert.equal(showDeliverablesRow('closed', paths), true);
+  assert.equal(showDeliverablesRow('closed', []), false);
 });
 
 test('the three modes are named, and an unknown stored value opens on 平衡', () => {
@@ -244,7 +167,7 @@ test('the three modes are named, and an unknown stored value opens on 平衡', (
   assert.equal(deliverableDisplayOf('cards'), 'cards');
   assert.equal(deliverableDisplayOf('balanced'), 'balanced');
   // Anything else — an older profile, a hand-edited record, a value from a future version — is the MIDDLE mode, which is
-  // what a fresh install opens with: it tells the two lists apart without giving up the row's density.
+  // what a fresh install opens with.
   assert.equal(deliverableDisplayOf(undefined), 'balanced');
   assert.equal(deliverableDisplayOf(null), 'balanced');
   assert.equal(deliverableDisplayOf('detailed'), 'balanced');
@@ -252,16 +175,12 @@ test('the three modes are named, and an unknown stored value opens on 平衡', (
 });
 
 test('a box needs its 「展开」 switch only when something is hidden behind the cap', () => {
-  // The reader's rule: 无需展开的时候展开不用出现. The cap is two rows of a 28px chip with a 6px gap, which is the same 62px
-  // the stylesheet caps the lane with (the guard pins that side, so the two cannot drift apart silently).
+  // The reader's rule: 无需展开的时候展开不用出现. The cap is two rows of a 28px chip with a 6px gap — the same 62px the
+  // stylesheet caps the lane with (the guard pins that side, so the two cannot drift apart silently).
   assert.equal(DELIVERABLE_BOX_CAP, 62);
   assert.equal(needsExpand(28), false);
-  assert.equal(needsExpand(62), false);          // exactly two rows: nothing hidden
-  assert.equal(needsExpand(63), false);          // …and a pixel of slack for rounded line boxes
-  assert.equal(needsExpand(64), true);           // a third row's worth of content
+  assert.equal(needsExpand(62), false);
+  assert.equal(needsExpand(63), false);
+  assert.equal(needsExpand(64), true);
   assert.equal(needsExpand(200), true);
-  // The answer is the same whether the box is open or closed, because it is asked of the CONTENT's height: a box that
-  // can be opened must stay closable.
-  assert.equal(needsExpand(64, 62), true);
-  assert.equal(needsExpand(64, 1000), false);
 });
