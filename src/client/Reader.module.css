@@ -506,9 +506,13 @@
 .changedCardRow:hover { background: var(--deliverable-hover, var(--dsw-alias-interactive-bg-hover)); }
 .changedCardRow:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
 .changedCardPath { min-width: 0; flex: 1; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.changedCardToggle { box-sizing: border-box; width: 100%; border: 0; border-top: .5px solid var(--dsw-alias-border-l1); background: 0 0; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; line-height: 20px; text-align: left; cursor: pointer; padding: 10px 12px; }
+.changedCardToggle { box-sizing: border-box; width: 100%; border: 0; border-top: .5px solid var(--dsw-alias-border-l1); background: 0 0; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; line-height: 20px; text-align: left; cursor: pointer; padding: 10px 12px; display: flex; align-items: center; gap: 6px; }
 .changedCardToggle:hover { background: var(--deliverable-hover, var(--dsw-alias-interactive-bg-hover)); color: var(--dsw-alias-label-secondary); }
 .changedCardToggle:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+/* 对话页同款的箭头 ✓：默认朝下 ✓，展开（现在是「收起」）时整枚旋转 180° ⇒ 朝上 ✓；尊重 reduced-motion ✓。 */
+.changedCardChevron, .changedCardChevronOpen { flex: none; color: var(--dsw-alias-label-tertiary); transition: transform 120ms ease; }
+.changedCardChevronOpen { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .changedCardChevron, .changedCardChevronOpen { transition: none; } }
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }

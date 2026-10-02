@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
   DiffBlock, FileTypeIcon, diffTotals, fileExtension,
-  IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
+  IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
   IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
   IconQueueOutlineRegular, JsonBlock, MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -737,7 +737,10 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
     </div>
     {foldable && <button type="button" className={css.changedCardToggle} aria-expanded={expanded}
       onClick={() => { setExpanded(value => !value); }}>
-      {expanded ? '收起' : `全部 ${String(changes.length)} 个文件`}
+      {/* 对话页同款的箭头 ✓：`IconChevronDownOutlineRegular`（primitives ✓ —— 宿主自己的 disclosure 用的就是它 ✓），
+          展开时整枚旋转 180° ✓，与宿主 `openChevron` 的做法一致 ✓。 */}
+      <span>{expanded ? '收起' : `全部 ${String(changes.length)} 个文件`}</span>
+      <IconChevronDownOutlineRegular size={12} className={expanded ? css.changedCardChevronOpen : css.changedCardChevron} />
     </button>}
   </div>;
 });

@@ -1034,7 +1034,11 @@ const markers = [
   ['the 详细卡片 mode draws the host’s changed-files LIST card, not a tile grid', () => bundle.includes('ChangedFilesCard')
     && bundle.includes('changedCardHeader')
     && bundle.includes('changedCardRow')
-    && bundle.includes('changedCardToggle')],
+    && bundle.includes('changedCardToggle')
+    // …with the host's own disclosure chevron: `IconChevronDownOutlineRegular`, the icon its own disclosures use, turning
+    // over when the list is open (the reader asked for the same arrow on 全部 N 个文件 and on 收起).
+    && bundle.includes('IconChevronDownOutlineRegular')
+    && bundle.includes('changedCardChevronOpen')],
   // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
   // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
   // own stores), but its address can be handed to `ctx.sidebarRight.openResource` and then the host draws it, unmodified.
