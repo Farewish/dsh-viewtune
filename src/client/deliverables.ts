@@ -259,7 +259,16 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
  */
 export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): readonly string[] {
   const { delivered, edited } = getTurnDeliverableGroups(turn, flow);
-  return [...delivered, ...edited];
+  // Deduped, because the two lists overlap BY DESIGN (a file can be edited and delivered): this flat list feeds inline
+  // mention resolution and the row's gate, and neither wants the same path twice. Deliveries first, as they were.
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  for (const path of [...delivered, ...edited]) {
+    if (seen.has(path)) continue;
+    seen.add(path);
+    paths.push(path);
+  }
+  return paths;
 }
 
 /** The three ways this view can show a turn's files — 「产物展示」. */
