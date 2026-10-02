@@ -913,12 +913,16 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
             )}
             {regions.filter(region => region.count > 0 && region.kind !== 'files').map(region => (
+              // 卡片档不再要区域标签 ✓（读者要求去掉「交付 N」✓）—— 卡片自己就写着文件名与描述 ✓，宿主那张卡也没有这一层 ✓。
               <div key={region.id} className={css.deliverablesRegion} data-region={region.id} title={region.hint}>
-                <span className={css.deliverablesRegionLabel}>
-                  {region.label}
-                  <span className={css.deliverablesRegionCount}>{region.count}</span>
-                </span>
-                <div className={css.deliverablesRow}>{region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
+                {/* 只有**提交**那栏保留标签 ✓：它是一串哈希泡泡，没有名字就看不出是什么 ✓；交付的卡片自己写着文件名与描述 ✓。 */}
+                {region.kind === 'commits' && (
+                  <span className={css.deliverablesRegionLabel}>
+                    {region.label}
+                    <span className={css.deliverablesRegionCount}>{region.count}</span>
+                  </span>
+                )}
+                <div className={css.deliverablesRow} data-single={region.kind === 'delivered' && region.count === 1 ? true : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                   : groups.commits.map((commit, index) => (
                     <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
                       {commit.hash ?? commit.subject}
