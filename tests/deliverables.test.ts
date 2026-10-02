@@ -43,10 +43,11 @@ test('basename and dirname handle POSIX and Windows style paths', () => {
   assert.equal(dirname('/root/file.md/'), '/root');
 });
 
-test('getTurnDeliverables reads the host’s two published lists as ONE 编辑 list', () => {
+test('getTurnDeliverables reads the host’s two published lists: 交付 and 编辑', () => {
   // This used to feed `deliverables.produced` — a field 0.2.0 does not publish — which is how the row ended up built
-  // entirely from the tool-flow fallback without anyone noticing. The real shape is `{ changes, presented }`, and the
-  // reader's decision is that both are files the turn made: one list, named 编辑.
+  // entirely from the tool-flow fallback without anyone noticing. The real shape is `{ changes, presented }`: `presented`
+  // is what was DELIVERED (the reader's share package — 交付), `changes` is what was edited (编辑), and a delivered file
+  // is not repeated under 编辑.
   const turn = turnWith({
     changes: {
       added: 12,
@@ -57,25 +58,25 @@ test('getTurnDeliverables reads the host’s two published lists as ONE 编辑 l
         { path: 'src/client/Reader.tsx' }, // duplicate
       ],
     },
-    // …and the delivered file — the reader's share package — is in the same list.
     presented: [{ seq: 1, path: 'dist/pkg.tgz' }],
   });
   assert.deepEqual(getTurnDeliverableGroups(turn), {
-    commits: [],
-    edited: ['dist/pkg.tgz', 'src/client/Reader.tsx', 'src/client/Reader.module.css'],
+    delivered: ['dist/pkg.tgz'],
+    edited: ['src/client/Reader.tsx', 'src/client/Reader.module.css'],
   });
+  // The flat list — inline mentions, and the row's gate — is the union, deliveries first.
   assert.deepEqual(getTurnDeliverables(turn), ['dist/pkg.tgz', 'src/client/Reader.tsx', 'src/client/Reader.module.css']);
 });
 
 test('getTurnDeliverables falls back to the tool flow when the host published nothing', () => {
   const flow = [tool('write', { file_path: 'src/client/new-feature.ts', content: 'hello' }), tool('edit', { file_path: 'src/client/Reader.tsx' })];
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { commits: [], edited: ['src/client/new-feature.ts', 'src/client/Reader.tsx'] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { delivered: [], edited: ['src/client/new-feature.ts', 'src/client/Reader.tsx'] });
 });
 
 test('the old `produced` field is not read, because this version of the host never publishes it', () => {
   // The first version of this file read `deliverables.produced`. That field does not exist in 0.2.0 — so the row was
   // always the tool-flow fallback: edited files shown under 「新增」, and the delivered file nowhere.
-  assert.deepEqual(getTurnDeliverableGroups(turnWith({ produced: [{ path: 'src/phantom.ts' }] })), { commits: [], edited: [] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith({ produced: [{ path: 'src/phantom.ts' }] })), { delivered: [], edited: [] });
 });
 
 test('created and edited files are ONE list, because the client cannot tell them apart', () => {
@@ -109,7 +110,7 @@ test('blank paths, repeated paths, failed calls and non-writing commands contrib
 });
 
 test('a turn with neither list has neither', () => {
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { commits: [], edited: [] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { delivered: [], edited: [] });
   assert.deepEqual(getTurnDeliverables(turnWith({ presented: [] }), []), []);
 });
 

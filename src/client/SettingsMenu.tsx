@@ -79,6 +79,8 @@ const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到�
 const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是全部保留';
 /** How the three ways of showing a turn's files differ, in the reader's own terms. */
 const DELIVERABLE_DISPLAY_HINT = '简略更紧凑，详细更像原生卡片';
+/** What the extra line buys, and that it only ever appears for a turn that committed. */
+const RECORD_COMMITS_HINT = '顺带列出这一轮的 git 提交';
 /** The frost rows, one per surface. Short because the row above it already says which surface is meant. */
 const FROST_HINT = '0px 只有玻璃，往上才是磨砂';
 
@@ -131,7 +133,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, recordCommits, onRecordCommits, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -162,6 +164,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** How a turn's files are shown: 简略气泡 / 平衡 / 详细卡片. */
   deliverableDisplay: DeliverableDisplay;
   onDeliverableDisplay: (next: DeliverableDisplay) => void;
+  /** Whether the reading view also lists the turn's git commits; off by default. */
+  recordCommits: boolean;
+  onRecordCommits: (next: boolean) => void;
   /** Whether a wheel over the toolbar's two column handles is forwarded to the transcript. */
   stripWheel: boolean;
   onStripWheel: (next: boolean) => void;
@@ -449,6 +454,14 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 onChange={event => { onDeliverableDisplay(deliverableDisplayOf(event.currentTarget.value)); }}>
                 {DELIVERABLE_DISPLAYS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
               </select>
+            </div>
+            {/* Its own feature, off by default: a commit is not a file, and the client only sees one when a tool call's
+                command really runs `git commit` — so this adds a line to turns that commit, and nothing otherwise. */}
+            <div className={css.settingsRow} title={RECORD_COMMITS_HINT} data-ud-check="reader-settings-record-commits">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>记录提交</span>
+              </span>
+              <Switch checked={recordCommits} onChange={onRecordCommits} label="记录提交" />
             </div>
             {/* No description on purpose: the label is the whole of it. */}
             <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">

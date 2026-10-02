@@ -22,7 +22,7 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow } from './deliverables.js';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnCommits } from './deliverables.js';
 import type { CommitRecord, DeliverableDisplay } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -625,9 +625,10 @@ function DeliverablesBox({ region, open, onToggle, children }: {
   );
 }
 
-function DeliverablesRow({ groups, display, openFile, revealFile }: {
-  groups: { commits: readonly CommitRecord[]; edited: readonly string[] };
+function DeliverablesRow({ groups, display, recordCommits, openFile, revealFile }: {
+  groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[] };
   display: DeliverableDisplay;
+  recordCommits: boolean;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
@@ -654,11 +655,14 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
   // 于是按读者的决定合并成一个「编辑」列表 ✓。
   const flat = groups.edited;
   const total = groups.edited.length;
-  // 两个区域：**编辑**（这一轮动过的文件）与**提交**（这一轮做过的提交 —— 这是客户端能真正分辨的另一类事）。区域只有
-  // 在有条目时才渲染。
+  // 三个区域：**编辑**（这一轮动过的文件）、**交付**（我交给你的文件 = 宿主的 `presented`，分享包在这里）与**提交**
+  //（这一轮的 git 提交 —— 它单独是一个功能，默认关，开关在「小功能」里）。区域只在有条目时渲染。
   const regions = [
     { id: 'edited', label: '编辑', hint: '这一轮改过的文件', kind: 'files' as const, count: groups.edited.length },
-    { id: 'commits', label: '提交', hint: '这一轮做过的提交', kind: 'commits' as const, count: groups.commits.length },
+    { id: 'delivered', label: '交付', hint: '这一轮交给你的文件', kind: 'delivered' as const, count: groups.delivered.length },
+    ...(recordCommits && groups.commits.length > 0
+      ? [{ id: 'commits', label: '提交', hint: '这一轮做过的 git 提交', kind: 'commits' as const, count: groups.commits.length }]
+      : []),
   ];
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
@@ -706,8 +710,8 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
               return (
                 <DeliverablesBox key={region.id} region={region} open={open}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
-                  {region.kind === 'files'
-                    ? chips(groups.edited)
+                  {region.kind === 'files' ? chips(groups.edited)
+                    : region.kind === 'delivered' ? chips(groups.delivered)
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble carrying the short
                     // hash (what a reader recognises) with the message's first line as its title box.
                     : groups.commits.map((commit, index) => (
@@ -733,8 +737,8 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
                   {region.label}
                   <span className={css.deliverablesRegionCount}>{region.count}</span>
                 </span>
-                <div className={css.deliverablesRow}>{region.kind === 'files'
-                  ? chips(groups.edited)
+                <div className={css.deliverablesRow}>{region.kind === 'files' ? chips(groups.edited)
+                  : region.kind === 'delivered' ? chips(groups.delivered)
                   : groups.commits.map((commit, index) => (
                     <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
                       {commit.hash ?? commit.subject}
@@ -750,7 +754,7 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -814,7 +818,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // …and the same files told apart, for the two detailed modes: the fallback list is what the turn EDITED, the host's own
   // list is what it DELIVERED (see deliverables.ts — presenting the first under the second's label is the mistake the
   // reader caught).
-  const deliverableGroups = useMemo(() => getTurnDeliverableGroups(turn, flow), [turn, flow]);
+  const deliverableGroups = useMemo(() => ({ ...getTurnDeliverableGroups(turn, flow), commits: recordCommits ? turnCommits(flow) : [] }), [turn, flow, recordCommits]);
   // The open mode is read HERE, through the subscriber, and handed to the opener as an argument.
   // The injected `openFile` cannot read it: `createReaderStore()` returns a handle (spec + create)
   // and the live snapshot belongs to the framework's own instance, which only this hook sees.
@@ -908,7 +912,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} display={deliverableDisplay} openFile={openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} display={deliverableDisplay} recordCommits={recordCommits} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
@@ -1248,6 +1252,8 @@ export function Reader(props: ReaderProps) {
   const foldBefore = props.useStore(state => turnFoldOf(state.collapseBefore));
   // How this view shows a turn's files — 「产物展示」: 简略气泡 / 平衡 / 详细卡片 (see deliverables.ts).
   const deliverableDisplay = props.useStore(state => deliverableDisplayOf(state.deliverableDisplay));
+  // …and whether the turn's git commits get a line of their own — a separate feature, off by default (小功能 → 记录提交).
+  const recordCommits = props.useStore(state => state.recordCommits === true);
   const foldBeforeRef = useRef(foldBefore);
   foldBeforeRef.current = foldBefore;
   const [foldWindow, setFoldWindow] = useState(foldBefore);
@@ -1654,6 +1660,7 @@ export function Reader(props: ReaderProps) {
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
           collapseBefore={foldBefore} onCollapseBefore={props.actions.setCollapseBefore}
           deliverableDisplay={deliverableDisplay} onDeliverableDisplay={props.actions.setDeliverableDisplay}
+          recordCommits={recordCommits} onRecordCommits={props.actions.setRecordCommits}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope}
@@ -1678,7 +1685,7 @@ export function Reader(props: ReaderProps) {
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (

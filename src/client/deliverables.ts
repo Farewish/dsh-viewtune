@@ -156,7 +156,7 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
  * deliveries (the share package the reader saw on the conversation page: a file the turn made is a file it made), and the
  * fallback's reading of the write/edit calls. `commits` is read from the calls themselves (`turnCommits`).
  */
-export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { commits: readonly CommitRecord[]; edited: readonly string[] } {
+export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { delivered: readonly string[]; edited: readonly string[] } {
   const changed: string[] = [];
   const delivered: string[] = [];
   const touched: string[] = [];
@@ -234,17 +234,21 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
       }
     }
   }
-  // Host entries first — the deliveries the conversation page shows, then the change announcement — and only then what
-  // the calls knew. All four lists are ONE list now (the reader's call: which file is 「新增」 cannot be told apart), and
-  // the same path can arrive from several of them, so it is deduped here, first occurrence winning.
+  // The turn's work in the two lists the row shows, and the reader settled both:
+  //   · 编辑 — every FILE the turn is known to have touched: the host's change announcement, the fallback's reading of the
+  //     write/edit calls, and (in the older shape) whatever the calls said they created. Whether a file was NEW or EDITED
+  //     cannot be told apart, so they are one list under 「编辑」.
+  //   · 交付 — what was DELIVERED: the host's `presented` list, which is the assistant's own hand-over (the share package
+  //     the reader saw on the conversation page). A delivered file is not repeated under 编辑.
   const editedList: string[] = [];
-  const seenEdited = new Set<string>();
-  for (const path of [...delivered, ...changed, ...touched]) {
-    if (path === '' || seenEdited.has(path)) continue;
-    seenEdited.add(path);
+  const seen = new Set<string>();
+  for (const path of [...delivered]) seen.add(path);
+  for (const path of [...changed, ...touched]) {
+    if (path === '' || seen.has(path)) continue;
+    seen.add(path);
     editedList.push(path);
   }
-  return { commits: turnCommits(flow), edited: editedList };
+  return { delivered, edited: editedList };
 }
 
 /**
@@ -252,7 +256,8 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
  * files, so they are not in it; the row's own gate asks about both (see the reader).
  */
 export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): readonly string[] {
-  return getTurnDeliverableGroups(turn, flow).edited;
+  const { delivered, edited } = getTurnDeliverableGroups(turn, flow);
+  return [...delivered, ...edited];
 }
 
 /** The three ways this view can show a turn's files — 「产物展示」. */

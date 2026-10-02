@@ -63,6 +63,14 @@ export interface ReaderState {
    */
   deliverableDisplay: DeliverableDisplay;
   /**
+   * Whether the reading view also lists the turn's **git commits**, beside the files it changed and delivered.
+   *
+   * A feature of its own, off by default: a commit is not a file, and the client can only see one when a tool call's
+   * command actually runs `git commit` — so this is a bonus line for turns that commit, never something the row depends
+   * on. Off, the row shows exactly the two file lists.
+   */
+  recordCommits: boolean;
+  /**
    * How often a streaming message publishes its revealed text.
    *
    * The steady 60Hz cadence is the DEFAULT, and `textCadenceOf` answers it for anything unrecognised: publishing once
@@ -194,6 +202,8 @@ type ReaderActions = {
   setDeliverableOpenMode: (draft: ReaderState, value: DeliverableOpenMode) => void;
   /** The reading view's deliverable presentation; the caller passes what `deliverableDisplayOf` resolved. */
   setDeliverableDisplay: (draft: ReaderState, value: DeliverableDisplay) => void;
+  /** Whether the row also lists the turn's git commits; off by default. */
+  setRecordCommits: (draft: ReaderState, value: boolean) => void;
   setTextCadence: (draft: ReaderState, value: TextCadence) => void;
   setRevealBlur: (draft: ReaderState, value: boolean) => void;
   setRevealWords: (draft: ReaderState, value: boolean) => void;
@@ -235,6 +245,8 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // …and its files are shown in the middle of the three ways: the row's density, both lists told apart, and the
       // full card one control away. See `deliverables.ts` for why the middle is where a fresh install opens.
       deliverableDisplay: 'balanced',
+      // …and git commits are an opt-in line of their own, off until the reader asks for them (小功能 → 记录提交).
+      recordCommits: false,
       // The handles forward the wheel until a reader says otherwise; see the field's own note for why that is the
       // default rather than an opt-in.
       stripWheel: true,
@@ -303,6 +315,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setCollapseMode: (draft, value: CollapseMode) => { draft.collapseMode = value; },
       setDeliverableOpenMode: (draft, value: DeliverableOpenMode) => { draft.deliverableOpenMode = value; },
       setDeliverableDisplay: (draft, value: DeliverableDisplay) => { draft.deliverableDisplay = value; },
+      setRecordCommits: (draft, value: boolean) => { draft.recordCommits = value; },
       setTextCadence: (draft, value: TextCadence) => { draft.textCadence = value; },
       setRevealBlur: (draft, value: boolean) => { draft.revealBlur = value; },
       setRevealWords: (draft, value: boolean) => { draft.revealWords = value; },
