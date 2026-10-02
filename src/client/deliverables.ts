@@ -235,15 +235,17 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
     }
   }
   // The turn's work in the two lists the row shows, and the reader settled both:
-  //   · 编辑 — every FILE the turn is known to have touched: the host's change announcement, the fallback's reading of the
+  //   · 编辑 — every file the turn is known to have touched: the host's change announcement, the fallback's reading of the
   //     write/edit calls, and (in the older shape) whatever the calls said they created. Whether a file was NEW or EDITED
   //     cannot be told apart, so they are one list under 「编辑」.
-  //   · 交付 — what was DELIVERED: the host's `presented` list, which is the assistant's own hand-over (the share package
-  //     the reader saw on the conversation page). A delivered file is not repeated under 编辑.
+  //   · 交付 — what was DELIVERED: the host's `presented` list, the assistant's own hand-over (the share package).
+  // The two OVERLAP on purpose, which the reader corrected: the boxes answer different questions — what did this turn
+  // change, and what did it hand over — so a file that was edited and then delivered answers both. Only the older shape
+  // (新增 vs 编辑) made them mutually exclusive, and that shape is gone. A delivered-only file is in 编辑 as well, for
+  // the same reason the client cannot tell a created file from an edited one.
   const editedList: string[] = [];
   const seen = new Set<string>();
-  for (const path of [...delivered]) seen.add(path);
-  for (const path of [...changed, ...touched]) {
+  for (const path of [...delivered, ...changed, ...touched]) {
     if (path === '' || seen.has(path)) continue;
     seen.add(path);
     editedList.push(path);
