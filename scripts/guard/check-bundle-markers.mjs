@@ -1038,7 +1038,12 @@ const markers = [
     // …with the host's own disclosure chevron: `IconChevronDownOutlineRegular`, the icon its own disclosures use, turning
     // over when the list is open (the reader asked for the same arrow on 全部 N 个文件 and on 收起).
     && bundle.includes('IconChevronDownOutlineRegular')
-    && bundle.includes('changedCardChevronOpen')],
+    && bundle.includes('changedCardChevronOpen')
+    // …and the DELIVERED card keeps the host's shape too: one full-width row per delivery, with the assistant's own
+    // description as the second line (the host's `cardDescription(file.description, metadata)` falls back to the type
+    // caption, which the same element does). The `data-delivered` hook is what selects the full-width layout.
+    && bundle.includes('data-delivered')
+    && bundle.includes('deliverableDescription')],
   // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
   // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
   // own stores), but its address can be handed to `ctx.sidebarRight.openResource` and then the host draws it, unmodified.

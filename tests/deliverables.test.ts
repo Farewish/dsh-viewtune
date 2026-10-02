@@ -61,11 +61,12 @@ test('getTurnDeliverables reads the host’s two published lists: 交付 and 编
         { path: 'src/client/Reader.tsx' }, // duplicate
       ],
     },
-    presented: [{ seq: 1, path: 'src/client/Reader.tsx' }, { seq: 2, path: 'dist/pkg.tgz' }],
+    presented: [{ seq: 1, path: 'src/client/Reader.tsx' }, { seq: 2, path: 'dist/pkg.tgz', description: '分享包' }],
   });
   assert.deepEqual(getTurnDeliverableGroups(turn), {
     changesSeq: undefined,
-    delivered: ['src/client/Reader.tsx', 'dist/pkg.tgz'],
+    // Delivered files carry the assistant's own description, which is the second line of the host's card.
+    delivered: [{ path: 'src/client/Reader.tsx' }, { description: '分享包', path: 'dist/pkg.tgz' }],
     // …the delivered files lead (first-seen), and the one that was only changed follows; each path appears once per list.
     edited: ['src/client/Reader.tsx', 'dist/pkg.tgz', 'src/client/Reader.module.css'],
   });

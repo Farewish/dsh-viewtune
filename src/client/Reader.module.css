@@ -487,6 +487,13 @@
 /* 详细卡片档也没有行首标签 ✓（读者要求去掉顶部那行 ✓），所以根网格同样收成一列、lane 跨过去 ✓ —— 与平衡档同一个理由 ✓。 */
 .deliverablesRoot[data-display=cards] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
 .deliverablesRoot[data-display=cards] .deliverablesLane { grid-column: 1 / -1; }
+/* 详细卡片档的**交付**卡：宿主那张「呈现文件」卡是**整行一张** ✓（不是两列网格 ✓），所以这里把行内网格收成一列 ✓，
+   卡片占满整行 ✓；第二行是描述 ✓（`cardDescription` 的回退在组件里 ✓）。 */
+.deliverablesRow:has(.deliverableChip[data-style=card][data-delivered]) { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.deliverableChip[data-style=card][data-delivered] { width: 100%; height: 60px; }
+.deliverableChip[data-style=card][data-delivered] .chipMain { max-width: none; }
+.deliverableChip[data-style=card][data-delivered] .deliverableName { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
+.deliverableDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 /* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。
    数值与结构照对话页那张卡量出来的：40px 图标砖（20px 图标 ✓）、标题 13px/500 ✓、计数 10px 等宽 ✓、行高按行的内容走 ✓，
    默认四行（`COLLAPSED_ROWS` ✓）之后由「全部 N 个文件」展开 ✓。行的**整行**都是点击目标 ✓（宿主那行本身就是 button ✓）。 */

@@ -158,9 +158,9 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
  * deliveries (the share package the reader saw on the conversation page: a file the turn made is a file it made), and the
  * fallback's reading of the write/edit calls. `commits` is read from the calls themselves (`turnCommits`).
  */
-export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { changesSeq?: number; delivered: readonly string[]; edited: readonly string[] } {
+export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { changesSeq?: number; delivered: readonly DeliveredFile[]; edited: readonly string[] } {
   const changed: string[] = [];
-  const delivered: string[] = [];
+  const delivered: DeliveredFile[] = [];
   const touched: string[] = [];
   const added: string[] = [];
   const seenChanged = new Set<string>();
@@ -169,9 +169,14 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
   // (1) The host's own two lists. `presented` is the deliveries — the share package included; `changes` is the change
   // announcement, whose per-file list is read tolerantly because only its added/deleted totals were certain at first
   // (`files` / `paths` / a bare array are all accepted, and an unrecognised shape simply contributes nothing).
+  // `presented` carries the assistant's own DESCRIPTION of each delivered file — the second line of the host's card — so
+  // it is kept rather than reduced to a path here: that is what lets the reading view's cards mode match that card
+  // instead of inventing a caption.
   for (const entry of deliverables?.presented ?? []) {
     const clean = typeof entry?.path === 'string' ? entry.path.trim() : '';
-    if (clean !== '') delivered.push(clean);
+    if (clean === '') continue;
+    const description = typeof entry?.description === 'string' && entry.description.trim() !== '' ? entry.description.trim() : undefined;
+    delivered.push(description === undefined ? { path: clean } : { path: clean, description });
   }
   // The change announcement's per-file list, read tolerantly: only its added/deleted totals were certain when this was
   // first written, so `files`, `paths` and a bare array are all accepted, and anything else contributes nothing rather
@@ -251,9 +256,10 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
   // change, and what did it hand over — so a file that was edited and then delivered answers both. Only the older shape
   // (新增 vs 编辑) made them mutually exclusive, and that shape is gone. A delivered-only file is in 编辑 as well, for
   // the same reason the client cannot tell a created file from an edited one.
+  const deliveredPaths = delivered.map(entry => entry.path);
   const editedList: string[] = [];
   const seen = new Set<string>();
-  for (const path of [...delivered, ...changed, ...touched]) {
+  for (const path of [...deliveredPaths, ...changed, ...touched]) {
     if (path === '' || seen.has(path)) continue;
     seen.add(path);
     editedList.push(path);
@@ -271,7 +277,7 @@ export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: reado
   // mention resolution and the row's gate, and neither wants the same path twice. Deliveries first, as they were.
   const paths: string[] = [];
   const seen = new Set<string>();
-  for (const path of [...delivered, ...edited]) {
+  for (const path of [...delivered.map(entry => entry.path), ...edited]) {
     if (seen.has(path)) continue;
     seen.add(path);
     paths.push(path);
@@ -323,6 +329,13 @@ export function needsExpand(contentHeight: number, cap: number = DELIVERABLE_BOX
   // A pixel of slack: sub-pixel line boxes round, and a switch that flickers in and out on a rounding error is worse
   // than one that appears a row early.
   return contentHeight > cap + 1;
+}
+
+/** One DELIVERED file: the assistant handed it over, with whatever it said about it. */
+export interface DeliveredFile {
+  /** The assistant's own words about the file, which the host's card shows as the second line. */
+  readonly description?: string;
+  readonly path: string;
 }
 
 /** One file a turn changed, with the raw hunks and the call that changed it. */

@@ -25,7 +25,7 @@ import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllo
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits } from './deliverables.js';
-import type { CommitRecord, DeliverableDisplay, TurnChange } from './deliverables.js';
+import type { CommitRecord, DeliveredFile, DeliverableDisplay, TurnChange } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
@@ -449,9 +449,13 @@ function GroupStatus({ group, sessionId, useChat, useSession, useSessionStatus, 
   </span>;
 }
 
-const DeliverableChip = memo(function DeliverableChip({ path, display, openFile, revealFile }: {
+const DeliverableChip = memo(function DeliverableChip({ path, display, description, full, openFile, revealFile }: {
   path: string;
   display: DeliverableDisplay;
+  /** The assistant's own words about a DELIVERED file — the second line of the host's card, when there is one. */
+  description?: string;
+  /** A delivered file: the host's card for one is a full-width row, not a half-width tile. */
+  full?: boolean;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
@@ -508,7 +512,7 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
   const kind = fileExtension(name).toUpperCase();
 
   return (
-    <div className={css.deliverableChip} data-status={status} data-style={display === 'cards' ? 'card' : undefined} title={path}>
+    <div className={css.deliverableChip} data-status={status} data-style={display === 'cards' ? 'card' : undefined} data-delivered={full === true ? '' : undefined} title={path}>
       <button
         type="button"
         className={css.chipMain}
@@ -532,7 +536,10 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
         )}
         <span className={css.deliverableName}>
           {status === 'opened' ? '已在外部打开' : name}
-          {display === 'cards' && status !== 'opened' && kind !== '' && <span className={css.deliverableKind}>{kind}</span>}
+          {/* 卡片档的第二行：宿主是「描述，没有就是类型名」（`cardDescription(file.description, metadata)` ✓）⇒ 这里照做 ✓。 */}
+          {display === 'cards' && status !== 'opened' && (description ?? kind) !== '' && (
+            <span className={css.deliverableDescription}>{description ?? kind}</span>
+          )}
         </span>
       </button>
 
@@ -746,7 +753,7 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
 });
 
 function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSidebar, turnNumber, sessionId, openChangesReview, openFile, revealFile }: {
-  groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[]; changesSeq?: number };
+  groups: { commits: readonly CommitRecord[]; delivered: readonly DeliveredFile[]; edited: readonly string[]; changesSeq?: number };
   changes: readonly TurnChange[];
   display: DeliverableDisplay;
   recordCommits: boolean;
@@ -828,8 +835,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
     setChangesOpen(true);
   };
 
-  const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }) => paths.map(path => (
-    <DeliverableChip key={path} path={path} display={display} openFile={open} revealFile={revealFile} />
+  const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }, delivered?: readonly DeliveredFile[]) => paths.map(path => (
+    <DeliverableChip key={path} path={path} display={display} description={delivered?.find(entry => entry.path === path)?.description}
+      full={delivered?.some(entry => entry.path === path) === true} openFile={open} revealFile={revealFile} />
   ));
   // 气泡的点击回到"打开文件本体" ✓，由「产物用侧边栏打开」开关决定外部还是侧边栏 ✓ —— 行内的 `openFile` 已经按开关路由
   //（`props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' })` ✓），所以这里不需要任何特例 ✓。
@@ -884,7 +892,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   onHeadingClick={edited ? openReview : undefined}                  panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
-                    : region.kind === 'delivered' ? chips(groups.delivered)
+                    : region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble carrying the short
                     // hash (what a reader recognises) with the message's first line as its title box.
                     : groups.commits.map((commit, index) => (
@@ -910,7 +918,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   {region.label}
                   <span className={css.deliverablesRegionCount}>{region.count}</span>
                 </span>
-                <div className={css.deliverablesRow}>{region.kind === 'delivered' ? chips(groups.delivered)
+                <div className={css.deliverablesRow}>{region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                   : groups.commits.map((commit, index) => (
                     <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
                       {commit.hash ?? commit.subject}
