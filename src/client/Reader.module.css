@@ -536,13 +536,16 @@
 .deliverableKind { margin-left: 6px; color: var(--dsw-alias-label-tertiary); font-size: 10px; }
 /* 详细卡片：宿主那张卡的实测数字（`--deliverable-fill` / `-hover`、60px 高、40px 图标砖、两列、
    窄容器一列 —— 宿主用 @container (width<=620px) 塌成一列，这里用同一个断点，`container-type` 由根提供）。 */
-.deliverablesRow:has(.deliverableChip[data-style=card]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+/* 这里**不再**有 `:has(.deliverableChip[data-style=card])` 那条两列网格 ✓（它是最早那版卡片实现留下的 ✓）：它的特异性
+   (0,3,0) 高于上面按数量的两条 (0,2,0) ✗ ⇒ 交付卡的"恰好一个 ⇒ 整行"永远赢不了 ✓ —— 读者看到的半宽卡就是这么来的 ✓。
+   卡片档的两列现在只由 `[data-delivered-count]` 决定 ✓（编辑是一整张列表卡 ✓，不参与这个网格 ✓）。 */
+@container (width <= 620px) { .deliverablesRow[data-delivered-count] { grid-template-columns: minmax(0, 1fr); } }
 .deliverableChip[data-style=card] { height: 60px; border-radius: var(--dsw-radius-lg); border-color: var(--dsw-alias-border-l1); padding: 8px 10px; background: var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)); }
 .deliverableChip[data-style=card]:hover { background: var(--deliverable-hover, var(--dsw-alias-bg-module-platform)); box-shadow: none; }
 .deliverableChip[data-style=card] .chipMain { max-width: none; flex: 1; gap: 10px; }
 .deliverableChip[data-style=card] .deliverableTypeIcon { width: 40px; height: 40px; border: .5px solid var(--dsw-alias-border-l1); border-radius: 10px; background: color-mix(in srgb, var(--dsw-static-neutral-00) 50%, transparent); color: var(--dsw-alias-link); }
 .deliverableChip[data-style=card] .deliverableName { display: inline-flex; align-items: baseline; min-width: 0; }
-@container (width <= 620px) { .deliverablesRow:has(.deliverableChip[data-style=card]) { grid-template-columns: minmax(0, 1fr); } }
+@container (width <= 620px) { .deliverablesRow[data-delivered-count] { grid-template-columns: minmax(0, 1fr); } }
 /* 提交气泡：不是文件，没有可点开的路径，所以只是一枚带短哈希的泡泡，标题（完整首行）放在 title 里。 */
 .deliverableCommit { box-sizing: border-box; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: var(--dsw-font-family-mono, monospace); }
 /* 总差异面板（读者要的）：悬停窗口与点击面板共用同一份内容 —— 每行是「路径 + ± 数字按钮」，点数字就地展开该文件的差异。

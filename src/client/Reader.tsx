@@ -909,7 +909,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
           <div className={css.deliverablesRegions}>
             {/* 顶部那行（「文件 / N 个文件 / 收起」）按读者要求去掉 ✓ —— 宿主那张卡本身没有这一层 ✓，它的折叠在卡内（「全部
                 N 个文件」✓）。底部「在文件夹中显示」也去掉 ✓。所以这里直接就是卡 + 交付 + 提交 ✓。 */}
-            {groups.edited.length > 0 && (
+            {/* 卡自己的数据为空就不显示 ✓（读者要求：没有编辑就别显示 ✓）—— 标题数的是**差异条目** ✓，所以门控也用同一个
+                数据 ✓：否则会出现「已编辑 0 个文件」那种自相矛盾的一行 ✓（读者截图里的正是它 ✓）。 */}
+            {changes.length > 0 && (
               <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
             )}
             {regions.filter(region => region.count > 0 && region.kind !== 'files').map(region => (
