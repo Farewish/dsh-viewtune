@@ -438,9 +438,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
             </div>
             <div className={css.settingsRow} title={OPEN_MODE_HINT} data-ud-check="reader-settings-openmode">
               <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>产物用右侧栏打开</span>
+                <span className={css.settingsLabel}>产物用侧边栏打开</span>
               </span>
-              <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
+              <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用侧边栏打开" />
             </div>
             {/* How a turn's files are SHOWN, beside where they open: 简略 is the row this view has always had, 详细 is the
                 host's own 60px card, and 平衡 keeps the row's density while telling the two lists apart — edited files and
