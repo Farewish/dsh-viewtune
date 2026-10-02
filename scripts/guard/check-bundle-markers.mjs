@@ -1039,10 +1039,12 @@ const markers = [
     // over when the list is open (the reader asked for the same arrow on 全部 N 个文件 and on 收起).
     && bundle.includes('IconChevronDownOutlineRegular')
     && bundle.includes('changedCardChevronOpen')
-    // …and the DELIVERED card keeps the host's shape too: one full-width row per delivery, with the assistant's own
-    // description as the second line (the host's `cardDescription(file.description, metadata)` falls back to the type
-    // caption, which the same element does). The `data-delivered` hook is what selects the full-width layout.
-    && bundle.includes('data-delivered')
+    // …and the DELIVERED card keeps the host's shape too: one card per delivery, the assistant's own description as the
+    // second line (the host's `cardDescription(file.description, metadata)` falls back to the type caption, which the same
+    // element does), and the layout driven WITHOUT selector matching — three rounds of attribute selectors silently did
+    // nothing here, so the column count is an inline style and the card's own shape is a CLASS, which never fails.
+    && bundle.includes('deliveredCard')
+    && bundle.includes('gridTemplateColumns')
     && bundle.includes('deliverableDescription')],
   // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
   // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
