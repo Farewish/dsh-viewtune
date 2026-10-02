@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, showDeliverablesRow, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 test('basename and dirname handle POSIX and Windows style paths', () => {
@@ -249,4 +249,19 @@ test('the three modes are named, and an unknown stored value opens on 平衡', (
   assert.equal(deliverableDisplayOf(null), 'balanced');
   assert.equal(deliverableDisplayOf('detailed'), 'balanced');
   assert.equal(deliverableDisplayOf(3), 'balanced');
+});
+
+test('a box needs its 「展开」 switch only when something is hidden behind the cap', () => {
+  // The reader's rule: 无需展开的时候展开不用出现. The cap is two rows of a 28px chip with a 6px gap, which is the same 62px
+  // the stylesheet caps the lane with (the guard pins that side, so the two cannot drift apart silently).
+  assert.equal(DELIVERABLE_BOX_CAP, 62);
+  assert.equal(needsExpand(28), false);
+  assert.equal(needsExpand(62), false);          // exactly two rows: nothing hidden
+  assert.equal(needsExpand(63), false);          // …and a pixel of slack for rounded line boxes
+  assert.equal(needsExpand(64), true);           // a third row's worth of content
+  assert.equal(needsExpand(200), true);
+  // The answer is the same whether the box is open or closed, because it is asked of the CONTENT's height: a box that
+  // can be opened must stay closable.
+  assert.equal(needsExpand(64, 62), true);
+  assert.equal(needsExpand(64, 1000), false);
 });

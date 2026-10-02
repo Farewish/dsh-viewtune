@@ -201,6 +201,31 @@ export function deliverableDisplayOf(value: unknown): DeliverableDisplay {
   return value === 'brief' || value === 'cards' ? value : 'balanced';
 }
 
+/** The chip row's height: `.deliverableChip { height: 28px }` in the balanced box. */
+export const DELIVERABLE_CHIP_HEIGHT = 28;
+/** The row gap inside the box's chip lane (`.deliverablesBoxLane { gap: 6px }`). */
+export const DELIVERABLE_CHIP_GAP = 6;
+/**
+ * How tall the balanced box's chip lane is allowed to grow before it needs opening: two rows exactly.
+ *
+ * Kept in step with the CSS by hand, and the guard pins the CSS side (`max-height:62px`), so a drift between the two is
+ * caught at build time rather than showing up as a switch that appears when there is nothing to open.
+ */
+export const DELIVERABLE_BOX_CAP = DELIVERABLE_CHIP_HEIGHT * 2 + DELIVERABLE_CHIP_GAP;
+
+/**
+ * Whether a chip lane of this natural height has anything hidden behind the cap — and therefore whether the box needs an
+ * 「展开」 switch at all. A box whose chips already fit shows no switch, which is what the reader asked for.
+ *
+ * The comparison is against the CAPPED height, not the lane's current one, so the answer does not change when the box is
+ * opened: `scrollHeight` is the content's height either way, and a box that was openable stays closable.
+ */
+export function needsExpand(contentHeight: number, cap: number = DELIVERABLE_BOX_CAP): boolean {
+  // A pixel of slack: sub-pixel line boxes round, and a switch that flickers in and out on a rounding error is worse
+  // than one that appears a row early.
+  return contentHeight > cap + 1;
+}
+
 /** The single produced path whose basename is exactly value, or undefined. */function onlyPathWithBasename(paths: readonly string[], value: string): string | undefined {
   const matches = paths.filter(path => basename(path) === value);
   return matches.length === 1 ? matches[0] : undefined;

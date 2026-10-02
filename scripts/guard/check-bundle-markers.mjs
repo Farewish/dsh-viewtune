@@ -990,6 +990,10 @@ const markers = [
     && bundle.includes('deliverablesBoxes')
     && bundle.includes('max-height:62px')
     && bundle.includes('data-open')
+    // …and the switch appears only when something IS hidden: the lane is measured (its content height against the same
+    // 62px) and the button renders only for a lane that overflows. The reader's 「无需展开的时候展开不用出现」.
+    && bundle.includes('function needsExpand(contentHeight, cap = 62)')
+    && bundle.includes('scrollHeight')
     // …and that the row claims the WHOLE row. `width:100%` is the stable half of it; `grid-column:1/-1` is the half that
     // saves it from a grid parent's `max-content` column (and is inert in a flex one). NOTE for whoever reads the built
     // file next: lightningcss folds `align-self` + `justify-self` into `place-self: stretch stretch`, so searching for the

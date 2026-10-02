@@ -22,7 +22,7 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow } from './deliverables.js';
 import type { DeliverableDisplay } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -585,6 +585,46 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
  * 详细卡片 gives each item the host's card shape. Both show EVERY file and both carry one control that folds the area
  * away, which is the reader's own 「要么都显示出来，要么加一个展开开关」 answered with both.
  */
+/**
+ * One box of the balanced row: heading and switch on their own line, chips below, two rows until it is opened.
+ *
+ * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」. That is a
+ * measurement, not a count: whether eight chips fit in two rows depends on how wide they are, so the lane is measured
+ * against the cap (see `needsExpand`). The measurement is re-taken when the paths, the mode, the open state or the box's
+ * own width change, because a narrower column wraps sooner.
+ */
+function DeliverablesBox({ region, open, onToggle, children }: {
+  region: { id: string; label: string; hint: string; paths: readonly string[] };
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const lane = useRef<HTMLDivElement | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const node = lane.current;
+    if (node === null) return;
+    const measure = () => { setOverflowing(needsExpand(node.scrollHeight)); };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => { observer.disconnect(); };
+  }, [region.paths, open]);
+  return (
+    <div className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
+      {/* The heading is a BUTTON because the reader has a use for it later; no click behaviour yet. */}
+      <button type="button" className={css.deliverablesBoxLabel}>共 {region.paths.length} 项{region.label}</button>
+      <div ref={lane} className={css.deliverablesBoxLane} title={region.hint}>{children}</div>
+      {overflowing && (
+        <button type="button" className={css.deliverablesToggle} aria-expanded={open} onClick={onToggle}>
+          {open ? '收起' : '展开'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function DeliverablesRow({ groups, display, openFile, revealFile }: {
   groups: { edited: readonly string[]; added: readonly string[] };
   display: DeliverableDisplay;
@@ -665,15 +705,10 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
             {regions.filter(region => region.paths.length > 0).map(region => {
               const open = boxOpen[region.id] === true;
               return (
-                <div key={region.id} className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
-                  {/* The heading is a BUTTON because the reader has a use for it later; no click behaviour yet. */}
-                  <button type="button" className={css.deliverablesBoxLabel}>共 {region.paths.length} 项{region.label}</button>
-                  <div className={css.deliverablesBoxLane} title={region.hint}>{chips(region.paths)}</div>
-                  <button type="button" className={css.deliverablesToggle} aria-expanded={open}
-                    onClick={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
-                    {open ? '收起' : '展开'}
-                  </button>
-                </div>
+                <DeliverablesBox key={region.id} region={region} open={open}
+                  onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
+                  {chips(region.paths)}
+                </DeliverablesBox>
               );
             })}
             {/* 平衡档也不要「在文件夹中显示」：框已经把这一轮的文件说完了（读者要求去掉行首标签与这个按钮）。 */}
