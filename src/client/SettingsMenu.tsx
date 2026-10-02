@@ -432,9 +432,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
             <Group caption="小功能" />
             <div className={css.settingsRow} title={STRIP_WHEEL_HINT} data-ud-check="reader-settings-strip-wheel">
               <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>竖条滚轮</span>
+                <span className={css.settingsLabel}>竖条滚轮缓动</span>
               </span>
-              <Switch checked={stripWheel} onChange={onStripWheel} label="竖条滚轮" />
+              <Switch checked={stripWheel} onChange={onStripWheel} label="竖条滚轮缓动" />
             </div>
             <div className={css.settingsRow} title={OPEN_MODE_HINT} data-ud-check="reader-settings-openmode">
               <span className={css.settingsCopy}>
@@ -459,9 +459,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 command really runs `git commit` — so this adds a line to turns that commit, and nothing otherwise. */}
             <div className={css.settingsRow} title={RECORD_COMMITS_HINT} data-ud-check="reader-settings-record-commits">
               <span className={css.settingsCopy}>
-                <span className={css.settingsLabel}>记录提交</span>
+                <span className={css.settingsLabel}>记录 git 提交</span>
               </span>
-              <Switch checked={recordCommits} onChange={onRecordCommits} label="记录提交" />
+              <Switch checked={recordCommits} onChange={onRecordCommits} label="记录 git 提交" />
             </div>
             {/* No description on purpose: the label is the whole of it. */}
             <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">
