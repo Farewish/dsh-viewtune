@@ -259,6 +259,15 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the box heading allowed to stretch, which makes the whole first row read as clickable',
+    // A grid item stretches by default, so a heading button without `justify-self: start` covers its entire column — the
+    // reader's report that the whole first line was clickable. `align-self` rather than a value containing the search,
+    // because the harness skips a mutation whose replacement is already present.
+    search: 'justify-self:start',
+    replace: 'align-self:start',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the balanced row pushed into the grid’s narrow column, which is exactly the half-row the reader saw',
     // `grid-column: 1 / -1` is what makes the row span a grid parent; starting it at column 2 leaves it in the
     // `max-content` column — the box hugging its content at the right end of the row, which is the report this fixes.

@@ -471,8 +471,10 @@
    第 2 列靠右，气泡跨两列落在第 2 行 ⇒ 气泡从内容左边缘开始（不再和标签挤同一行），换行后的气泡自然对齐在第一个
    气泡下面。框的左右各留少量余量（10px），上下 8px。 */
 .deliverablesBox { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 6px 8px; align-items: start; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
-/* 框头是按钮（读者说后面有用），所以先把它还原成"像文字"的按钮：字体与颜色继承、无边框、无内边距、可点。 */
-.deliverablesBoxLabel { grid-column: 1; grid-row: 1; padding: 0; border: 0; background: 0 0; font: inherit; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; text-align: left; }
+/* 框头是按钮（读者说后面有用），所以先把它还原成"像文字"的按钮：字体与颜色继承、无边框、无内边距、可点。
+   **必须 `justify-self: start`**：网格项默认 stretch ⇒ 按钮会铺满整列，于是"整行都是可点击状态"（读者的报告 ✗）。
+   按内容宽之后，可点区域就只有那几个字本身 ✓。 */
+.deliverablesBoxLabel { grid-column: 1; grid-row: 1; justify-self: start; padding: 0; border: 0; background: 0 0; font: inherit; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; text-align: left; }
 .deliverablesBoxLabel:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
 .deliverablesBox[data-region=added] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
 .deliverablesBoxLane { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-width: 0; max-height: 62px; overflow: hidden; }
