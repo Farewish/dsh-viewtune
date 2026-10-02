@@ -47,6 +47,7 @@ Three things that are easy to get wrong:
 A conversation is a sequence of **turns** (a prompt plus its answer), and the reading view is organised by that unit:
 
 - **The process is visible**: thinking, tool calls, subagents and progress are rendered live, so a long turn is more than a spinner; a turn that **finished successfully** folds its process away and keeps the answer, while a running or unfinished one stays open.
+- **A turn that something else woke up says so**: when a turn was not started from the composer but by a notification — a goal continuing, a task message, an external event / webhook, a scheduled run, a background job's state — the reading view shows an expandable row above it: **icon + why this turn started + the time**, and opening it gives the explanation, the notification's own text, and 「查看原始记录」. The titles and the icons are the conversation page's own, one for one (a goal says 「继续执行目标」 there and here), so the two views never tell two stories about one record.
 - **Every user message comes first**: a turn may open with a system prompt and carry several user / steering messages. They are all rendered, in source order, above the process disclosure — with or without a system prompt, the order is the same:
 
   ```

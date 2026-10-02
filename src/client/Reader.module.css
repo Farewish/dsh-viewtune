@@ -756,6 +756,21 @@
 .settingsNumber:hover { border-color: var(--dsw-alias-border-l3); }
 .settingsNumber:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 .settingsUnit { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+/* 「继续执行目标」 and its nine siblings: the host's `turn-trigger` record, which is why this turn exists at all. The
+   plate, the token and the structure follow the conversation page's own `TurnTriggerNodeView` — a button header with the
+   family icon, the title, the time and a chevron that turns, then the explanation and the notification. */
+.turnTrigger { box-sizing: border-box; border: .5px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-turn-trigger-bg, var(--dsw-alias-markdown-code-block)); min-width: 0; transition: background-color .1s; }
+.turnTrigger:hover { background: var(--dsw-alias-turn-trigger-bg-hover, var(--dsw-alias-interactive-bg-hover)); }
+.turnTriggerHeader { box-sizing: border-box; width: 100%; color: inherit; font: inherit; text-align: left; background: 0 0; border: 0; cursor: pointer; align-items: center; gap: 8px; padding: 8px 12px; display: flex; }
+.turnTriggerHeader:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 12px; }
+.turnTriggerIcon { flex: none; color: var(--dsw-alias-label-tertiary); display: inline-flex; }
+.turnTriggerTitle { min-width: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+.turnTriggerTime { flex: none; margin-left: auto; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.turnTriggerChevron, .turnTriggerChevronOpen { flex: none; color: var(--dsw-alias-label-tertiary); transition: transform 120ms ease; }
+.turnTriggerChevronOpen { transform: rotate(180deg); }
+.turnTriggerBody { border-top: .5px solid var(--dsw-alias-border-l1); margin: 0 12px; padding: 8px 0 10px; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 22px; }
+.turnTriggerExplanation { margin: 0 0 6px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
+@media (prefers-reduced-motion: reduce) { .turnTrigger, .turnTriggerChevron, .turnTriggerChevronOpen { transition: none; } }
 /* Frosted glass: an opt-in skin, ported from upstream 0.2.0's `data-reader-glass` block and mapped
    onto this fork's surfaces. The rule is the same in both — the reader paints no plates of its own,
    so a host wallpaper or skin stays visible behind the reading view, and the labels that are

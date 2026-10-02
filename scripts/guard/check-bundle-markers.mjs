@@ -954,7 +954,21 @@ const markers = [
     && bundle.includes('selection.isCollapsed')
     && bundle.includes('GOAL_BAR_INTERACTIVE.some((selector) => target.closest(selector) !== null)')
     && bundle.includes('max-height: 40vh')
+    // …and a fixed height ANYWHERE above it is released too: the bar renders into `conversation.input.dock`, whose
+    // wrapper belongs to the composer, and a height up that chain would clip the growth while the objective wrapped.
+    && bundle.includes('max-height: none')
     && bundle.includes('dsh-viewtune-goal-bar')],
+  // The host's `turn-trigger` record — the notification that woke the turn up (a goal continuing, a webhook, a job…).
+  // The conversation page renders it as `TurnTriggerNodeView`; the reading view answered 「此记录类型暂未接入阅读页」.
+  // The component is not exported, so the reading view mirrors it, and what it mirrors is pinned here: the row's own
+  // hook, the dispatch, the title table (one string the reader's screenshot named) and two of the ten icons that come
+  // from the same primitives package the host imports them from.
+  ['the reading view renders the host’s turn-trigger record instead of a “not connected” notice', () => bundle.includes('data-reader-turn-trigger')
+    && bundle.includes('isNode(node, "turn-trigger")')
+    && bundle.includes('turnTriggerReading(data.source)')
+    && bundle.includes('继续执行目标')
+    && bundle.includes('IconGoalOutlineRegular')
+    && bundle.includes('IconCordisPluginOutlineRegular')],
   // Which rule reads which variable is pinned rule by rule in `wallpaper-scope.test.ts` (a regex over a minified
   // bundle cannot say it reliably); what is asserted here is that both dials and both variables survive.
   ['the chrome scrim has one dial per surface', () => {

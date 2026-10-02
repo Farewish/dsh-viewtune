@@ -123,7 +123,11 @@ export function goalBarCss(): string {
     `  pointer-events: none;`,
     `}`,
     `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR}::after { transform: translateY(2px) rotate(-135deg); }`,
-    `/* Expanded: the bar grows, the objective wraps, and everything else stays on the first line. */`,
+    `/* Expanded: the bar grows, the objective wraps, and everything else stays on the first line. The DOCK is released
+       too, and defensively: it carries no height today (measured — nLMEza_dock is width and margin only), but the
+       bar is rendered into a slot (conversation.input.dock) whose wrapper belongs to the composer, and a fixed height
+       anywhere up that chain would clip the growth to one line while the objective happily wrapped inside it. */`,
+    `html[${GOAL_EXPANDED_ATTRIBUTE}] [class*="_dock"]:has(> ${GOAL_BAR_SELECTOR}) { height: auto; max-height: none; }`,
     `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR} {`,
     `  height: auto;`,
     `  min-height: 36px;`,

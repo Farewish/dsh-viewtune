@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the turn-trigger row renamed away from the words the conversation page uses for the same record',
+    // The two views must say the SAME thing about the same record — that is the whole point of mirroring the host's
+    // title table rather than paraphrasing it — so the copy is pinned, not just the presence of a row.
+    search: '继续执行目标',
+    replace: '执行目标',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the goal bar’s own buttons treated as the control, so 暂停 / 编辑 / 清除 fold the bar instead of doing their job',
     // The excluded element kinds are what keeps the four icon actions and the edit field out of the toggle. The mutation
     // kills the CALL while leaving the list declared, which is exactly why the marker pins the call and not the name.

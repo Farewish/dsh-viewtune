@@ -32,6 +32,17 @@
 - **测试与守护**：新增 `tests/goal-bar.test.ts`（点击归属、四类可交互元素逐一排除、拖选不切换、属性翻转与幂等设置 ✓，用鸭子类型的假元素与假根 ✓ —— 与 `app-backdrop.test.ts` 的 `fakeDocument` 同一套路 ✓）；守卫新增 1 条 marker（属性名、钩子、安装点、捕获监听、选区判断、**"排除可交互元素"那处调用**、高度上限、样式表 id ✓）；反向自检新增 1 例（把那处调用抹成 `false` —— 列表还在却不再被使用 ⇒ 要求 marker 失败），**71 → 72 例** ✓。全链：`TYPES OK` ✓、**38/38** 测试 ✓（新文件使 37 → 38）、守卫 **23/23** ✓、反向自检 **OK** ✓。
 - **又一次被同一条不变量拦下**：加完新文件后守卫三次连红在 `verify-build` ✗ —— 它只复制 **git 已跟踪**的文件（`git ls-files` ✓），新文件没入索引 ⇒ 重建时 `UNRESOLVED_IMPORT` ✗；`git add` 之后**第一次就绿** ✓（昨天同一条，今天再现一次 —— 这正是那条检查值钱的地方 ✓）。
 
+### 阅读页认得了 `turn-trigger`：这一轮是被谁唤起的
+
+- **读者的报告**（附截图）：对话页在"你已经答完、而目标还在继续、于是自动开下一轮"时会出现一枚 **「继续执行目标」** 行，点开能看详情；**阅读页**同一处却只显示「此记录类型暂未接入阅读页：turn-trigger」✗。
+- **先量宿主**：这类记录是宿主的 ChatNode 类型之一（`dsh-client-ui-chat` 的 `TURN_PROCESS_INDEPENDENT_KINDS` 里有它 ✓），渲染成 `TurnTriggerNodeView` —— `section[data-turn-trigger]`，头部是一个 **button**（图标 + 标题 + `<time>` + 会翻转的箭头 ✓），展开后先是一句说明，再是通知内容；底板用专门的 token `--dsw-alias-turn-trigger-bg` / `-bg-hover` ✓。标题**按来源种类**取（`message.trigger.goal` = 「继续执行目标」✓、`request`、`agent-message`、`team-message`、`subagent-settled`、`webhook`（`provider === 'github'` 时换成 github 那条 ✓）、`schedule`、`tool-jobs`、`cordis-host-runner` ✓），图标也是十种（`IconGoalOutlineRegular`、`IconCordisPluginOutlineRegular`、`IconQueueOutlineRegular` … ✓）。
+- **做法：照它**（这是唯一诚实的路）—— 宿主的组件**不导出** ✗（那个包只发布 `inject` / `apply`，和所有客户端插件一样 ✓），所以能做的是**共用词汇表**：同一条标题表（逐字抄它自己的中文词典，两个视图对同一条记录说同一句话 ✓）、同一句说明（「这条通知触发了本轮回复。」✓）、以及**同一套图标** —— 它们来自 `@deepseek-ai/dsh-client-ui-primitives`，正是本插件已经在 import 的那个包 ✓✓。时间用本仓库已有的 `formatMessageClock` ✓ —— 宿主那个组件用的**就是同名函数** ✓，所以格式天然一致 ✓。
+- **一处必须说明的近似**：宿主展开后的通知正文用它的 `ModelFacingContent` 渲染 ✗（不可导入 ✗）；本插件做的是**取出其中的文本块**（`turnTriggerText` ✓）按 markdown 渲染，并保留**原来的「查看原始记录」**（JSON 原文 ✓）—— 也就是说，这条记录的可达信息**不比以前少** ✓，而最常见的情况（通知本身就是一段文字）看起来与宿主一致 ✓。
+- **目标栏那件事，顺手加固但未证实**：读者报告"展开后条不变高" ✓。我量到平台的 composer seat 是 `position: sticky; bottom: 0`（有 overlay 时 `absolute; bottom: 0` ✓），而挂载点是 slot `conversation.input.dock` ✓ —— 于是给"**挂载容器**"也放开了高度（`[class*="_dock"]:has(> [data-goal-bar]) { height: auto; max-height: none }` ✓）。**但我没有浏览器，无法确认这是不是那一条** ✗ —— 所以这一半留给读者的眼睛（见下"未验证"✓），并附一个一眼可判的问题 ✓。
+- **一次自伤，记下来**：我在**模板字面量里的注释**中写了反引号 ✗ —— 它把模板字面量**提前闭合**了，`tsdown` 报 `PARSE_ERROR … Expected ',' or ']' but found '{'` ✗；更麻烦的是我第一遍"修"只改掉了其中一对 ✗，第二遍又把收尾那个反引号弄丢了 ✗，于是同一处连报三次 ✗。教训写进代码注释里了：**这些 CSS 注释里不许出现反引号** ✓。
+- **测试与守护**：新增 `tests/turn-trigger.test.ts`（十种来源的标题、webhook 的 github 分支、不可用来源落回 `收到执行请求` 而不是空行、时间与正文文本的取值 ✓）；守卫新增 1 条 marker（本行钩子、分派、读取端、标题表里那句「继续执行目标」、以及两个来自 primitives 的图标名 ✓），并强化了目标栏那条（钉 `max-height: none` —— 也就是"上面某层若定死高度也要放开" ✓）；反向自检新增 1 例（把「继续执行目标」改成「执行目标」⇒ 两个视图的说法不再一致 ⇒ 要求 marker 失败 ✓），**72 → 73 例** ✓。全链：`TYPES OK` ✓、**39/39** 测试 ✓（新文件使 38 → 39）、守卫 **23/23** ✓、反向自检 **OK** ✓。
+- **未验证（要你的眼睛）**：① 目标栏展开后到底哪种情况 —— **底板也变高了、只是压住了下面的输入区**（⇒ 层叠/定位问题，我改成"推开"），还是**底板仍是一行高、文字直接溢出**（⇒ 我把 `height: auto` 被谁压住的那一层量出来）。② `turn-trigger` 行在真实记录上的观感（图标/标题/时间与对话页是否一致 ✓、展开后的正文是否够看 ✓）。
+
 ## 0.5.4 (frost dials per surface, the reader's own settings as the defaults, and a settings page that reads as boxes)
 
 **两处读者报告：① 不管「竖条滚轮」开着还是关着，在竖条上滚轮都会滚动正文，差别只是有没有缓动；② 希望「界面遮罩」拆成侧栏与顶栏，各自调不同透明度。**

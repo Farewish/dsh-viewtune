@@ -3,7 +3,14 @@ import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo
 import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
+import {
+  IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
+  IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
+  IconQueueOutlineRegular, JsonBlock, MarkdownText,
+} from '@deepseek-ai/dsh-client-ui-primitives';
+import { formatMessageClock } from './message-chrome.js';
+import { TURN_TRIGGER_EXPLANATION, turnTriggerReading, turnTriggerText, turnTriggerTime } from './turn-trigger.js';
+import type { TurnTriggerIcon } from './turn-trigger.js';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
@@ -233,6 +240,60 @@ const CompactionDivider = memo(function CompactionDivider({ data }: {
   );
 });
 
+/**
+ * The trigger icons, kind for kind — the host's own ten, imported from the same primitives package it imports them from.
+ *
+ * The mapping is per SOURCE FAMILY rather than per record, which is what makes one row enough to say "a webhook woke
+ * this turn up" without inventing wording the conversation page does not use.
+ */
+const TRIGGER_ICONS: Record<TurnTriggerIcon, (props: { size?: number }) => ReactNode> = {
+  request: IconContextInjectionOutlineRegular,
+  goal: IconGoalOutlineRegular,
+  agent: IconPaperPlaneOutlineRegular,
+  team: IconAgentPresetOutlineRegular,
+  subagent: IconAgentPresetOutlineRegular,
+  github: IconBranchOutlineRegular,
+  webhook: IconGlobeOutlineRegular,
+  schedule: IconClockOutlineRegular,
+  job: IconQueueOutlineRegular,
+  plugin: IconCordisPluginOutlineRegular,
+};
+
+/**
+ * The host's `turn-trigger` row: what woke this turn up.
+ *
+ * It is the conversation page's `TurnTriggerNodeView`, rebuilt on this side because that component is not exported: a
+ * plate whose header is a BUTTON (so it is keyboard-reachable for free), carrying the family's icon, the title, the
+ * time, and a chevron that turns; opening it explains that the notification started the reply and shows the
+ * notification itself, with the raw record one more click away — the same fallback the unknown-record row already
+ * offered, so nothing about this record becomes less accessible than it was.
+ */
+const TurnTriggerNode = memo(function TurnTriggerNode({ data }: { data: { source?: unknown; time?: unknown; content?: unknown } }) {
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  const reading = turnTriggerReading(data.source);
+  const Icon = TRIGGER_ICONS[reading.icon];
+  const time = turnTriggerTime(data.time);
+  const text = turnTriggerText(data.content);
+  return <section className={css.turnTrigger} data-reader-turn-trigger data-reader-anchor>
+    <button type="button" className={css.turnTriggerHeader} aria-expanded={open} aria-controls={bodyId}
+      onClick={() => { setOpen(value => !value); }}>
+      <span className={css.turnTriggerIcon} aria-hidden><Icon size={14} /></span>
+      <span className={css.turnTriggerTitle}>{reading.title}</span>
+      {time !== null && <time className={css.turnTriggerTime} dateTime={new Date(time).toISOString()}>{formatMessageClock(time)}</time>}
+      <svg className={open ? css.turnTriggerChevronOpen : css.turnTriggerChevron} viewBox="0 0 16 16" width={12} height={12}
+        fill="none" stroke="currentColor" aria-hidden>
+        <path d="m4 6 4 4 4-4" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+    {open && <div id={bodyId} className={css.turnTriggerBody}>
+      <p className={css.turnTriggerExplanation}>{TURN_TRIGGER_EXPLANATION}</p>
+      {text !== '' && <MarkdownText text={text} labels={markdownLabels} />}
+      <JsonBlock label="查看原始记录" payload={data} truncatedLabel={truncatedJsonLabel} />
+    </div>}
+  </section>;
+});
+
 const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
@@ -306,6 +367,9 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       <p className={css.commandInput}>{data.text}</p>
     </div>;
   }
+  // The record the host renders as `TurnTriggerNodeView`, and the reading view used to answer 「此记录类型暂未接入阅读页」:
+  // it is not process furniture, it is the reason this turn exists, so it gets its own row (see TurnTriggerNode above).
+  if (isNode(node, 'turn-trigger')) return <TurnTriggerNode data={node.data} />;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
     <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />
