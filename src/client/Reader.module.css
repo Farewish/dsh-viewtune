@@ -458,9 +458,22 @@
    网格的两个列，气泡从不在标签下面开始。右边的开关占住自己的列。一般只显示两行：28px 气泡 + 6px 行距 = 62px
    正好两行，第三行整行被裁掉（不会露出半行）；点展开后 max-height 放开，显示全部。 */
 /* 平衡档：整行占满 + 根网格收成一列（没有行首标签了，否则框会落进那个 `max-content` 列里被挤窄）。
-   它是一轮 `<section>` 的直接子元素，父级的对齐方式会让一个网格子元素"收成内容宽" —— 文件少时框就只占右半行，
-   所以这里显式要一整行。简略档按原样保持内容宽（那是它一直的样子），详细卡片档也照旧。 */
-.deliverablesRoot[data-display=balanced] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
+   为什么几条"占满"一起写：唯一的直接父级是那一轮 `<section className={css.turn}>`，它是 `display:flex;
+   flex-direction:column` 且默认 `align-items: stretch` —— 在那里 `width:100%` 本该就够，但读者实测仍只占右半行，
+   而我没有浏览器可复现 ✗。于是把父级的**其他可能形态**也覆盖掉，彼此惰性、互不打架：
+     · column flex 下的右对齐 ⇒ `align-self: stretch`（压过 `align-items: center / flex-end`）；
+     · 网格父级下的 `max-content` 列 ⇒ `grid-column: 1 / -1` 跨过所有列 + `justify-self: stretch`；
+     · 横向 flex 且会换行 ⇒ `width:100%` 本身就让这一项独占一整行。
+   **不写 `flex: 1 0 100%`**：如果父级真是 column flex，那条管的是**高度**而不是宽度（100% 高度），是错的杠杆。
+   等读者确认生效，多余的可以删掉。 */
+.deliverablesRoot[data-display=balanced] {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+  grid-column: 1 / -1;
+  justify-self: stretch;
+}
 .deliverablesBoxes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesBox { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: start; column-gap: 8px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
 .deliverablesBoxLabel { grid-column: 1; padding-top: 4px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; }
