@@ -789,9 +789,14 @@ const markers = [
     // made this marker flake once (it went red inside a full guard run while passing three times standalone); what
     // must hold is the SEMANTICS — an endlessly looping animation whose keyframes belong to that module, plus a
     // reduced-motion block that stops it.
-    /animation:[^;}]*infinite[^;}]*\w+_markBusyPulse\}/.test(bundle)
+    // SHAPE, and nothing else: neither the shorthand's member order, the timing values, nor the position of the
+    // keyframe name relative to the closing brace are asserted — all three are the minifier's business, and the scratch
+    // rebuild inside `verify-build` produces slightly different bytes run to run (which is what made this marker flake
+    // twice: first on the values, then on `\w+_markBusyPulse\}`). What must hold is the SEMANTICS: an endlessly looping
+    // animation whose keyframes belong to that stylesheet, plus a reduced-motion block that stops it.
+    /animation:[^;}]*infinite[^;}]*_markBusyPulse/.test(bundle)
     && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_markBusy \.\w+_tick\{animation:none\}\}/.test(bundle)
-    && /animation:[^;}]*infinite[^;}]*\w+_pulse\}/.test(bundle)
+    && /animation:[^;}]*infinite[^;}]*_pulse/.test(bundle)
     && /@media \(prefers-reduced-motion:reduce\)\{\.\w+_pulseDot\{animation:none\}\}/.test(bundle)],
   ['the steps pill never claims a denominator it does not have', '`${answer} 步`'],
   ['…and the 动效 switch is read the defensive way, like every other switch that is on unless a record says otherwise', 'state.motion) !== false'],
@@ -1378,6 +1383,12 @@ const markers = [
     // value is inherited), written as a background: read, not redefined, so it is not the cycle the snapshot avoids.
     && bundle.includes('[data-changed-files] [class*="_header"]')
     && bundle.includes('var(--changes-fill, var(--viewtune-layer-plate, transparent))')
+    // …and the PER-FILE 产物 cards, the other card the host renders in that same spot. The reader asked whether they
+    // follow the diff dial; they did not, because the host paints them from a STATIC neutral (`--deliverable-fill`,
+    // themed by an attribute rather than by a token), so the dial is applied by READING that variable on the card — the
+    // header's construction — instead of by sweeping a token that no sweep could match.
+    && bundle.includes('[data-presented-file]')
+    && bundle.includes('var(--deliverable-fill, var(--viewtune-layer-plate')
     // …and the diff paper's ROWS are four plates of their own, none of which anything here dialled: the reader's
     // 「增减的绿红底色还是不透明」. All four ride the DIFF dial, like the paper itself — in the column, and again on the
     // portaled detail, which a column-scoped token override cannot reach.

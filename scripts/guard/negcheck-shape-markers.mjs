@@ -259,6 +259,15 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the per-file 产物 cards left out of the diff dial, so the two cards the host renders side by side disagree',
+    // The host itself calls them neighbours (`.nyYjTG_root[data-after-changes=true]` exists to sit this row directly
+    // under the changed-files card), and one of a pair being dialled while the other is not is the split this plugin's
+    // grouping rule forbids — which is exactly what the reader noticed.
+    search: '[data-presented-file]',
+    replace: '[data-presented-file-moved]',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the goal bar’s expanded height left where it never lands, so the bar stays one line high while the objective wraps',
     // `data-goal-bar` is the outer DOCK and the 36px is on its child, so a height written against the hook does nothing
     // at all: the objective (a descendant rule) keeps wrapping while the bar it is inside stays one line tall. That is

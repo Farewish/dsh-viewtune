@@ -101,7 +101,7 @@ With it on, the toolbar, cards, tool frames and code blocks stop painting plates
 | 用户气泡 | your own message's background | 3px |
 | 卡片与面板 | reasoning cards, tool frames, the system prompt, note boxes, the changed-files card | 8px |
 | 代码块 | fenced code blocks | 25px |
-| 差异面板 | the diff panel and its add/remove row tints (gutters included), its file tabs, inline diffs in a tool's result, and the conversation page's 「已编辑 x 个文件」 card with its header and hover detail | 25px |
+| 差异面板 | the diff panel and its add/remove row tints (gutters included), its file tabs, inline diffs in a tool's result, and the conversation page's 「已编辑 x 个文件」 card with its header and hover detail — **plus the per-file 产物 cards the host renders in that same spot, hover colour included** | 25px |
 | 滚动条槽位 | the rightmost scrollbar's track | — (the groove is a scrollbar pseudo-element, where `backdrop-filter` does nothing, so there is no such dial) |
 | 产物标签 | the product-file chips at the end of a turn | 5px |
 | 用量与步骤胶囊 | the two counters, 「用量 … tok」 and 「… 个步骤」 | 2px |

@@ -68,7 +68,11 @@ test('publishing sets the gate and just the two dials, and withdrawing takes the
 
 test('every rule that paints is gated, and the one that is not only snapshots', () => {
   const css = conversationGlassCss();
-  const selectors = css.split('\n')
+  // Comments are stripped before anything is read as a rule, and they have to be: these stylesheets carry long
+  // explanations, a continuation line of one is indistinguishable from a selector by `startsWith('/*')` alone, and a
+  // comment that quotes a declaration (`… { background: var(--x) }`) reads as an UNGATED rule otherwise. The same
+  // lesson was learned in wallpaper-scope.test.ts, for the same reason.
+  const selectors = css.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
     .map(line => line.trim())
     .filter(line => line.includes('{') && !line.startsWith('/*'));
   assert.ok(selectors.length >= 4, `expected a few rules, saw ${String(selectors.length)}`);
@@ -120,6 +124,14 @@ test('the changed-files card, its portaled detail, and the host’s to-bottom bu
   // from a LAYER token, which is exactly why the skin never reached it. Asserted across the selector/declaration line
   // break, because these rules are written one declaration per line.
   assert.ok(/\[data-changed-files\]\s*\{[^}]*--glass-diff/.test(css), 'the changed-files card rides the DIFF dial');
+  // …and the PER-FILE 产物 cards that the host renders in that same spot (the reader's question: they follow the diff
+  // dial too, and they did not before — the host paints them from a STATIC neutral, `--deliverable-fill`, which no token
+  // sweep could reach). Same construction as the card's header: the host's own variable is READ on the card where it is
+  // inherited, never redefined, so no cycle forms; the hover keeps the host's own feedback colour at the same dial.
+  assert.ok(/\[data-presented-file\]\s*\{[^}]*--glass-diff/.test(css), 'the presented-file cards ride the DIFF dial');
+  assert.ok(/\[data-presented-file\]\s*\{[^}]*backdrop-filter: blur\(var\(--glass-blur-diff\)\)/.test(css), '…with the diff dial’s frost');
+  assert.ok(css.includes('var(--deliverable-fill, var(--viewtune-layer-plate'), '…reading the host’s own fill, not a hard-coded neutral');
+  assert.ok(/\[data-presented-file\]:hover\s*\{[^}]*var\(--deliverable-hover/.test(css), '…and the hover reads the host’s own hover colour');
   // …and its hover DETAIL, which the deliverables package hands to the primitives' HoverCard: that card is PORTALED to
   // the body, so it is outside the column and the column scope cannot reach it. Three lines, because the plate and the
   // frost are stated on the two candidate boxes separately: the tint/frost pair on the content and its container, and
