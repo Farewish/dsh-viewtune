@@ -486,11 +486,10 @@
 .deliverablesBox .deliverablesToggle { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
 /* 详细卡片档也没有行首标签 ✓（读者要求去掉顶部那行 ✓），所以根网格同样收成一列、lane 跨过去 ✓ —— 与平衡档同一个理由 ✓。 */
 .deliverablesRoot[data-display=cards] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
-/* **区域本身**也要收成一列 ✓ —— 这是读者贴出 DOM 之后量清的真因 ✓：根与区域都是「标签列 + 内容列」的两列栅格 ✓，
-   第一列是 `max-content` ✓；卡片档把标签删掉后 ✓，卡片成了区域的**第一个**子元素 ⇒ 落进 `max-content` 那一列 ✓ ⇒
-   列宽只等于内容宽度 ✓，交付卡因此"只有一段长" ✓（编辑那张列表卡看着满宽 ✓，只是因为它的内容 —— 一长串 Windows 路径
-   —— 本身 max-content 就很宽 ✓）。平衡/简略档有标签 ✓，两列照旧 ✓。 */
-.deliverablesRoot[data-display=cards] .deliverablesRegion { grid-template-columns: minmax(0, 1fr); }
+/* **只有没有标签的那个区域**（交付 ✓ `data-region=delivered` ✓）才收成一列 ✓ —— 卡片档把它的标签删掉了 ✓，卡片成了
+   第一个子元素 ⇒ 会落进 `max-content` 那一列 ⇒ 列宽只等于内容宽度 ✓（读者贴的 DOM 量清了这一点 ✓）。**不能**对每个区域
+   都收 ✓：提交那一栏**有**标签 ✓，收成一列会把「提交 N」和气泡挤成上下两行 ✓（读者发现的副作用 ✓）。平衡/简略档不动 ✓。 */
+.deliverablesRoot[data-display=cards] .deliverablesRegion[data-region=delivered] { grid-template-columns: minmax(0, 1fr); }
 .deliverablesRoot[data-display=cards] .deliverablesLane { grid-column: 1 / -1; }
 /* 详细卡片档的**交付**卡：宿主那张「呈现文件」区的排版按**数量**分 —— 多个 ⇒ 两列网格 ✓、恰好一个 ⇒ 整行 ✓
    （它自己的 `data-single=true` 就是这个意思 ✓）。这里只读**行上的数量属性** ✓，不再用 `:has()` 去数子元素 ✗：
