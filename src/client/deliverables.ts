@@ -160,7 +160,6 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
  */
 export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { changesSeq?: number; delivered: readonly DeliveredFile[]; edited: readonly string[] } {
   const changed: string[] = [];
-  const delivered: DeliveredFile[] = [];
   const touched: string[] = [];
   const added: string[] = [];
   const seenChanged = new Set<string>();
@@ -172,12 +171,20 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
   // `presented` carries the assistant's own DESCRIPTION of each delivered file — the second line of the host's card — so
   // it is kept rather than reduced to a path here: that is what lets the reading view's cards mode match that card
   // instead of inventing a caption.
+  //
+  // …and it is deduped BY PATH, keeping the LATEST declaration, which is the host's own rule (`presentedForClosing`: "the
+  // latest declaration of each path"). Without it a turn that presents one file twice counted two — and since the cards
+  // are keyed by path, React drew ONE card in a two-column grid: the half-width card with an empty right side that the
+  // reader reported three times. Every earlier attempt blamed the stylesheets; the stylesheet was right, the COUNT was
+  // wrong.
+  const deliveredByPath = new Map<string, DeliveredFile>();
   for (const entry of deliverables?.presented ?? []) {
     const clean = typeof entry?.path === 'string' ? entry.path.trim() : '';
     if (clean === '') continue;
     const description = typeof entry?.description === 'string' && entry.description.trim() !== '' ? entry.description.trim() : undefined;
-    delivered.push(description === undefined ? { path: clean } : { path: clean, description });
+    deliveredByPath.set(clean, description === undefined ? { path: clean } : { path: clean, description });
   }
+  const delivered: DeliveredFile[] = [...deliveredByPath.values()];
   // The change announcement's per-file list, read tolerantly: only its added/deleted totals were certain when this was
   // first written, so `files`, `paths` and a bare array are all accepted, and anything else contributes nothing rather
   // than throwing.

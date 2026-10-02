@@ -128,6 +128,19 @@ test('the announcement’s sequence rides along, because the host’s review add
   assert.equal(getTurnDeliverableGroups(turnWith(undefined)).changesSeq, undefined);
 });
 
+test('the same delivered path declared twice counts once, the latest description winning', () => {
+  // The host's own rule (`presentedForClosing`: the latest declaration per path). Without it, `delivered.length` was 2
+  // while React drew ONE card (the cards are keyed by path), so the grid picked two columns for what looked like a single
+  // delivery — the half-width card with an empty right side that the reader reported three times. The stylesheets were
+  // never the problem: the COUNT was. So this pins the count.
+  const groups = getTurnDeliverableGroups(turnWith({
+    presented: [{ seq: 1, path: 'dist/a.tgz', description: '第一版' }, { seq: 2, path: 'dist/a.tgz', description: '第二版' }],
+  }));
+  assert.deepEqual(groups.delivered, [{ path: 'dist/a.tgz', description: '第二版' }]);
+  // …and the flat list the mentions and the row's gate use has it once as well.
+  assert.deepEqual(getTurnDeliverables(turnWith({ presented: [{ seq: 1, path: 'dist/a.tgz' }, { seq: 2, path: 'dist/a.tgz' }] })), ['dist/a.tgz']);
+});
+
 test('the changes-review address is spelled exactly as the host spells it', () => {
   // `dsh-resource://changes-review/session/<encodeURIComponent(sessionId)>/<seq>/<turn>` — what the deliverables package's
   // own `changesReviewAddress` builds and what its `canOpen` parses (`seq` digits, `turn` a 1-based integer). This address
