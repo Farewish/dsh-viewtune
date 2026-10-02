@@ -1009,6 +1009,9 @@ const markers = [
     && bundle.includes('deliverablesChanges')
     && bundle.includes('deliverablesBoxPanel')
     && bundle.includes('DiffStatButton')
+    // …and the small window the 编辑 heading shows on hover: the plain `title` the settings rows already use, pinned in its
+    // RENDERED form so the pin cannot be satisfied by a comment that happens to mention the words.
+    && bundle.includes('title: "点击查看差异"')
     && bundle.includes('turnChanges')
     // …and the commits are read from the calls, with the global options a real command carries: every commit in the
     // reader's instance is `git -C <dir> commit …`, and a pattern demanding `git` immediately before `commit` matched

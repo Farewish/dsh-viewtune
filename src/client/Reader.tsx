@@ -598,22 +598,22 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
 /**
  * One box of the balanced row: heading and switch on their own line, chips below, two rows until it is opened.
  *
- * The heading is a button for 编辑, and pressing it reveals the total-diff panel under it (`panel`) — the reader's
- * replacement for the host's review click, which no View can open. There is deliberately NO hover window: an earlier
- * version anchored the primitives' `HoverCard` here (500ms, width-anchored, the same widget the conversation page uses),
- * and the reader dropped it in favour of the click alone.
+ * The heading is a button ONLY where there is something to click: 编辑's click reveals the total-diff panel under it
+ * (`panel`) — the reader's replacement for the host's review click, which no View can open. 交付 and 提交 have no click, so
+ * they are plain text: a button that does nothing (or a disabled one) reads as one that should (the reader's calls, in
+ * that order). The 编辑 heading also carries the small 「点击查看差异」 window the reader asked for — the plain `title`
+ * the settings rows already use, rather than a custom hover card.
  *
- * `plainHeading` renders the heading as text instead: a 提交 box has nothing to click, and a button that does nothing
- * reads as one that should.
+ * There is deliberately NO hover window of our own: an earlier version anchored the primitives' `HoverCard` here (500ms,
+ * width-anchored, the same widget the conversation page uses) and the reader dropped it once the click existed.
  *
  * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」.
  */
-function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading, panel, children }: {
+function DeliverablesBox({ region, open, onToggle, onHeadingClick, panel, children }: {
   region: { id: string; label: string; hint: string; count: number };
   open: boolean;
   onToggle: () => void;
   onHeadingClick?: () => void;
-  plainHeading?: boolean;
   /** The panel the heading's click reveals, under the heading and across both columns. */
   panel?: ReactNode;
   children: ReactNode;
@@ -630,12 +630,12 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading,
     observer.observe(node);
     return () => { observer.disconnect(); };
   }, [region.count, open]);
-  const heading = plainHeading === true
-    // A plain heading gets its OWN class: the button's class carries `cursor: pointer`, so reusing it left the 提交 box
-    // looking like a button even after the element stopped being one (the reader's report).
+  const heading = onHeadingClick === undefined
+    // A plain heading gets its OWN class: the button's class carries `cursor: pointer`, so reusing it left a heading that
+    // is only text looking like a button (the reader's report, twice).
     ? <span className={css.deliverablesBoxPlain}>共 {region.count} 项{region.label}</span>
     : (
-      <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} aria-expanded={panel === undefined ? undefined : open} disabled={onHeadingClick === undefined}>
+      <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} title="点击查看差异">
         共 {region.count} 项{region.label}
       </button>
     );
@@ -788,10 +788,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openFile, re
                   // 这条是能拿到的最接近的面 ✓）；悬停窗口列出这一轮改过的文件与 ± 计数 ✓（读者贴的那张对话页截图正是这个
                   // 内容 ✓）。框头文字**不随悬停变化** ✓ —— 早先那句「在侧边栏预览」承诺了点击做不到的事，已去掉 ✓。
                   // 交付框：按读者要求悬停无内容、点击先不做 ✓。提交框：框头是**纯文字** ✓（没有可点的东西，做成按钮会误导 ✓）。
-                  plainHeading={region.kind === 'commits'}
-                  // 点击「共 x 项编辑」= 就地展开**总差异面板** ✓（悬停也显示同一份内容 ✓ —— 两者共用同一个面板 ✓，
-                  // 面板里的 ± 数字是按钮 ✓，点开该文件的差异 ✓）。这条替代了原先"跳去宿主检视器"的做法 ✓ —— 读者选了
-                  // 就地看差异 ✓，因为它才是 R1 想要的东西 ✓，而且不需要任何未公开的面 API ✓。交付框仍是"点击先不做" ✓。
+                  // 框头：**有点击行为的才是按钮** ✓ —— 只有编辑是按钮（点击就地展开总差异面板 ✓，并带「点击查看差异」的小窗口 ✓
+                  // = 原生 `title` ✓，与设置里那些选项同一套 ✓）；交付与提交没有点击 ⇒ 纯文字 ✓（读者两次要求 ✓，也避免了"禁用
+                  // 按钮"那种别扭样子 ✓）。
                   onHeadingClick={edited ? () => { setChangesOpen(value => !value); } : undefined}
                   panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
