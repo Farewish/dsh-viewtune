@@ -512,9 +512,8 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
   const kind = fileExtension(name).toUpperCase();
 
   return (
-    <div className={full === true ? `${css.deliverableChip} ${css.deliveredCard}` : css.deliverableChip}
-      data-status={status} data-style={display === 'cards' ? 'card' : undefined} title={path}
-      style={full === true ? { width: '100%' } : undefined}>
+    <div className={css.deliverableChip}
+      data-status={status} data-style={display === 'cards' ? 'card' : undefined} title={path}>
       <button
         type="button"
         className={css.chipMain}
