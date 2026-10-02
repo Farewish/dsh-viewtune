@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the goal bar’s own buttons treated as the control, so 暂停 / 编辑 / 清除 fold the bar instead of doing their job',
+    // The excluded element kinds are what keeps the four icon actions and the edit field out of the toggle. The mutation
+    // kills the CALL while leaving the list declared, which is exactly why the marker pins the call and not the name.
+    search: 'GOAL_BAR_INTERACTIVE.some((selector) => target.closest(selector) !== null)',
+    replace: 'false',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the settings panel closed by an outside click dropping the number the reader had just typed',
     // A panel removed from under the pointer never delivers `blur` to the field it took away, so closing is the only
     // exit that can still apply it. The mutation takes that exit away and leaves blur/Enter in place — which is exactly

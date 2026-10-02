@@ -19,6 +19,7 @@ import { installComposerGlass } from './composer-glass.js';
 import { installAppBackdrop } from './app-backdrop.js';
 import { installConversationGlass } from './conversation-glass.js';
 import { installConversationSolid } from './conversation-solid.js';
+import { installGoalBar } from './goal-bar.js';
 import type { ReaderInjected } from './types.js';
 
 /** Structural face of the sanctioned per-session composer writer. */
@@ -92,6 +93,14 @@ export function apply(ctx: Context): void {
    * attribute: a separate switch from the skin's, because it is about what that page is made of.
    */
   ctx.effect(() => installConversationSolid(document), 'dsh-viewtune: conversation solid page');
+  /**
+   * The host's goal bar, which is one ellipsised line with no affordance of its own.
+   *
+   * Two things about it are host facts rather than choices: the bar re-renders with its React tree, so a node this
+   * plugin inserted would be dropped and would need re-attaching forever; and it does not exist when this runs. So the
+   * control is a delegated click and ONE attribute on `<html>` that the installed stylesheet keys on (see goal-bar.ts).
+   */
+  ctx.effect(() => installGoalBar(document), 'dsh-viewtune: goal bar expand');
   /**
    * The right sidebar's resource opener, looked up per click rather than once at activation.
    *

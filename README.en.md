@@ -67,6 +67,17 @@ A conversation is a sequence of **turns** (a prompt plus its answer), and the re
 - **Its scope is the current turn**: the same predicate the reading scroll uses to pick an anchor, and when the viewport straddles two turns it takes **the upper one**.
 - Shortcuts **Alt+C / Alt+Shift+C**, rebindable in the settings. If the button disappears because it collapsed itself, focus goes to **the toolbar's other control** rather than the document body.
 
+## The goal bar (the line above the composer)
+
+The host's own goal bar is ONE line: anything longer is ellipsised, and it offers no way to see the whole thing. This plugin gives it an expand / collapse:
+
+- **Click the bar to expand it, click again to collapse.** The whole bar is the control, except the host's own parts: the resume / edit / pause / clear buttons, and the edit field while it is open.
+- Expanded, the bar **grows** (it is pinned to `height: 36px`), the objective **wraps** instead of being ellipsised, and it is capped at **40vh with its own scrollbar** so a very long goal cannot take the screen; the action buttons stay on the first line.
+- The **little marker at the end** is drawn in CSS (borders, not a glyph — a text chevron's weight and alignment belong to whatever font is in force, a lesson this repository learned the hard way) and flips when expanded. It is `pointer-events: none`, so clicking it clicks the bar underneath and works like the rest.
+- **Dragging to select the goal does not toggle it**: that click was a copy, not a fold.
+- **Nothing is inserted into the host's DOM.** The bar re-renders with its React tree, so an inserted node would be dropped by the next render. The feature is one attribute on `<html>` (`data-viewtune-goal-expanded`), a stylesheet, and one delegated capture-phase click — the same division of labour as the wallpaper and the skin.
+- It is a **mode, not a preference**: it lasts for the session and resets on reload, and there is no separate switch for it.
+
 ## The settings panel
 
 Opened by 「viewtune ⚙」, with **three pages** (arrows, Home and End move between them):

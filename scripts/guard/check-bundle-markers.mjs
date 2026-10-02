@@ -940,6 +940,21 @@ const markers = [
   // rather than a spelled-out selector, because the selector is built from the attribute constant at runtime.
   ['the settings panel offers the window-wide wallpaper', '"data-ud-check": "reader-settings-wallpaper-scope"'],
   // The chrome's scrim has a dial PER SURFACE since the reader asked the sidebar and the top bar to move apart.
+  // The host's GOAL BAR, which is one ellipsised line with no affordance of its own (measured in
+  // `@deepseek-ai/dsh-client-ui-goal`: `.objective { white-space: nowrap; text-overflow: ellipsis; overflow: hidden }`
+  // inside a bar pinned to `height: 36px`, and no `title` anywhere). This plugin expands it WITHOUT inserting a node
+  // into the host's tree — the next render would drop that — so the whole feature is one attribute on `<html>`, one
+  // delegated capture-phase click, and a stylesheet. The interactive exclusion is pinned as a CALL, not as the list's
+  // name: a marker that only saw `GOAL_BAR_INTERACTIVE` would pass with the list declared and never consulted, which is
+  // the regression where the edit and pause buttons fold the bar instead of doing their job.
+  ['the goal bar expands and collapses without touching the host’s tree', () => bundle.includes('data-viewtune-goal-expanded')
+    && bundle.includes('data-goal-bar')
+    && bundle.includes('installGoalBar(document)')
+    && bundle.includes('addEventListener("click"')
+    && bundle.includes('selection.isCollapsed')
+    && bundle.includes('GOAL_BAR_INTERACTIVE.some((selector) => target.closest(selector) !== null)')
+    && bundle.includes('max-height: 40vh')
+    && bundle.includes('dsh-viewtune-goal-bar')],
   // Which rule reads which variable is pinned rule by rule in `wallpaper-scope.test.ts` (a regex over a minified
   // bundle cannot say it reliably); what is asserted here is that both dials and both variables survive.
   ['the chrome scrim has one dial per surface', () => {
