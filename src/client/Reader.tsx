@@ -641,7 +641,8 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
 
   return (
     <div className={css.deliverablesRoot} data-reader-deliverables data-display={display}>
-      <span className={css.deliverablesLabel}>{display === 'brief' ? '产物' : '文件'}</span>
+      {/* 平衡档不要行首的标签：框自己已经写着「共 N 项编辑 / 新增」，再来一个「文件」是重复的一层。 */}
+      {display !== 'balanced' && <span className={css.deliverablesLabel}>{display === 'brief' ? '产物' : '文件'}</span>}
       <div className={css.deliverablesLane}>
         {display === 'brief' ? (
           <div className={css.deliverablesRow}>
@@ -669,9 +670,7 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
                 </div>
               );
             })}
-            {/* The folder button stays below the boxes, in the row wrapper — a bare button in the column would be
-                stretched to full width by the flex default. */}
-            <div className={css.deliverablesLane}>{folderButton(total)}</div>
+            {/* 平衡档也不要「在文件夹中显示」：框已经把这一轮的文件说完了（读者要求去掉行首标签与这个按钮）。 */}
           </div>
         ) : (
           <div className={css.deliverablesRegions}>
