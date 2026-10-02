@@ -268,6 +268,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the changed-files list card’s rows renamed, so the card loses the row shape the reader asked to match',
+    // The card is the host's shape: a header, then ROWS. Losing the row class leaves the files as unshaped text, which is
+    // what the marker guards. A case flip, since the harness skips a replacement that is already present.
+    search: 'changedCardRow',
+    replace: 'CHANGEDCARDROW',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the changes-review address prefix changed, so the host’s review can no longer be opened at all',
     // The address is the contract: the deliverables package's `canOpen` parses this exact prefix, so a different one opens
     // nothing — and the reader's switch silently does nothing instead. A case flip, because the harness skips a mutation

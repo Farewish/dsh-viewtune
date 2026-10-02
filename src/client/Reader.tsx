@@ -4,7 +4,7 @@ import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
-  DiffBlock, FileTypeIcon, fileExtension,
+  DiffBlock, FileTypeIcon, diffTotals, fileExtension,
   IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
   IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
   IconQueueOutlineRegular, JsonBlock, MarkdownText,
@@ -685,6 +685,63 @@ const TurnChangesPanel = memo(function TurnChangesPanel({ changes, openDiffs, on
   </div>;
 });
 
+/**
+ * The conversation page's 「已编辑 N 个文件」 card, rebuilt for the reading view because the card itself cannot be imported.
+ *
+ * Measured from the host: one rounded card holding a list — a header BUTTON (a 40px tile with `FileTypeIcon kind="code"`
+ * at 20px, the title 「已编辑 N 个文件」, the turn's total ± counts, and a hover hint), then one row per file showing its
+ * path and its own ± counts, the row itself the click target, and a 「全部 N 个文件」 control that unfolds the rest — four
+ * rows first (`COLLAPSED_ROWS`), which is what the reader's screenshot shows.
+ *
+ * The row click opens that turn's changes review, as the host's does (`openReview(index)` there; the review's address is
+ * per turn here, so the turn's review is what opens). The `±` numbers are shown as plain counts, like the host's rows —
+ * the BUTTON form belongs to the in-page panel, where pressing one unfolds that file's diff.
+ */
+const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview, onOpenFile }: {
+  changes: readonly TurnChange[];
+  /** The row's click: the host's review when it can be addressed, the file otherwise. */
+  onOpenReview: (change: TurnChange) => void;
+  onOpenFile?: (path: string) => void;
+}) {
+  const COLLAPSED_ROWS = 4;
+  const [expanded, setExpanded] = useState(false);
+  const totals = changes.reduce((sum, change) => {
+    const counts = diffTotals(change.hunks);
+    return { added: sum.added + counts.added, removed: sum.removed + counts.removed };
+  }, { added: 0, removed: 0 });
+  const foldable = changes.length > COLLAPSED_ROWS;
+  const rows = foldable && !expanded ? changes.slice(0, COLLAPSED_ROWS) : changes;
+  return <div className={css.changedCard} data-region-card>
+    <button type="button" className={css.changedCardHeader} title="点击查看差异" onClick={() => { onOpenReview(changes[0] ?? { hunks: [], path: '' }); }}>
+      <span className={css.changedCardTile} aria-hidden><FileTypeIcon kind="code" size={20} /></span>
+      <span className={css.changedCardTitles}>
+        <span className={css.changedCardTitle}>已编辑 {changes.length} 个文件</span>
+        <span className={css.changedCardCounts}>
+          <span className={css.changedCardAdded}>+{totals.added}</span>
+          <span className={css.changedCardRemoved}>-{totals.removed}</span>
+        </span>
+      </span>
+    </button>
+    <div className={css.changedCardList}>
+      {rows.map(change => {
+        const counts = diffTotals(change.hunks);
+        return <button key={change.path} type="button" className={css.changedCardRow} title={change.path}
+          onClick={() => { onOpenReview(change); }} onDoubleClick={() => { onOpenFile?.(change.path); }}>
+          <span className={css.changedCardPath}>{change.path}</span>
+          <span className={css.changedCardCounts}>
+            <span className={css.changedCardAdded}>+{counts.added}</span>
+            <span className={css.changedCardRemoved}>-{counts.removed}</span>
+          </span>
+        </button>;
+      })}
+    </div>
+    {foldable && <button type="button" className={css.changedCardToggle} aria-expanded={expanded}
+      onClick={() => { setExpanded(value => !value); }}>
+      {expanded ? '收起' : `全部 ${String(changes.length)} 个文件`}
+    </button>}
+  </div>;
+});
+
 function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSidebar, turnNumber, sessionId, openChangesReview, openFile, revealFile }: {
   groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[]; changesSeq?: number };
   changes: readonly TurnChange[];
@@ -755,6 +812,21 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
     }
     setChangesOpen(value => !value);
   };
+  /**
+   * 列表卡里某一行的点击：**打开这一轮的差异审查** ✓ —— 与对话页那张卡的行点击一致 ✓（宿主那里是 `openReview(index)` ✓；
+   * 审查地址是按**轮**的 ✓，所以打开的是这一轮的审查 ✓）。坐标不全时退回**本页面板** ✓，而双击仍然直接打开文件本身 ✓
+   * （给"就是要看文件"留一条路 ✓）。
+   */
+  const openReviewFor = () => {
+    const seq = groups.changesSeq;
+    if (reviewInSidebar && typeof seq === 'number' && Number.isInteger(seq)
+      && Number.isInteger(turnNumber) && turnNumber > 0 && openChangesReview !== undefined) {
+      openChangesReview({ sessionId, seq, turn: turnNumber });
+      return;
+    }
+    // 退回本页面板 ✓ —— 它是这一轮所有文件的总差异 ✓（宿主审查的地址也同样是按轮的 ✓），所以不需要行自己的坐标 ✓。
+    setChangesOpen(true);
+  };
 
   const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }) => paths.map(path => (
     <DeliverableChip key={path} path={path} display={display} openFile={open} revealFile={revealFile} />
@@ -809,8 +881,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   // 框头：**有点击行为的才是按钮** ✓ —— 只有编辑是按钮（点击就地展开总差异面板 ✓，并带「点击查看差异」的小窗口 ✓
                   // = 原生 `title` ✓，与设置里那些选项同一套 ✓）；交付与提交没有点击 ⇒ 纯文字 ✓（读者两次要求 ✓，也避免了"禁用
                   // 按钮"那种别扭样子 ✓）。
-                  onHeadingClick={edited ? openReview : undefined}
-                  panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
+                  onHeadingClick={edited ? openReview : undefined}                  panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
                     : region.kind === 'delivered' ? chips(groups.delivered)
@@ -833,14 +904,18 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               <button type="button" className={css.deliverablesToggle} aria-expanded={!folded}
                 onClick={() => { setFolded(value => !value); }}>{folded ? '展开' : '收起'}</button>
             </div>
-            {!folded && regions.filter(region => region.count > 0).map(region => (
+            {/* 详细卡片档：**编辑**换成宿主那张**列表卡** ✓（它自带「已编辑 N 个文件」标题 ✓，所以不再另起区域标签 ✓ ——
+                与对话页 图1 一致 ✓）；**交付**保持宿主呈现交付文件用的 60px 磁贴 ✓；提交仍是泡泡 ✓。 */}
+            {!folded && groups.edited.length > 0 && (
+              <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
+            )}
+            {!folded && regions.filter(region => region.count > 0 && region.kind !== 'files').map(region => (
               <div key={region.id} className={css.deliverablesRegion} data-region={region.id} title={region.hint}>
                 <span className={css.deliverablesRegionLabel}>
                   {region.label}
                   <span className={css.deliverablesRegionCount}>{region.count}</span>
                 </span>
-                <div className={css.deliverablesRow}>{region.kind === 'files' ? chips(groups.edited)
-                  : region.kind === 'delivered' ? chips(groups.delivered)
+                <div className={css.deliverablesRow}>{region.kind === 'delivered' ? chips(groups.delivered)
                   : groups.commits.map((commit, index) => (
                     <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
                       {commit.hash ?? commit.subject}

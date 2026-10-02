@@ -484,6 +484,28 @@
 .deliverablesBox .deliverableChip { height: 28px; }
 /* 开关与标题同一行、贴右、与标题上下居中（读者先指出贴底、再要求挪到标题行）。 */
 .deliverablesBox .deliverablesToggle { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
+/* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。
+   数值与结构照对话页那张卡量出来的：40px 图标砖（20px 图标 ✓）、标题 13px/500 ✓、计数 10px 等宽 ✓、行高按行的内容走 ✓，
+   默认四行（`COLLAPSED_ROWS` ✓）之后由「全部 N 个文件」展开 ✓。行的**整行**都是点击目标 ✓（宿主那行本身就是 button ✓）。 */
+.changedCard { box-sizing: border-box; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-lg, 12px); background: var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)); overflow: hidden; }
+.changedCardHeader { box-sizing: border-box; width: 100%; border: 0; background: 0 0; color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.changedCardHeader:hover { background: var(--deliverable-hover, var(--dsw-alias-interactive-bg-hover)); }
+.changedCardHeader:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.changedCardTile { flex: none; width: 40px; height: 40px; border: .5px solid var(--dsw-alias-border-l1); border-radius: 10px; background: color-mix(in srgb, var(--dsw-static-neutral-00) 50%, transparent); display: inline-flex; align-items: center; justify-content: center; }
+.changedCardTitles { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.changedCardTitle { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.changedCardCounts { display: inline-flex; gap: 6px; font-family: var(--ds-font-family-code, monospace); font-size: 10px; line-height: 16px; }
+.changedCardAdded { color: var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary)); }
+.changedCardRemoved { color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-tertiary)); }
+.changedCardList { border-top: .5px solid var(--dsw-alias-border-l1); display: flex; flex-direction: column; }
+.changedCardRow { box-sizing: border-box; width: 100%; border: 0; border-top: .5px solid var(--dsw-alias-border-l1); background: 0 0; color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.changedCardRow:first-child { border-top: 0; }
+.changedCardRow:hover { background: var(--deliverable-hover, var(--dsw-alias-interactive-bg-hover)); }
+.changedCardRow:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.changedCardPath { min-width: 0; flex: 1; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.changedCardToggle { box-sizing: border-box; width: 100%; border: 0; border-top: .5px solid var(--dsw-alias-border-l1); background: 0 0; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; line-height: 20px; text-align: left; cursor: pointer; padding: 10px 12px; }
+.changedCardToggle:hover { background: var(--deliverable-hover, var(--dsw-alias-interactive-bg-hover)); color: var(--dsw-alias-label-secondary); }
+.changedCardToggle:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }

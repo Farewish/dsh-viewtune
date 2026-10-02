@@ -1027,6 +1027,14 @@ const markers = [
     // …and the fallback that decides what an unrecognised stored value means: the MIDDLE mode, which is what a fresh
     // install opens with.
     && bundle.includes('value === "brief" || value === "cards" ? value : "balanced"')],
+  // The conversation page's 「已编辑 N 个文件」 card, rebuilt in the reading view's 详细卡片 mode: ONE rounded card holding a
+  // list (a header button with a 40px tile and the turn's totals, one clickable row per file with its own ±, and a control
+  // that unfolds the rest) — the host's CHANGED-files shape, which is not the same as its presented-file tile grid that
+  // this plugin uses for 交付.
+  ['the 详细卡片 mode draws the host’s changed-files LIST card, not a tile grid', () => bundle.includes('ChangedFilesCard')
+    && bundle.includes('changedCardHeader')
+    && bundle.includes('changedCardRow')
+    && bundle.includes('changedCardToggle')],
   // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
   // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
   // own stores), but its address can be handed to `ctx.sidebarRight.openResource` and then the host draws it, unmodified.
