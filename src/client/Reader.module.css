@@ -484,6 +484,9 @@
 .deliverablesBox .deliverableChip { height: 28px; }
 /* 开关与标题同一行、贴右、与标题上下居中（读者先指出贴底、再要求挪到标题行）。 */
 .deliverablesBox .deliverablesToggle { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
+/* 详细卡片档也没有行首标签 ✓（读者要求去掉顶部那行 ✓），所以根网格同样收成一列、lane 跨过去 ✓ —— 与平衡档同一个理由 ✓。 */
+.deliverablesRoot[data-display=cards] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
+.deliverablesRoot[data-display=cards] .deliverablesLane { grid-column: 1 / -1; }
 /* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。
    数值与结构照对话页那张卡量出来的：40px 图标砖（20px 图标 ✓）、标题 13px/500 ✓、计数 10px 等宽 ✓、行高按行的内容走 ✓，
    默认四行（`COLLAPSED_ROWS` ✓）之后由「全部 N 个文件」展开 ✓。行的**整行**都是点击目标 ✓（宿主那行本身就是 button ✓）。 */

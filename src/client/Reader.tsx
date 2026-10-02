@@ -755,8 +755,6 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   revealFile?: (path: string) => Promise<void> | void;
 }) {
   const [folderStatus, setFolderStatus] = useState<'idle' | 'opened'>('idle');
-  // Expanded on mount: seeing the files is the reason the row exists, and folding is the exception.
-  const [folded, setFolded] = useState(false);
   // The chip's own timer is cancelled by the next flash; this one had no ref at all, so a second click stacked a second
   // timer and unmounting left the callback holding a component that was gone.
   const folderTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -776,7 +774,6 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   // 记录后确认「新增」与「编辑」在文件上分不出来（宿主的改动公告覆盖全部写入，而 `write` 新建与覆盖是同一个调用），
   // 于是按读者的决定合并成一个「编辑」列表 ✓。
   const flat = groups.edited;
-  const total = groups.edited.length;
   // 三个区域：**编辑**（这一轮动过的文件）、**交付**（我交给你的文件 = 宿主的 `presented`，分享包在这里）与**提交**
   //（这一轮的 git 提交 —— 它单独是一个功能，默认关，开关在「小功能」里）。区域只在有条目时渲染。
   const regions = [
@@ -853,8 +850,8 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
 
   return (
     <div className={css.deliverablesRoot} data-reader-deliverables data-display={display}>
-      {/* 平衡档不要行首的标签：框自己已经写着「共 N 项编辑 / 新增」，再来一个「文件」是重复的一层。 */}
-      {display !== 'balanced' && <span className={css.deliverablesLabel}>{display === 'brief' ? '产物' : '文件'}</span>}
+      {/* 只有**简略**档保留行首的「产物」标签 ✓ —— 平衡档自己有框头 ✓，详细卡片档现在就是宿主那张列表卡本身 ✓（读者要求去掉顶部那行 ✓）。 */}
+      {display === 'brief' && <span className={css.deliverablesLabel}>产物</span>}
       <div className={css.deliverablesLane}>
         {display === 'brief' ? (
           <div className={css.deliverablesRow}>
@@ -899,17 +896,12 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
           </div>
         ) : (
           <div className={css.deliverablesRegions}>
-            <div className={css.deliverablesTotalRow}>
-              <span className={css.deliverablesTotal}>{total} 个文件</span>
-              <button type="button" className={css.deliverablesToggle} aria-expanded={!folded}
-                onClick={() => { setFolded(value => !value); }}>{folded ? '展开' : '收起'}</button>
-            </div>
-            {/* 详细卡片档：**编辑**换成宿主那张**列表卡** ✓（它自带「已编辑 N 个文件」标题 ✓，所以不再另起区域标签 ✓ ——
-                与对话页 图1 一致 ✓）；**交付**保持宿主呈现交付文件用的 60px 磁贴 ✓；提交仍是泡泡 ✓。 */}
-            {!folded && groups.edited.length > 0 && (
+            {/* 顶部那行（「文件 / N 个文件 / 收起」）按读者要求去掉 ✓ —— 宿主那张卡本身没有这一层 ✓，它的折叠在卡内（「全部
+                N 个文件」✓）。底部「在文件夹中显示」也去掉 ✓。所以这里直接就是卡 + 交付 + 提交 ✓。 */}
+            {groups.edited.length > 0 && (
               <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
             )}
-            {!folded && regions.filter(region => region.count > 0 && region.kind !== 'files').map(region => (
+            {regions.filter(region => region.count > 0 && region.kind !== 'files').map(region => (
               <div key={region.id} className={css.deliverablesRegion} data-region={region.id} title={region.hint}>
                 <span className={css.deliverablesRegionLabel}>
                   {region.label}
@@ -923,7 +915,6 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   ))}</div>
               </div>
             ))}
-            {!folded && <div className={css.deliverablesLane}>{folderButton(total)}</div>}
           </div>
         )}
       </div>
