@@ -259,6 +259,15 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the two deliverable regions merged back into one by renaming the hook that tells 编辑 from 产物',
+    // The split IS the correction: one region for what the turn EDITED, one for what it DELIVERED. Renaming the hook
+    // merges them into the single list the reader asked us to stop showing under one label. (`data-area` rather than
+    // something containing `data-region`, because the harness skips a mutation whose replacement is already present.)
+    search: 'data-region',
+    replace: 'data-area',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the per-file 产物 cards left out of the diff dial, so the two cards the host renders side by side disagree',
     // The host itself calls them neighbours (`.nyYjTG_root[data-after-changes=true]` exists to sit this row directly
     // under the changed-files card), and one of a pair being dialled while the other is not is the split this plugin's

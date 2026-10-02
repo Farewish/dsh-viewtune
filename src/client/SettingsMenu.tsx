@@ -14,6 +14,8 @@ import { GLASS_BLUR_MAX, GLASS_PARTS } from './glass.js';
 import { COLLAPSE_MODES, collapseModeOf } from './collapse-mode.js';
 import type { CollapseMode } from './collapse-mode.js';
 import { TURN_FOLD_MAX, turnFoldOf } from './turn-fold.js';
+import { DELIVERABLE_DISPLAYS, deliverableDisplayOf } from './deliverables.js';
+import type { DeliverableDisplay } from './deliverables.js';
 import { TEXT_CADENCES, textCadenceOf } from './text-cadence.js';
 import type { TextCadence } from './text-cadence.js';
 import { FOLLOW_MODES, followModeOf } from './reading-scroll.js';
@@ -75,6 +77,8 @@ const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
 const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到展开阅读那么高';
 /** What the turn window buys, as that row's `title` box: behaviour only, and short (the copy check caps it at 28). */
 const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是全部保留';
+/** How the three ways of showing a turn's files differ, in the reader's own terms. */
+const DELIVERABLE_DISPLAY_HINT = '简略更紧凑，详细更像原生卡片';
 /** The frost rows, one per surface. Short because the row above it already says which surface is meant. */
 const FROST_HINT = '0px 只有玻璃，往上才是磨砂';
 
@@ -127,7 +131,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -155,6 +159,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** Whether a delivered file opens in the right sidebar rather than the system app. */
   openInSidebar: boolean;
   onOpenInSidebar: (next: boolean) => void;
+  /** How a turn's files are shown: 简略气泡 / 平衡 / 详细卡片. */
+  deliverableDisplay: DeliverableDisplay;
+  onDeliverableDisplay: (next: DeliverableDisplay) => void;
   /** Whether a wheel over the toolbar's two column handles is forwarded to the transcript. */
   stripWheel: boolean;
   onStripWheel: (next: boolean) => void;
@@ -429,6 +436,19 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>产物用右侧栏打开</span>
               </span>
               <Switch checked={openInSidebar} onChange={onOpenInSidebar} label="产物用右侧栏打开" />
+            </div>
+            {/* How a turn's files are SHOWN, beside where they open: 简略 is the row this view has always had, 详细 is the
+                host's own 60px card, and 平衡 keeps the row's density while telling the two lists apart — edited files and
+                delivered files are different claims about a turn, and the fallback that built the first used to be shown
+                under the second's label. A select rather than a switch because it is three named states. */}
+            <div className={css.settingsRow} title={DELIVERABLE_DISPLAY_HINT} data-ud-check="reader-settings-deliverable-display">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>产物展示</span>
+              </span>
+              <select className={css.settingsSelect} value={deliverableDisplay} aria-label="产物展示方式"
+                onChange={event => { onDeliverableDisplay(deliverableDisplayOf(event.currentTarget.value)); }}>
+                {DELIVERABLE_DISPLAYS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
             </div>
             {/* No description on purpose: the label is the whole of it. */}
             <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">

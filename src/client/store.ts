@@ -3,6 +3,7 @@ import type { EngineStoreHandle } from '@deepseek-ai/dsh-client-store';
 import type { ShortcutAction } from './shortcuts.js';
 import type { CollapseMode } from './collapse-mode.js';
 import type { DeliverableOpenMode } from './open-file.js';
+import type { DeliverableDisplay } from './deliverables.js';
 import type { TextCadence } from './text-cadence.js';
 import type { FollowMode } from './reading-scroll.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
@@ -54,6 +55,13 @@ export interface ReaderState {
   collapseMode: CollapseMode;
   /** Where a delivered file opens: the system app by default, the right sidebar on request. */
   deliverableOpenMode: DeliverableOpenMode;
+  /**
+   * How the reading view SHOWS a turn's files — 「产物展示」: 简略气泡, 平衡, 详细卡片.
+   *
+   * Read through `deliverableDisplayOf`, which answers `balanced` for anything unrecognised: that is the mode this view
+   * opens with, and the other two are departures from it (the brief row says the least, the card says the most).
+   */
+  deliverableDisplay: DeliverableDisplay;
   /**
    * How often a streaming message publishes its revealed text.
    *
@@ -184,6 +192,8 @@ type ReaderActions = {
   setConversationSolid: (draft: ReaderState, value: boolean) => void;
   setCollapseMode: (draft: ReaderState, value: CollapseMode) => void;
   setDeliverableOpenMode: (draft: ReaderState, value: DeliverableOpenMode) => void;
+  /** The reading view's deliverable presentation; the caller passes what `deliverableDisplayOf` resolved. */
+  setDeliverableDisplay: (draft: ReaderState, value: DeliverableDisplay) => void;
   setTextCadence: (draft: ReaderState, value: TextCadence) => void;
   setRevealBlur: (draft: ReaderState, value: boolean) => void;
   setRevealWords: (draft: ReaderState, value: boolean) => void;
@@ -222,6 +232,9 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
      */
     init: (): ReaderState => ({
       expanded: {}, motion: true, glass: true, glassParts: {}, glassBlur: {}, deliverableOpenMode: 'external',
+      // …and its files are shown in the middle of the three ways: the row's density, both lists told apart, and the
+      // full card one control away. See `deliverables.ts` for why the middle is where a fresh install opens.
+      deliverableDisplay: 'balanced',
       // The handles forward the wheel until a reader says otherwise; see the field's own note for why that is the
       // default rather than an opt-in.
       stripWheel: true,
@@ -289,6 +302,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setConversationSolid: (draft, value: boolean) => { draft.conversationSolid = value; },
       setCollapseMode: (draft, value: CollapseMode) => { draft.collapseMode = value; },
       setDeliverableOpenMode: (draft, value: DeliverableOpenMode) => { draft.deliverableOpenMode = value; },
+      setDeliverableDisplay: (draft, value: DeliverableDisplay) => { draft.deliverableDisplay = value; },
       setTextCadence: (draft, value: TextCadence) => { draft.textCadence = value; },
       setRevealBlur: (draft, value: boolean) => { draft.revealBlur = value; },
       setRevealWords: (draft, value: boolean) => { draft.revealWords = value; },

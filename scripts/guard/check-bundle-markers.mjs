@@ -969,6 +969,23 @@ const markers = [
     // wrapper belongs to the composer, and a height up that chain would clip the growth while the objective wrapped.
     && bundle.includes('max-height: none')
     && bundle.includes('dsh-viewtune-goal-bar')],
+  // 「产物展示」: the three ways this view can show a turn's files, and the two lists told apart inside the detailed
+  // ones. The reader asked for exactly this — 简略气泡 left as it was, and 编辑 kept apart from 产物 in the other two,
+  // because the fallback that builds the first list used to arrive under the second list's label (see deliverables.ts).
+  ['the deliverable row has three modes, and the detailed two tell 编辑 from 产物', () => bundle.includes('deliverableDisplayOf(state.deliverableDisplay)')
+    && bundle.includes('reader-settings-deliverable-display')
+    && bundle.includes('产物展示')
+    // The two regions and their hook: one for what the turn EDITED, one for what it DELIVERED.
+    && bundle.includes('data-region')
+    && bundle.includes('data-display')
+    // …the one control that folds the detailed modes away (they show every file, so they need one)…
+    && bundle.includes('deliverablesToggle')
+    // …the card look of the detailed mode, and the split reader that feeds both.
+    && bundle.includes('data-style')
+    && bundle.includes('getTurnDeliverableGroups')
+    // …and the fallback that decides what an unrecognised stored value means: the MIDDLE mode, which is what a fresh
+    // install opens with.
+    && bundle.includes('value === "brief" || value === "cards" ? value : "balanced"')],
   // The host's `turn-trigger` record — the notification that woke the turn up (a goal continuing, a webhook, a job…).
   // The conversation page renders it as `TurnTriggerNodeView`; the reading view answered 「此记录类型暂未接入阅读页」.
   // The component is not exported, so the reading view mirrors it, and what it mirrors is pinned here: the row's own

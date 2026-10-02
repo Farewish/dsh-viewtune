@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, showDeliverablesRow, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 test('basename and dirname handle POSIX and Windows style paths', () => {
@@ -125,4 +125,82 @@ test('produced-files row waits for turn close even when paths already exist', ()
   assert.equal(showDeliverablesRow('open', paths), false);
   assert.equal(showDeliverablesRow('closed', paths), true);
   assert.equal(showDeliverablesRow('closed', []), false);
+});
+
+/** A turn whose data map holds whatever the deliverables package published for it. */
+function turnWith(deliverables: unknown): TurnLocation {
+  const map = new Map<string, unknown>();
+  if (deliverables !== undefined) map.set('deliverables', deliverables);
+  return { data: map } as unknown as TurnLocation;
+}
+
+/** One tool entry in the shape the flow builds them (`toolIdentity` reads the name and the raw arguments off the block). */
+function tool(name: string, args: unknown, isError = false): ReaderFlowEntry {
+  return {
+    kind: 'tool',
+    key: `tool:${name}`,
+    callId: `call:${name}`,
+    step: 1,
+    order: 0,
+    block: { kind: 'tool-call', name, argsRaw: JSON.stringify(args), isError } as any,
+  };
+}
+
+test('what a turn DELIVERED and what it merely EDITED are two lists, not one', () => {
+  // The correction the reader asked for: the fallback list is files the turn TOUCHED, and calling those 「产物」 claims
+  // something about the turn that is not true. Both lists are available now, and the single flat list the mention
+  // resolver asks for is untouched — it still prefers what was delivered.
+  const turn = turnWith({ produced: [{ path: 'out/report.md' }, { path: 'out/chart.png' }] });
+  const flow = [tool('write', { file_path: 'src/a.ts' }), tool('edit', { file_path: 'src/b.ts' })];
+  assert.deepEqual(getTurnDeliverableGroups(turn, flow), {
+    edited: ['src/a.ts', 'src/b.ts'],
+    produced: ['out/report.md', 'out/chart.png'],
+  });
+  assert.deepEqual(getTurnDeliverables(turn, flow), ['out/report.md', 'out/chart.png']);
+});
+
+test('a path in both lists is shown only as a 产物: delivering it is the stronger claim', () => {
+  const turn = turnWith({ produced: [{ path: 'out/report.md' }] });
+  const flow = [tool('write', { file_path: 'out/report.md' }), tool('write', { file_path: 'src/a.ts' })];
+  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { edited: ['src/a.ts'], produced: ['out/report.md'] });
+});
+
+test('a turn that delivered nothing shows the files it edited, under that label now', () => {
+  const turn = turnWith({ produced: [] });
+  const flow = [tool('apply_patch', { path: 'src/a.ts' })];
+  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { edited: ['src/a.ts'], produced: [] });
+  assert.deepEqual(getTurnDeliverables(turn, flow), ['src/a.ts']);
+});
+
+test('blank paths, repeated paths, failed calls and non-editing tools contribute nothing', () => {
+  const turn = turnWith({ produced: [{ path: '  ' }, { path: 'out/report.md' }, { path: 'out/report.md' }, { seq: 3 }] });
+  const flow = [
+    tool('write', { file_path: 'src/a.ts' }),
+    tool('write', { file_path: 'src/a.ts' }),
+    tool('edit', { file_path: 'src/b.ts' }, true),
+    tool('read', { file_path: 'src/c.ts' }),
+    tool('str_replace_editor', { command: 'view', path: 'src/d.ts' }),
+    tool('str_replace_editor', { command: 'str_replace', path: 'src/e.ts' }),
+    tool('write', {}),
+  ];
+  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { edited: ['src/a.ts', 'src/e.ts'], produced: ['out/report.md'] });
+});
+
+test('a turn with neither list has neither', () => {
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { edited: [], produced: [] });
+  assert.deepEqual(getTurnDeliverables(turnWith({ produced: [] }), []), []);
+});
+
+test('the three modes are named, and an unknown stored value opens on 平衡', () => {
+  assert.deepEqual(DELIVERABLE_DISPLAYS.map(entry => entry.id), ['brief', 'balanced', 'cards']);
+  assert.deepEqual(DELIVERABLE_DISPLAYS.map(entry => entry.label), ['简略气泡', '平衡', '详细卡片']);
+  assert.equal(deliverableDisplayOf('brief'), 'brief');
+  assert.equal(deliverableDisplayOf('cards'), 'cards');
+  assert.equal(deliverableDisplayOf('balanced'), 'balanced');
+  // Anything else — an older profile, a hand-edited record, a value from a future version — is the MIDDLE mode, which is
+  // what a fresh install opens with: it tells the two lists apart without giving up the row's density.
+  assert.equal(deliverableDisplayOf(undefined), 'balanced');
+  assert.equal(deliverableDisplayOf(null), 'balanced');
+  assert.equal(deliverableDisplayOf('detailed'), 'balanced');
+  assert.equal(deliverableDisplayOf(3), 'balanced');
 });

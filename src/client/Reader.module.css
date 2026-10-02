@@ -450,6 +450,31 @@
 .chipActionBtn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: none; border-radius: 4px; background: transparent; color: var(--dsw-alias-label-tertiary); cursor: pointer; transition: color 120ms ease, background-color 120ms ease; }
 .chipActionBtn:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 .actionIcon { width: 12px; height: 12px; }
+/* 「产物展示」的另外两档：把「编辑」与「产物」分成两个区域，并且全部显示（带一个收起开关）。
+   两个区域不只靠名字区分，也靠样式 —— 读者说"要么不同样式、要么两个区域"，两样都做才一眼看得出分界：
+  「编辑」是安静的第三级色，「产物」带强调色。 */
+.deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
+.deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.deliverablesToggle { border: 1px solid transparent; border-radius: 6px; background: 0 0; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer; padding: 1px 8px; }
+.deliverablesToggle:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }
+.deliverablesToggle:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
+.deliverablesRegion { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; column-gap: 10px; min-width: 0; }
+.deliverablesRegionLabel { grid-column: 1; padding-top: 2px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.deliverablesRegionCount { color: var(--dsw-alias-label-caption); font-size: 11px; font-variant-numeric: tabular-nums; }
+.deliverablesRegion[data-region=edited] .deliverablesRegionLabel { color: var(--dsw-alias-label-tertiary); }
+.deliverablesRegion[data-region=produced] .deliverablesRegionLabel { color: var(--dsw-alias-state-business-primary); }
+.deliverableTypeIcon { width: 16px; height: 16px; flex: none; color: var(--dsw-alias-label-secondary); display: inline-flex; align-items: center; justify-content: center; }
+.deliverableKind { margin-left: 6px; color: var(--dsw-alias-label-tertiary); font-size: 10px; }
+/* 详细卡片：宿主那张卡的实测数字（`--deliverable-fill` / `-hover`、60px 高、40px 图标砖、两列、
+   窄容器一列 —— 宿主用 @container (width<=620px) 塌成一列，这里用同一个断点，`container-type` 由根提供）。 */
+.deliverablesRow:has(.deliverableChip[data-style=card]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.deliverableChip[data-style=card] { height: 60px; border-radius: var(--dsw-radius-lg); border-color: var(--dsw-alias-border-l1); padding: 8px 10px; background: var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)); }
+.deliverableChip[data-style=card]:hover { background: var(--deliverable-hover, var(--dsw-alias-bg-module-platform)); box-shadow: none; }
+.deliverableChip[data-style=card] .chipMain { max-width: none; flex: 1; gap: 10px; }
+.deliverableChip[data-style=card] .deliverableTypeIcon { width: 40px; height: 40px; border: .5px solid var(--dsw-alias-border-l1); border-radius: 10px; background: color-mix(in srgb, var(--dsw-static-neutral-00) 50%, transparent); color: var(--dsw-alias-link); }
+.deliverableChip[data-style=card] .deliverableName { display: inline-flex; align-items: baseline; min-width: 0; }
+@container (width <= 620px) { .deliverablesRow:has(.deliverableChip[data-style=card]) { grid-template-columns: minmax(0, 1fr); } }
 .deliverablesMore { font-size: 12px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }
 .deliverablesShowFolder { border: 1px solid transparent; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 7px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; transition: all 150ms ease; }
 .deliverablesShowFolder:hover { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-interactive-bg-hover); border-color: var(--dsw-alias-border-l2); }

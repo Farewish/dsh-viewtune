@@ -4,6 +4,7 @@ import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
+  FileTypeIcon, fileExtension,
   IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
   IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
   IconQueueOutlineRegular, JsonBlock, MarkdownText,
@@ -21,7 +22,8 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
+import type { DeliverableDisplay } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
@@ -445,8 +447,9 @@ function GroupStatus({ group, sessionId, useChat, useSession, useSessionStatus, 
   </span>;
 }
 
-const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFile }: {
+const DeliverableChip = memo(function DeliverableChip({ path, display, openFile, revealFile }: {
   path: string;
+  display: DeliverableDisplay;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
@@ -497,9 +500,13 @@ const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFi
 
   const name = basename(path);
   const folder = dirname(path);
+  // The brief row is the one the reader asked NOT to change, so it keeps the generic document glyph. The other two know
+  // what the file IS: the host's own `FileTypeIcon` (and `fileExtension` for the card's description line) come from the
+  // primitives package this file already imports.
+  const kind = fileExtension(name).toUpperCase();
 
   return (
-    <div className={css.deliverableChip} data-status={status} title={path}>
+    <div className={css.deliverableChip} data-status={status} data-style={display === 'cards' ? 'card' : undefined} title={path}>
       <button
         type="button"
         className={css.chipMain}
@@ -511,14 +518,19 @@ const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFi
           <svg className={css.statusIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
             <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        ) : (
+        ) : display === 'brief' ? (
           <svg className={css.deliverableIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
             <path d="M4 2.5h5l3 3V13.5H4V2.5z" strokeWidth="1.2" strokeLinejoin="round" />
             <path d="M9 2.5v3h3" strokeWidth="1.2" strokeLinejoin="round" />
           </svg>
+        ) : (
+          <span className={css.deliverableTypeIcon} aria-hidden>
+            <FileTypeIcon path={path} size={display === 'cards' ? 20 : 14} />
+          </span>
         )}
         <span className={css.deliverableName}>
           {status === 'opened' ? '已在外部打开' : name}
+          {display === 'cards' && status !== 'opened' && kind !== '' && <span className={css.deliverableKind}>{kind}</span>}
         </span>
       </button>
 
@@ -563,12 +575,25 @@ const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFi
   );
 });
 
-function DeliverablesRow({ deliverables, openFile, revealFile }: {
-  deliverables: readonly string[];
+/**
+ * A turn's files, in the three ways 「产物展示」 offers.
+ *
+ * 简略 is the row this view has always had, kept as it was: one flat list, the newest eight, a 「+N 个文件」 count and
+ * the folder button. The other two TELL THE TWO LISTS APART, which is the correction the reader asked for — what a turn
+ * EDITED and what it DELIVERED are different claims about that turn, and the fallback that built the edited list used to
+ * arrive under the 「产物」 label. 平衡 keeps the row's density for both lists (each item wearing its own type icon);
+ * 详细卡片 gives each item the host's card shape. Both show EVERY file and both carry one control that folds the area
+ * away, which is the reader's own 「要么都显示出来，要么加一个展开开关」 answered with both.
+ */
+function DeliverablesRow({ groups, display, openFile, revealFile }: {
+  groups: { edited: readonly string[]; produced: readonly string[] };
+  display: DeliverableDisplay;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
   const [folderStatus, setFolderStatus] = useState<'idle' | 'opened'>('idle');
+  // Expanded on mount: seeing the files is the reason the row exists, and folding is the exception.
+  const [folded, setFolded] = useState(false);
   // The chip's own timer is cancelled by the next flash; this one had no ref at all, so a second click stacked a second
   // timer and unmounting left the callback holding a component that was gone.
   const folderTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -584,42 +609,69 @@ function DeliverablesRow({ deliverables, openFile, revealFile }: {
     }
   };
 
+  // The one list the brief row has always shown: what was delivered, or — when nothing was — what was touched.
+  const flat = groups.produced.length > 0 ? groups.produced : groups.edited;
+  const total = groups.edited.length + groups.produced.length;
+  const regions = [
+    { id: 'edited', label: '编辑', hint: '这一轮改过的文件', paths: groups.edited },
+    { id: 'produced', label: '产物', hint: '这一轮交付给你的文件', paths: groups.produced },
+  ] as const;
+
+  const chips = (paths: readonly string[]) => paths.map(path => (
+    <DeliverableChip key={path} path={path} display={display} openFile={openFile} revealFile={revealFile} />
+  ));
+  const folderButton = (count: number) => count > 1 && (
+    <button
+      type="button"
+      className={css.deliverablesShowFolder}
+      data-status={folderStatus}
+      onClick={onOpenWorkspace}
+      title="在访达中打开整个工作区目录"
+    >
+      {folderStatus === 'opened' && (
+        <svg className={css.statusIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+          <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+      <span>{folderStatus === 'opened' ? '已打开访达' : '在文件夹中显示'}</span>
+    </button>
+  );
+
   return (
-    <div className={css.deliverablesRoot} data-reader-deliverables>
-      <span className={css.deliverablesLabel}>产物</span>
+    <div className={css.deliverablesRoot} data-reader-deliverables data-display={display}>
+      <span className={css.deliverablesLabel}>{display === 'brief' ? '产物' : '文件'}</span>
       <div className={css.deliverablesLane}>
-        <div className={css.deliverablesRow}>
-          {deliverables.slice(0, 8).map(path => (
-            <DeliverableChip key={path} path={path} openFile={openFile} revealFile={revealFile} />
-          ))}
-          {deliverables.length > 8 && (
-            <span className={css.deliverablesMore}>
-              + {deliverables.length - 8} 个文件
-            </span>
-          )}
-          {deliverables.length > 1 && (
-            <button
-              type="button"
-              className={css.deliverablesShowFolder}
-              data-status={folderStatus}
-              onClick={onOpenWorkspace}
-              title="在访达中打开整个工作区目录"
-            >
-              {folderStatus === 'opened' && (
-                <svg className={css.statusIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-                  <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-              <span>{folderStatus === 'opened' ? '已打开访达' : '在文件夹中显示'}</span>
-            </button>
-          )}
-        </div>
+        {display === 'brief' ? (
+          <div className={css.deliverablesRow}>
+            {chips(flat.slice(0, 8))}
+            {flat.length > 8 && <span className={css.deliverablesMore}>+ {flat.length - 8} 个文件</span>}
+            {folderButton(flat.length)}
+          </div>
+        ) : (
+          <div className={css.deliverablesRegions}>
+            <div className={css.deliverablesTotalRow}>
+              <span className={css.deliverablesTotal}>{total} 个文件</span>
+              <button type="button" className={css.deliverablesToggle} aria-expanded={!folded}
+                onClick={() => { setFolded(value => !value); }}>{folded ? '展开' : '收起'}</button>
+            </div>
+            {!folded && regions.filter(region => region.paths.length > 0).map(region => (
+              <div key={region.id} className={css.deliverablesRegion} data-region={region.id} title={region.hint}>
+                <span className={css.deliverablesRegionLabel}>
+                  {region.label}
+                  <span className={css.deliverablesRegionCount}>{region.paths.length}</span>
+                </span>
+                <div className={css.deliverablesRow}>{chips(region.paths)}</div>
+              </div>
+            ))}
+            {!folded && <div className={css.deliverablesLane}>{folderButton(total)}</div>}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -680,6 +732,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   }, [wantsProcess]);
   const expanded = settledProcess;
   const deliverables = useMemo(() => getTurnDeliverables(turn, flow), [turn, flow]);
+  // …and the same files told apart, for the two detailed modes: the fallback list is what the turn EDITED, the host's own
+  // list is what it DELIVERED (see deliverables.ts — presenting the first under the second's label is the mistake the
+  // reader caught).
+  const deliverableGroups = useMemo(() => getTurnDeliverableGroups(turn, flow), [turn, flow]);
   // The open mode is read HERE, through the subscriber, and handed to the opener as an argument.
   // The injected `openFile` cannot read it: `createReaderStore()` returns a handle (spec + create)
   // and the live snapshot belongs to the framework's own instance, which only this hook sees.
@@ -773,7 +829,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow groups={deliverableGroups} display={deliverableDisplay} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
@@ -1111,6 +1167,8 @@ export function Reader(props: ReaderProps) {
   // what the reveal control has added since the last commit — its own state, because it is about what this reader is
   // reading right now rather than a preference.
   const foldBefore = props.useStore(state => turnFoldOf(state.collapseBefore));
+  // How this view shows a turn's files — 「产物展示」: 简略气泡 / 平衡 / 详细卡片 (see deliverables.ts).
+  const deliverableDisplay = props.useStore(state => deliverableDisplayOf(state.deliverableDisplay));
   const foldBeforeRef = useRef(foldBefore);
   foldBeforeRef.current = foldBefore;
   const [foldWindow, setFoldWindow] = useState(foldBefore);
@@ -1516,6 +1574,7 @@ export function Reader(props: ReaderProps) {
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
           collapseBefore={foldBefore} onCollapseBefore={props.actions.setCollapseBefore}
+          deliverableDisplay={deliverableDisplay} onDeliverableDisplay={props.actions.setDeliverableDisplay}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope}
@@ -1540,7 +1599,7 @@ export function Reader(props: ReaderProps) {
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (
