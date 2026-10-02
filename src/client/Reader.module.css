@@ -491,7 +491,9 @@
    （它自己的 `data-single=true` 就是这个意思 ✓）。这里只读**行上的数量属性** ✓，不再用 `:has()` 去数子元素 ✗：
    少一个活动件，就少一种"看着对、实际没生效"的可能 ✓。第二行永远是描述（没有就退回类型名 ✓）。 */
 .deliverablesRow[data-delivered-count] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
-.deliverablesRow[data-delivered-count="1"] { grid-template-columns: minmax(0, 1fr); }
+/* **属性存在性**判断 ✓，不用带引号的值 ✗ —— `[attr="1"]` 在这条打包/注入链上没有生效 ✓（读者三次都看到同一种排版 ✓），
+   而本仓库别处的属性选择器一律不带引号 ✓。所以"恰好一个"由 JSX 单独带一个属性来表达 ✓。 */
+.deliverablesRow[data-delivered-one] { grid-template-columns: minmax(0, 1fr); }
 .deliverableChip[data-style=card][data-delivered] { height: 60px; width: 100%; }
 .deliverableChip[data-style=card][data-delivered] .deliverableName { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
 .deliverableDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }

@@ -925,8 +925,11 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   </span>
                 )}
                 {/* 宿主的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single=true` ✓）。
-                    这里写成**行上的一个数量属性** ✓，不再让 CSS 去 `:has()` 找子元素 ✗ —— 少一个可能失效的环节 ✓。 */}
-                <div className={css.deliverablesRow} data-delivered-count={region.kind === 'delivered' ? String(region.count) : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
+                    判断只用**属性是否存在** ✓ —— 不用带引号的值 ✗（`[attr="1"]` 在这条打包/注入链上会失效 ✓，而本仓库别处
+                    的属性选择器一律不带引号 ✓），也不用 `:has()` ✓：行自己带着那个属性，CSS 只读它 ✓。 */}
+                <div className={css.deliverablesRow}
+                  data-delivered-count={region.kind === 'delivered' ? String(region.count) : undefined}
+                  data-delivered-one={region.kind === 'delivered' && region.count === 1 ? true : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                   : groups.commits.map((commit, index) => (
                     <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
                       {commit.hash ?? commit.subject}
