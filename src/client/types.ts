@@ -50,6 +50,12 @@ export interface ReaderInjected {
   openFile: (path: string, options?: { mode?: DeliverableOpenMode }) => Promise<void> | void;
   /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
   revealFile?: (path: string) => Promise<void> | void;
+  /**
+   * Open the HOST'S changes review for one turn in the sidebar — the same resource the conversation page's 「已编辑 x 个
+   * 文件」 card opens. Used when the reader turns on 「差异在侧边栏审查」; without it (or without a sidebar) the reading view
+   * keeps its own in-page panel.
+   */
+  openChangesReview?: (coordinates: { sessionId: string; seq: number; turn: number }) => void;
   /** Fork the conversation at a specific message sequence into a new branch session. */
   forkAt?: (seq: number) => void;
   /** Load session history through a target sequence number. */

@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
+import { basename, changesReviewAddress, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, CHANGES_REVIEW_KIND, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
@@ -64,6 +64,7 @@ test('getTurnDeliverables reads the host’s two published lists: 交付 and 编
     presented: [{ seq: 1, path: 'src/client/Reader.tsx' }, { seq: 2, path: 'dist/pkg.tgz' }],
   });
   assert.deepEqual(getTurnDeliverableGroups(turn), {
+    changesSeq: undefined,
     delivered: ['src/client/Reader.tsx', 'dist/pkg.tgz'],
     // …the delivered files lead (first-seen), and the one that was only changed follows; each path appears once per list.
     edited: ['src/client/Reader.tsx', 'dist/pkg.tgz', 'src/client/Reader.module.css'],
@@ -74,13 +75,13 @@ test('getTurnDeliverables reads the host’s two published lists: 交付 and 编
 
 test('getTurnDeliverables falls back to the tool flow when the host published nothing', () => {
   const flow = [tool('write', { file_path: 'src/client/new-feature.ts', content: 'hello' }), tool('edit', { file_path: 'src/client/Reader.tsx' })];
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { delivered: [], edited: ['src/client/new-feature.ts', 'src/client/Reader.tsx'] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { changesSeq: undefined, delivered: [], edited: ['src/client/new-feature.ts', 'src/client/Reader.tsx'] });
 });
 
 test('the old `produced` field is not read, because this version of the host never publishes it', () => {
   // The first version of this file read `deliverables.produced`. That field does not exist in 0.2.0 — so the row was
   // always the tool-flow fallback: edited files shown under 「新增」, and the delivered file nowhere.
-  assert.deepEqual(getTurnDeliverableGroups(turnWith({ produced: [{ path: 'src/phantom.ts' }] })), { delivered: [], edited: [] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith({ produced: [{ path: 'src/phantom.ts' }] })), { changesSeq: undefined, delivered: [], edited: [] });
 });
 
 test('created and edited files are ONE list, because the client cannot tell them apart', () => {
@@ -114,8 +115,31 @@ test('blank paths, repeated paths, failed calls and non-writing commands contrib
 });
 
 test('a turn with neither list has neither', () => {
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { delivered: [], edited: [] });
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { changesSeq: undefined, delivered: [], edited: [] });
   assert.deepEqual(getTurnDeliverables(turnWith({ presented: [] }), []), []);
+});
+
+test('the announcement’s sequence rides along, because the host’s review address needs it', () => {
+  assert.equal(getTurnDeliverableGroups(turnWith({ changes: { seq: 7272, files: [{ path: 'a.md' }] } })).changesSeq, 7272);
+  // A bare array (or no announcement at all) has no sequence, and a missing one must not become a made-up address: the
+  // caller falls back to the in-page panel.
+  assert.equal(getTurnDeliverableGroups(turnWith({ changes: [{ path: 'a.md' }] })).changesSeq, undefined);
+  assert.equal(getTurnDeliverableGroups(turnWith(undefined)).changesSeq, undefined);
+});
+
+test('the changes-review address is spelled exactly as the host spells it', () => {
+  // `dsh-resource://changes-review/session/<encodeURIComponent(sessionId)>/<seq>/<turn>` — what the deliverables package's
+  // own `changesReviewAddress` builds and what its `canOpen` parses (`seq` digits, `turn` a 1-based integer). This address
+  // is the ONE route a View has to the host's review, so its spelling is pinned rather than assumed.
+  assert.equal(CHANGES_REVIEW_KIND, 'changes-review');
+  assert.equal(
+    changesReviewAddress({ sessionId: 'session-abc', seq: 7272, turn: 51 }),
+    'dsh-resource://changes-review/session/session-abc/7272/51',
+  );
+  assert.equal(
+    changesReviewAddress({ sessionId: 'a b/c', seq: 1, turn: 2 }),
+    `dsh-resource://changes-review/session/${encodeURIComponent('a b/c')}/1/2`,
+  );
 });
 
 test('the commits a turn made are read from its calls: hash and subject', () => {

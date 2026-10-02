@@ -71,6 +71,15 @@ export interface ReaderState {
    */
   recordCommits: boolean;
   /**
+   * Where 「共 x 项编辑」's click leads — the reading view's own diff panel (default), or the HOST's changes review.
+   *
+   * Off is the reading view's panel, expanded under the heading: self-contained, nothing moves. On opens the host's own
+   * review tab through `ctx.sidebarRight.openResource`, which is the same thing the conversation page's 「已编辑 x 个文件」
+   * card does — the card cannot be imported (its package exports no components and its slot occupant needs that package's
+   * own stores), but its resource can be opened, and then the HOST draws it, unmodified, in the sidebar.
+   */
+  reviewInSidebar: boolean;
+  /**
    * How often a streaming message publishes its revealed text.
    *
    * The steady 60Hz cadence is the DEFAULT, and `textCadenceOf` answers it for anything unrecognised: publishing once
@@ -204,6 +213,8 @@ type ReaderActions = {
   setDeliverableDisplay: (draft: ReaderState, value: DeliverableDisplay) => void;
   /** Whether the row also lists the turn's git commits; off by default. */
   setRecordCommits: (draft: ReaderState, value: boolean) => void;
+  /** Whether the 编辑 heading opens the host's changes review in the sidebar instead of the in-page panel. */
+  setReviewInSidebar: (draft: ReaderState, value: boolean) => void;
   setTextCadence: (draft: ReaderState, value: TextCadence) => void;
   setRevealBlur: (draft: ReaderState, value: boolean) => void;
   setRevealWords: (draft: ReaderState, value: boolean) => void;
@@ -247,6 +258,9 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       deliverableDisplay: 'balanced',
       // …and git commits are an opt-in line of their own, off until the reader asks for them (小功能 → 记录提交).
       recordCommits: false,
+      // …and 「共 x 项编辑」 opens the reading view's own panel until the reader asks for the host's review instead: the
+      // effect that exists today stays the default.
+      reviewInSidebar: false,
       // The handles forward the wheel until a reader says otherwise; see the field's own note for why that is the
       // default rather than an opt-in.
       stripWheel: true,
@@ -316,6 +330,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setDeliverableOpenMode: (draft, value: DeliverableOpenMode) => { draft.deliverableOpenMode = value; },
       setDeliverableDisplay: (draft, value: DeliverableDisplay) => { draft.deliverableDisplay = value; },
       setRecordCommits: (draft, value: boolean) => { draft.recordCommits = value; },
+      setReviewInSidebar: (draft, value: boolean) => { draft.reviewInSidebar = value; },
       setTextCadence: (draft, value: TextCadence) => { draft.textCadence = value; },
       setRevealBlur: (draft, value: boolean) => { draft.revealBlur = value; },
       setRevealWords: (draft, value: boolean) => { draft.revealWords = value; },

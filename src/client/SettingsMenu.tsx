@@ -81,6 +81,8 @@ const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是�
 const DELIVERABLE_DISPLAY_HINT = '简略更紧凑，详细更像原生卡片';
 /** What the extra line buys, and that it only ever appears for a turn that committed. */
 const RECORD_COMMITS_HINT = '顺带列出这一轮的 git 提交';
+/** What the other switch changes, in the reader's own terms. */
+const REVIEW_IN_SIDEBAR_HINT = '点差异时改在侧边栏打开审查页';
 /** The frost rows, one per surface. Short because the row above it already says which surface is meant. */
 const FROST_HINT = '0px 只有玻璃，往上才是磨砂';
 
@@ -133,7 +135,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, recordCommits, onRecordCommits, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -167,6 +169,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** Whether the reading view also lists the turn's git commits; off by default. */
   recordCommits: boolean;
   onRecordCommits: (next: boolean) => void;
+  /** Whether 「共 x 项编辑」 opens the host's changes review in the sidebar instead of the in-page panel. */
+  reviewInSidebar: boolean;
+  onReviewInSidebar: (next: boolean) => void;
   /** Whether a wheel over the toolbar's two column handles is forwarded to the transcript. */
   stripWheel: boolean;
   onStripWheel: (next: boolean) => void;
@@ -462,6 +467,15 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>记录 git 提交</span>
               </span>
               <Switch checked={recordCommits} onChange={onRecordCommits} label="记录 git 提交" />
+            </div>
+            {/* Where 「共 x 项编辑」's click leads, beside the line it changes: this view's own diff panel (the default, and
+                what the reader has now) or the host's own changes review in the sidebar — the same resource the
+                conversation page's 「已编辑 x 个文件」 card opens. Two states because both are wanted. */}
+            <div className={css.settingsRow} title={REVIEW_IN_SIDEBAR_HINT} data-ud-check="reader-settings-review-in-sidebar">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>差异在侧边栏审查</span>
+              </span>
+              <Switch checked={reviewInSidebar} onChange={onReviewInSidebar} label="差异在侧边栏审查" />
             </div>
             {/* No description on purpose: the label is the whole of it. */}
             <div className={css.settingsRow} data-ud-check="reader-settings-auto-collapse">

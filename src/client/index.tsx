@@ -10,6 +10,7 @@ import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { fillComposerDom } from './mcp-app.js';
 import { deliverableOpenModeOf, openDeliverableFile } from './open-file.js';
+import { changesReviewAddress } from './deliverables.js';
 import { replaceableGuide } from './sidebar-guide.js';
 import type { SidebarTabLike } from './sidebar-guide.js';
 import type { DeliverableOpenMode } from './open-file.js';
@@ -131,6 +132,23 @@ export function apply(ctx: Context): void {
       return undefined;
     }
   };
+
+  /**
+   * 侧边栏只有「开始」页时，让这次打开**替换**掉它 ✓ —— 打开文件与打开审查页共用这一小段 ✓。
+   *
+   * `replaceTab` 是宿主文档里的"take this tab's place … and close it in the same step" ✓；任何不确定都不动 ✓（拿不到
+   * tab 列表、多于一个、或那一个不是 guide ⇒ `replaceableGuide` 给 undefined ✓）。face 的方法按其文档"会响亮地失败" ✓，
+   * 所以整段包在 try 里 ✓ —— 读不到状态绝不能挡住"打开"这件事本身 ✓。
+   */
+  const guideReplacement = (sessionId: string): { replaceTab?: string } | undefined => {
+    try {
+      const replaceTab = replaceableGuide(sidebarRightFace()?.tabsIn?.(sessionId), sidebarRightFace()?.active?.());
+      return replaceTab === undefined ? undefined : { replaceTab };
+    } catch (error) {
+      console.warn('[dsh-better-display] sidebar guide check failed:', error);
+      return undefined;
+    }
+  };
   ctx.slots.inject('conversation.view', function* () {
     yield ctx.slots.register({
     name: 'conversation.view',
@@ -153,28 +171,14 @@ export function apply(ctx: Context): void {
           if (!receipt.ok) throw new Error(receipt.error.message);
           return { data: Uint8Array.from(receipt.value.data), mediaType: receipt.value.attachment.mediaType };
         },
-        openFile: async (path: string, options?: { mode?: DeliverableOpenMode }) => {
-          try {
+        openFile: async (path: string, options?: { mode?: DeliverableOpenMode }) => {          try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
             // The system opener is the default and the fallback; the sidebar is opt-in per reader, and
             // the reader's own subscription hands the choice down as `options.mode` — this face cannot
             // read it for itself (`createReaderStore()` is a handle, not a live instance).
             const sidebar = sidebarRightFace();
             const openSidebar = typeof sidebar?.openResource === 'function'
-              ? (address: string) => {
-                // 读者的机制 ✓：侧边栏**只有「开始」页**时，让这个文件**替换**掉它（`replaceTab` ✓ —— 宿主文档里的
-                // "Take this tab's place … and close it in the same step" ✓），而不是在它旁边再开一页 ✓。
-                // 任何不确定都不动它 ✓：拿不到 tab 列表、多于一个 tab、或那一个不是 guide ⇒ `replaceableGuide` 返回
-                // undefined ✓。face 的方法按它的文档"会响亮地失败" ✓，所以整段包在 try 里 ✓ —— 读不到状态绝不能让
-                // "打开文件"这件事失败 ✓。
-                let replaceTab: string | undefined;
-                try {
-                  replaceTab = replaceableGuide(sidebar.tabsIn?.(sessionId), sidebar.active?.());
-                } catch (error) {
-                  console.warn('[dsh-better-display] sidebar guide check failed:', error);
-                }
-                sidebar.openResource!(address, replaceTab === undefined ? undefined : { replaceTab });
-              }
+              ? (address: string) => { sidebar.openResource!(address, guideReplacement(sessionId)); }
               : undefined;
             const openExternal = async (absolutePath: string) => {
               // `remote` and `remote.session` are services in 0.2.0 (`ctx.get`), and the plugin already declares both in
@@ -206,8 +210,27 @@ export function apply(ctx: Context): void {
             console.warn('[dsh-better-display] openFile error:', error);
           }
         },
-        revealFile: async (path: string) => {
+        /**
+         * 打开**宿主自己的**「改动审查」页 ✓ —— 也就是对话页那张「已编辑 x 个文件」卡的点击所做的事 ✓。
+         *
+         * 卡片本体 import 不到 ✓（那些包只导出 `apply`/`inject` ✓，而且那张卡的 slot 占位需要它自己内部的 store ✓），
+         * 但它的**资源地址**是公开约定 ✓：`dsh-resource://changes-review/session/<sessionId>/<seq>/<turn>` ✓ ⇒ 交给
+         * `openResource` 之后，**宿主自己**画出那份审查 ✓（原封不动 ✓）。读者用「小功能 → 差异在侧边栏审查」在它与本页
+         * 面板之间切换 ✓（默认本页面板 ✓）。
+         */
+        openChangesReview: (coordinates: { sessionId: string; seq: number; turn: number }) => {
           try {
+            const sidebar = sidebarRightFace();
+            if (typeof sidebar?.openResource !== 'function') {
+              console.warn('[dsh-better-display] sidebarRight is not available for the changes review');
+              return;
+            }
+            sidebar.openResource(changesReviewAddress(coordinates), guideReplacement(coordinates.sessionId));
+          } catch (error) {
+            console.warn('[dsh-better-display] openChangesReview error:', error);
+          }
+        },
+        revealFile: async (path: string) => {          try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
             const targetPath = resolveWorkspacePath(cwd, path);
             // 1. Try dedicated host endpoint for native file highlighting (open -R / explorer /select)

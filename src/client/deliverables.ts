@@ -158,7 +158,7 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
  * deliveries (the share package the reader saw on the conversation page: a file the turn made is a file it made), and the
  * fallback's reading of the write/edit calls. `commits` is read from the calls themselves (`turnCommits`).
  */
-export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { delivered: readonly string[]; edited: readonly string[] } {
+export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { changesSeq?: number; delivered: readonly string[]; edited: readonly string[] } {
   const changed: string[] = [];
   const delivered: string[] = [];
   const touched: string[] = [];
@@ -177,6 +177,12 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
   // first written, so `files`, `paths` and a bare array are all accepted, and anything else contributes nothing rather
   // than throwing.
   const rawChanges = deliverables?.changes;
+  // The announcement's own sequence, which the review address needs: the host publishes it beside the file list and uses
+  // it for its own previews (`seq: changes.seq`). Absent when the change data is a bare array, in which case the address
+  // cannot be built and the caller falls back to the in-page panel.
+  const changesSeq = typeof (rawChanges as { seq?: unknown } | undefined)?.seq === 'number'
+    ? (rawChanges as { seq: number }).seq
+    : undefined;
   const changeList: unknown[] = Array.isArray(rawChanges)
     ? rawChanges
     : (typeof rawChanges === 'object' && rawChanges !== null
@@ -252,7 +258,7 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
     seen.add(path);
     editedList.push(path);
   }
-  return { delivered, edited: editedList };
+  return { changesSeq, delivered, edited: editedList };
 }
 
 /**
@@ -356,6 +362,27 @@ export function turnChanges(flow?: readonly ReaderFlowEntry[]): readonly TurnCha
     }
   }
   return [...byPath.values()];
+}
+
+/** The tab kind the deliverables package owns for its changes review. */
+export const CHANGES_REVIEW_KIND = 'changes-review';
+
+/** The address prefix a changes-review resource lives under, read from the package's own builder. */
+const CHANGES_REVIEW_ADDRESS = 'dsh-resource://changes-review/session/';
+
+/**
+ * The address of the HOST'S OWN changes review for one turn — the tab its 「已编辑 x 个文件」 card opens.
+ *
+ * Spelled exactly as the deliverables package spells it (`changesReviewAddress`), because the address is what its
+ * `canOpen` parses: `dsh-resource://changes-review/session/<encodeURIComponent(sessionId)>/<seq>/<turn>`, with `seq` the
+ * announcing event's sequence and `turn` the 1-based turn number the package validates as `^[1-9]\d*$`.
+ *
+ * This is the one route to the host's review that a View actually has. The card itself cannot be imported — the packages
+ * export only `apply`/`inject`, and the card's slot occupant needs the package's own stores — but opening its resource
+ * makes the HOST draw it, unmodified, in the sidebar.
+ */
+export function changesReviewAddress(coordinates: { readonly sessionId: string; readonly seq: number; readonly turn: number }): string {
+  return `${CHANGES_REVIEW_ADDRESS}${encodeURIComponent(coordinates.sessionId)}/${String(coordinates.seq)}/${String(coordinates.turn)}`;
 }
 
 /** The single produced path whose basename is exactly value, or undefined. */

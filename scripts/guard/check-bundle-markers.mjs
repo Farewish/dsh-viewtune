@@ -1027,6 +1027,15 @@ const markers = [
     // …and the fallback that decides what an unrecognised stored value means: the MIDDLE mode, which is what a fresh
     // install opens with.
     && bundle.includes('value === "brief" || value === "cards" ? value : "balanced"')],
+  // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
+  // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
+  // own stores), but its address can be handed to `ctx.sidebarRight.openResource` and then the host draws it, unmodified.
+  // The address is spelled exactly as the deliverables package spells it, since that is what its `canOpen` parses.
+  ['the host’s changes review is reachable by its own resource address, behind the reader’s switch', () => bundle.includes('dsh-resource://changes-review/session/')
+    && bundle.includes('changesReviewAddress')
+    && bundle.includes('openChangesReview')
+    && bundle.includes('reader-settings-review-in-sidebar')
+    && bundle.includes('reviewInSidebar')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

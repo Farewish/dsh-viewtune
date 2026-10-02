@@ -685,11 +685,15 @@ const TurnChangesPanel = memo(function TurnChangesPanel({ changes, openDiffs, on
   </div>;
 });
 
-function DeliverablesRow({ groups, changes, display, recordCommits, openFile, revealFile }: {
-  groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[] };
+function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSidebar, turnNumber, sessionId, openChangesReview, openFile, revealFile }: {
+  groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[]; changesSeq?: number };
   changes: readonly TurnChange[];
   display: DeliverableDisplay;
   recordCommits: boolean;
+  reviewInSidebar: boolean;
+  turnNumber: number;
+  sessionId: string;
+  openChangesReview?: (coordinates: { sessionId: string; seq: number; turn: number }) => void;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
@@ -736,6 +740,20 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openFile, re
       if (next.has(path)) next.delete(path); else next.add(path);
       return next;
     });
+  };
+  /**
+   * 「共 x 项编辑」的点击：开关打开、且审查页要的三个坐标齐全时，打开**宿主的**审查页 ✓（与对话页那张「已编辑 x 个文件」
+   * 卡的点击一致 ✓ —— 宿主自己画 ✓）；否则就地展开**本页的面板** ✓（默认走这条 ✓）。坐标不全就退回面板 ✓，而不是打一个
+   * 宿主会拒绝的地址 ✓ —— 它按 `^[1-9]\d*$` 校验 turn、按 `^\d+$` 校验 seq ✓。
+   */
+  const openReview = () => {
+    const seq = groups.changesSeq;
+    if (reviewInSidebar && typeof seq === 'number' && Number.isInteger(seq)
+      && Number.isInteger(turnNumber) && turnNumber > 0 && openChangesReview !== undefined) {
+      openChangesReview({ sessionId, seq, turn: turnNumber });
+      return;
+    }
+    setChangesOpen(value => !value);
   };
 
   const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }) => paths.map(path => (
@@ -791,7 +809,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openFile, re
                   // 框头：**有点击行为的才是按钮** ✓ —— 只有编辑是按钮（点击就地展开总差异面板 ✓，并带「点击查看差异」的小窗口 ✓
                   // = 原生 `title` ✓，与设置里那些选项同一套 ✓）；交付与提交没有点击 ⇒ 纯文字 ✓（读者两次要求 ✓，也避免了"禁用
                   // 按钮"那种别扭样子 ✓）。
-                  onHeadingClick={edited ? () => { setChangesOpen(value => !value); } : undefined}
+                  onHeadingClick={edited ? openReview : undefined}
                   panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
@@ -910,6 +928,11 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // The injected `openFile` cannot read it: `createReaderStore()` returns a handle (spec + create)
   // and the live snapshot belongs to the framework's own instance, which only this hook sees.
   const openInSidebar = props.useStore(state => deliverableOpenModeOf(state.deliverableOpenMode)) === 'sidebar';
+  // …and where the 编辑 heading's click leads: the host's own changes review, or this view's panel (the default). Read here
+  // rather than passed down, like the mode above — this component already subscribes to the store for its own needs.
+  const reviewInSidebar = props.useStore(state => state.reviewInSidebar) === true;
+  // The review address needs the 1-based turn number the host validates; the group's key is that number.
+  const turnNumber = Number(group.turn);
   const openFile = useCallback(
     (path: string) => { props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' }); },
     [props.openFile, openInSidebar],
@@ -999,7 +1022,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} openFile={openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} reviewInSidebar={reviewInSidebar} turnNumber={turnNumber} sessionId={props.sessionId} openChangesReview={props.openChangesReview} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
@@ -1343,6 +1366,8 @@ export function Reader(props: ReaderProps) {
   // The comparison sits OUTSIDE the selector, which is the shape the settings guard looks for: a default of false means an
   // absent key is off, so the reader has to say `=== true` (`state.recordCommits) === true`).
   const recordCommits = props.useStore(state => state.recordCommits) === true;
+  // …and where 「共 x 项编辑」's click leads (the host's review, or this view's own panel). Read here for the settings row.
+  const reviewInSidebar = props.useStore(state => state.reviewInSidebar) === true;
   const foldBeforeRef = useRef(foldBefore);
   foldBeforeRef.current = foldBefore;
   const [foldWindow, setFoldWindow] = useState(foldBefore);
@@ -1750,6 +1775,7 @@ export function Reader(props: ReaderProps) {
           collapseBefore={foldBefore} onCollapseBefore={props.actions.setCollapseBefore}
           deliverableDisplay={deliverableDisplay} onDeliverableDisplay={props.actions.setDeliverableDisplay}
           recordCommits={recordCommits} onRecordCommits={props.actions.setRecordCommits}
+          reviewInSidebar={reviewInSidebar} onReviewInSidebar={props.actions.setReviewInSidebar}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope}

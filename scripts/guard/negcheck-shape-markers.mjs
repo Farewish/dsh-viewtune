@@ -268,6 +268,15 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the changes-review address prefix changed, so the host’s review can no longer be opened at all',
+    // The address is the contract: the deliverables package's `canOpen` parses this exact prefix, so a different one opens
+    // nothing — and the reader's switch silently does nothing instead. A case flip, because the harness skips a mutation
+    // whose replacement is already present and that test is a substring test.
+    search: 'dsh-resource://changes-review/session/',
+    replace: 'DSH-RESOURCE://CHANGES-REVIEW/SESSION/',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the click-revealed diff panel renamed, so 共 x 项编辑 has no way to show the turn’s diff at all',
     // The panel is the ONLY route to the diff now that the hover window is gone (the reader dropped it), so losing its
     // class is losing the feature: the heading's click would reveal nothing. The replacement is a case flip, because the
