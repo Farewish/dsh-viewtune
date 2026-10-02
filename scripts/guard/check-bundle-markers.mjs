@@ -1004,7 +1004,12 @@ const markers = [
     // receives only inspectCall/viewRequest/openView/completeViewRequest, so the review entry point is not reachable.
     && bundle.includes('variant: "preview"')
     && bundle.includes('openDelayMs: 500')
-    && bundle.includes('inspectCall')
+    // …and the total-diff panel, which is what the heading's click reveals and what the hover card shows: the reader's
+    // replacement for the host's review click. Its ± counts are the FLOW's own button (`DiffStatButton`), pinned here so
+    // the two cannot drift apart — pressing one unfolds that file's diff through the flow's own `DiffBlock`.
+    && bundle.includes('deliverablesChanges')
+    && bundle.includes('deliverablesBoxPanel')
+    && bundle.includes('DiffStatButton')
     && bundle.includes('turnChanges')
     // …and the commits are read from the calls, with the global options a real command carries: every commit in the
     // reader's instance is `git -C <dir> commit …`, and a pattern demanding `git` immediately before `commit` matched

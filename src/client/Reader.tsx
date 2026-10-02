@@ -4,11 +4,13 @@ import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
-  DiffBlock, FileTypeIcon, HoverCard, diffTotals, fileExtension,
+  DiffBlock, FileTypeIcon, HoverCard, fileExtension,
   IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
   IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
   IconQueueOutlineRegular, JsonBlock, MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives';
+import { DiffStatButton } from './DiffPanel.js';
+import { diffBlockLabels } from './primitive-labels.js';
 import { formatMessageClock } from './message-chrome.js';
 import { TURN_TRIGGER_EXPLANATION, turnTriggerReading, turnTriggerText, turnTriggerTime } from './turn-trigger.js';
 import type { TurnTriggerIcon } from './turn-trigger.js';
@@ -597,9 +599,11 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
  * One box of the balanced row: heading and switch on their own line, chips below, two rows until it is opened.
  *
  * Two optional behaviours, both of them the conversation page's own (measured there):
- *   · `onHeadingClick` — the heading is a button; for 编辑 it opens the host's inspector for the call that changed the
- *     file (`inspectCall`), which is the closest published surface to the host's own review click. The heading's TEXT does
- *     not change on hover: an earlier version swapped it for 「在侧边栏预览」, which promised something the click cannot do.
+ *   · `onHeadingClick` — the heading is a button; for 编辑 it reveals the total-diff panel under it (`panel`), which is the
+ *     reader's replacement for the host's review click: no View can open that review, so the diff is shown where the
+ *     reader already is. An earlier version called the host's inspector (`inspectCall`) instead, which lands on the
+ *     trajectory page — not what was wanted. The heading's TEXT does not change on hover: another earlier version swapped
+ *     it for 「在侧边栏预览」, which promised something the click cannot do.
  *   · `preview` — the hover window, using the primitives' own `HoverCard` in the `preview` variant with the host's 500ms
  *     delay and its width anchored to the box, so it is literally the same widget the conversation page uses.
  * `plainHeading` renders the heading as text instead: a 提交 box has nothing to click, and a button that does nothing
@@ -607,13 +611,15 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
  *
  * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」.
  */
-function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading, preview, children }: {
+function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading, preview, panel, children }: {
   region: { id: string; label: string; hint: string; count: number };
   open: boolean;
   onToggle: () => void;
   onHeadingClick?: () => void;
   plainHeading?: boolean;
   preview?: ReactNode;
+  /** The panel the heading's click reveals, under the heading and across both columns. */
+  panel?: ReactNode;
   children: ReactNode;
 }) {
   const lane = useRef<HTMLDivElement | null>(null);
@@ -634,7 +640,7 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading,
     // looking like a button even after the element stopped being one (the reader's report).
     ? <span className={css.deliverablesBoxPlain}>共 {region.count} 项{region.label}</span>
     : (
-      <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} disabled={onHeadingClick === undefined}>
+      <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} aria-expanded={panel === undefined ? undefined : open} disabled={onHeadingClick === undefined}>
         共 {region.count} 项{region.label}
       </button>
     );
@@ -643,6 +649,7 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading,
       {preview === undefined ? heading : (
         <HoverCard variant="preview" anchor={heading} content={preview} openDelayMs={500} widthAnchorRef={box} />
       )}
+      {panel !== undefined && <div className={css.deliverablesBoxPanel}>{panel}</div>}
       <div ref={lane} className={css.deliverablesBoxLane} title={region.hint}>{children}</div>
       {overflowing && (
         <button type="button" className={css.deliverablesToggle} aria-expanded={open} onClick={onToggle}>
@@ -653,13 +660,43 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading,
   );
 }
 
-function DeliverablesRow({ groups, changes, display, recordCommits, openInSidebar, inspectCall, openFile, revealFile }: {
+/**
+ * The turn's changes, as a panel — the reader's replacement for the host's review, which no View can open.
+ *
+ * Each row is a file with its ± counts as a BUTTON: the very one the tool rows use (`DiffStatButton`), so the numbers read
+ * and behave exactly as they do in the flow, and pressing one unfolds that file's diff under it through the same renderer
+ * the flow uses (`DiffBlock`). This is what makes the counts worth showing — the reader's own conclusion, that the panel
+ * compensates for a review click the plugin cannot make.
+ *
+ * Hover and click share this one panel: the heading's click decides whether it is revealed at all, the hover card shows
+ * the same content without state, and the ± buttons work in both.
+ */
+const TurnChangesPanel = memo(function TurnChangesPanel({ changes, openDiffs, onToggleDiff }: {
+  changes: readonly TurnChange[];
+  openDiffs: ReadonlySet<string>;
+  onToggleDiff: (path: string) => void;
+}) {
+  return <div className={css.deliverablesChanges}>
+    {changes.map(change => {
+      const shown = openDiffs.has(change.path);
+      return <div key={change.path} className={css.deliverablesChange}>
+        <div className={css.deliverablesChangeHead}>
+          <span className={css.deliverablesChangePath} title={change.path}>{change.path}</span>
+          <DiffStatButton hunks={change.hunks} label={change.path} open={shown} onToggle={() => { onToggleDiff(change.path); }} />
+        </div>
+        {shown && <div className={css.deliverablesChangeDiff}>
+          <DiffBlock diffs={change.hunks} maxLines={24} labels={diffBlockLabels} />
+        </div>}
+      </div>;
+    })}
+  </div>;
+});
+
+function DeliverablesRow({ groups, changes, display, recordCommits, openFile, revealFile }: {
   groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[] };
   changes: readonly TurnChange[];
   display: DeliverableDisplay;
   recordCommits: boolean;
-  openInSidebar: boolean;
-  inspectCall?: (callId: string) => void;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
@@ -697,6 +734,16 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openInSideba
   ];
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
+  // 「共 x 项编辑」点击展开的总差异面板 ✓（读者要的：悬停或点击都能看 ✓），以及面板里哪些文件的差异被展开了 ✓。
+  const [changesOpen, setChangesOpen] = useState(false);
+  const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set());
+  const toggleDiff = (path: string) => {
+    setOpenDiffs(current => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  };
 
   const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }) => paths.map(path => (
     <DeliverableChip key={path} path={path} display={display} openFile={open} revealFile={revealFile} />
@@ -749,27 +796,12 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openInSideba
                   // 内容 ✓）。框头文字**不随悬停变化** ✓ —— 早先那句「在侧边栏预览」承诺了点击做不到的事，已去掉 ✓。
                   // 交付框：按读者要求悬停无内容、点击先不做 ✓。提交框：框头是**纯文字** ✓（没有可点的东西，做成按钮会误导 ✓）。
                   plainHeading={region.kind === 'commits'}
-                  onHeadingClick={edited ? () => {
-                    const callId = changes[0]?.callId;
-                    if (callId !== undefined && inspectCall !== undefined) { inspectCall(callId); return; }
-                    if (changes[0] !== undefined) openFile?.(changes[0].path);
-                  } : undefined}
-                  preview={edited && changes.length > 0 ? (
-                    <div className={css.deliverablesPreview}>
-                      {changes.map(change => {
-                        const totals = diffTotals(change.hunks);
-                        return (
-                          <div key={change.path} className={css.deliverablesPreviewRow}>
-                            <span className={css.deliverablesPreviewPath} title={change.path}>{change.path}</span>
-                            <span className={css.deliverablesPreviewCounts}>
-                              <span className={css.deliverablesPreviewAdded}>+{totals.added}</span>
-                              <span className={css.deliverablesPreviewRemoved}>-{totals.removed}</span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : undefined}
+                  // 点击「共 x 项编辑」= 就地展开**总差异面板** ✓（悬停也显示同一份内容 ✓ —— 两者共用同一个面板 ✓，
+                  // 面板里的 ± 数字是按钮 ✓，点开该文件的差异 ✓）。这条替代了原先"跳去宿主检视器"的做法 ✓ —— 读者选了
+                  // 就地看差异 ✓，因为它才是 R1 想要的东西 ✓，而且不需要任何未公开的面 API ✓。交付框仍是"点击先不做" ✓。
+                  onHeadingClick={edited ? () => { setChangesOpen(value => !value); } : undefined}
+                  panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
+                  preview={edited && changes.length > 0 ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
                     : region.kind === 'delivered' ? chips(groups.delivered)
@@ -976,7 +1008,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} openInSidebar={openInSidebar} inspectCall={props.inspectCall} openFile={openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
