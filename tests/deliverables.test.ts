@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, deliverableDisplayOf, deliverableHeadingHint, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
@@ -225,11 +225,4 @@ test('the turn’s changed files carry their hunks and the call that changed the
   // Nothing changed ⇒ nothing to show, and nothing to click.
   assert.deepEqual(turnChanges([]), []);
   assert.deepEqual(turnChanges(undefined), []);
-});
-
-test('the heading’s hover sentence follows the switch', () => {
-  // The host swaps its ± counts for a preview hint on hover; the reader asked for the same sentence, and the switch is what
-  // decides where a preview lands — so the sentence says that.
-  assert.equal(deliverableHeadingHint(true), '在侧边栏预览');
-  assert.equal(deliverableHeadingHint(false), '预览差异');
 });

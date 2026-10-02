@@ -358,19 +358,6 @@ export function turnChanges(flow?: readonly ReaderFlowEntry[]): readonly TurnCha
   return [...byPath.values()];
 }
 
-/**
- * What the 编辑 box's heading says while the pointer is on it.
- *
- * The host's changed-files card swaps its ± counts for a hint on hover, and the reader asked for the same: the heading
- * reads 「共 N 项编辑」 at rest and a sentence about what a click does when pointed at. The sentence follows the switch,
- * because the switch is what decides where a preview lands — with it on the click inspects the change (the host's own
- * surface, since no review entry point is published to a View — measured from the live slot catalog), and with it off
- * the same click still opens that surface rather than the file.
- */
-export function deliverableHeadingHint(openInSidebar: boolean): string {
-  return openInSidebar ? '在侧边栏预览' : '预览差异';
-}
-
 /** The single produced path whose basename is exactly value, or undefined. */
 function onlyPathWithBasename(paths: readonly string[], value: string): string | undefined {
   const matches = paths.filter(path => basename(path) === value);

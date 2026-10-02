@@ -22,7 +22,7 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, deliverableDisplayOf, deliverableHeadingHint, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits } from './deliverables.js';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits } from './deliverables.js';
 import type { CommitRecord, DeliverableDisplay, TurnChange } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -596,22 +596,23 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
 /**
  * One box of the balanced row: heading and switch on their own line, chips below, two rows until it is opened.
  *
- * Three optional behaviours, all of them the conversation page's own (measured there):
- *   · `hint` — the heading swaps its 「共 N 项…」 line for a sentence while the pointer is on it, exactly as the host's
- *     changed-files card swaps its ± counts for a preview hint (CSS does the swap: two spans, one hidden).
+ * Two optional behaviours, both of them the conversation page's own (measured there):
  *   · `onHeadingClick` — the heading is a button; for 编辑 it opens the host's inspector for the call that changed the
- *     file (`inspectCall`), which is the closest published surface to the host's own review click.
+ *     file (`inspectCall`), which is the closest published surface to the host's own review click. The heading's TEXT does
+ *     not change on hover: an earlier version swapped it for 「在侧边栏预览」, which promised something the click cannot do.
  *   · `preview` — the hover window, using the primitives' own `HoverCard` in the `preview` variant with the host's 500ms
  *     delay and its width anchored to the box, so it is literally the same widget the conversation page uses.
+ * `plainHeading` renders the heading as text instead: a 提交 box has nothing to click, and a button that does nothing
+ * reads as one that should.
  *
  * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」.
  */
-function DeliverablesBox({ region, open, onToggle, hint, onHeadingClick, preview, children }: {
+function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading, preview, children }: {
   region: { id: string; label: string; hint: string; count: number };
   open: boolean;
   onToggle: () => void;
-  hint?: string;
   onHeadingClick?: () => void;
+  plainHeading?: boolean;
   preview?: ReactNode;
   children: ReactNode;
 }) {
@@ -628,12 +629,13 @@ function DeliverablesBox({ region, open, onToggle, hint, onHeadingClick, preview
     observer.observe(node);
     return () => { observer.disconnect(); };
   }, [region.count, open]);
-  const heading = (
-    <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} disabled={onHeadingClick === undefined}>
-      <span className={css.deliverablesBoxHeading}>共 {region.count} 项{region.label}</span>
-      {hint !== undefined && <span className={css.deliverablesBoxHint}>{hint}</span>}
-    </button>
-  );
+  const heading = plainHeading === true
+    ? <span className={css.deliverablesBoxLabel}>共 {region.count} 项{region.label}</span>
+    : (
+      <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} disabled={onHeadingClick === undefined}>
+        共 {region.count} 项{region.label}
+      </button>
+    );
   return (
     <div ref={box} className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
       {preview === undefined ? heading : (
@@ -749,11 +751,11 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openInSideba
               const edited = region.kind === 'files';
               return (
                 <DeliverablesBox key={region.id} region={region} open={open}
-                  // 编辑框：框头悬停换成「在侧边栏预览」/「预览差异」✓（宿主的改动卡就是这套互换 ✓），点击交给宿主的检视器
-                  // （第一个改动的调用 ✓ —— 宿主自己的 review 入口不对 View 开放，这条是能拿到的最接近的面 ✓）；悬停窗口
-                  // 列出这一轮改过的文件与 ± 计数 ✓（读者贴的那张对话页截图正是这个内容 ✓）。交付框：按读者要求悬停无内容、
-                  // 点击也先不做 ✓。
-                  hint={edited ? deliverableHeadingHint(openInSidebar) : undefined}
+                  // 编辑框：框头是按钮，点它交给宿主的检视器（第一个改动的调用 ✓ —— 宿主自己的 review 入口不对 View 开放 ✓，
+                  // 这条是能拿到的最接近的面 ✓）；悬停窗口列出这一轮改过的文件与 ± 计数 ✓（读者贴的那张对话页截图正是这个
+                  // 内容 ✓）。框头文字**不随悬停变化** ✓ —— 早先那句「在侧边栏预览」承诺了点击做不到的事，已去掉 ✓。
+                  // 交付框：按读者要求悬停无内容、点击先不做 ✓。提交框：框头是**纯文字** ✓（没有可点的东西，做成按钮会误导 ✓）。
+                  plainHeading={region.kind === 'commits'}
                   onHeadingClick={edited ? () => {
                     const callId = changes[0]?.callId;
                     if (callId !== undefined && inspectCall !== undefined) { inspectCall(callId); return; }

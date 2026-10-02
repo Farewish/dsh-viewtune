@@ -131,6 +131,12 @@
   7. **不做整卡可点、不动 `title`** ✓（按你的要求 ✓）。
 - **测试与守卫** ✓：新增 `turnChanges` 的用例 ✓（一文件一条、**后来者胜**（与宿主"取每个路径最后一次声明"一致 ✓）、无路径的 hunk 被跳过 ✓、顺序为首见 ✓、空输入 ✓）与框头文案的用例 ✓（开关两种状态 ✓）；守卫新增 5 个针 ✓（`variant: "preview"` / `openDelayMs: 500` / `inspectCall` / `deliverablesBoxHint` / `turnChanges` ✓，实测产物里正是 `HoverCard, { variant: "preview", anchor: heading, content: preview, openDelayMs: 500, widthAnchorRef: box }` ✓）；反向自检新增 1 例 ✓（把 `openDelayMs: 500` 改成 `499` ⇒ 指针掠过即弹窗 ⇒ 要求 marker 失败 ✓），**共 81 例** ✓。全链：build ✓、`TYPES OK` ✓、**39/39** ✓、守卫 **23/23** ✓、反向自检 **OK** ✓。
 
+### 两处纠正：不实的悬停文案，与不该是按钮的框头
+
+- **去掉框头悬停换文案** ✓：上一版让「共 x 项编辑」在指针悬停时变成**「在侧边栏预览」** ✗ —— 读者指出**事实上并不能在侧边栏预览** ✓ ⇒ 这是一句**不实的承诺** ✗，去掉 ✓。现在框头文字**恒定不变** ✓（换文案用的两个 span、交换机用的 CSS、`deliverableHeadingHint()` 与它的用例**一并删除** ✓，不留死代码 ✓ —— 产物里已确认渲染字符串不存在 ✓）。
+- **「共 x 项提交」的框头改成纯文字** ✓：提交框没有可点的东西 ✓，做成按钮会读成"应该有反应" ✗。按读者要求**只改这一档** ✓ ——「共 x 项编辑」与「共 x 项交付」仍是按钮 ✓（前者有点击行为 ✓，后者留给以后 ✓）。
+- **保留的部分** ✓：编辑框的 `HoverCard` 悬停窗口 ✓（`variant: "preview"` + `openDelayMs: 500` + 宽度贴框 + 内容为改动清单与 ± 计数 ✓）与框头点击 ⇒ `inspectCall` ✓ 都在这两条之外，未受影响 ✓。全链：build ✓、`TYPES OK` ✓、**39/39** ✓、守卫 **23/23** ✓、反向自检 **OK（81 例）** ✓。
+
 ## 0.5.4 (frost dials per surface, the reader's own settings as the defaults, and a settings page that reads as boxes)
 
 **两处读者报告：① 不管「竖条滚轮」开着还是关着，在竖条上滚轮都会滚动正文，差别只是有没有缓动；② 希望「界面遮罩」拆成侧栏与顶栏，各自调不同透明度。**

@@ -1005,7 +1005,6 @@ const markers = [
     && bundle.includes('variant: "preview"')
     && bundle.includes('openDelayMs: 500')
     && bundle.includes('inspectCall')
-    && bundle.includes('deliverablesBoxHint')
     && bundle.includes('turnChanges')
     // …and the commits are read from the calls, with the global options a real command carries: every commit in the
     // reader's instance is `git -C <dir> commit …`, and a pattern demanding `git` immediately before `commit` matched
