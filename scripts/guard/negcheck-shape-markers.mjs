@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the balanced row pushed into the grid’s narrow column, which is exactly the half-row the reader saw',
+    // `grid-column: 1 / -1` is what makes the row span a grid parent; starting it at column 2 leaves it in the
+    // `max-content` column — the box hugging its content at the right end of the row, which is the report this fixes.
+    search: 'grid-column:1/-1',
+    replace: 'grid-column:2/-1',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the balanced boxes left uncapped, so a long file list shows every row instead of the two the reader asked for',
     // 「一般只显示两行，展开后显示全部」 is the spec: the cap is what makes the box a summary rather than a list, and
     // lifting it silently turns the balanced mode into the detailed one's height cost.

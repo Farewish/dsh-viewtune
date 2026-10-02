@@ -990,6 +990,12 @@ const markers = [
     && bundle.includes('deliverablesBoxes')
     && bundle.includes('max-height:62px')
     && bundle.includes('data-open')
+    // …and that the row claims the WHOLE row. `width:100%` is the stable half of it; `grid-column:1/-1` is the half that
+    // saves it from a grid parent's `max-content` column (and is inert in a flex one). NOTE for whoever reads the built
+    // file next: lightningcss folds `align-self` + `justify-self` into `place-self: stretch stretch`, so searching for the
+    // longhand names in the artifact finds nothing even when the rule is right there.
+    && bundle.includes('width:100%')
+    && bundle.includes('grid-column:1/-1')
     // …and the fallback that decides what an unrecognised stored value means: the MIDDLE mode, which is what a fresh
     // install opens with.
     && bundle.includes('value === "brief" || value === "cards" ? value : "balanced"')],
