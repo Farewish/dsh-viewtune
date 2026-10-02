@@ -512,8 +512,9 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
   const kind = fileExtension(name).toUpperCase();
 
   return (
-    <div className={css.deliverableChip}
-      data-status={status} data-style={display === 'cards' ? 'card' : undefined} title={path}>
+    <div className={full === true ? `${css.deliverableChip} ${css.deliveredCard}` : css.deliverableChip}
+      data-status={status} data-style={display === 'cards' ? 'card' : undefined} title={path}
+      style={full === true ? { width: '100%' } : undefined}>
       <button
         type="button"
         className={css.chipMain}
@@ -753,65 +754,6 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
   </div>;
 });
 
-/**
- * The conversation page's presented-file cards, copied rather than approximated.
- *
- * The reader asked for this in as many words after four rounds of the card coming out the wrong width: the plugin's own
- * chip classes carry a lot of history (pills, tiles, caps, per-mode rules) and something in that pile was winning. This
- * block uses ONLY new class names, so none of those rules can reach it, and its structure and every declaration are the
- * host's own, read out of its stylesheet:
- *
- *   .presented { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; min-width: 0; display: grid }
- *   .presented[data-single=true] { grid-template-columns: minmax(0,1fr) }        ← ONE delivery takes the whole row
- *   .file { height: 60px; border: .5px solid …; border-radius: …; background: var(--deliverable-fill);
- *           padding: 8px 10px; gap: 10px; display: flex; align-items: center; position: relative; overflow: hidden }
- *   .cardPreview { position: absolute; inset: 0; border-radius: inherit; cursor: pointer }
- *
- * `data-single=true` is written UNQUOTED, exactly as the host writes it — `true` is a valid CSS identifier, so it needs no
- * quotes, and the one quoted attribute value this plugin ever wrote was the one that silently did nothing.
- */
-const PresentedFiles = memo(function PresentedFiles({ files, openFile, revealFile }: {
-  files: readonly DeliveredFile[];
-  openFile?: (path: string) => Promise<void> | void;
-  revealFile?: (path: string) => Promise<void> | void;
-}) {
-  const [opened, setOpened] = useState<string | undefined>(undefined);
-  return <div className={css.presentedFiles} data-single={files.length === 1 ? 'true' : undefined}>
-    {files.map(file => {
-      const name = basename(file.path);
-      const extension = fileExtension(name).toUpperCase();
-      return <div key={file.path} className={css.presentedFile} title={file.path}>
-        <span className={css.presentedTile} aria-hidden><FileTypeIcon path={file.path} size={20} /></span>
-        <span className={css.presentedText}>
-          <span className={css.presentedName}>{opened === file.path ? '已在外部打开' : name}</span>
-          {/* The host's `cardDescription(file.description, metadata)`: the assistant's words, or the type caption instead. */}
-          {opened !== file.path && <span className={css.presentedDescription}>{file.description ?? extension}</span>}
-        </span>
-        <span className={css.presentedActions}>
-          {revealFile !== undefined && (
-            <button type="button" className={css.chipActionBtn} title={`在访达中定位所在目录`} aria-label="在访达中显示所在目录"
-              onClick={() => { void revealFile(file.path); }}>
-              <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-                <path d="M2 4.5h4l1.5 2H14v6.5H2V4.5z" strokeWidth="1.2" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
-          <button type="button" className={css.chipActionBtn} title="复制路径" aria-label="复制路径"
-            onClick={() => { void navigator.clipboard?.writeText(file.path); }}>
-            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-              <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" strokeWidth="1.2" />
-              <path d="M3.5 5.5h-1v8h8v-1" strokeWidth="1.2" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </span>
-        {/* The host's whole-card preview button, ports and all: absolute, focus ring inset, above the artwork. */}
-        <button type="button" className={css.presentedPreview} aria-label={`打开 ${file.path}`}
-          onClick={() => { setOpened(file.path); void openFile?.(file.path); }} />
-      </div>;
-    })}
-  </div>;
-});
-
 function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSidebar, turnNumber, sessionId, openChangesReview, openFile, revealFile }: {
   groups: { commits: readonly CommitRecord[]; delivered: readonly DeliveredFile[]; edited: readonly string[]; changesSeq?: number };
   changes: readonly TurnChange[];
@@ -984,19 +926,19 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                     <span className={css.deliverablesRegionCount}>{region.count}</span>
                   </span>
                 )}
-                {/* 交付那一栏**照抄宿主** ✓：不再借道插件自己的条目组件（它身上压着历史规则 ✓，四轮都怀疑是它 ✗），
-                    而是用全新的类名与宿主的每一条声明 ✓，由 `PresentedFiles` 渲染 ✓（单件整行 / 多件两列 ✓ 也是它的原写法 ✓）。 */}
-                {region.kind === 'delivered' ? (
-                  <PresentedFiles files={groups.delivered} openFile={path => { openFile?.(path); }} revealFile={revealFile} />
-                ) : (
-                  <div className={css.deliverablesRow}>
-                    {groups.commits.map((commit, index) => (
-                      <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
-                        {commit.hash ?? commit.subject}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {/* 宿主的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single=true` ✓）。
+                    三次尝试都卡在"CSS 属性选择器没有生效"上 ✓，所以这里**不再依赖 CSS** ✗：栅格由**内联样式**给出 ✓ ——
+                    内联样式不经过选择器匹配、不受特异性与打包顺序影响 ✓，是这条链上唯一确定会生效的一层 ✓。交付以外的
+                    区域（提交那串哈希）保持原本的流式排列 ✓。 */}
+                <div className={css.deliverablesRow}
+                  style={region.kind === 'delivered'
+                    ? { display: 'grid', gridTemplateColumns: region.count === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }
+                    : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
+                  : groups.commits.map((commit, index) => (
+                    <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
+                      {commit.hash ?? commit.subject}
+                    </span>
+                  ))}</div>
               </div>
             ))}
           </div>

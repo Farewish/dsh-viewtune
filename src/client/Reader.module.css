@@ -486,6 +486,11 @@
 .deliverablesBox .deliverablesToggle { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
 /* 详细卡片档也没有行首标签 ✓（读者要求去掉顶部那行 ✓），所以根网格同样收成一列、lane 跨过去 ✓ —— 与平衡档同一个理由 ✓。 */
 .deliverablesRoot[data-display=cards] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
+/* **区域本身**也要收成一列 ✓ —— 这是读者贴出 DOM 之后量清的真因 ✓：根与区域都是「标签列 + 内容列」的两列栅格 ✓，
+   第一列是 `max-content` ✓；卡片档把标签删掉后 ✓，卡片成了区域的**第一个**子元素 ⇒ 落进 `max-content` 那一列 ✓ ⇒
+   列宽只等于内容宽度 ✓，交付卡因此"只有一段长" ✓（编辑那张列表卡看着满宽 ✓，只是因为它的内容 —— 一长串 Windows 路径
+   —— 本身 max-content 就很宽 ✓）。平衡/简略档有标签 ✓，两列照旧 ✓。 */
+.deliverablesRoot[data-display=cards] .deliverablesRegion { grid-template-columns: minmax(0, 1fr); }
 .deliverablesRoot[data-display=cards] .deliverablesLane { grid-column: 1 / -1; }
 /* 详细卡片档的**交付**卡：宿主那张「呈现文件」区的排版按**数量**分 —— 多个 ⇒ 两列网格 ✓、恰好一个 ⇒ 整行 ✓
    （它自己的 `data-single=true` 就是这个意思 ✓）。这里只读**行上的数量属性** ✓，不再用 `:has()` 去数子元素 ✗：
@@ -494,21 +499,10 @@
 /* **属性存在性**判断 ✓，不用带引号的值 ✗ —— `[attr="1"]` 在这条打包/注入链上没有生效 ✓（读者三次都看到同一种排版 ✓），
    而本仓库别处的属性选择器一律不带引号 ✓。所以"恰好一个"由 JSX 单独带一个属性来表达 ✓。 */
 .deliverablesRow[data-delivered-one] { grid-template-columns: minmax(0, 1fr); }
-/* ===== 交付卡：**照抄宿主**（读者第四次要求后照办 ✓）=====
-   结构与每一条声明都来自它的样式表原样 ✓，类名全新 ✓ ⇒ 插件自己那堆历史规则（pills / tiles / 上限 / 分档）一条都碰不到它 ✓。
-   `[data-single=true]` **不带引号** ✓ —— 与宿主写法一致 ✓（`true` 是合法标识符 ✓，无需引号 ✓），而本插件唯一一次带引号的值
-   就是那条静默失效的规则 ✓。 */
-.presentedFiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; min-width: 0; }
-.presentedFiles[data-single=true] { grid-template-columns: minmax(0, 1fr); }
-.presentedFile { box-sizing: border-box; border: .5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-lg); background: var(--deliverable-fill); min-width: 0; height: 60px; color: var(--dsw-alias-label-primary); align-items: center; gap: 10px; padding: 8px 10px; transition: background-color .12s; display: flex; position: relative; overflow: hidden; }
-.presentedFile:hover { background: var(--deliverable-hover); }
-.presentedTile { flex: none; display: inline-flex; align-items: center; justify-content: center; }
-.presentedText { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
-.presentedName { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.presentedDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.presentedActions { position: relative; z-index: 2; flex: none; display: inline-flex; align-items: center; gap: 4px; }
-.presentedPreview { position: absolute; inset: 0; z-index: 1; width: 100%; padding: 0; border: 0; background: 0 0; border-radius: inherit; cursor: pointer; }
-.presentedPreview:focus-visible { box-shadow: inset 0 0 0 2px var(--dsw-focus-ring, var(--dsw-alias-state-business-primary)); }
+/* 交付卡（详细卡片档）用**类名**判断 ✓ —— 这一轮学到的正是它 ✓：属性选择器在这条链上三次都没生效 ✓，而类名一贯可靠 ✓
+   （本插件别处也一直用类名 ✓）。宽度另有内联样式兜底 ✓，不依赖任何选择器 ✓。 */
+.deliverableChip.deliveredCard { width: 100%; height: 60px; }
+.deliverableChip.deliveredCard .deliverableName { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
 .deliverableDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 /* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。
    数值与结构照对话页那张卡量出来的：40px 图标砖（20px 图标 ✓）、标题 13px/500 ✓、计数 10px 等宽 ✓、行高按行的内容走 ✓，

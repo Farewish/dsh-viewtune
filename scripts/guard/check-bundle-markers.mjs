@@ -1039,13 +1039,12 @@ const markers = [
     // over when the list is open (the reader asked for the same arrow on 全部 N 个文件 and on 收起).
     && bundle.includes('IconChevronDownOutlineRegular')
     && bundle.includes('changedCardChevronOpen')
-    // …and the DELIVERED block is the host's own, copied: its grid, its `[data-single=true]` (UNQUOTED — the plugin's one
-    // quoted attribute value was the rule that silently did nothing, four rounds of reports ago), and its 60px flex card
-    // with the absolute preview button. New class names, so none of this plugin's own chip history can reach it.
-    && bundle.includes('presentedFiles')
-    && bundle.includes('presentedFile')
-    && bundle.includes('[data-single=true]')
-    && bundle.includes('presentedPreview')
+    // …and the DELIVERED card keeps the host's shape too: one card per delivery, the assistant's own description as the
+    // second line (the host's `cardDescription(file.description, metadata)` falls back to the type caption, which the same
+    // element does), and the layout driven WITHOUT selector matching — three rounds of attribute selectors silently did
+    // nothing here, so the column count is an inline style and the card's own shape is a CLASS, which never fails.
+    && bundle.includes('deliveredCard')
+    && bundle.includes('gridTemplateColumns')
     && bundle.includes('deliverableDescription')],
   // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
   // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
