@@ -466,16 +466,20 @@
 .deliverablesRoot[data-display=balanced] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
 .deliverablesRoot[data-display=balanced] .deliverablesLane { grid-column: 1 / -1; }
 .deliverablesBoxes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.deliverablesBox { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: start; column-gap: 8px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
+/* 平衡档的框（读者第二次定的版式）：**标题与开关自成一行** —— 「共 N 项编辑/新增」靠左、开关靠右 —— 气泡在下面，默认
+   两行。于是一个框一般三行：标题行 + 两行气泡。网格两列两行就够，不必改 DOM：标签在第 1 行第 1 列，开关在第 1 行
+   第 2 列靠右，气泡跨两列落在第 2 行 ⇒ 气泡从内容左边缘开始（不再和标签挤同一行），换行后的气泡自然对齐在第一个
+   气泡下面。框的左右各留少量余量（10px），上下 8px。 */
+.deliverablesBox { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 6px 8px; align-items: start; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
 /* 框头是按钮（读者说后面有用），所以先把它还原成"像文字"的按钮：字体与颜色继承、无边框、无内边距、可点。 */
-.deliverablesBoxLabel { grid-column: 1; padding: 4px 0 0; border: 0; background: 0 0; font: inherit; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; text-align: left; }
+.deliverablesBoxLabel { grid-column: 1; grid-row: 1; padding: 0; border: 0; background: 0 0; font: inherit; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; text-align: left; }
 .deliverablesBoxLabel:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
 .deliverablesBox[data-region=added] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
-.deliverablesBoxLane { grid-column: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; max-height: 62px; overflow: hidden; }
+.deliverablesBoxLane { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-width: 0; max-height: 62px; overflow: hidden; }
 .deliverablesBox[data-open] .deliverablesBoxLane { max-height: none; overflow: visible; }
 .deliverablesBox .deliverableChip { height: 28px; }
-/* 开关上下居中（读者指出之前贴在底部）。 */
-.deliverablesBox .deliverablesToggle { grid-column: 3; align-self: center; }
+/* 开关与标题同一行、贴右、与标题上下居中（读者先指出贴底、再要求挪到标题行）。 */
+.deliverablesBox .deliverablesToggle { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
