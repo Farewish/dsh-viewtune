@@ -142,6 +142,16 @@
 - **读者定**：点击**产物气泡** ⇒ **打开文件本体** ✓，由「产物用侧边栏打开」开关决定**外部**还是**侧边栏** ✓。这正是行内 `openFile` 一直以来的行为 ✓（`props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' })` ✓）⇒ 所以这一轮做的是**去掉上一版的编辑框特例** ✓（它让编辑气泡走 `inspectCall` ⇒ 跳到轨迹页 ✗，读者不喜欢 ✓）。
 - **未动** ✓：编辑框**框头**的点击仍是 `inspectCall` ✓（读者还没定那一条 ✓ —— 我给了四个选项 ✓，其中"就地展开本页差异"最接近原意 ✓）；悬停窗口 ✓（`HoverCard` + 改动清单与 ± 计数 ✓）也不受影响 ✓。全链：build ✓、`TYPES OK` ✓、**39/39** ✓、守卫 **23/23** ✓、反向自检 **OK（81 例）** ✓。
 
+### 侧边栏只有「开始」页时，打开产物就**替换**掉它
+
+- **读者的要求** ✓：用侧边栏打开产物时，如果侧边栏**存在且仅存在**「开始」页，就自动关掉它 ✓。
+- **先量清楚「开始」是什么** ✓：「开始」是右栏的 **guide tab** ✓（`dsh-client-ui-sidebar-right` 的 i18n `tab.guide.title = 「开始」` ✓，注释写着"一个 pane 最多一个 guide" ✓），它的身份是那个包**公开的常量** ✓：`GUIDE_ID = "@deepseek-ai/dsh-client-ui-sidebar-right/guide"` ✓；关闭它的文案是 `dock.closeTab = 「关闭」` ✓。
+- **不用 DOM，有正规面** ✓：`ctx.sidebarRight`（`ISidebarRight` ✓，跨插件公开 ✓）就是右栏的导航控制器 ✓ —— 里面有 `active()` / `tabsIn(sessionId)` / `openResource(address, options?)` / `close(tabId)` / `closeTarget(target)` ✓。两条关键事实 ✓：
+  - `close(tabId)` **不会**关掉"唯一那个 guide" ✗（文档原话：**"the sole docked guide remains open"** ✓ —— 它是空 pane 的占位页 ✓）；
+  - 而 `openResource` 的 **`replaceTab`** 选项 ✓：「**Take this tab's place — its pane and its strip slot — and close it in the same step.**」✓✓ ⇒ **这就是这个机制本身** ✓，一步完成，不需要"先关后开" ✓。
+- **实现** ✓：新增 `sidebar-guide.ts`（常量 ✓、`isGuideTab()` ✓、`replaceableGuide(tabs, active)` ✓ —— **纯函数** ✓），并在插件**打开侧边栏资源**的那一处接上 ✓（`openFile` 里 `openSidebar` 那个闭包 ✓ —— 也就是"在侧边栏打开"本来就是插件自己走宿主导航 ✓）。**条件严格按读者原话** ✓：只有**恰好一个** tab、且它是 guide、且 `active()` 也这么说 ✓，才把它的 id 交给 `replaceTab` ✓；**任何不确定都不动** ✓（拿不到 tab 列表 ✓、多于一个 ✓、那一个不是 guide ✓、没有 id ✓ ⇒ 一律返回 `undefined` ✓ —— "说不清还有什么开着"就**不**当作"没别的开着" ✓）。整段包在 `try` 里 ✓：face 的方法按其文档"会响亮地失败" ✓ ⇒ 读状态失败**绝不能**让"打开文件"失败 ✓。
+- **测试与守卫** ✓：新增 `tests/sidebar-guide.test.ts`（常量钉住 ✓、识别 ✓、只有唯一 guide 才替换 ✓、两个 tab 不动 ✓、非 guide 不动 ✓、没有列表不动 ✓、只有 `active()` 能证明时也认 ✓、而 `active()` 说是别的就不认 ✓）；守卫**新增 1 条** marker ✓（guide 常量 ✓、`replaceableGuide` ✓、`replaceTab` ✓）；反向自检新增 1 例 ✓（把 guide 常量改一个字符 ⇒ 识别失效、机制**静默**失灵 ⇒ 要求 marker 失败 ✓），**共 82 例** ✓。全链：build ✓、`TYPES OK` ✓、**40/40** ✓（新测试文件 ✓）、守卫 **23/23** ✓、反向自检 **OK** ✓。
+
 ## 0.5.4 (frost dials per surface, the reader's own settings as the defaults, and a settings page that reads as boxes)
 
 **两处读者报告：① 不管「竖条滚轮」开着还是关着，在竖条上滚轮都会滚动正文，差别只是有没有缓动；② 希望「界面遮罩」拆成侧栏与顶栏，各自调不同透明度。**

@@ -10,6 +10,8 @@ import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { fillComposerDom } from './mcp-app.js';
 import { deliverableOpenModeOf, openDeliverableFile } from './open-file.js';
+import { replaceableGuide } from './sidebar-guide.js';
+import type { SidebarTabLike } from './sidebar-guide.js';
 import type { DeliverableOpenMode } from './open-file.js';
 import { installWindowScope } from './wallpaper-scope.js';
 import { installScrollbarStyle } from './scrollbar.js';
@@ -38,7 +40,10 @@ interface ConversationFace {
  * system opener with a warning.
  */
 interface SidebarRightFace {
-  openResource?: (address: string, options?: { params?: { line?: number } }) => void;
+  openResource?: (address: string, options?: { params?: { line?: number }; replaceTab?: string }) => void;
+  /** The tab on top of the active pane, and every committed tab of a session — the reader's "only the guide" test. */
+  active?: () => SidebarTabLike | undefined;
+  tabsIn?: (sessionId: string) => readonly SidebarTabLike[];
 }
 interface RemoteSessionFace {
   openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>;
@@ -156,7 +161,20 @@ export function apply(ctx: Context): void {
             // read it for itself (`createReaderStore()` is a handle, not a live instance).
             const sidebar = sidebarRightFace();
             const openSidebar = typeof sidebar?.openResource === 'function'
-              ? (address: string) => { sidebar.openResource!(address); }
+              ? (address: string) => {
+                // 读者的机制 ✓：侧边栏**只有「开始」页**时，让这个文件**替换**掉它（`replaceTab` ✓ —— 宿主文档里的
+                // "Take this tab's place … and close it in the same step" ✓），而不是在它旁边再开一页 ✓。
+                // 任何不确定都不动它 ✓：拿不到 tab 列表、多于一个 tab、或那一个不是 guide ⇒ `replaceableGuide` 返回
+                // undefined ✓。face 的方法按它的文档"会响亮地失败" ✓，所以整段包在 try 里 ✓ —— 读不到状态绝不能让
+                // "打开文件"这件事失败 ✓。
+                let replaceTab: string | undefined;
+                try {
+                  replaceTab = replaceableGuide(sidebar.tabsIn?.(sessionId), sidebar.active?.());
+                } catch (error) {
+                  console.warn('[dsh-better-display] sidebar guide check failed:', error);
+                }
+                sidebar.openResource!(address, replaceTab === undefined ? undefined : { replaceTab });
+              }
               : undefined;
             const openExternal = async (absolutePath: string) => {
               // `remote` and `remote.session` are services in 0.2.0 (`ctx.get`), and the plugin already declares both in

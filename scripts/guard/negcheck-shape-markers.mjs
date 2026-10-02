@@ -259,6 +259,17 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the sidebar guide’s identity changed, so a lone 「开始」 page stops being recognised and is never replaced',
+    // The guide is recognised by the host's published constant alone. Change it and nothing throws: the column simply
+    // keeps 开始 beside the file it opened — the reported annoyance, back again and silent.
+    // The replacement must neither CONTAIN the search nor BE CONTAINED BY it: the harness skips a mutation whose
+    // replacement is already present, and that test is a substring test — `…/guide-x` contains `…/guide`, and `…/guid` is
+    // contained by it, so both were skipped (and a skip counts as a failure). A case flip is neither.
+    search: '@deepseek-ai/dsh-client-ui-sidebar-right/guide',
+    replace: '@deepseek-ai/dsh-client-ui-sidebar-right/GUIDE',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the hover window’s opening delay dropped, so a passing pointer pops the preview instead of waiting',
     // The host opens its preview after 500ms; without the delay the window appears while the pointer is merely crossing the
     // box, which is the behaviour the delay exists to prevent.

@@ -1020,6 +1020,13 @@ const markers = [
     // …and the fallback that decides what an unrecognised stored value means: the MIDDLE mode, which is what a fresh
     // install opens with.
     && bundle.includes('value === "brief" || value === "cards" ? value : "balanced"')],
+  // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
+  // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
+  // place and close it in the same step". The guide is identified by the identity the sidebar package publishes
+  // (`GUIDE_ID`), and `close()` is deliberately not used: a sole guide is documented to stay open.
+  ['the sidebar opening replaces a lone 「开始」 guide, by the host’s own tab identity', () => bundle.includes('@deepseek-ai/dsh-client-ui-sidebar-right/guide')
+    && bundle.includes('replaceableGuide')
+    && bundle.includes('replaceTab')],
   // The host's `turn-trigger` record — the notification that woke the turn up (a goal continuing, a webhook, a job…).
   // The conversation page renders it as `TurnTriggerNodeView`; the reading view answered 「此记录类型暂未接入阅读页」.
   // The component is not exported, so the reading view mirrors it, and what it mirrors is pinned here: the row's own
