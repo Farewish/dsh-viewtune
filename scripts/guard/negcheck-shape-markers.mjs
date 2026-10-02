@@ -259,6 +259,24 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the settings panel closed by an outside click dropping the number the reader had just typed',
+    // A panel removed from under the pointer never delivers `blur` to the field it took away, so closing is the only
+    // exit that can still apply it. The mutation takes that exit away and leaves blur/Enter in place — which is exactly
+    // the reader's report, and exactly what a marker that only looked at the two event handlers would miss.
+    search: 'commitFoldDraft()',
+    replace: 'void 0',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
+    label: 'the turn window computed and then never applied, so the page renders a history it was told not to',
+    // The regression is the render guard disappearing while the window itself still gets computed — which is exactly
+    // what a marker that only checked `insideWindow`/`renderedTurnsOf` would miss, so the case is aimed at the call
+    // site rather than at the arithmetic.
+    search: 'hiddenTurnKeys.has(group.key)',
+    replace: 'false',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the steps pill interpolating a denominator it does not have, which printed the word null',
     search: '`${answer} 步`',
     replace: '`${answer}/null 个步骤`',

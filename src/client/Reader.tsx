@@ -32,6 +32,7 @@ import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
+import { insideWindow, renderedTurnsOf, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -1036,6 +1037,45 @@ export function Reader(props: ReaderProps) {
   // Only while something streams, and then only for the turns that are NOT the one growing: the reader asked for the
   // running turn alone to stay open.
   const foldEarlier = autoCollapseEarlier && liveTurn !== null;
+  // …and the TURN window, which is a different mechanism entirely (see turn-fold.ts): the newest `foldBefore` turns
+  // are the ones this view RENDERS. Everything older is not rendered at all — reader's message, process and answer
+  // together — so the page stops paying for a history nobody is looking at.
+  //
+  // It is COMMITTED rather than live on purpose, and the reader asked for exactly this trigger: the window is re-read
+  // when a NEW turn starts, so an edit in the panel waits for the next turn instead of folding the page under a reader
+  // mid-sentence, and nothing is pulled out from under someone reading turn 40 because turn 41 arrived. `revealed` is
+  // what the reveal control has added since the last commit — its own state, because it is about what this reader is
+  // reading right now rather than a preference.
+  const foldBefore = props.useStore(state => turnFoldOf(state.collapseBefore));
+  const foldBeforeRef = useRef(foldBefore);
+  foldBeforeRef.current = foldBefore;
+  const [foldWindow, setFoldWindow] = useState(foldBefore);
+  const [revealed, setRevealed] = useState(0);
+  const committedTurn = useRef<number | null>(null);
+  useEffect(() => {
+    // Once per new turn: a turn ENDING must not yank away turns the reader just revealed, and a setting edit must not
+    // apply until the next one starts. The ref carries the latest setting without making it a dependency.
+    if (liveTurn === null || committedTurn.current === liveTurn) return;
+    committedTurn.current = liveTurn;
+    setFoldWindow(foldBeforeRef.current);
+    setRevealed(0);
+  }, [liveTurn]);
+  const renderedTurns = renderedTurnsOf(foldWindow, revealed);
+  /**
+   * The turn groups the window leaves out, by key.
+   *
+   * Ordinals are counted among TURN groups only, from the tail: a group with no turn (a cluster of submissions still
+   * being sent) is not part of the conversation's history and always renders. With the setting OFF the window is
+   * unreachable, so this set is empty and the render loop below is unchanged.
+   */
+  const hiddenTurnKeys = useMemo(() => {
+    const turns = groups.filter(group => group.turn !== null);
+    const hidden = new Set<string>();
+    for (let index = 0; index < turns.length; index += 1) {
+      if (!insideWindow(index, turns.length, renderedTurns)) hidden.add(turns[index]!.key);
+    }
+    return hidden;
+  }, [groups, renderedTurns]);
   // The reasoning card's own movement, and the pace 自动滚动 advances at. Both are the reader's settings and both are
   // read defensively: a record written before either existed keeps the two-lines-per-step pace this card always had.
   // They are handed down as primitives so the memoized seats below only re-render when a value actually changes.
@@ -1383,7 +1423,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.4" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.5" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
@@ -1411,6 +1451,7 @@ export function Reader(props: ReaderProps) {
           reasoningFollow={reasoningFollow} onReasoningFollow={props.actions.setReasoningFollow}
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
+          collapseBefore={foldBefore} onCollapseBefore={props.actions.setCollapseBefore}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}
           onWallpaper={props.actions.setWallpaper} onWallpaperDim={props.actions.setWallpaperDim}
           wallpaperScope={wallpaperScope}
@@ -1423,14 +1464,19 @@ export function Reader(props: ReaderProps) {
           onWallpaperChromeHeaderBlur={props.actions.setWallpaperChromeHeaderBlur}
           shortcuts={{ collapseTurn: collapseTurnKey, collapseAll: collapseAllKey }} onShortcut={props.actions.setShortcut} buttonRef={settingsRef} />
       </div>
-      {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
-        setHistoryError(false);
-        try { await props.loadOlder(); } catch { setHistoryError(true); }
-      }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
+      {(hiddenTurnKeys.size > 0 || hasMore) && <button type="button" className={css.historyButton} disabled={loadingOlder}
+        onClick={async () => {
+          // What is already in hand comes first: the timeline holds the turns the host has loaded, so revealing them
+          // costs nothing and cannot fail. Only when nothing is left to reveal does this read older turns from disk —
+          // the reader's own compromise (N rendered, the next band held in memory, anything older read on demand).
+          if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
+          setHistoryError(false);
+          try { await props.loadOlder(); } catch { setHistoryError(true); }
+        }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (

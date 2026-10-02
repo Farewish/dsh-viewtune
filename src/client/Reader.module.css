@@ -748,6 +748,14 @@
 .settingsRangeValue { min-width: 34px; text-align: right; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; }
 .settingsRange input[type=range] { width: 96px; height: 16px; margin: 0; accent-color: var(--dsw-alias-state-business-primary); cursor: pointer; }
 .settingsRange input[type=range]:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+/* The panel's one text field — 「自动折叠更早的轮次」, a count of turns. Sized to the three digits the ceiling allows
+   (`50`) plus its unit, so the row reads like the others: label left, control right. `tabular-nums` because the number
+   is the value, and a proportional font makes it jitter as it is edited. */
+.settingsField { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.settingsNumber { width: 44px; padding: 3px 6px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; line-height: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+.settingsNumber:hover { border-color: var(--dsw-alias-border-l3); }
+.settingsNumber:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
+.settingsUnit { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
 /* Frosted glass: an opt-in skin, ported from upstream 0.2.0's `data-reader-glass` block and mapped
    onto this fork's surfaces. The rule is the same in both — the reader paints no plates of its own,
    so a host wallpaper or skin stays visible behind the reading view, and the labels that are

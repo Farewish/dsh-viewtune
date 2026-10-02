@@ -102,6 +102,16 @@ export interface ReaderState {
    */
   autoCollapseEarlier: boolean;
   /**
+   * How many of the newest turns keep their process open — 「自动折叠更早的轮次」.
+   *
+   * 0 is OFF, and OFF is the shipped default: this plugin does not fold a reader's history behind their back. Read
+   * through `turnFoldOf`, which is also where the ceiling lives. Deliberately a SECOND setting rather than a widening
+   * of `autoCollapseEarlier`: that one is a boolean that acts only WHILE a turn streams, while this one acts at rest
+   * too — and since a folded process UNMOUNTS its content rather than hiding it, this is the one that lowers the cost
+   * of a long conversation rather than only the cost of a running one.
+   */
+  collapseBefore: number;
+  /**
    * How the reasoning card keeps up with what is being written into it: 自动滚动 (a reading pace), 跟随最新 (always
    * the newest line), or 手动滚动 (never move on its own).
    *
@@ -179,6 +189,8 @@ type ReaderActions = {
   setRevealWords: (draft: ReaderState, value: boolean) => void;
   setFollowMode: (draft: ReaderState, value: FollowMode) => void;
   setAutoCollapseEarlier: (draft: ReaderState, value: boolean) => void;
+  /** The count behind 「自动折叠更早的轮次」; the caller passes what `turnFoldOf` already clamped. */
+  setCollapseBefore: (draft: ReaderState, value: number) => void;
   setReasoningFollow: (draft: ReaderState, value: ReasoningFollowMode) => void;
   setReasoningRate: (draft: ReaderState, value: number) => void;
   setFocusExpand: (draft: ReaderState, value: boolean) => void;
@@ -233,6 +245,10 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // …and the earlier turns' processes are put away while something streams: the reader's setting, adopted here, so
       // a fresh install opens the way they run it.
       autoCollapseEarlier: true,
+      // …and nothing is folded by COUNT to begin with: the reader asked for this dial, not for a history that folds
+      // itself. It is the one setting whose shipped default is not taken from their record, because their record has
+      // no such key yet — 0 is OFF, and OFF is the behaviour every earlier build had (see `turnFoldOf`).
+      collapseBefore: 0,
       // The reasoning card's own movement: the reader's setting — 跟随最新, i.e. stay on the newest line rather than
       // walk down at a reading pace — at the pace they chose (3 lines/s; `reasoningRateOf`'s own fallback stays at the
       // old standard 2, which is what a record with an unusable value keeps).
@@ -278,6 +294,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setRevealWords: (draft, value: boolean) => { draft.revealWords = value; },
       setFollowMode: (draft, value: FollowMode) => { draft.followMode = value; },
       setAutoCollapseEarlier: (draft, value: boolean) => { draft.autoCollapseEarlier = value; },
+      setCollapseBefore: (draft, value: number) => { draft.collapseBefore = value; },
       setReasoningFollow: (draft, value: ReasoningFollowMode) => { draft.reasoningFollow = value; },
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
       setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },

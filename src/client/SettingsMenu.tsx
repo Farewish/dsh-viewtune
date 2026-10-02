@@ -13,6 +13,7 @@ import type { ShortcutAction, ShortcutProblem } from './shortcuts.js';
 import { GLASS_BLUR_MAX, GLASS_PARTS } from './glass.js';
 import { COLLAPSE_MODES, collapseModeOf } from './collapse-mode.js';
 import type { CollapseMode } from './collapse-mode.js';
+import { TURN_FOLD_MAX, turnFoldOf } from './turn-fold.js';
 import { TEXT_CADENCES, textCadenceOf } from './text-cadence.js';
 import type { TextCadence } from './text-cadence.js';
 import { FOLLOW_MODES, followModeOf } from './reading-scroll.js';
@@ -72,6 +73,8 @@ const REASONING_FOLLOW_HINT = '自动滚动按阅读速度走；跟随最新停�
 const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
 /** What the focused expansion does, as that row's `title` box. */
 const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到展开阅读那么高';
+/** What the turn window buys, as that row's `title` box: behaviour only, and short (the copy check caps it at 28). */
+const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是全部保留';
 /** The frost rows, one per surface. Short because the row above it already says which surface is meant. */
 const FROST_HINT = '0px 只有玻璃，往上才是磨砂';
 
@@ -124,7 +127,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -165,6 +168,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onFollowMode: (next: FollowMode) => void;
   autoCollapseEarlier: boolean;
   onAutoCollapseEarlier: (next: boolean) => void;
+  /** How many of the newest turns keep their process open; already clamped by the caller (0 is OFF). */
+  collapseBefore: number;
+  onCollapseBefore: (next: number) => void;
   reasoningFollow: ReasoningFollowMode;
   onReasoningFollow: (next: ReasoningFollowMode) => void;
   reasoningRate: number;
@@ -217,6 +223,46 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   const wrap = useRef<HTMLDivElement>(null);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const panelId = useId();
+  /**
+   * The fold count, held as TEXT while it is being edited.
+   *
+   * A controlled field bound straight to the preference would write on every keystroke: typing 12 would store 1 first
+   * and fold the whole page on the way, and deleting the field would store 0 without the reader having said so. So the
+   * draft is local, it follows the preference whenever that changes from anywhere else, and `commitFoldDraft` below is
+   * the only writer — on blur and on Enter.
+   */
+  const [foldDraft, setFoldDraft] = useState(String(collapseBefore));
+  useEffect(() => { setFoldDraft(String(collapseBefore)); }, [collapseBefore]);
+  const commitFoldDraft = () => {
+    const text = foldDraft.trim();
+    // Empty means OFF — a reader who cleared the field is asking for no folding, and that is also what the store's own
+    // default is. Anything that is not a number is a typo: revert to what the preference holds rather than quietly
+    // turning the feature off, and let the field show the real value again.
+    if (text === '') { onCollapseBefore(0); return; }
+    const parsed = Number(text);
+    if (!Number.isFinite(parsed)) { setFoldDraft(String(collapseBefore)); return; }
+    // The parent clamps through `turnFoldOf`, and the effect above then writes the clamped number back into the field,
+    // so what the reader sees after a commit is exactly what they will get.
+    onCollapseBefore(turnFoldOf(parsed));
+  };
+  /**
+   * …and a third writer: the panel CLOSING.
+   *
+   * A panel dismissed by an outside pointer never delivers a `blur` to the field it removes — the element is gone
+   * before anything could fire — so a number typed and then abandoned by clicking elsewhere was silently lost. That is
+   * the reader's report (「直接点击外面…填完的数字不会被应用」), and closing IS an exit: an exit applies what is in the
+   * field, which is the same rule the Enter key follows, for the reader who never presses it. Escape while the field
+   * has focus still means "revert" — the field's own handler writes the stored value back first, and this commit then
+   * writes that same value — so the two never disagree.
+   *
+   * The `!==` guard keeps a close that changed nothing from writing to the store at all, and `foldDraft` is
+   * deliberately not a dependency: this must fire when the panel closes, not on every keystroke.
+   */
+  useEffect(() => {
+    if (open) return;
+    if (foldDraft !== String(collapseBefore)) commitFoldDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see the note above: the draft is read, never depended on.
+  }, [open]);
 
   // The two ways out. Outside-pointer dismissal is the product's own hook; Escape needs its own
   // handler because it also has to hand focus back — a keyboard reader can be inside the panel when
@@ -390,6 +436,32 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>自动收起更早流程</span>
               </span>
               <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
+            </div>
+            {/* The COUNT-based folding, right next to the boolean one because the two answer the same question at
+                different times: that one acts while a turn streams, this one at rest as well — and since a folded
+                process UNMOUNTS its content rather than hiding it, this is the dial that lowers the cost of a LONG
+                conversation.
+                The panel's only text field, and a field rather than a dial on purpose: the value is a count of turns,
+                whose useful range (a handful) is narrower than a slider expresses comfortably, and a reader who knows
+                what they want should be able to type it. It commits on blur or Enter and NEVER per keystroke — a
+                half-typed number is not a setting (writing 12 through 1 would fold the page on the way), and an empty
+                field is the reader clearing it, which means OFF rather than a value the store has to guess at. Text
+                that is not a number at all reverts, so a typo cannot silently turn the feature off. */}
+            <div className={css.settingsRow} title={FOLD_BEFORE_HINT} data-ud-check="reader-settings-collapse-before">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>自动折叠更早的轮次</span>
+              </span>
+              <span className={css.settingsField}>
+                <input className={css.settingsNumber} type="text" inputMode="numeric" value={foldDraft}
+                  aria-label={`自动折叠更早的轮次：只渲染最近几轮，最多 ${String(TURN_FOLD_MAX)}`}
+                  onChange={event => { setFoldDraft(event.currentTarget.value); }}
+                  onBlur={commitFoldDraft}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                    else if (event.key === 'Escape') setFoldDraft(String(collapseBefore));
+                  }} />
+                <span className={css.settingsUnit}>轮</span>
+              </span>
             </div>
             {/* What the toolbar's collapse button DOES — a behaviour, so it sits with the other behaviours on this page.
                 It used to live on the SHORTCUTS page, next to the two bindings, where it read as one of them; the

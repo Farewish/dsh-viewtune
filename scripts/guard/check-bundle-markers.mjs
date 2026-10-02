@@ -627,14 +627,40 @@ const markers = [
   ['…with the defaults being the reader’s own mode at the pace they chose', () => bundle.includes('reasoningFollow: "latest"') && bundle.includes('reasoningRate: 3')],
   ['…both read defensively', () => bundle.includes('reasoningFollowModeOf(state.reasoningFollow)') && bundle.includes('reasoningRateOf(state.reasoningRate)')],
   ['…and a change to either reaches the follower that is already running', () => /reasoningMode,\s*rate\s*\]\)/.test(bundle)],
-  // 自动收起更早流程, pinned at every end that has to agree. The fold itself (only a turn with `status === "open"` stays
-  // open), the TWO places the rule is asked — the reader's rendering and the toolbar's own "what is open" pass, which
-  // would otherwise disagree with what is on screen — the default and the defensive read, and the clear that makes a
-  // new turn put the earlier processes away (gated by the same two conditions the fold uses).
+  // The two folding settings, pinned at every end that has to agree — and kept clearly apart, because they fold
+  // DIFFERENT things and confusing them is the mistake this pair is here to prevent.
+  //
+  // 自动收起更早流程 (the boolean) folds a turn's PROCESS, and only WHILE a turn streams: the fold itself (only a turn
+  // with `status === "open"` stays open), the two places the rule is asked — the reader's rendering and the toolbar's
+  // own "what is open" pass, which would otherwise disagree with what is on screen — the default, the defensive read,
+  // and the clear that makes a new turn put the earlier processes away.
   ['自动收起更早流程 folds every turn but the growing one', 'if (foldEarlier && boundary.status !== "open") return false;'],
   ['…and the toolbar asks the same rule, so it agrees with the screen', () => (bundle.match(/processExpanded\(choice, boundary, foldEarlier\)/g) ?? []).length === 2],
   ['…with the switch ON unless a record says otherwise', 'autoCollapseEarlier: true'],
   ['…and that record read the defensive way', 'state.autoCollapseEarlier) !== false'],
+  // 自动折叠更早的轮次 (the count) folds whole TURNS — reader's message, process and answer together — by not rendering
+  // them at all, and its window is COMMITTED: it is re-read when a NEW turn starts and at no other time, so an edit in
+  // the panel waits for the next turn instead of folding the page under a reader mid-sentence.
+  ['…and the turn window, OFF unless a record says otherwise', () => bundle.includes('collapseBefore: 0')
+    && bundle.includes('turnFoldOf(state.collapseBefore)')],
+  ['…measured from the tail, and the reveal serves what is in hand before anything is read from disk', () => bundle.includes('renderedTurnsOf(foldWindow, revealed)')
+    && bundle.includes('insideWindow(index, turns.length, renderedTurns)')
+    && bundle.includes('hiddenTurnKeys.has(group.key)')
+    // One name for the control, in both cases: the reader asked for that (「那个按钮也命名为加载更早记录即可」), so the
+    // reveal is only ever the click handler's arithmetic and the label is the same string the disk path uses.
+    && (bundle.match(/revealStepOf\(foldWindow\)/g) ?? []).length === 1
+    && bundle.includes('hiddenTurnKeys.size > 0')
+    && bundle.includes('加载更早记录')
+    && !bundle.includes('显示更早的')],
+  ['…and re-read only when a NEW turn starts, so nothing is pulled out from under a reader', 'committedTurn.current === liveTurn'],
+  ['…with a ceiling a typo cannot argue with, and a text field in the panel', () => bundle.includes('Math.min(50, Math.max(0, Math.round(value)))')
+    && bundle.includes('"data-ud-check": "reader-settings-collapse-before"')],
+  // …and the field commits on the panel CLOSING as well, which is the only exit that can: a panel dismissed by an
+  // outside pointer removes the field before any `blur` could fire, so a number typed and then abandoned by clicking
+  // elsewhere was lost (the reader's report). `commitFoldDraft()` appears exactly once — the close effect — because the
+  // two event handlers pass the function itself.
+  ['…and a panel closed by clicking outside still applies what was typed', () => bundle.includes('foldDraft !== String(collapseBefore)')
+    && (bundle.match(/commitFoldDraft\(\)/g) ?? []).length === 1],
   ['…and a new turn clearing the stored choices, so the earlier ones fold by themselves', () => {
     const gated = (bundle.match(/autoCollapseEarlier && liveTurn !== null/g) ?? []).length;
     return gated === 2 && bundle.includes('clearExpanded');
