@@ -997,6 +997,16 @@ const markers = [
     // …and the heading button is content-wide, not stretched over its whole grid column: a stretched grid item made the
     // entire first row read as clickable (the reader's report).
     && bundle.includes('justify-self:start')
+    // …and the hover window plus the heading's click, copied from the conversation page: the primitives' own `HoverCard`
+    // in its preview variant with the host's 500ms delay and the width anchored to the box, its content the changed files
+    // with their ± counts (the same `diffTotals` the tool rows use), and a heading that hands the call to the host's
+    // inspector. `inspectCall` is the closest published surface to the host's review click: the slot catalog shows a View
+    // receives only inspectCall/viewRequest/openView/completeViewRequest, so the review entry point is not reachable.
+    && bundle.includes('variant: "preview"')
+    && bundle.includes('openDelayMs: 500')
+    && bundle.includes('inspectCall')
+    && bundle.includes('deliverablesBoxHint')
+    && bundle.includes('turnChanges')
     // …and the commits are read from the calls, with the global options a real command carries: every commit in the
     // reader's instance is `git -C <dir> commit …`, and a pattern demanding `git` immediately before `commit` matched
     // none of them, so 「提交」 never appeared at all.

@@ -1,7 +1,9 @@
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { ReaderFlowEntry } from './tool-activity.js';
-import { inputFields, stringValue, toolIdentity } from './tool-activity.js';
+import { callDiffHunks, inputFields, stringValue, toolIdentity } from './tool-activity.js';
+// Type-only, so this module stays free of the primitives at RUNTIME and can still be unit-tested outside a browser.
+import type { DiffHunk } from '@deepseek-ai/dsh-client-ui-primitives';
 
 interface PresentedEntry {
   readonly seq?: number;
@@ -317,7 +319,60 @@ export function needsExpand(contentHeight: number, cap: number = DELIVERABLE_BOX
   return contentHeight > cap + 1;
 }
 
-/** The single produced path whose basename is exactly value, or undefined. */function onlyPathWithBasename(paths: readonly string[], value: string): string | undefined {
+/** One file a turn changed, with the raw hunks and the call that changed it. */
+export interface TurnChange {
+  /** The tool call responsible, when the flow knows one — this is what the heading's click hands to the host's inspector. */
+  readonly callId?: string;
+  /** The host's own rows for this file, read through the one normaliser (`callDiffHunks`). */
+  readonly hunks: DiffHunk[];
+  readonly path: string;
+}
+
+/**
+ * The turn's changed files, each with its hunks and the call that changed it.
+ *
+ * Two consumers, one list: the hover window shows the files with their ± counts (the reader's own screenshot of the
+ * conversation page), and the heading's click needs a call to inspect. Both read the SAME normaliser the tool rows use
+ * (`callDiffHunks`), so a file cannot be counted one way on a row and another way in the window. The counts themselves
+ * are left to the caller: they come from `diffTotals` in the primitives, which this module stays clear of so it can be
+ * unit-tested without a browser.
+ *
+ * A path changed by several calls keeps the LAST one, the way the host's own `presentedForClosing` keeps the latest
+ * declaration of a path, and the order is first-seen.
+ */
+export function turnChanges(flow?: readonly ReaderFlowEntry[]): readonly TurnChange[] {
+  const byPath = new Map<string, TurnChange>();
+  if (!flow) return [];
+  for (const item of flow) {
+    if (item.kind !== 'tool' || !item.block) continue;
+    const { name, raw } = toolIdentity(item);
+    const block = item.block as unknown as { name?: string; argsRaw?: string; call?: { name?: string; argsRaw?: string } };
+    const toolName = name !== '工具调用' ? name : (block.name || block.call?.name);
+    const toolRaw = raw || (block.argsRaw || block.call?.argsRaw || '');
+    const hunks = callDiffHunks(item.block, toolName, inputFields(toolRaw));
+    for (const hunk of hunks) {
+      if (typeof hunk.path !== 'string' || hunk.path === '') continue;
+      byPath.set(hunk.path, { path: hunk.path, hunks: [hunk], callId: item.callId });
+    }
+  }
+  return [...byPath.values()];
+}
+
+/**
+ * What the 编辑 box's heading says while the pointer is on it.
+ *
+ * The host's changed-files card swaps its ± counts for a hint on hover, and the reader asked for the same: the heading
+ * reads 「共 N 项编辑」 at rest and a sentence about what a click does when pointed at. The sentence follows the switch,
+ * because the switch is what decides where a preview lands — with it on the click inspects the change (the host's own
+ * surface, since no review entry point is published to a View — measured from the live slot catalog), and with it off
+ * the same click still opens that surface rather than the file.
+ */
+export function deliverableHeadingHint(openInSidebar: boolean): string {
+  return openInSidebar ? '在侧边栏预览' : '预览差异';
+}
+
+/** The single produced path whose basename is exactly value, or undefined. */
+function onlyPathWithBasename(paths: readonly string[], value: string): string | undefined {
   const matches = paths.filter(path => basename(path) === value);
   return matches.length === 1 ? matches[0] : undefined;
 }

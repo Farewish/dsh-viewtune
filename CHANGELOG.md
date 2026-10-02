@@ -115,6 +115,22 @@
 - **改法**：`edited` 的合并顺序变成「交付 → 改动公告 → 工具流程」并**只在本列表内去重** ✓ ⇒ 交付的文件同时出现在两个框里 ✓，各自只出现一次 ✓。推论也写上：**只被交付、看不出改动**的文件（shell 产出的分享包 ✓）同样进「编辑」 ✓ —— 因为客户端分不出"新建"与"编辑" ✓（读者自己定的那条 ✓）。
 - **测试**：那条用例改成"同一路径出现在两份列表里" ✓（`presented` 与 `changes` 都含 `Reader.tsx` ⇒ 交付与编辑都有它 ✓，而只改过的 `Reader.module.css` 只在编辑里 ✓）。全链：build ✓、`TYPES OK` ✓、**39/39** ✓、守卫 **23/23** ✓、反向自检 **OK（80 例）** ✓。
 
+### 平衡档：悬停窗口、框头点击，照对话页那套来
+
+- **先量宿主**（这轮的关键收获 ✓）：对话页那两张卡的行为是这样的 ——
+  - **交付卡**（`data-presented-file`）：一张**绝对定位铺满整卡**的按钮 ✓ 负责点击（`inset: 0` + `border-radius: inherit` + **内阴影**聚焦环 ✓），点击 = `onPreview` = `openFile(path)` ✓，`title` 是 `resolveWorkspacePath` 的**绝对路径** ✓；悬停时底色 `--deliverable-fill` → `--deliverable-hover` ✓，**描述行换成「点击预览」** ✓。
+  - **编辑卡**（`data-changed-files`）：头部**没有点击** ✗ —— 它是 **primitives 的 `HoverCard`** 的锚点 ✓（`variant: "preview"` ✓、**`openDelayMs: 500`** ✓、`widthAnchorRef` 贴卡宽 ✓、内容 `ChangedFilePreview` = 差异 ✓，portal 到 body ✓）；**真正的点击在文件行上** ✓：`onClick: () => { openReview(index); }` ✓（另有列表展开的 `setExpanded` ✓）；头部悬停时 **`+N −M` 隐藏、提示文字显示** ✓。
+  - **一个重要限制**（用 Inspect 查了 live slot 目录 ✓）：`conversation.view` 给 View 的 owner props **只有** `inspectCall` / `viewRequest` / `openView` / `completeViewRequest` ✓ ⇒ **宿主的 review 入口不对插件开放** ✗。
+- **因此这一轮做的（平衡档）** ✓：
+  1. **点击「共 x 项编辑」** ✓ ⇒ 用能拿到的最接近宿主那一下的面：**`inspectCall(改过该文件的那次调用的 callId)`** ✓（宿主自己的工具调用检视器 ✓，里面有差异 ✓）；拿不到 callId 时退回打开文件 ✓。**不是**宿主的 `openReview` ✗，这点如实写明 ✓。
+  2. **悬停「共 x 项编辑」** ✓ ⇒ 框头文字从「共 N 项编辑」换成 **「在侧边栏预览」** ✓（开关关闭时写「预览差异」✓）—— 纯 CSS 两个 span 互斥显示 ✓，和宿主那张卡的互换同构 ✓。
+  3. **悬停窗口** ✓ ⇒ **primitives 的 `HoverCard`** ✓，`variant: "preview"` + `openDelayMs: 500` + 宽度贴框 ✓，内容是**这一轮改过的文件与 ± 计数** ✓（计数用 `diffTotals` ✓ —— 和工具行同一个来源 ✓，所以同一文件不会两处两个数 ✓），与你贴的那张对话页截图一致 ✓。
+  4. **开关打开时** ✓：点编辑框里的气泡 ⇒ `inspectCall`（**差异** ✓，不是文件本体 ✓）。**开关关闭时** ✓：除两条标题外一律**外部打开文件本体** ✓ —— 这一条本来就成立 ✓（行内的 `openFile` 一直按开关路由 ✓），本轮未改 ✓。
+  5. **交付框** ✓ ⇒ **悬停无内容** ✓（不挂 HoverCard ✓，也没有提示互换 ✓）；**开关打开时点击气泡 = 侧边栏打开文件本体** ✓。
+  6. **「共 x 项交付」的点击先不做** ✓。
+  7. **不做整卡可点、不动 `title`** ✓（按你的要求 ✓）。
+- **测试与守卫** ✓：新增 `turnChanges` 的用例 ✓（一文件一条、**后来者胜**（与宿主"取每个路径最后一次声明"一致 ✓）、无路径的 hunk 被跳过 ✓、顺序为首见 ✓、空输入 ✓）与框头文案的用例 ✓（开关两种状态 ✓）；守卫新增 5 个针 ✓（`variant: "preview"` / `openDelayMs: 500` / `inspectCall` / `deliverablesBoxHint` / `turnChanges` ✓，实测产物里正是 `HoverCard, { variant: "preview", anchor: heading, content: preview, openDelayMs: 500, widthAnchorRef: box }` ✓）；反向自检新增 1 例 ✓（把 `openDelayMs: 500` 改成 `499` ⇒ 指针掠过即弹窗 ⇒ 要求 marker 失败 ✓），**共 81 例** ✓。全链：build ✓、`TYPES OK` ✓、**39/39** ✓、守卫 **23/23** ✓、反向自检 **OK** ✓。
+
 ## 0.5.4 (frost dials per surface, the reader's own settings as the defaults, and a settings page that reads as boxes)
 
 **两处读者报告：① 不管「竖条滚轮」开着还是关着，在竖条上滚轮都会滚动正文，差别只是有没有缓动；② 希望「界面遮罩」拆成侧栏与顶栏，各自调不同透明度。**

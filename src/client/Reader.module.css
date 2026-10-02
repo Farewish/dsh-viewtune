@@ -506,6 +506,22 @@
 @container (width <= 620px) { .deliverablesRow:has(.deliverableChip[data-style=card]) { grid-template-columns: minmax(0, 1fr); } }
 /* 提交气泡：不是文件，没有可点开的路径，所以只是一枚带短哈希的泡泡，标题（完整首行）放在 title 里。 */
 .deliverableCommit { box-sizing: border-box; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: var(--dsw-font-family-mono, monospace); }
+/* 框头：静止时是「共 N 项编辑」，指针一到就换成一句说明（宿主那张改动卡就是这么互换它的 ± 计数与提示的 ✓）。
+   两个 span 叠在同一个网格位里，用显示切换，不需要 JS。 */
+.deliverablesBoxHeading { grid-area: 1 / 1; }
+.deliverablesBoxHint { grid-area: 1 / 1; display: none; color: var(--dsw-alias-label-secondary); }
+.deliverablesBoxLabel { display: grid; }
+.deliverablesBoxLabel:hover .deliverablesBoxHeading,
+.deliverablesBoxLabel:focus-visible .deliverablesBoxHeading { display: none; }
+.deliverablesBoxLabel:hover .deliverablesBoxHint,
+.deliverablesBoxLabel:focus-visible .deliverablesBoxHint { display: block; }
+/* 悬停窗口里的改动清单：路径 + ± 计数，和读者贴的对话页截图一致（计数用 diffTotals，和工具行同一个来源）。 */
+.deliverablesPreview { min-width: 260px; max-width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.deliverablesPreviewRow { display: flex; align-items: center; gap: 12px; font-size: 12px; line-height: 20px; }
+.deliverablesPreviewPath { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); }
+.deliverablesPreviewCounts { flex: none; display: inline-flex; gap: 6px; font-family: var(--ds-font-family-code, monospace); font-size: 11px; }
+.deliverablesPreviewAdded { color: var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary)); }
+.deliverablesPreviewRemoved { color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-tertiary)); }
 .deliverablesMore { font-size: 12px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }
 .deliverablesShowFolder { border: 1px solid transparent; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 7px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; transition: all 150ms ease; }
 .deliverablesShowFolder:hover { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-interactive-bg-hover); border-color: var(--dsw-alias-border-l2); }

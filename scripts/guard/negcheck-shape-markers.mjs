@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the hover window’s opening delay dropped, so a passing pointer pops the preview instead of waiting',
+    // The host opens its preview after 500ms; without the delay the window appears while the pointer is merely crossing the
+    // box, which is the behaviour the delay exists to prevent.
+    search: 'openDelayMs: 500',
+    replace: 'openDelayMs: 499',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the commit pattern no longer allowing a global option, so every `git -C … commit` stops being a commit',
     // Exactly the reported bug: the reader's own commits are all `git -C <dir> commit …`, so without the global-option
     // allowance the 提交 box is empty forever while the files still pile up under 编辑.

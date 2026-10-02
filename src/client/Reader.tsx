@@ -4,7 +4,7 @@ import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
-  FileTypeIcon, fileExtension,
+  DiffBlock, FileTypeIcon, HoverCard, diffTotals, fileExtension,
   IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
   IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
   IconQueueOutlineRegular, JsonBlock, MarkdownText,
@@ -22,8 +22,8 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnCommits } from './deliverables.js';
-import type { CommitRecord, DeliverableDisplay } from './deliverables.js';
+import { basename, createProducedFileMentions, deliverableDisplayOf, deliverableHeadingHint, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits } from './deliverables.js';
+import type { CommitRecord, DeliverableDisplay, TurnChange } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { SettingsMenu } from './SettingsMenu.js';
@@ -593,13 +593,30 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
  * against the cap (see `needsExpand`). The measurement is re-taken when the paths, the mode, the open state or the box's
  * own width change, because a narrower column wraps sooner.
  */
-function DeliverablesBox({ region, open, onToggle, children }: {
+/**
+ * One box of the balanced row: heading and switch on their own line, chips below, two rows until it is opened.
+ *
+ * Three optional behaviours, all of them the conversation page's own (measured there):
+ *   · `hint` — the heading swaps its 「共 N 项…」 line for a sentence while the pointer is on it, exactly as the host's
+ *     changed-files card swaps its ± counts for a preview hint (CSS does the swap: two spans, one hidden).
+ *   · `onHeadingClick` — the heading is a button; for 编辑 it opens the host's inspector for the call that changed the
+ *     file (`inspectCall`), which is the closest published surface to the host's own review click.
+ *   · `preview` — the hover window, using the primitives' own `HoverCard` in the `preview` variant with the host's 500ms
+ *     delay and its width anchored to the box, so it is literally the same widget the conversation page uses.
+ *
+ * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」.
+ */
+function DeliverablesBox({ region, open, onToggle, hint, onHeadingClick, preview, children }: {
   region: { id: string; label: string; hint: string; count: number };
   open: boolean;
   onToggle: () => void;
+  hint?: string;
+  onHeadingClick?: () => void;
+  preview?: ReactNode;
   children: ReactNode;
 }) {
   const lane = useRef<HTMLDivElement | null>(null);
+  const box = useRef<HTMLDivElement | null>(null);
   const [overflowing, setOverflowing] = useState(false);
   useEffect(() => {
     const node = lane.current;
@@ -611,10 +628,17 @@ function DeliverablesBox({ region, open, onToggle, children }: {
     observer.observe(node);
     return () => { observer.disconnect(); };
   }, [region.count, open]);
+  const heading = (
+    <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} disabled={onHeadingClick === undefined}>
+      <span className={css.deliverablesBoxHeading}>共 {region.count} 项{region.label}</span>
+      {hint !== undefined && <span className={css.deliverablesBoxHint}>{hint}</span>}
+    </button>
+  );
   return (
-    <div className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
-      {/* The heading is a BUTTON because the reader has a use for it later; no click behaviour yet. */}
-      <button type="button" className={css.deliverablesBoxLabel}>共 {region.count} 项{region.label}</button>
+    <div ref={box} className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
+      {preview === undefined ? heading : (
+        <HoverCard variant="preview" anchor={heading} content={preview} openDelayMs={500} widthAnchorRef={box} />
+      )}
       <div ref={lane} className={css.deliverablesBoxLane} title={region.hint}>{children}</div>
       {overflowing && (
         <button type="button" className={css.deliverablesToggle} aria-expanded={open} onClick={onToggle}>
@@ -625,10 +649,13 @@ function DeliverablesBox({ region, open, onToggle, children }: {
   );
 }
 
-function DeliverablesRow({ groups, display, recordCommits, openFile, revealFile }: {
+function DeliverablesRow({ groups, changes, display, recordCommits, openInSidebar, inspectCall, openFile, revealFile }: {
   groups: { commits: readonly CommitRecord[]; delivered: readonly string[]; edited: readonly string[] };
+  changes: readonly TurnChange[];
   display: DeliverableDisplay;
   recordCommits: boolean;
+  openInSidebar: boolean;
+  inspectCall?: (callId: string) => void;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
 }) {
@@ -667,9 +694,21 @@ function DeliverablesRow({ groups, display, recordCommits, openFile, revealFile 
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
 
-  const chips = (paths: readonly string[]) => paths.map(path => (
-    <DeliverableChip key={path} path={path} display={display} openFile={openFile} revealFile={revealFile} />
+  const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }) => paths.map(path => (
+    <DeliverableChip key={path} path={path} display={display} openFile={open} revealFile={revealFile} />
   ));
+  // 编辑框里的每一条都尽量找到"改了它的那次调用" ✓：悬停窗口的 ± 计数与框头的点击都基于它 ✓。开关打开时点击走宿主的
+  // 检视器（`inspectCall` ✓ —— 那是能拿到的、最接近宿主"点击即看差异"的面 ✓，因为 review 入口不对 View 开放 ✓）；开关
+  // 关闭时按读者要求退回**外部打开文件本体** ✓（行内的 `openFile` 已经按开关路由 ✓）。
+  const changeOf = (path: string) => changes.find(change => change.path === path);
+  const openDiffOrFile = (path: string) => {
+    const callId = changeOf(path)?.callId;
+    if (openInSidebar && callId !== undefined && inspectCall !== undefined) {
+      inspectCall(callId);
+      return;
+    }
+    openFile?.(path);
+  };
   const folderButton = (count: number) => count > 1 && (
     <button
       type="button"
@@ -707,10 +746,37 @@ function DeliverablesRow({ groups, display, recordCommits, openFile, revealFile 
           <div className={css.deliverablesBoxes}>
             {regions.filter(region => region.count > 0).map(region => {
               const open = boxOpen[region.id] === true;
+              const edited = region.kind === 'files';
               return (
                 <DeliverablesBox key={region.id} region={region} open={open}
+                  // 编辑框：框头悬停换成「在侧边栏预览」/「预览差异」✓（宿主的改动卡就是这套互换 ✓），点击交给宿主的检视器
+                  // （第一个改动的调用 ✓ —— 宿主自己的 review 入口不对 View 开放，这条是能拿到的最接近的面 ✓）；悬停窗口
+                  // 列出这一轮改过的文件与 ± 计数 ✓（读者贴的那张对话页截图正是这个内容 ✓）。交付框：按读者要求悬停无内容、
+                  // 点击也先不做 ✓。
+                  hint={edited ? deliverableHeadingHint(openInSidebar) : undefined}
+                  onHeadingClick={edited ? () => {
+                    const callId = changes[0]?.callId;
+                    if (callId !== undefined && inspectCall !== undefined) { inspectCall(callId); return; }
+                    if (changes[0] !== undefined) openFile?.(changes[0].path);
+                  } : undefined}
+                  preview={edited && changes.length > 0 ? (
+                    <div className={css.deliverablesPreview}>
+                      {changes.map(change => {
+                        const totals = diffTotals(change.hunks);
+                        return (
+                          <div key={change.path} className={css.deliverablesPreviewRow}>
+                            <span className={css.deliverablesPreviewPath} title={change.path}>{change.path}</span>
+                            <span className={css.deliverablesPreviewCounts}>
+                              <span className={css.deliverablesPreviewAdded}>+{totals.added}</span>
+                              <span className={css.deliverablesPreviewRemoved}>-{totals.removed}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
-                  {region.kind === 'files' ? chips(groups.edited)
+                  {edited ? chips(groups.edited, openDiffOrFile)
                     : region.kind === 'delivered' ? chips(groups.delivered)
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble carrying the short
                     // hash (what a reader recognises) with the message's first line as its title box.
@@ -819,6 +885,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // list is what it DELIVERED (see deliverables.ts — presenting the first under the second's label is the mistake the
   // reader caught).
   const deliverableGroups = useMemo(() => ({ ...getTurnDeliverableGroups(turn, flow), commits: recordCommits ? turnCommits(flow) : [] }), [turn, flow, recordCommits]);
+  // The changed files, each with its hunks and the call that changed it: the hover window's ± counts and the heading's
+  // click target both come from this one list.
+  const deliverableChanges = useMemo(() => turnChanges(flow), [flow]);
   // The open mode is read HERE, through the subscriber, and handed to the opener as an argument.
   // The injected `openFile` cannot read it: `createReaderStore()` returns a handle (spec + create)
   // and the live snapshot belongs to the framework's own instance, which only this hook sees.
@@ -912,7 +981,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} display={deliverableDisplay} recordCommits={recordCommits} openFile={openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} openInSidebar={openInSidebar} inspectCall={props.inspectCall} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });

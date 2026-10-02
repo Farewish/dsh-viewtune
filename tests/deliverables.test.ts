@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, deliverableDisplayOf, deliverableHeadingHint, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
@@ -203,4 +203,33 @@ test('a box needs its 「展开」 switch only when something is hidden behind t
   assert.equal(needsExpand(63), false);
   assert.equal(needsExpand(64), true);
   assert.equal(needsExpand(200), true);
+});
+
+test('the turn’s changed files carry their hunks and the call that changed them', () => {
+  // Two consumers of one list: the hover window (paths with ± counts, read through `diffTotals`) and the heading's click
+  // (the call to inspect). The hunks come from `callDiffHunks`, the same normaliser the tool rows use.
+  const first = tool('write', { file_path: 'src/a.md', content: 'one' });
+  (first.block as unknown as { meta: unknown }).meta = { diffs: [{ path: 'src/a.md', oldText: 'one', newText: 'one\ntwo' }] };
+  const second = tool('edit', { file_path: 'src/a.md' });
+  (second.block as unknown as { meta: unknown }).meta = { diffs: [{ path: 'src/a.md', oldText: 'one', newText: 'one\nthree' }] };
+  const third = tool('write', { file_path: 'src/b.md', content: 'b' });
+  (third.block as unknown as { meta: unknown }).meta = { diffs: [{ path: 'src/b.md', oldText: '', newText: 'b' }, { path: '', oldText: 'x', newText: 'y' }] };
+
+  const changes = turnChanges([first, second, third]);
+  // One entry per path — the LAST call wins, the way the host keeps the latest declaration of a path — and a hunk with no
+  // path is skipped rather than becoming an entry with an empty name. Order is first-seen.
+  assert.deepEqual(changes.map(change => change.path), ['src/a.md', 'src/b.md']);
+  assert.equal(changes[0]?.callId, 'call:edit');
+  assert.equal(changes[0]?.hunks[0]?.newText, 'one\nthree');
+  assert.equal(changes[1]?.callId, 'call:write');
+  // Nothing changed ⇒ nothing to show, and nothing to click.
+  assert.deepEqual(turnChanges([]), []);
+  assert.deepEqual(turnChanges(undefined), []);
+});
+
+test('the heading’s hover sentence follows the switch', () => {
+  // The host swaps its ± counts for a preview hint on hover; the reader asked for the same sentence, and the switch is what
+  // decides where a preview lands — so the sentence says that.
+  assert.equal(deliverableHeadingHint(true), '在侧边栏预览');
+  assert.equal(deliverableHeadingHint(false), '预览差异');
 });
