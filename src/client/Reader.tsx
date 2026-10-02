@@ -1253,7 +1253,9 @@ export function Reader(props: ReaderProps) {
   // How this view shows a turn's files — 「产物展示」: 简略气泡 / 平衡 / 详细卡片 (see deliverables.ts).
   const deliverableDisplay = props.useStore(state => deliverableDisplayOf(state.deliverableDisplay));
   // …and whether the turn's git commits get a line of their own — a separate feature, off by default (小功能 → 记录提交).
-  const recordCommits = props.useStore(state => state.recordCommits === true);
+  // The comparison sits OUTSIDE the selector, which is the shape the settings guard looks for: a default of false means an
+  // absent key is off, so the reader has to say `=== true` (`state.recordCommits) === true`).
+  const recordCommits = props.useStore(state => state.recordCommits) === true;
   const foldBeforeRef = useRef(foldBefore);
   foldBeforeRef.current = foldBefore;
   const [foldWindow, setFoldWindow] = useState(foldBefore);
