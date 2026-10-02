@@ -1024,7 +1024,7 @@ const markers = [
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes
   // (`GUIDE_ID`), and `close()` is deliberately not used: a sole guide is documented to stay open.
-  ['the sidebar opening replaces a lone 「开始」 guide, by the host’s own tab identity', () => bundle.includes('@deepseek-ai/dsh-client-ui-sidebar-right/guide')
+  ['the sidebar opening replaces a lone 「开始」 guide, by the kind its tab actually carries', () => bundle.includes('kind === "guide"')
     && bundle.includes('replaceableGuide')
     && bundle.includes('replaceTab')],
   // The host's `turn-trigger` record — the notification that woke the turn up (a goal continuing, a webhook, a job…).

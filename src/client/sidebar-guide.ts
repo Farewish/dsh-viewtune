@@ -12,12 +12,26 @@
  *   · `GUIDE_ID` — the guide type's identity, a published constant in
  *     `lib/types/client/tabs/guide/definition.d.ts`: `@deepseek-ai/dsh-client-ui-sidebar-right/guide`.
  *
+ * The guide is a tab like any other in the layout — `guideIn(layout, paneId)` finds it with
+ * `findPaneContentTab(layout, paneId, pageAddress(GUIDE_KIND), GUIDE_KIND)` — and its KIND is the short string the package
+ * declares right there:
+ *
+ *   const GUIDE_KIND = "guide";
+ *
+ * The first version of this module compared the kind against `GUIDE_ID` instead, which is the key the guide's BODY
+ * registers under (`@deepseek-ai/dsh-client-ui-sidebar-right/guide`) and never a tab kind — so the test never matched and
+ * the mechanism silently did nothing. Both are kept below, because they mean different things and only one of them is
+ * what a tab record carries.
+ *
  * `close(tabId)` deliberately does NOT remove a sole guide ("the sole docked guide remains open" — it is the empty pane's
  * own placeholder), which is why replacing is the right verb here rather than closing.
  *
  * The condition is the reader's, word for word: ONLY the guide. So a face that cannot say what else is open is not
  * trusted to say that nothing else is — `replaceableGuide` does nothing without a tab list.
  */
+export const SIDEBAR_GUIDE_KIND = 'guide';
+
+/** The key the guide's body registers under (its slot identity) — NOT the kind a tab record carries. */
 export const SIDEBAR_GUIDE_ID = '@deepseek-ai/dsh-client-ui-sidebar-right/guide';
 
 /** The fields of a tab record this module reads (the dock kit's own `TabRecord` carries more). */
@@ -28,7 +42,7 @@ export interface SidebarTabLike {
 
 /** Whether a tab record is the shipped 「开始」 guide. */
 export function isGuideTab(tab: SidebarTabLike | undefined): boolean {
-  return tab?.kind === SIDEBAR_GUIDE_ID || tab?.id === SIDEBAR_GUIDE_ID;
+  return tab?.kind === SIDEBAR_GUIDE_KIND || tab?.id === SIDEBAR_GUIDE_ID;
 }
 
 /**
