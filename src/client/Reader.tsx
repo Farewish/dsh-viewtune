@@ -701,18 +701,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openInSideba
   const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }) => paths.map(path => (
     <DeliverableChip key={path} path={path} display={display} openFile={open} revealFile={revealFile} />
   ));
-  // 编辑框里的每一条都尽量找到"改了它的那次调用" ✓：悬停窗口的 ± 计数与框头的点击都基于它 ✓。开关打开时点击走宿主的
-  // 检视器（`inspectCall` ✓ —— 那是能拿到的、最接近宿主"点击即看差异"的面 ✓，因为 review 入口不对 View 开放 ✓）；开关
-  // 关闭时按读者要求退回**外部打开文件本体** ✓（行内的 `openFile` 已经按开关路由 ✓）。
-  const changeOf = (path: string) => changes.find(change => change.path === path);
-  const openDiffOrFile = (path: string) => {
-    const callId = changeOf(path)?.callId;
-    if (openInSidebar && callId !== undefined && inspectCall !== undefined) {
-      inspectCall(callId);
-      return;
-    }
-    openFile?.(path);
-  };
+  // 气泡的点击回到"打开文件本体" ✓，由「产物用侧边栏打开」开关决定外部还是侧边栏 ✓ —— 行内的 `openFile` 已经按开关路由
+  //（`props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' })` ✓），所以这里不需要任何特例 ✓。
+  // 编辑框的**框头**仍然走宿主的检视器（`inspectCall` ✓）—— 读者还没定那一条 ✓，本轮只动气泡 ✓。
   const folderButton = (count: number) => count > 1 && (
     <button
       type="button"
@@ -780,7 +771,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openInSideba
                     </div>
                   ) : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
-                  {edited ? chips(groups.edited, openDiffOrFile)
+                  {edited ? chips(groups.edited)
                     : region.kind === 'delivered' ? chips(groups.delivered)
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble carrying the short
                     // hash (what a reader recognises) with the message's first line as its title box.
