@@ -453,6 +453,18 @@
 /* 「产物展示」的另外两档：把「编辑」与「产物」分成两个区域，并且全部显示（带一个收起开关）。
    两个区域不只靠名字区分，也靠样式 —— 读者说"要么不同样式、要么两个区域"，两样都做才一眼看得出分界：
   「编辑」是安静的第三级色，「产物」带强调色。 */
+/* 平衡档的版式（读者规格）：每个区域一个框 —— 只有一圈圆角边框，展开时随内容变高，不做其他效果。框内第一行是
+   「共 N 项编辑 / 新增」接着就是气泡，一直排到该行结束；换行后的气泡与第一个气泡**对齐**，因为标签与气泡列是同一
+   网格的两个列，气泡从不在标签下面开始。右边的开关占住自己的列。一般只显示两行：28px 气泡 + 6px 行距 = 62px
+   正好两行，第三行整行被裁掉（不会露出半行）；点展开后 max-height 放开，显示全部。 */
+.deliverablesBoxes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.deliverablesBox { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: start; column-gap: 8px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
+.deliverablesBoxLabel { grid-column: 1; padding-top: 4px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; }
+.deliverablesBox[data-region=produced] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
+.deliverablesBoxLane { grid-column: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; max-height: 62px; overflow: hidden; }
+.deliverablesBox[data-open] .deliverablesBoxLane { max-height: none; overflow: visible; }
+.deliverablesBox .deliverableChip { height: 28px; }
+.deliverablesBox .deliverablesToggle { grid-column: 3; align-self: end; }
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }

@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the balanced boxes left uncapped, so a long file list shows every row instead of the two the reader asked for',
+    // 「一般只显示两行，展开后显示全部」 is the spec: the cap is what makes the box a summary rather than a list, and
+    // lifting it silently turns the balanced mode into the detailed one's height cost.
+    search: 'max-height:62px',
+    replace: 'max-height:620px',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the two deliverable regions merged back into one by renaming the hook that tells 编辑 from 产物',
     // The split IS the correction: one region for what the turn EDITED, one for what it DELIVERED. Renaming the hook
     // merges them into the single list the reader asked us to stop showing under one label. (`data-area` rather than

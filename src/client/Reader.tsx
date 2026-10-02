@@ -614,8 +614,10 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
   const total = groups.edited.length + groups.produced.length;
   const regions = [
     { id: 'edited', label: '编辑', hint: '这一轮改过的文件', paths: groups.edited },
-    { id: 'produced', label: '产物', hint: '这一轮交付给你的文件', paths: groups.produced },
+    { id: 'produced', label: '新增', hint: '这一轮交付给你的文件', paths: groups.produced },
   ] as const;
+  // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
+  const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
 
   const chips = (paths: readonly string[]) => paths.map(path => (
     <DeliverableChip key={path} path={path} display={display} openFile={openFile} revealFile={revealFile} />
@@ -646,6 +648,30 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
             {chips(flat.slice(0, 8))}
             {flat.length > 8 && <span className={css.deliverablesMore}>+ {flat.length - 8} 个文件</span>}
             {folderButton(flat.length)}
+          </div>
+        ) : display === 'balanced' ? (
+          /* 平衡档的版式来自读者的规格：每个区域一个框（只有一圈圆角边框，展开时随内容变高），框内第一行是
+             「共 N 项编辑 / 新增」接着就是气泡、一直排到该行结束；换行后的气泡与第一个气泡**对齐**（两者在
+             同一网格列里，所以后一行自然从第一个气泡下面开始，而不会跑到标签下面）；右边的开关占住自己的列。
+             一般只显示两行，点展开后显示全部 —— 封顶高度是 28px 气泡 + 6px 行距 = 62px 正好两行，第三行整行
+             被裁掉，不会露出半行。 */
+          <div className={css.deliverablesBoxes}>
+            {regions.filter(region => region.paths.length > 0).map(region => {
+              const open = boxOpen[region.id] === true;
+              return (
+                <div key={region.id} className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
+                  <span className={css.deliverablesBoxLabel}>共 {region.paths.length} 项{region.label}</span>
+                  <div className={css.deliverablesBoxLane} title={region.hint}>{chips(region.paths)}</div>
+                  <button type="button" className={css.deliverablesToggle} aria-expanded={open}
+                    onClick={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
+                    {open ? '收起' : '展开'}
+                  </button>
+                </div>
+              );
+            })}
+            {/* The folder button stays below the boxes, in the row wrapper — a bare button in the column would be
+                stretched to full width by the flex default. */}
+            <div className={css.deliverablesLane}>{folderButton(total)}</div>
           </div>
         ) : (
           <div className={css.deliverablesRegions}>

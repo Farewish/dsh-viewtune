@@ -983,6 +983,13 @@ const markers = [
     // …the card look of the detailed mode, and the split reader that feeds both.
     && bundle.includes('data-style')
     && bundle.includes('getTurnDeliverableGroups')
+    // …and 平衡 's own shape, which came from the reader's spec: one rounded box per region, its first line carrying
+    // 「共 N 项编辑 / 新增」 and then chips to the end of that line, later lines aligned under the first chip (label and
+    // chips are two columns of one grid), the switch holding a column of its own, and TWO ROWS by default — 28px chip
+    // plus a 6px gap is 62px exactly, so a third row is clipped whole rather than half-shown — until it is opened.
+    && bundle.includes('deliverablesBoxes')
+    && bundle.includes('max-height:62px')
+    && bundle.includes('data-open')
     // …and the fallback that decides what an unrecognised stored value means: the MIDDLE mode, which is what a fresh
     // install opens with.
     && bundle.includes('value === "brief" || value === "cards" ? value : "balanced"')],
