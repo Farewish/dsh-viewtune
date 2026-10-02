@@ -124,6 +124,21 @@ test('the commits a turn made are read from its calls: hash and subject', () => 
   assert.deepEqual(turnCommits(flow), [{ hash: '1a2b3c4', subject: 'Fix the box heading' }]);
 });
 
+test('a commit made with a global option is still a commit — the reader’s own case', () => {
+  // Every commit in the reader's instance is made as `git -C <dir> commit …` (it is how this project's are made), and a
+  // pattern demanding `git` be followed immediately by `commit` matched none of them: 「提交」 never appeared.
+  const flow = [tool('pwsh', { command: 'git -C D:\\DSH\\dsh-better-display-tools\\worktree\\dsh-viewtune commit -m "A real one"' })];
+  assert.deepEqual(turnCommits(flow), [{ subject: 'A real one' }]);
+  assert.deepEqual(turnCommits([tool('pwsh', { command: 'git -c core.pager=cat commit --message "And another"' })]), [{ subject: 'And another' }]);
+});
+
+test('a commit with no -m takes its subject from git’s own summary line', () => {
+  // …which is the `-F <file>` case: this project's own commits are made that way.
+  const flow = [tool('pwsh', { command: 'git -C repo commit -F msg.txt' })];
+  (flow[0].block as unknown as { content: unknown }).content = [{ type: 'text', text: '[adapt-0.2.0 e49eaa9] Merge the file lists into 编辑' }];
+  assert.deepEqual(turnCommits(flow), [{ hash: 'e49eaa9', subject: 'Merge the file lists into 编辑' }]);
+});
+
 test('a command that merely MENTIONS a commit is not one, and neither is a document about commits', () => {
   // The false positive that matters: this plugin's own CHANGELOG discusses `git commit`, and a `write` carries its file
   // content in its ARGUMENTS — so only a command-shaped field may count.

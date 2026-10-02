@@ -79,6 +79,15 @@ export interface CommitRecord {
   readonly subject: string;
 }
 
+/**
+ * `git commit` in COMMAND position, allowing the global options that sit between the program and its subcommand.
+ *
+ * That allowance is the whole bug the reader reported: every commit in their instance was made as
+ * `git -C <dir> commit -m …` — exactly how this project's own commits are made — and a pattern demanding `git` be
+ * followed immediately by `commit` never matched one, so 「提交」 stayed empty forever.
+ */
+const GIT_COMMIT = /(?:^|[;&|]|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/;
+
 /** The message of a `git commit`, from the first `-m`/`--message` argument the command carries. */
 function commitSubject(command: string): string {
   const quoted = /(?:^|\s)-{1,2}m(?:essage)?[= ](?:"([^"]+)"|'([^']+)'|([^\s"'&|;]+))/m.exec(command);
@@ -86,9 +95,11 @@ function commitSubject(command: string): string {
   return subject === '' ? '一次提交' : subject;
 }
 
-/** The short hash git prints on its own summary line (`[main 1a2b3c4] subject`), out of a tool result. */
-function commitHash(text: string): string | undefined {
-  return /^\s*\[[^\]\s]+ ([0-9a-f]{7,40})\]/m.exec(text)?.[1];
+/** Git's own summary line in a result: `[branch 1a2b3c4] the subject`, both halves at once. */
+function commitSummary(text: string): { hash?: string; subject?: string } {
+  const match = /^\s*\[[^\]\s]+ ([0-9a-f]{7,40})\]\s*(.*)$/m.exec(text);
+  if (match === null) return {};
+  return { hash: match[1], subject: match[2]?.trim() };
 }
 
 /**
@@ -118,16 +129,17 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
     // ONLY a command-shaped field counts. Searching the whole argument text would count a `write` whose CONTENT happens to
     // mention `git commit` — this very plugin's CHANGELOG does — and a false commit is worse than a missed one.
     const command = stringValue(args, 'command', 'cmd', 'script', 'input');
-    // …and the phrase must be in COMMAND position, not quoted inside another command's pattern: `git log --grep="git
-    // commit"` mentions a commit without making one, and the plugin's own tests caught exactly that false positive.
-    if (command === undefined || !/(?:^|[;&|]|\bthen\b)\s*git\s+commit\b/.test(command)) continue;
+    if (command === undefined || !GIT_COMMIT.test(command)) continue;
     const result = (block.content ?? []).map(part => typeof part?.text === 'string' ? part.text : '').join('\n');
-    const hash = commitHash(result);
+    const summary = commitSummary(result);
+    // The command's own `-m` names the commit first; git's summary line is the fallback, and it also carries the hash —
+    // which is what a commit made with `-F <file>` (as this project's own are) has to rely on.
     const subject = commitSubject(command);
-    const key = `${hash ?? ''}\u0000${subject}`;
+    const finalSubject = subject === '一次提交' && summary.subject !== undefined && summary.subject !== '' ? summary.subject : subject;
+    const key = `${summary.hash ?? ''}\u0000${finalSubject}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    commits.push(hash === undefined ? { subject } : { hash, subject });
+    commits.push(summary.hash === undefined ? { subject: finalSubject } : { hash: summary.hash, subject: finalSubject });
   }
   return commits;
 }

@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the commit pattern no longer allowing a global option, so every `git -C … commit` stops being a commit',
+    // Exactly the reported bug: the reader's own commits are all `git -C <dir> commit …`, so without the global-option
+    // allowance the 提交 box is empty forever while the files still pile up under 编辑.
+    search: '-C|-c|--git-dir|--work-tree',
+    replace: '-Z|-z|--git-dir|--work-tree',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the box heading allowed to stretch, which makes the whole first row read as clickable',
     // A grid item stretches by default, so a heading button without `justify-self: start` covers its entire column — the
     // reader's report that the whole first line was clickable. `align-self` rather than a value containing the search,
