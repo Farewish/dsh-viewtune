@@ -4,7 +4,7 @@ import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
-  DiffBlock, FileTypeIcon, HoverCard, fileExtension,
+  DiffBlock, FileTypeIcon, fileExtension,
   IconAgentPresetOutlineRegular, IconBranchOutlineRegular, IconClockOutlineRegular, IconContextInjectionOutlineRegular,
   IconCordisPluginOutlineRegular, IconGlobeOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular,
   IconQueueOutlineRegular, JsonBlock, MarkdownText,
@@ -598,32 +598,27 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
 /**
  * One box of the balanced row: heading and switch on their own line, chips below, two rows until it is opened.
  *
- * Two optional behaviours, both of them the conversation page's own (measured there):
- *   · `onHeadingClick` — the heading is a button; for 编辑 it reveals the total-diff panel under it (`panel`), which is the
- *     reader's replacement for the host's review click: no View can open that review, so the diff is shown where the
- *     reader already is. An earlier version called the host's inspector (`inspectCall`) instead, which lands on the
- *     trajectory page — not what was wanted. The heading's TEXT does not change on hover: another earlier version swapped
- *     it for 「在侧边栏预览」, which promised something the click cannot do.
- *   · `preview` — the hover window, using the primitives' own `HoverCard` in the `preview` variant with the host's 500ms
- *     delay and its width anchored to the box, so it is literally the same widget the conversation page uses.
+ * The heading is a button for 编辑, and pressing it reveals the total-diff panel under it (`panel`) — the reader's
+ * replacement for the host's review click, which no View can open. There is deliberately NO hover window: an earlier
+ * version anchored the primitives' `HoverCard` here (500ms, width-anchored, the same widget the conversation page uses),
+ * and the reader dropped it in favour of the click alone.
+ *
  * `plainHeading` renders the heading as text instead: a 提交 box has nothing to click, and a button that does nothing
  * reads as one that should.
  *
  * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」.
  */
-function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading, preview, panel, children }: {
+function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading, panel, children }: {
   region: { id: string; label: string; hint: string; count: number };
   open: boolean;
   onToggle: () => void;
   onHeadingClick?: () => void;
   plainHeading?: boolean;
-  preview?: ReactNode;
   /** The panel the heading's click reveals, under the heading and across both columns. */
   panel?: ReactNode;
   children: ReactNode;
 }) {
   const lane = useRef<HTMLDivElement | null>(null);
-  const box = useRef<HTMLDivElement | null>(null);
   const [overflowing, setOverflowing] = useState(false);
   useEffect(() => {
     const node = lane.current;
@@ -645,10 +640,8 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading,
       </button>
     );
   return (
-    <div ref={box} className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
-      {preview === undefined ? heading : (
-        <HoverCard variant="preview" anchor={heading} content={preview} openDelayMs={500} widthAnchorRef={box} />
-      )}
+    <div className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
+      {heading}
       {panel !== undefined && <div className={css.deliverablesBoxPanel}>{panel}</div>}
       <div ref={lane} className={css.deliverablesBoxLane} title={region.hint}>{children}</div>
       {overflowing && (
@@ -801,7 +794,6 @@ function DeliverablesRow({ groups, changes, display, recordCommits, openFile, re
                   // 就地看差异 ✓，因为它才是 R1 想要的东西 ✓，而且不需要任何未公开的面 API ✓。交付框仍是"点击先不做" ✓。
                   onHeadingClick={edited ? () => { setChangesOpen(value => !value); } : undefined}
                   panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
-                  preview={edited && changes.length > 0 ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
                     : region.kind === 'delivered' ? chips(groups.delivered)

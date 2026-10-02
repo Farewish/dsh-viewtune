@@ -268,11 +268,12 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
-    label: 'the hover window’s opening delay dropped, so a passing pointer pops the preview instead of waiting',
-    // The host opens its preview after 500ms; without the delay the window appears while the pointer is merely crossing the
-    // box, which is the behaviour the delay exists to prevent.
-    search: 'openDelayMs: 500',
-    replace: 'openDelayMs: 499',
+    label: 'the click-revealed diff panel renamed, so 共 x 项编辑 has no way to show the turn’s diff at all',
+    // The panel is the ONLY route to the diff now that the hover window is gone (the reader dropped it), so losing its
+    // class is losing the feature: the heading's click would reveal nothing. The replacement is a case flip, because the
+    // harness skips a mutation whose replacement is already present and that test is a substring test.
+    search: 'deliverablesBoxPanel',
+    replace: 'DELIVERABLESBOXPANEL',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {

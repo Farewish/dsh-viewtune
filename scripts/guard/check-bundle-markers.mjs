@@ -1002,10 +1002,9 @@ const markers = [
     // with their ± counts (the same `diffTotals` the tool rows use), and a heading that hands the call to the host's
     // inspector. `inspectCall` is the closest published surface to the host's review click: the slot catalog shows a View
     // receives only inspectCall/viewRequest/openView/completeViewRequest, so the review entry point is not reachable.
-    && bundle.includes('variant: "preview"')
-    && bundle.includes('openDelayMs: 500')
-    // …and the total-diff panel, which is what the heading's click reveals and what the hover card shows: the reader's
-    // replacement for the host's review click. Its ± counts are the FLOW's own button (`DiffStatButton`), pinned here so
+    // …and the total-diff panel, which is what the heading's click reveals: the reader's replacement for the host's review
+    // click, and the only way in — the hover window was dropped on request (an earlier build anchored the primitives'
+    // `HoverCard` here with the host's 500ms delay). Its ± counts are the FLOW's own button (`DiffStatButton`), pinned so
     // the two cannot drift apart — pressing one unfolds that file's diff through the flow's own `DiffBlock`.
     && bundle.includes('deliverablesChanges')
     && bundle.includes('deliverablesBoxPanel')
