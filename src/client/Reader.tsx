@@ -586,7 +586,7 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, openFile,
  * away, which is the reader's own 「要么都显示出来，要么加一个展开开关」 answered with both.
  */
 function DeliverablesRow({ groups, display, openFile, revealFile }: {
-  groups: { edited: readonly string[]; produced: readonly string[] };
+  groups: { edited: readonly string[]; added: readonly string[] };
   display: DeliverableDisplay;
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
@@ -609,12 +609,17 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
     }
   };
 
-  // The one list the brief row has always shown: what was delivered, or — when nothing was — what was touched.
-  const flat = groups.produced.length > 0 ? groups.produced : groups.edited;
-  const total = groups.edited.length + groups.produced.length;
+  // 简略档保持原来的形状（最近 8 个 + `+N 个文件` + 文件夹按钮），但内容修好了：它以前只看"改动过的文件"，因为读取端
+  // 读的是一个本版本根本不存在的字段 —— 交付的文件（分享包）因此从不出现。现在两类都在，交付的排在前面。
+  const flat = [...groups.added, ...groups.edited];
+  const total = groups.edited.length + groups.added.length;
+  // 两个区域的含义按宿主**实际发布的两份数据**来（在它自己的包里量到的：`{ changes, presented }`）：「编辑」= 这一轮
+  // 改动过的文件（`changes` + 工具流程兜底）；「新增」= 助手**明确交付**的文件（`presented`，读者那个分享包就在这里）
+  // 加上工具明说"创建"的文件（`str_replace_editor create`、`apply_patch` 的 `*** Add File:`）。交付过的文件只算新增，
+  // 不会在「编辑」里重复。
   const regions = [
     { id: 'edited', label: '编辑', hint: '这一轮改过的文件', paths: groups.edited },
-    { id: 'produced', label: '新增', hint: '这一轮交付给你的文件', paths: groups.produced },
+    { id: 'added', label: '新增', hint: '这一轮交付或新建的文件', paths: groups.added },
   ] as const;
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
@@ -661,7 +666,8 @@ function DeliverablesRow({ groups, display, openFile, revealFile }: {
               const open = boxOpen[region.id] === true;
               return (
                 <div key={region.id} className={css.deliverablesBox} data-region={region.id} data-open={open || undefined}>
-                  <span className={css.deliverablesBoxLabel}>共 {region.paths.length} 项{region.label}</span>
+                  {/* The heading is a BUTTON because the reader has a use for it later; no click behaviour yet. */}
+                  <button type="button" className={css.deliverablesBoxLabel}>共 {region.paths.length} 项{region.label}</button>
                   <div className={css.deliverablesBoxLane} title={region.hint}>{chips(region.paths)}</div>
                   <button type="button" className={css.deliverablesToggle} aria-expanded={open}
                     onClick={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>

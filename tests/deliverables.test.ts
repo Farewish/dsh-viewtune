@@ -15,18 +15,25 @@ test('basename and dirname handle POSIX and Windows style paths', () => {
   assert.equal(dirname('/root/file.md/'), '/root');
 });
 
-test('getTurnDeliverables extracts produced paths from turn deliverables data', () => {
+test('getTurnDeliverables reads the host’s two published lists, deliveries first', () => {
+  // This test used to feed `deliverables.produced` — a field 0.2.0 does not publish — which is how the row ended up
+  // built entirely from the tool-flow fallback without anyone noticing. The real shape is `{ changes, presented }`.
   const map = new Map<string, unknown>();
   map.set('deliverables', {
-    produced: [
-      { seq: 1, path: 'src/client/Reader.tsx' },
-      { seq: 2, path: 'src/client/Reader.module.css' },
-      { seq: 3, path: 'src/client/Reader.tsx' }, // duplicate
-    ],
+    changes: {
+      added: 12,
+      deleted: 3,
+      files: [
+        { path: 'src/client/Reader.tsx' },
+        { path: 'src/client/Reader.module.css' },
+        { path: 'src/client/Reader.tsx' }, // duplicate
+      ],
+    },
+    presented: [{ seq: 1, path: 'dist/pkg.tgz' }],
   });
   const turn = { data: map } as unknown as TurnLocation;
-  const paths = getTurnDeliverables(turn);
-  assert.deepEqual(paths, ['src/client/Reader.tsx', 'src/client/Reader.module.css']);
+  // Deliveries first — what was handed over — then what the turn changed, each path once.
+  assert.deepEqual(getTurnDeliverables(turn), ['dist/pkg.tgz', 'src/client/Reader.tsx', 'src/client/Reader.module.css']);
 });
 
 test('getTurnDeliverables falls back to tool flow when turn data is absent', () => {
@@ -146,34 +153,73 @@ function tool(name: string, args: unknown, isError = false): ReaderFlowEntry {
   };
 }
 
-test('what a turn DELIVERED and what it merely EDITED are two lists, not one', () => {
-  // The correction the reader asked for: the fallback list is files the turn TOUCHED, and calling those 「产物」 claims
-  // something about the turn that is not true. Both lists are available now, and the single flat list the mention
-  // resolver asks for is untouched — it still prefers what was delivered.
-  const turn = turnWith({ produced: [{ path: 'out/report.md' }, { path: 'out/chart.png' }] });
-  const flow = [tool('write', { file_path: 'src/a.ts' }), tool('edit', { file_path: 'src/b.ts' })];
-  assert.deepEqual(getTurnDeliverableGroups(turn, flow), {
-    edited: ['src/a.ts', 'src/b.ts'],
-    produced: ['out/report.md', 'out/chart.png'],
+test('the host publishes TWO lists on a turn, and they mean「新增」and「编辑」', () => {
+  // Measured from the deliverables package's own bundle: `turn.data.get("deliverables")` is `{ changes, presented }`.
+  // `presented` is what the assistant declared it delivered — the reader's share package lives there, which is why it
+  // shows on the conversation page. `changes` is the change announcement: the files the turn EDITED.
+  const turn = turnWith({
+    changes: { added: 40, deleted: 3, files: [{ path: 'src/glass.ts' }, { path: 'src/Reader.tsx' }] },
+    presented: [{ seq: 93, path: 'dsh-viewtune-0.5.4.tgz', description: '分享包' }],
   });
-  assert.deepEqual(getTurnDeliverables(turn, flow), ['out/report.md', 'out/chart.png']);
+  assert.deepEqual(getTurnDeliverableGroups(turn), {
+    added: ['dsh-viewtune-0.5.4.tgz'],
+    edited: ['src/glass.ts', 'src/Reader.tsx'],
+  });
 });
 
-test('a path in both lists is shown only as a 产物: delivering it is the stronger claim', () => {
-  const turn = turnWith({ produced: [{ path: 'out/report.md' }] });
-  const flow = [tool('write', { file_path: 'out/report.md' }), tool('write', { file_path: 'src/a.ts' })];
-  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { edited: ['src/a.ts'], produced: ['out/report.md'] });
+test('the old `produced` field is not read, because this version of the host never publishes it', () => {
+  // The first version of this file read `deliverables.produced`. That field does not exist in 0.2.0 — so the row was
+  // always the tool-flow fallback, which is why edited files appeared under 「新增」 and the delivered file nowhere.
+  const turn = turnWith({ produced: [{ path: 'src/phantom.ts' }] });
+  assert.deepEqual(getTurnDeliverableGroups(turn), { added: [], edited: [] });
 });
 
-test('a turn that delivered nothing shows the files it edited, under that label now', () => {
-  const turn = turnWith({ produced: [] });
-  const flow = [tool('apply_patch', { path: 'src/a.ts' })];
-  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { edited: ['src/a.ts'], produced: [] });
-  assert.deepEqual(getTurnDeliverables(turn, flow), ['src/a.ts']);
+test('with nothing published, the turn’s own tool calls answer instead', () => {
+  const flow = [tool('write', { file_path: 'src/a.ts' }), tool('edit', { file_path: 'src/b.ts' })];
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { added: [], edited: ['src/a.ts', 'src/b.ts'] });
+  assert.deepEqual(getTurnDeliverables(turnWith(undefined), flow), ['src/a.ts', 'src/b.ts']);
 });
 
-test('blank paths, repeated paths, failed calls and non-editing tools contribute nothing', () => {
-  const turn = turnWith({ produced: [{ path: '  ' }, { path: 'out/report.md' }, { path: 'out/report.md' }, { seq: 3 }] });
+test('the flat list is the union, deliveries first, so a delivered file is mentionable and shows a row', () => {
+  // A turn that only delivered something publishes no change summary and may have no write call the fallback can see —
+  // the delivered path is then the only reason a row exists at all, and the only thing worth clicking.
+  const turn = turnWith({ presented: [{ seq: 4, path: 'dist/pkg.tgz' }] });
+  assert.deepEqual(getTurnDeliverableGroups(turn), { added: ['dist/pkg.tgz'], edited: [] });
+  assert.deepEqual(getTurnDeliverables(turn), ['dist/pkg.tgz']);
+});
+
+test('a file a tool call SAYS it created is 新增, and is no longer listed under 编辑', () => {
+  const flow = [
+    tool('str_replace_editor', { command: 'create', path: 'src/new.ts' }),
+    tool('str_replace_editor', { command: 'str_replace', path: 'src/old.ts' }),
+  ];
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { added: ['src/new.ts'], edited: ['src/old.ts'] });
+});
+
+test('an apply_patch names its files in its own text, and only Add File is creation evidence', () => {
+  const patch = JSON.stringify({ patch: [
+    '*** Begin Patch',
+    '*** Add File: src/patched.ts',
+    '+hello',
+    '*** Update File: src/updated.ts',
+    '@@',
+    '-a',
+    '+b',
+    '*** End Patch',
+  ].join('\n') });
+  const flow = [
+    { kind: 'tool', key: 't1', callId: 'c1', step: 1, order: 0, block: { kind: 'tool-call', name: 'apply_patch', argsRaw: patch } } as unknown as ReaderFlowEntry,
+    // A `write` creates as happily as it overwrites, so it is NOT evidence of creation: the path stays under 编辑.
+    tool('write', { file_path: 'src/written.ts' }),
+  ];
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), {
+    added: ['src/patched.ts'],
+    edited: ['src/updated.ts', 'src/written.ts'],
+  });
+});
+
+test('blank paths, repeated paths, failed calls and non-writing commands contribute nothing', () => {
+  const turn = turnWith({ changes: { files: [{ path: 'src/changed.ts' }, { path: 'src/changed.ts' }, { path: '  ' }] } });
   const flow = [
     tool('write', { file_path: 'src/a.ts' }),
     tool('write', { file_path: 'src/a.ts' }),
@@ -183,12 +229,12 @@ test('blank paths, repeated paths, failed calls and non-editing tools contribute
     tool('str_replace_editor', { command: 'str_replace', path: 'src/e.ts' }),
     tool('write', {}),
   ];
-  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { edited: ['src/a.ts', 'src/e.ts'], produced: ['out/report.md'] });
+  assert.deepEqual(getTurnDeliverableGroups(turn, flow), { added: [], edited: ['src/changed.ts', 'src/a.ts', 'src/e.ts'] });
 });
 
 test('a turn with neither list has neither', () => {
-  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { edited: [], produced: [] });
-  assert.deepEqual(getTurnDeliverables(turnWith({ produced: [] }), []), []);
+  assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), []), { added: [], edited: [] });
+  assert.deepEqual(getTurnDeliverables(turnWith({ presented: [] }), []), []);
 });
 
 test('the three modes are named, and an unknown stored value opens on 平衡', () => {

@@ -3,13 +3,30 @@ import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives
 import type { ReaderFlowEntry } from './tool-activity.js';
 import { inputFields, stringValue, toolIdentity } from './tool-activity.js';
 
-interface ProducedEntry {
+interface PresentedEntry {
   readonly seq?: number;
-  readonly path: string;
+  readonly path?: string;
+  readonly description?: string;
 }
 
+/**
+ * What the deliverables package publishes ON A TURN in 0.2.0, measured from its own bundle:
+ *
+ * ```js
+ * owner.turn.data.get("deliverables")   // → { changes, presented }
+ * ```
+ *
+ * `changes` is the 「已编辑 x 个文件」 announcement — the files the turn CHANGED, with added/deleted counts.
+ * `presented` is what the assistant explicitly DELIVERED — `presentedForClosing` walks it and keeps the latest
+ * declaration of each path. The share package the reader saw on the conversation page lives HERE.
+ *
+ * The first version of this file read `deliverables.produced`, a field this version of the host does not publish at all
+ * — so the row was always showing the tool-flow fallback, which is files the turn touched: that is why edited files
+ * appeared under 「新增」 and the genuinely delivered file never appeared anywhere.
+ */
 interface DeliverablesData {
-  readonly produced: readonly ProducedEntry[];
+  readonly changes?: unknown;
+  readonly presented?: readonly PresentedEntry[];
 }
 
 /** Extract standard filename without directory components. */
@@ -35,60 +52,132 @@ export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths
 }
 
 /**
- * The turn's files, SPLIT — and the split is the point.
+ * The turn's files, SPLIT — and the split is the correction the reader made twice.
  *
- * The old single list answered one question from two sources: the host's official `produced` data when there was any,
- * and otherwise the files this turn's write/edit tools touched. Flattened together, the fallback arrived under the
- * label 「产物」 — files that were EDITED presented as files that were DELIVERED, which is a claim about the turn that
- * is not true. Both are kept apart here, and a path in both is shown only as produced: delivering a file is the
- * stronger statement.
+ * The first version of this function kept the host's official `produced` list apart from the fallback list of files the
+ * turn's write/edit tools touched, and labelled the host's list 「新增」. The reader checked it against a real turn (the
+ * one that packaged a release) and the truth was the other way round: the host's `produced` held the fourteen files that
+ * turn had *changed* — glass.ts, Reader.tsx, package.json, CHANGELOG.md — and the one genuinely new file, the share
+ * package, was in neither list. So:
+ *
+ *   · `edited` — what the turn CHANGED: the host's `produced` list, plus the files the fallback found (same meaning,
+ *     so they are one list; a path in both is listed once, host entries first).
+ *   · `added`  — what the turn CREATED, and only where a tool call SAYS SO: `str_replace_editor` with `create`/`insert`,
+ *     or an `apply_patch` whose patch text carries an `*** Add File:` header for that path. A plain `write` is NOT
+ *     evidence of creation (it overwrites as happily as it creates), so it stays in `edited` — the conservative way
+ *     round, because a wrong guess here only files a created file under 编辑 instead of 新增.
+ *
+ * What NO version can show: files a turn made without a file-writing tool call — a share package from `npm pack`, a
+ * build artifact, anything a shell command wrote — because the plugin sees only tool calls and the host's published
+ * lists, and the reader's own `.tgz` was in neither (shell-written and gitignored). Said plainly in the CHANGELOG.
  */
-export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { edited: readonly string[]; produced: readonly string[] } {
-  const produced: string[] = [];
-  const edited: string[] = [];
-  const seen = new Set<string>();
+export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): { added: readonly string[]; edited: readonly string[] } {
+  const changed: string[] = [];
+  const delivered: string[] = [];
+  const touched: string[] = [];
+  const added: string[] = [];
+  const seenChanged = new Set<string>();
+  const seenTouched = new Set<string>();
   const deliverables = (turn?.data as { get(key: string): unknown } | undefined)?.get('deliverables') as DeliverablesData | undefined;
-  if (deliverables?.produced && Array.isArray(deliverables.produced)) {
-    for (const item of deliverables.produced) {
-      const clean = typeof item?.path === 'string' ? item.path.trim() : '';
-      if (clean === '' || seen.has(clean)) continue;
-      seen.add(clean);
-      produced.push(clean);
+  // (1) The host's own two lists. `presented` is the deliveries — the share package included; `changes` is the change
+  // announcement, whose per-file list is read tolerantly because only its added/deleted totals were certain at first
+  // (`files` / `paths` / a bare array are all accepted, and an unrecognised shape simply contributes nothing).
+  for (const entry of deliverables?.presented ?? []) {
+    const clean = typeof entry?.path === 'string' ? entry.path.trim() : '';
+    if (clean !== '') delivered.push(clean);
+  }
+  // The change announcement's per-file list, read tolerantly: only its added/deleted totals were certain when this was
+  // first written, so `files`, `paths` and a bare array are all accepted, and anything else contributes nothing rather
+  // than throwing.
+  const rawChanges = deliverables?.changes;
+  const changeList: unknown[] = Array.isArray(rawChanges)
+    ? rawChanges
+    : (typeof rawChanges === 'object' && rawChanges !== null
+      ? (Array.isArray((rawChanges as { files?: unknown }).files)
+        ? (rawChanges as { files: unknown[] }).files
+        : (Array.isArray((rawChanges as { paths?: unknown }).paths) ? (rawChanges as { paths: unknown[] }).paths : []))
+      : []);
+  for (const entry of changeList) {
+    const clean = typeof entry === 'string' ? entry.trim() : (typeof (entry as { path?: unknown })?.path === 'string' ? ((entry as { path: string }).path).trim() : '');
+    if (clean !== '' && !seenChanged.has(clean)) {
+      seenChanged.add(clean);
+      changed.push(clean);
     }
   }
+  // (2) The fallback: the files this turn's own write/edit tool calls touched, and — where a call SAYS it created one —
+  // the files it added. Kept even when the host published lists, because a turn that changed files without announcing a
+  // change summary would otherwise show nothing at all.
   if (flow) {
     for (const item of flow) {
       if (item.kind !== 'tool' || !item.block) continue;
       // Skip failed tool results
       if ('isError' in item.block && item.block.isError) continue;
       const { name, raw } = toolIdentity(item);
-      const toolName = name !== '工具调用' ? name : ((item.block as unknown as { name?: string }).name || (item.block as unknown as { call?: { name?: string } }).call?.name);
-      const toolRaw = raw || ((item.block as unknown as { argsRaw?: string }).argsRaw || (item.block as unknown as { call?: { argsRaw?: string } }).call?.argsRaw || '');
+      const block = item.block as unknown as { name?: string; argsRaw?: string; call?: { name?: string; argsRaw?: string } };
+      const toolName = name !== '工具调用' ? name : (block.name || block.call?.name);
+      const toolRaw = raw || (block.argsRaw || block.call?.argsRaw || '');
       const args = inputFields(toolRaw);
-      let target: string | undefined;
-      if (toolName === 'write' || toolName === 'edit' || toolName === 'apply_patch') {
-        target = stringValue(args, 'file_path', 'path', 'filename', 'filePath');
+      // One entry can name SEVERAL paths — a patch names its files in its own text — so each call yields a list.
+      const found: { path: string; created: boolean }[] = [];
+      if (toolName === 'apply_patch') {
+        const patch = stringValue(args, 'patch', 'input', 'diff') ?? toolRaw;
+        for (const match of patch.matchAll(/^\*\*\* (Add|Update|Delete|add|update|delete) File:\s*(.+)$/gm)) {
+          const path = match[2].trim();
+          if (path !== '') found.push({ path, created: match[1].toLowerCase() === 'add' });
+        }
+        const field = stringValue(args, 'file_path', 'path', 'filename', 'filePath');
+        if (field !== undefined && !found.some(entry => entry.path === field)) found.push({ path: field, created: false });
+      } else if (toolName === 'write' || toolName === 'edit') {
+        // NOT creation evidence: a write creates and overwrites with the same call, so this stays in 编辑.
+        const target = stringValue(args, 'file_path', 'path', 'filename', 'filePath');
+        if (target !== undefined) found.push({ path: target, created: false });
       } else if (toolName === 'str_replace_editor') {
-        const cmd = stringValue(args, 'command');
-        if (cmd === 'create' || cmd === 'str_replace' || cmd === 'insert') target = stringValue(args, 'path');
+        // Only the commands that WRITE: `view` is how the same tool reads a file, and counting it would have put every
+        // file the turn merely looked at into 编辑.
+        const command = stringValue(args, 'command');
+        if (command === 'create' || command === 'str_replace' || command === 'insert') {
+          const target = stringValue(args, 'path');
+          if (target !== undefined) found.push({ path: target, created: command === 'create' });
+        }
       }
-      const clean = target?.trim() ?? '';
-      if (clean === '' || seen.has(clean)) continue;
-      seen.add(clean);
-      edited.push(clean);
+      for (const entry of found) {
+        const clean = entry.path.trim();
+        if (clean === '' || seenTouched.has(clean)) continue;
+        seenTouched.add(clean);
+        touched.push(clean);
+        if (entry.created) added.push(clean);
+      }
     }
   }
-  return { edited, produced };
+  // A delivered file is also a NEW file (it was made this turn), so it leads the 新增 list and is never repeated under
+  // 编辑. The tool-flow creation evidence joins it, and whatever remains is what the turn changed — each list deduped,
+  // both orders first-seen.
+  const addedAll: string[] = [];
+  const addedSet = new Set<string>();
+  for (const path of [...delivered, ...added]) {
+    if (path === '' || addedSet.has(path)) continue;
+    addedSet.add(path);
+    addedAll.push(path);
+  }
+  const editedAll: string[] = [];
+  const seenEdited = new Set<string>();
+  for (const path of [...changed, ...touched]) {
+    if (path === '' || addedSet.has(path) || seenEdited.has(path)) continue;
+    seenEdited.add(path);
+    editedAll.push(path);
+  }
+  return { added: addedAll, edited: editedAll };
 }
 
 /**
- * The one list the rest of this plugin asks for: the files a turn DELIVERED, or — when the host published none — the
- * files it touched. Mention resolution and the row's own gate both want that single answer, so it stays exactly as it
- * behaved while the row above gained the ability to show the two apart.
+ * The one list the rest of this plugin asks for — inline file mentions, and whether the row appears at all — as the
+ * union of both, deliveries first. It has to be the union: the delivered file is exactly the one the reader wants to be
+ * able to click, and a turn that only delivered something (no change announcement, no write tool call the fallback can
+ * see) would otherwise show no row at all.
  */
 export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): readonly string[] {
-  const { edited, produced } = getTurnDeliverableGroups(turn, flow);
-  return produced.length > 0 ? produced : edited;
+  const { added, edited } = getTurnDeliverableGroups(turn, flow);
+  return [...added, ...edited];
 }
 
 /** The three ways this view can show a turn's files — 「产物展示」. */

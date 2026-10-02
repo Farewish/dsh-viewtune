@@ -467,12 +467,15 @@
 .deliverablesRoot[data-display=balanced] .deliverablesLane { grid-column: 1 / -1; }
 .deliverablesBoxes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesBox { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: start; column-gap: 8px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
-.deliverablesBoxLabel { grid-column: 1; padding-top: 4px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; }
-.deliverablesBox[data-region=produced] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
+/* 框头是按钮（读者说后面有用），所以先把它还原成"像文字"的按钮：字体与颜色继承、无边框、无内边距、可点。 */
+.deliverablesBoxLabel { grid-column: 1; padding: 4px 0 0; border: 0; background: 0 0; font: inherit; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; text-align: left; }
+.deliverablesBoxLabel:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
+.deliverablesBox[data-region=added] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
 .deliverablesBoxLane { grid-column: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; max-height: 62px; overflow: hidden; }
 .deliverablesBox[data-open] .deliverablesBoxLane { max-height: none; overflow: visible; }
 .deliverablesBox .deliverableChip { height: 28px; }
-.deliverablesBox .deliverablesToggle { grid-column: 3; align-self: end; }
+/* 开关上下居中（读者指出之前贴在底部）。 */
+.deliverablesBox .deliverablesToggle { grid-column: 3; align-self: center; }
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
