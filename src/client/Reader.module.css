@@ -476,6 +476,8 @@
    按内容宽之后，可点区域就只有那几个字本身 ✓。 */
 .deliverablesBoxLabel { grid-column: 1; grid-row: 1; justify-self: start; padding: 0; border: 0; background: 0 0; font: inherit; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; text-align: left; }
 .deliverablesBoxLabel:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
+/* 纯文字的框头（提交框 ✓）：和按钮同样的排版，但**不是**可点外观 —— 没有手型、没有聚焦环 ✓。 */
+.deliverablesBoxPlain { grid-column: 1; grid-row: 1; padding: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: default; }
 .deliverablesBox[data-region=added] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
 .deliverablesBoxLane { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-width: 0; max-height: 62px; overflow: hidden; }
 .deliverablesBox[data-open] .deliverablesBoxLane { max-height: none; overflow: visible; }

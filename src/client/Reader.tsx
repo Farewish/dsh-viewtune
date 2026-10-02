@@ -630,7 +630,9 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, plainHeading,
     return () => { observer.disconnect(); };
   }, [region.count, open]);
   const heading = plainHeading === true
-    ? <span className={css.deliverablesBoxLabel}>共 {region.count} 项{region.label}</span>
+    // A plain heading gets its OWN class: the button's class carries `cursor: pointer`, so reusing it left the 提交 box
+    // looking like a button even after the element stopped being one (the reader's report).
+    ? <span className={css.deliverablesBoxPlain}>共 {region.count} 项{region.label}</span>
     : (
       <button type="button" className={css.deliverablesBoxLabel} onClick={onHeadingClick} disabled={onHeadingClick === undefined}>
         共 {region.count} 项{region.label}
