@@ -953,6 +953,12 @@ const markers = [
     && bundle.includes('addEventListener("click"')
     && bundle.includes('selection.isCollapsed')
     && bundle.includes('GOAL_BAR_INTERACTIVE.some((selector) => target.closest(selector) !== null)')
+    // THE TARGET IS THE CHILD, not the element the hook is on. `data-goal-bar` is the OUTER dock
+    // (`div.dock[data-goal-bar] > div.bar`) and the 36px the reader complained about lives on that child, so aiming the
+    // geometry at the hook leaves the bar one line high while the objective still wraps — the reported symptom, and the
+    // bug this shipped twice before the DOM was measured.
+    && bundle.includes('> [class*="_bar"]')
+    && bundle.includes('height: auto !important')
     && bundle.includes('max-height: 40vh')
     // …and a fixed height ANYWHERE above it is released too: the bar renders into `conversation.input.dock`, whose
     // wrapper belongs to the composer, and a height up that chain would clip the growth while the objective wrapped.

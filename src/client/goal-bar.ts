@@ -110,12 +110,15 @@ export function goalBarCss(): string {
   // exactly that reason while two attempts at the fix each left a different backtick behind. Down here backticks are
   // ordinary characters.
   //
-  //   · the host pins `.nLMEza_bar` to `height: 36px`, so the expanded state has to say `height: auto` — and, because
-  //     the reader saw the objective WRAP while the bar stayed one line high, it says it with `!important` as well.
-  //     There are only two ways that report can be true: something outranks this rule (in which case the wrap it
-  //     plainly performed came from this same block, so the block IS applied — and `!important` settles it anyway), or
-  //     the growth happens and is covered by the composer, which sits below the dock in the same seat. The first is
-  //     what the `!important`s are for; the second is what releasing the DOCK's height is for.
+  //   · WHERE THE HEIGHT LIVES, which is the bug this file shipped twice: `data-goal-bar` is on the OUTER dock
+  //     (`div.dock[data-goal-bar] > div.bar`), and the element pinned to `height: 36px` is the CHILD. Rules aimed at
+  //     `[data-goal-bar]` therefore hit a wrapper with no height to give — which is exactly why the objective wrapped
+  //     (a DESCENDANT rule, `[data-goal-bar] [class*="_objective"]`, matched fine) while the bar stayed one line high.
+  //     Every geometry rule below therefore targets `[data-goal-bar] > [class*="_bar"]`, the direct child, and the
+  //     marker is a flex item of THAT element rather than of the dock.
+  //   · the host pins `.nLMEza_bar` to `height: 36px`, so the expanded state says `height: auto !important` — the
+  //     `!important` because this is a host rule being beaten down a chain we do not own, the same reason the wallpaper
+  //     rules carry it.
   //   · the dock (`.nLMEza_dock`) carries no height today — width and margin only, measured — but it is created by the
   //     `conversation.input.dock` slot, whose wrapper belongs to the composer, and a fixed height anywhere up that
   //     chain would clip the growth to one line while the objective wrapped happily inside it. So the rule releases it
@@ -128,7 +131,7 @@ export function goalBarCss(): string {
     `/* Say it can be clicked, collapsed and expanded alike. */`,
     `${GOAL_BAR_SELECTOR} [class*="_objective"]:not([class*="_objectiveInput"]) { cursor: pointer; }`,
     `/* The marker: a flex item at the end of the bar, after the actions. */`,
-    `${GOAL_BAR_SELECTOR}::after {`,
+    `${GOAL_BAR_SELECTOR} > [class*="_bar"]::after {`,
     `  content: '';`,
     `  flex: none;`,
     `  align-self: center;`,
@@ -141,13 +144,13 @@ export function goalBarCss(): string {
     `  transition: transform 120ms ease;`,
     `  pointer-events: none;`,
     `}`,
-    `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR}::after { transform: translateY(2px) rotate(-135deg); }`,
+    `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR} > [class*="_bar"]::after { transform: translateY(2px) rotate(-135deg); }`,
     `/* Expanded: the bar grows, the objective wraps, and everything else stays on the first line. The DOCK is released
        too, and defensively: it carries no height today (measured — nLMEza_dock is width and margin only), but the
        bar is rendered into a slot (conversation.input.dock) whose wrapper belongs to the composer, and a fixed height
        anywhere up that chain would clip the growth to one line while the objective happily wrapped inside it. */`,
     `html[${GOAL_EXPANDED_ATTRIBUTE}] [class*="_dock"]:has(> ${GOAL_BAR_SELECTOR}) { height: auto; max-height: none; }`,
-    `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR} {`,
+    `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR} > [class*="_bar"] {`,
     `  height: auto !important;`,
     `  min-height: 36px !important;`,
     `  max-height: none !important;`,

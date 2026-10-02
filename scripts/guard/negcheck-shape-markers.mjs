@@ -259,6 +259,19 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the goal bar’s expanded height left where it never lands, so the bar stays one line high while the objective wraps',
+    // `data-goal-bar` is the outer DOCK and the 36px is on its child, so a height written against the hook does nothing
+    // at all: the objective (a descendant rule) keeps wrapping while the bar it is inside stays one line tall. That is
+    // the reader's report, word for word, and the mutation restores exactly it.
+    //
+    // The replacement is `34px` rather than the host's own `36px` on purpose: the harness refuses a mutation whose
+    // replacement is ALREADY present, and `min-height: 36px !important` (the next declaration in the same block)
+    // contains that string — so a `36px` here is skipped as a no-op rather than run.
+    search: 'height: auto !important',
+    replace: 'height: 34px !important',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the turn-trigger row renamed away from the words the conversation page uses for the same record',
     // The two views must say the SAME thing about the same record — that is the whole point of mirroring the host's
     // title table rather than paraphrasing it — so the copy is pinned, not just the presence of a row.
