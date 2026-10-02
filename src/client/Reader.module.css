@@ -487,11 +487,12 @@
 /* 详细卡片档也没有行首标签 ✓（读者要求去掉顶部那行 ✓），所以根网格同样收成一列、lane 跨过去 ✓ —— 与平衡档同一个理由 ✓。 */
 .deliverablesRoot[data-display=cards] { grid-template-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
 .deliverablesRoot[data-display=cards] .deliverablesLane { grid-column: 1 / -1; }
-/* 详细卡片档的**交付**卡：宿主那张「呈现文件」区的排版是 **多个 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的
-   `data-single=true` ✓）。第二行永远是描述（没有就退回类型名 ✓ —— `cardDescription` 的回退在组件里 ✓）。 */
-.deliverablesRow:has(.deliverableChip[data-delivered]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
-.deliverablesRow[data-single]:has(.deliverableChip[data-delivered]) { grid-template-columns: minmax(0, 1fr); }
-.deliverableChip[data-style=card][data-delivered] { height: 60px; }
+/* 详细卡片档的**交付**卡：宿主那张「呈现文件」区的排版按**数量**分 —— 多个 ⇒ 两列网格 ✓、恰好一个 ⇒ 整行 ✓
+   （它自己的 `data-single=true` 就是这个意思 ✓）。这里只读**行上的数量属性** ✓，不再用 `:has()` 去数子元素 ✗：
+   少一个活动件，就少一种"看着对、实际没生效"的可能 ✓。第二行永远是描述（没有就退回类型名 ✓）。 */
+.deliverablesRow[data-delivered-count] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.deliverablesRow[data-delivered-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.deliverableChip[data-style=card][data-delivered] { height: 60px; width: 100%; }
 .deliverableChip[data-style=card][data-delivered] .deliverableName { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
 .deliverableDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 /* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。

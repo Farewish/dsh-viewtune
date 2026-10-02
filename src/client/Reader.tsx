@@ -922,7 +922,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                     <span className={css.deliverablesRegionCount}>{region.count}</span>
                   </span>
                 )}
-                <div className={css.deliverablesRow} data-single={region.kind === 'delivered' && region.count === 1 ? true : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
+                {/* 宿主的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single=true` ✓）。
+                    这里写成**行上的一个数量属性** ✓，不再让 CSS 去 `:has()` 找子元素 ✗ —— 少一个可能失效的环节 ✓。 */}
+                <div className={css.deliverablesRow} data-delivered-count={region.kind === 'delivered' ? String(region.count) : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                   : groups.commits.map((commit, index) => (
                     <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
                       {commit.hash ?? commit.subject}
