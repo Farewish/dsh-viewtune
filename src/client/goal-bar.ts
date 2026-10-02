@@ -105,6 +105,25 @@ export function toggleGoalBar(root: GoalAttributeRoot, expanded?: boolean): bool
  * font is in force. `pointer-events: none` keeps it out of the way of the click, which lands on the bar underneath it.
  */
 export function goalBarCss(): string {
+  // Why the expanded geometry is what it is, recorded HERE rather than as comments inside the array below: a backtick
+  // in one of those comments closes the template literal it lives in, and this file's build failed three times for
+  // exactly that reason while two attempts at the fix each left a different backtick behind. Down here backticks are
+  // ordinary characters.
+  //
+  //   · the host pins `.nLMEza_bar` to `height: 36px`, so the expanded state has to say `height: auto` — and, because
+  //     the reader saw the objective WRAP while the bar stayed one line high, it says it with `!important` as well.
+  //     There are only two ways that report can be true: something outranks this rule (in which case the wrap it
+  //     plainly performed came from this same block, so the block IS applied — and `!important` settles it anyway), or
+  //     the growth happens and is covered by the composer, which sits below the dock in the same seat. The first is
+  //     what the `!important`s are for; the second is what releasing the DOCK's height is for.
+  //   · the dock (`.nLMEza_dock`) carries no height today — width and margin only, measured — but it is created by the
+  //     `conversation.input.dock` slot, whose wrapper belongs to the composer, and a fixed height anywhere up that
+  //     chain would clip the growth to one line while the objective wrapped happily inside it. So the rule releases it
+  //     defensively, scoped by `:has(> [data-goal-bar])` so no other dock in the app is touched.
+  //   · the objective swaps `nowrap`/`ellipsis` for wrapping with a `40vh` ceiling and its own scrollbar, and the
+  //     children align to the TOP: a 28px action button centred on a tall bar reads as a mistake.
+  //   · the marker is drawn with borders rather than a glyph, for the reason the collapse control learned: a text
+  //     chevron's weight and alignment belong to whatever font is in force.
   return [
     `/* Say it can be clicked, collapsed and expanded alike. */`,
     `${GOAL_BAR_SELECTOR} [class*="_objective"]:not([class*="_objectiveInput"]) { cursor: pointer; }`,
@@ -129,9 +148,10 @@ export function goalBarCss(): string {
        anywhere up that chain would clip the growth to one line while the objective happily wrapped inside it. */`,
     `html[${GOAL_EXPANDED_ATTRIBUTE}] [class*="_dock"]:has(> ${GOAL_BAR_SELECTOR}) { height: auto; max-height: none; }`,
     `html[${GOAL_EXPANDED_ATTRIBUTE}] ${GOAL_BAR_SELECTOR} {`,
-    `  height: auto;`,
-    `  min-height: 36px;`,
-    `  align-items: flex-start;`,
+    `  height: auto !important;`,
+    `  min-height: 36px !important;`,
+    `  max-height: none !important;`,
+    `  align-items: flex-start !important;`,
     `  padding-top: 6px;`,
     `  padding-bottom: 6px;`,
     `}`,
