@@ -434,7 +434,9 @@
 .dialogClose { position: absolute; right: 8px; top: 4px; border: 0; background: transparent; color: inherit; width: 32px; height: 32px; border-radius: 8px; font-size: 24px; }
 .jumpDock { position: sticky; bottom: calc(var(--dsh-composer-height, 152px) + 16px); align-self: flex-end; height: 0; z-index: 8; }
 .deliverablesRoot { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; column-gap: 10px; margin-top: 14px; font-size: 13px; line-height: 22px; }
-.deliverablesLabel { grid-column: 1; grid-row: 1; color: var(--dsw-alias-label-tertiary); font-size: 12px; padding-top: 2px; font-weight: 500; }
+/* 「产物」/「提交」这两行的行首标签：颜色**比三级再重一档** ✓（读者要求「颜色重些」✓）—— 用 secondary ✓：
+   它们是简略档里唯一的两个区域名 ✓，太淡就只剩内容、看不出这一行说的是什么 ✓。 */
+.deliverablesLabel { grid-column: 1; grid-row: 1; color: var(--dsw-alias-label-secondary); font-size: 12px; padding-top: 2px; font-weight: 500; }
 .deliverablesLane { grid-column: 2; grid-row: 1; min-width: 0; }
 .deliverablesRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .deliverableChip { box-sizing: border-box; display: inline-flex; align-items: center; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease; overflow: hidden; }
@@ -537,7 +539,8 @@
 /* **简略档**的提交行 ✓（读者要求：不要在产物那一行里 ✓，单开一行「提交」✓）：左边标签 ✓、右边哈希气泡 ✓。
    它挂在根栅格上 ✓ ⇒ 必须**跨满**（根在简略档是「标签 + 内容」两列 ✓），否则会落进标签那一列 ✓。 */
 .commitsRow { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: 6px; }
-.commitsLabel { flex: none; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; }
+/* 「提交」与「产物」同一档 ✓（读者要求两处都重些 ✓）。 */
+.commitsLabel { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
 .commitsList { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
