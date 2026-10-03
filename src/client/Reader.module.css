@@ -564,11 +564,19 @@
 .deliverableChip[data-style=card] .deliverableName { display: inline-flex; align-items: baseline; min-width: 0; }
 @container (width <= 620px) { .deliverablesRow[data-delivered-count] { grid-template-columns: minmax(0, 1fr); } }
 /* 提交气泡：不是文件，没有可点开的路径，所以只是一枚带短哈希的泡泡，标题（完整首行）放在 title 里。 */
-.deliverableCommit { box-sizing: border-box; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: var(--dsw-font-family-mono, monospace); cursor: pointer; }
-/* 提交气泡：**一行封顶**（读者选的方案 B ✓）—— 主题可以很长，没有上限就会把整行撑开 ✓；
-   所以标签自己带省略号 ✓，悬停看全文与哈希 ✓，点击复制短哈希 ✓。 */
-.deliverableCommitText { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deliverableCommit:hover { border-color: var(--dsw-alias-border-l3); background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); }
+.deliverableCommit { box-sizing: border-box; position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: var(--dsw-font-family-mono, monospace); cursor: pointer; }
+/* 提交气泡：**一行封顶** ✓（读者选的方案 B ✓）—— 主题可以很长，没有上限就会把整行撑开 ✓。
+   省略号落在**这一行文字的末尾** ✓（`line-height` 与胶囊高度无关 ✓，文字始终垂直居中 ✓）。 */
+.deliverableCommitText { display: block; line-height: 20px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 「已复制」**盖在标签上** ✓，不参与布局 ⇒ 气泡尺寸不变 ✓，后面的气泡不会跟着挪位 ✓（读者第 2 条 ✓）。 */
+.deliverableCommitCopied { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: inherit; background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover)); color: var(--dsw-alias-state-success-primary, var(--dsw-alias-label-primary)); }
+/* 悬停高亮**跟档** ✓（读者第 3 条：不要实心 ✓）—— 提交气泡属于**产物栏**那一族 ✓；`100%` 回退保证不开磨砂皮肤时
+   与从前一致 ✓（档位属性只在皮肤开启时才存在 ✓）。 */
+.deliverableCommit:hover {
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l3, rgba(128,128,128,.32)) var(--glass-chip, 100%), transparent);
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-chip, 100%), transparent);
+  color: var(--dsw-alias-label-primary);
+}
 .deliverableCommit:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 /* 总差异面板（读者要的）：悬停窗口与点击面板共用同一份内容 —— 每行是「路径 + ± 数字按钮」，点数字就地展开该文件的差异。
    **留出余量** ✓：早先的版本没有内边距，文字直接贴在窗口边缘 ✓（读者的报告 ✓），所以这里四周都给 10px 左右。 */

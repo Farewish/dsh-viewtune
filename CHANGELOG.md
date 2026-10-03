@@ -210,6 +210,14 @@
 - **抽成纯函数** ✓：`commitLabel` / `commitTitle` / `commitClipboard` 三个小函数 ✓（`deliverables.ts` ✓）—— "该显示哪个"正是刚出过问题的地方 ✓，值得单测 ✓（新增一条用例覆盖三种情形 ✓）。三档仍共用同一个 `CommitBubble` ✓。
 - **守卫** ✓：那条 marker 增补四个针 ✓（`commitLabel` ✓、`commitClipboard` ✓、`deliverableCommitText` ✓、`复制提交` ✓），反向用例新增一条删掉复制那一半 ✓（**89 例** ✓）。全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **23/23** ✓、反向自检 **OK** ✓。
 
+### 提交气泡三处微调：省略号落位、复制提示不改尺寸、悬停高亮跟档
+
+- **读者三条** ✓：①省略号要用「…」、且落在文字的**末尾** ✓；②点出「已复制」时气泡**长度不能变** ✓（否则后面每个提交都跟着挪位 ✓）；③悬停高亮**不要实心** ✓。
+- **①** ✓：标签是**一行封顶** ✓，给文字自身 `line-height: 20px` ✓ 并靠胶囊的 `align-items: center` 垂直居中 ✓ ⇒ 省略号落在**这一行的末尾** ✓，不会跑到下面去 ✓（先前只写了 `overflow` + `text-overflow`，行高由继承决定 ✓，这正是它看起来"在底部"的来源 ✓）。
+- **②** ✓：标签**始终**是提交信息 ✓ ⇒ 宽度恒定 ✓；「已复制」改成**绝对定位的覆盖层** ✓（`inset: 0` + 自己那层底色盖住标签 ✓，不参与布局 ✓）⇒ 出现与淡去都不改变气泡尺寸 ✓，后面的气泡**不会集体挪位** ✓。
+- **③** ✓：气泡的悬停底色与描边改成 `color-mix(… var(--glass-chip, 100%), transparent)` ✓ —— 它属于**产物栏**那一族 ✓；`100%` 回退保证**不开磨砂皮肤时与从前一致** ✓。产物里可数：跟着档位混色的规则由 5 处增至 **7** 处 ✓。
+- 纯样式/交互微调 ✓（无纯逻辑改动 ✓，沿用上一条的 `commitLabel`/`commitClipboard` 用例 ✓）。守卫 marker 增补 `deliverableCommitCopied` 一针 ✓。全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **23/23** ✓、反向自检 **OK（89 例）** ✓。
+
 ## 0.5.4 (frost dials per surface, the reader's own settings as the defaults, and a settings page that reads as boxes)
 
 **两处读者报告：① 不管「竖条滚轮」开着还是关着，在竖条上滚轮都会滚动正文，差别只是有没有缓动；② 希望「界面遮罩」拆成侧栏与顶栏，各自调不同透明度。**

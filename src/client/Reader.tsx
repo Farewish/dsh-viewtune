@@ -782,7 +782,10 @@ const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitReco
   return (
     <button type="button" className={css.deliverableCommit} title={commitTitle(commit)}
       aria-label={`复制提交 ${commitClipboard(commit)}`} onClick={copy}>
-      <span className={css.deliverableCommitText}>{copied ? '已复制' : commitLabel(commit)}</span>
+      {/* 标签**始终是提交信息** ✓：宽度因此不会变 ✓（读者第 2 条：「已复制」一出现，后面的气泡全都跟着挪位 ✗）。
+          确认提示**盖在上面** ✓（绝对定位、不吃布局 ✓），淡去之后气泡还是原来那个尺寸 ✓。 */}
+      <span className={css.deliverableCommitText}>{commitLabel(commit)}</span>
+      {copied && <span className={css.deliverableCommitCopied} aria-hidden>已复制</span>}
     </button>
   );
 });

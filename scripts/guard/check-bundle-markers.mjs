@@ -1088,6 +1088,10 @@ const markers = [
     && bundle.includes('commitLabel')
     && bundle.includes('commitClipboard')
     && bundle.includes('deliverableCommitText')
+    // …and the three refinements the reader asked for after seeing it: the confirmation is an OVERLAY (so the bubble's
+    // width — and therefore every bubble after it — cannot move when it appears), and the highlight follows the dial
+    // instead of an opaque fill.
+    && bundle.includes('deliverableCommitCopied')
     && bundle.includes('复制提交')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
