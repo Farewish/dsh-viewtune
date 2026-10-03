@@ -564,7 +564,10 @@
 .deliverableChip[data-style=card] .deliverableName { display: inline-flex; align-items: baseline; min-width: 0; }
 @container (width <= 620px) { .deliverablesRow[data-delivered-count] { grid-template-columns: minmax(0, 1fr); } }
 /* 提交气泡：不是文件，没有可点开的路径，所以只是一枚带短哈希的泡泡，标题（完整首行）放在 title 里。 */
-.deliverableCommit { box-sizing: border-box; position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: var(--dsw-font-family-mono, monospace); cursor: pointer; }
+/* 气泡用**正文字体**，不是等宽 ✓ —— 读者报的「省略号在中间」正是等宽字体的 `…`（画在中间高度 ✗）：
+   而这个气泡以前装的是**哈希** ✓（等宽合适 ✓），现在装的是**提交信息** ✓（散文 ✓），等宽既不好读 ✓、又把省略号画歪 ✓。
+   换成继承的正文字体后，`…` 落在**基线**上 ✓，与读者给的第二张图一致 ✓。 */
+.deliverableCommit { box-sizing: border-box; position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: inherit; cursor: pointer; }
 /* 提交气泡：**一行封顶** ✓（读者选的方案 B ✓）—— 主题可以很长，没有上限就会把整行撑开 ✓。
    省略号落在**这一行文字的末尾** ✓（`line-height` 与胶囊高度无关 ✓，文字始终垂直居中 ✓）。 */
 .deliverableCommitText { display: block; line-height: 20px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
