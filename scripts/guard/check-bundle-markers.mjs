@@ -1076,6 +1076,13 @@ const markers = [
     // which is what made hovering an option turn it into a solid plate under the frosted skin.
     && bundle.includes('background:var(--changes-fill')
     && bundle.includes('--glass-chip,100%')],
+  // A commit's NAME is its message, and the message is read from git's own output when the command has no `-m` — which is
+  // the reader's own shape: their commits are `git commit -F <file>` and the tool result keeps only the last line, a
+  // `git log --oneline -1` line. Pinned as the one component all three modes render plus the honest placeholder constant,
+  // because the failure they reported was silent: a bubble labelled 「一次提交」 looks like a message.
+  ['a commit bubble is labelled with the commit’s message, and an unreadable message says so', () => bundle.includes('CommitBubble')
+    && bundle.includes('UNKNOWN_COMMIT')
+    && bundle.includes('[0-9a-f]{7,40}')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

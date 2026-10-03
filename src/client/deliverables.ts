@@ -73,11 +73,19 @@ export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths
  * build artifact, anything a shell command wrote — because the plugin sees only tool calls and the host's published
  * lists, and the reader's own `.tgz` was in neither (shell-written and gitignored). Said plainly in the CHANGELOG.
  */
+/**
+ * What a commit is called when neither the command's `-m` nor the result carried a message.
+ *
+ * Deliberately NOT a word that could pass for a name: the reader saw 「一次提交」 in a bubble and read it as the commit's
+ * own message — a placeholder that looks like a name is worse than an admission that the message was not readable.
+ */
+export const UNKNOWN_COMMIT = '未读到提交信息';
+
 /** One commit a turn made, as much as a client can honestly know about it. */
 export interface CommitRecord {
   /** The short hash git printed, when the tool's result was readable. */
   readonly hash?: string;
-  /** The message's first line, from the command's own `-m`, or a plain 「一次提交」. */
+  /** The message's first line, from the command's own `-m` or from git's output, or `UNKNOWN_COMMIT`. */
   readonly subject: string;
 }
 
@@ -94,14 +102,23 @@ const GIT_COMMIT = /(?:^|[;&|]|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tr
 function commitSubject(command: string): string {
   const quoted = /(?:^|\s)-{1,2}m(?:essage)?[= ](?:"([^"]+)"|'([^']+)'|([^\s"'&|;]+))/m.exec(command);
   const subject = (quoted?.[1] ?? quoted?.[2] ?? quoted?.[3] ?? '').split('\n')[0]?.trim() ?? '';
-  return subject === '' ? '一次提交' : subject;
+  return subject === '' ? UNKNOWN_COMMIT : subject;
 }
 
 /** Git's own summary line in a result: `[branch 1a2b3c4] the subject`, both halves at once. */
 function commitSummary(text: string): { hash?: string; subject?: string } {
   const match = /^\s*\[[^\]\s]+ ([0-9a-f]{7,40})\]\s*(.*)$/m.exec(text);
-  if (match === null) return {};
-  return { hash: match[1], subject: match[2]?.trim() };
+  if (match !== null) return { hash: match[1], subject: match[2]?.trim() };
+  // …and the ONE-LINE LOG shape, which is the one the reader's own commits arrive in and the reason 「提交」 showed a
+  // placeholder rather than a name: their command ends with `git log --oneline -1`, so the only line the tool result keeps
+  // is `<short hash> <subject>` — no brackets, so the bracketed pattern above never matched it. Measured from their own
+  // command, not guessed.
+  //
+  // The bare form is accepted only line-anchored, with a 7..40 hex run and a space before a non-space: the shapes that
+  // could otherwise look like this are file content, and a `git commit` result is git's own output.
+  const bare = /^[^\S\n]*([0-9a-f]{7,40})[^\S\n]+(\S.*)$/m.exec(text);
+  if (bare === null) return {};
+  return { hash: bare[1], subject: bare[2]?.trim() };
 }
 
 /**
@@ -137,7 +154,7 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
     // The command's own `-m` names the commit first; git's summary line is the fallback, and it also carries the hash —
     // which is what a commit made with `-F <file>` (as this project's own are) has to rely on.
     const subject = commitSubject(command);
-    const finalSubject = subject === '一次提交' && summary.subject !== undefined && summary.subject !== '' ? summary.subject : subject;
+    const finalSubject = subject === UNKNOWN_COMMIT && summary.subject !== undefined && summary.subject !== '' ? summary.subject : subject;
     const key = `${summary.hash ?? ''}\u0000${finalSubject}`;
     if (seen.has(key)) continue;
     seen.add(key);

@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, changesReviewAddress, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, CHANGES_REVIEW_KIND, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS } from '../src/client/deliverables.ts';
+import { basename, changesReviewAddress, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, CHANGES_REVIEW_KIND, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS, UNKNOWN_COMMIT } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
@@ -195,6 +195,22 @@ test('a command that merely MENTIONS a commit is not one, and neither is a docum
 
 test('a commit keeps its subject even when the result carries no readable hash', () => {
   assert.deepEqual(turnCommits([tool('bash', { command: 'git commit --message "Only a subject"' })]), [{ subject: 'Only a subject' }]);
+});
+
+test('a result that is only a `git log --oneline -1` line still names the commit — the reader’s own shape', () => {
+  // Their commits end with the tool result reduced to the LAST line, which is that log line: `<short hash> <subject>`, no
+  // brackets. The bracketed pattern never matched it, so the bubble fell back to the placeholder and the reader saw
+  // 「一次提交」 instead of their message. Measured from their own command, and pinned here.
+  const flow = [tool('pwsh', { command: 'git -C repo commit -F msg.txt; git -C repo log --oneline -1' })];
+  (flow[0].block as unknown as { content: unknown }).content = [{ type: 'text', text: ' b2302ee Brief mode only: commits get their own row\n' }];
+  assert.deepEqual(turnCommits(flow), [{ hash: 'b2302ee', subject: 'Brief mode only: commits get their own row' }]);
+});
+
+test('when nothing readable names the commit, the bubble says so instead of inventing a name', () => {
+  // A `-F <file>` commit whose result holds neither the summary line nor a log line: the message is simply not readable
+  // from a client, and saying that is the honest outcome — the reader read the old placeholder 「一次提交」 as the commit's
+  // own message, which is exactly what a placeholder must not look like.
+  assert.deepEqual(turnCommits([tool('bash', { command: 'git commit -F msg.txt' })]), [{ subject: UNKNOWN_COMMIT }]);
 });
 
 test('createProducedFileMentions resolves exact paths and unique basenames, leaving ambiguous basenames inert', () => {

@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the unreadable-commit placeholder renamed, so a bubble can label itself with nothing readable',
+    // The constant exists so a commit whose message could not be read says that, rather than wearing a phrase that reads
+    // like a message. Losing its name is how the reader's 「一次提交」 came back looking like a real commit message.
+    search: 'UNKNOWN_COMMIT',
+    replace: 'UNKNOWNCOMMIT',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the hover highlight stops following its dial, so hovering an option lays down a solid plate again',
     // The `100%` is the fallback that keeps the NO-skin look identical; under the skin the property exists and the highlight
     // follows the dial. Changing it means the reading view paints an opaque plate on hover — the reader's report.

@@ -24,7 +24,7 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits } from './deliverables.js';
+import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
 import type { CommitRecord, DeliveredFile, DeliverableDisplay, TurnChange } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -754,6 +754,23 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
   </div>;
 });
 
+/**
+ * One git commit, as a bubble: **the message is the label** and the short hash is the tooltip.
+ *
+ * That order is the reader's correction — the bubble used to show the hash and keep the message in the `title`, so once
+ * the message was readable they still could not see it. A hash tells you a commit exists; the message is the name. The
+ * hash falls back to being the label only when no message was readable at all (`UNKNOWN_COMMIT`), where it is the most
+ * useful thing left.
+ *
+ * One component rather than three copies: the row appears in all three display modes and they must not drift.
+ */
+const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitRecord }) {
+  const named = commit.subject !== UNKNOWN_COMMIT;
+  const label = named ? commit.subject : (commit.hash ?? UNKNOWN_COMMIT);
+  const title = commit.hash === undefined ? commit.subject : `${commit.hash} ${commit.subject}`;
+  return <span className={css.deliverableCommit} title={title}>{label}</span>;
+});
+
 function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSidebar, turnNumber, sessionId, openChangesReview, openFile, revealFile }: {
   groups: { commits: readonly CommitRecord[]; delivered: readonly DeliveredFile[]; edited: readonly string[]; changesSeq?: number };
   changes: readonly TurnChange[];
@@ -898,12 +915,10 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
                     : region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
-                    // A commit is not a file: it has no path to open or reveal, so it is a plain bubble carrying the short
-                    // hash (what a reader recognises) with the message's first line as its title box.
+                    // A commit is not a file: it has no path to open or reveal, so it is a plain bubble — the message as the
+                    // label, the short hash in the tooltip (see `CommitBubble`).
                     : groups.commits.map((commit, index) => (
-                      <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
-                        {commit.hash ?? commit.subject}
-                      </span>
+                      <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
                     ))}
                 </DeliverablesBox>
               );
@@ -935,9 +950,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               <DeliverablesBox region={commitsRegion} open={boxOpen[commitsRegion.id] === true}
                 onToggle={() => { setBoxOpen(current => ({ ...current, [commitsRegion.id]: current[commitsRegion.id] !== true })); }}>
                 {groups.commits.map((commit, index) => (
-                  <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
-                    {commit.hash ?? commit.subject}
-                  </span>
+                  <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
                 ))}
               </DeliverablesBox>
             )}
@@ -952,9 +965,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
           <span className={css.commitsLabel}>提交</span>
           <div className={css.commitsList}>
             {groups.commits.map((commit, index) => (
-              <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
-                {commit.hash ?? commit.subject}
-              </span>
+              <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
             ))}
           </div>
         </div>
