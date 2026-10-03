@@ -505,6 +505,10 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
   };
 
   const name = basename(path);
+  // 宿主的形态是**一个**控件：主按钮 + 分隔的箭头按钮，点箭头弹出菜单（截图里是应用列表 + 末尾「显示文件位置」✓）。
+  // 那份**应用列表**属于宿主的文件打开器（`presentedOpen`/`presentedHost` 两个 hook 插件拿不到 ✓），所以菜单里是插件
+  // 自己有的三项 ✓：默认程序打开 / 在文件夹中显示 / 复制相对路径 ✓。
+  const [menu, setMenu] = useState(false);
   const folder = dirname(path);
   // The brief row is the one the reader asked NOT to change, so it keeps the generic document glyph. The other two know
   // what the file IS: the host's own `FileTypeIcon` (and `fileExtension` for the card's description line) come from the
@@ -546,41 +550,50 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
       </button>
 
       <div className={css.chipActions} aria-label="文件操作">
-        <button
-          type="button"
-          className={css.chipActionBtn}
-          title={`在访达中定位所在目录 (${folder})`}
-          aria-label="在访达中显示所在目录"
-          onClick={onReveal}
-        >
-          {status === 'revealed' ? (
-            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-              <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          ) : (
-            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-              <path d="M2 4.5h4l1.5 2H14v6.5H2V4.5z" strokeWidth="1.2" strokeLinejoin="round" />
-            </svg>
-          )}
-        </button>
-        <button
-          type="button"
-          className={css.chipActionBtn}
-          title="复制相对路径"
-          aria-label="复制相对路径"
-          onClick={onCopy}
-        >
-          {status === 'copied' ? (
-            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-              <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          ) : (
-            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-              <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" strokeWidth="1.2" />
-              <path d="M4 10.5H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-          )}
-        </button>
+        <span className={css.chipSplit}>
+          <button type="button" className={css.chipSplitMain} title={`用默认程序打开 (${name})`} aria-label="用默认程序打开" onClick={onOpen}>
+            {status === 'opened' ? (
+              <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <path d="M6 3.5h6.5V10" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M12.5 3.5L6.5 9.5" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M11 11v1.5H3.5V5H5" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+          <button type="button" className={css.chipSplitChevron} title="更多打开方式" aria-haspopup="menu" aria-expanded={menu}
+            onClick={() => { setMenu(value => !value); }}>
+            <IconChevronDownOutlineRegular size={12} className={menu ? css.chipSplitChevronOpen : undefined} />
+          </button>
+        </span>
+        {menu && (
+          <div className={css.chipMenu} role="menu">
+            <button type="button" className={css.chipMenuItem} role="menuitem" onClick={event => { setMenu(false); onOpen(event); }}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <path d="M6 3.5h6.5V10" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M12.5 3.5L6.5 9.5" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M11 11v1.5H3.5V5H5" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              用默认程序打开
+            </button>
+            <button type="button" className={css.chipMenuItem} role="menuitem" title={folder} onClick={event => { setMenu(false); onReveal(event); }}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <path d="M2 4.5h4l1.5 2H14v6.5H2V4.5z" strokeWidth="1.2" strokeLinejoin="round" />
+              </svg>
+              {status === 'revealed' ? '已定位' : '在文件夹中显示'}
+            </button>
+            <button type="button" className={css.chipMenuItem} role="menuitem" onClick={event => { setMenu(false); onCopy(event); }}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" strokeWidth="1.2" />
+                <path d="M4 10.5H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              {status === 'copied' ? '已复制' : '复制相对路径'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
