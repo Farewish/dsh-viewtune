@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the hover highlight stops following its dial, so hovering an option lays down a solid plate again',
+    // The `100%` is the fallback that keeps the NO-skin look identical; under the skin the property exists and the highlight
+    // follows the dial. Changing it means the reading view paints an opaque plate on hover — the reader's report.
+    search: '--glass-chip,100%',
+    replace: '--glass-chip,10%',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the 产物栏 label renamed in code, so the settings row the reader asked for stops existing',
     // The dial's LABEL is what the reader named; its id stays `chip` (the stored-record key) on purpose. A one-character
     // change is enough — the guard pins the label, and nothing else in the plugin would notice it had gone.

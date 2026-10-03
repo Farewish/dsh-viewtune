@@ -1069,7 +1069,13 @@ const markers = [
     // conversation page's did — the reader's report — because `--deliverable-fill` only ever existed inside that root.
     && bundle.includes('--deliverable-fill:var(--dsw-static-neutral-50)')
     && bundle.includes('--deliverable-fill:var(--dsw-static-neutral-850)')
-    && bundle.includes('--changes-fill:var(--dsw-static-neutral-50)')],
+    && bundle.includes('--changes-fill:var(--dsw-static-neutral-50)')
+    // …and the three things the reader asked for on top of that wiring, each one a fact that could be lost alone:
+    // the changed-files card's header is its OWN colour (`--changes-fill`, the host's own split from the card body's layer
+    // token), and every highlight this plugin paints follows a dial with a `100%` fallback rather than an opaque token —
+    // which is what made hovering an option turn it into a solid plate under the frosted skin.
+    && bundle.includes('background:var(--changes-fill')
+    && bundle.includes('--glass-chip,100%')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

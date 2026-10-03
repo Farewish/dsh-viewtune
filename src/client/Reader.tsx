@@ -795,6 +795,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
       ? [{ id: 'commits', label: '提交', hint: '这一轮做过的 git 提交', kind: 'commits' as const, count: groups.commits.length }]
       : []),
   ];
+  // 详细卡片档里的「提交」要**复用平衡档那个框** ✓（读者要求 ✓），所以这里把它的区域描述取出来一份 ✓ —— 只在这个
+  // 开关打开且真有提交时存在 ✓，其余情况为 undefined ✓（框也就不渲染 ✓）。
+  const commitsRegion = regions.find(region => region.kind === 'commits');
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
   // 「共 x 项编辑」点击展开的总差异面板 ✓（读者要的：悬停或点击都能看 ✓），以及面板里哪些文件的差异被展开了 ✓。
@@ -916,31 +919,28 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
             {changes.length > 0 && (
               <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
             )}
-            {regions.filter(region => region.count > 0 && region.kind !== 'files').map(region => (
-              // 卡片档不再要区域标签 ✓（读者要求去掉「交付 N」✓）—— 卡片自己就写着文件名与描述 ✓，宿主那张卡也没有这一层 ✓。
-              <div key={region.id} className={css.deliverablesRegion} data-region={region.id} title={region.hint}>
-                {/* 只有**提交**那栏保留标签 ✓：它是一串哈希泡泡，没有名字就看不出是什么 ✓；交付的卡片自己写着文件名与描述 ✓。 */}
-                {region.kind === 'commits' && (
-                  <span className={css.deliverablesRegionLabel}>
-                    {region.label}
-                    <span className={css.deliverablesRegionCount}>{region.count}</span>
-                  </span>
-                )}
-                {/* 宿主的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single=true` ✓）。
-                    三次尝试都卡在"CSS 属性选择器没有生效"上 ✓，所以这里**不再依赖 CSS** ✗：栅格由**内联样式**给出 ✓ ——
-                    内联样式不经过选择器匹配、不受特异性与打包顺序影响 ✓，是这条链上唯一确定会生效的一层 ✓。交付以外的
-                    区域（提交那串哈希）保持原本的流式排列 ✓。 */}
+            {/* 交付：宿主那张卡的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single` ✓）。
+                栅格用**内联样式**给出 ✓（不再依赖属性选择器 ✓ —— 那三次失败的正是不生效的选择器 ✓）。 */}
+            {groups.delivered.length > 0 && (
+              <div className={css.deliverablesRegion} data-region="delivered" title="这一轮交给你的文件">
                 <div className={css.deliverablesRow}
-                  style={region.kind === 'delivered'
-                    ? { display: 'grid', gridTemplateColumns: region.count === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }
-                    : undefined}>                  {region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
-                  : groups.commits.map((commit, index) => (
-                    <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
-                      {commit.hash ?? commit.subject}
-                    </span>
-                  ))}</div>
+                  style={{ display: 'grid', gridTemplateColumns: groups.delivered.length === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }}>
+                  {chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)}
+                </div>
               </div>
-            ))}
+            )}
+            {/* 提交：**直接复用平衡档那个框** ✓（读者要求「样式换成平衡档那样的，直接复用」✓）—— 框头、展开开关、
+                气泡、底色与档位全都与平衡档同一份实现 ✓，所以两边不会各自漂移 ✓。 */}
+            {commitsRegion !== undefined && (
+              <DeliverablesBox region={commitsRegion} open={boxOpen[commitsRegion.id] === true}
+                onToggle={() => { setBoxOpen(current => ({ ...current, [commitsRegion.id]: current[commitsRegion.id] !== true })); }}>
+                {groups.commits.map((commit, index) => (
+                  <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
+                    {commit.hash ?? commit.subject}
+                  </span>
+                ))}
+              </DeliverablesBox>
+            )}
           </div>
         )}
       </div>
