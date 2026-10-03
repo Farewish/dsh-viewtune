@@ -873,6 +873,13 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
           <div className={css.deliverablesRow}>
             {chips(flat.slice(0, 8))}
             {flat.length > 8 && <span className={css.deliverablesMore}>+ {flat.length - 8} 个文件</span>}
+            {/* 提交：**简略档此前整块漏掉** ✗（读者报的 bug ✓，不是这次改坏的 ✓）—— 三档都该显示 ✓，这里是同一串
+                哈希气泡 ✓、同一个类 ✓，所以它在三档里的样子与行为一致 ✓。文件夹按钮仍在最右 ✓。 */}
+            {groups.commits.map((commit, index) => (
+              <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
+                {commit.hash ?? commit.subject}
+              </span>
+            ))}
             {folderButton(flat.length)}
           </div>
         ) : display === 'balanced' ? (
