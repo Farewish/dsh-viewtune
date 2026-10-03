@@ -1063,7 +1063,13 @@ const markers = [
     && bundle.includes('--glass-chip')
     && bundle.includes('--glass-blur-chip')
     && bundle.includes('data-changed-files')
-    && bundle.includes('data-presented-file')],
+    && bundle.includes('data-presented-file')
+    // …and the host's OWN card colours are defined for the reading view, values and dark-theme override alike, exactly as
+    // the deliverables package defines them for its own root. Without these the boxes and cards had no colour while the
+    // conversation page's did — the reader's report — because `--deliverable-fill` only ever existed inside that root.
+    && bundle.includes('--deliverable-fill:var(--dsw-static-neutral-50)')
+    && bundle.includes('--deliverable-fill:var(--dsw-static-neutral-850)')
+    && bundle.includes('--changes-fill:var(--dsw-static-neutral-50)')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

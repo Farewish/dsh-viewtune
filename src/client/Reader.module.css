@@ -470,7 +470,7 @@
    两行。于是一个框一般三行：标题行 + 两行气泡。网格两列两行就够，不必改 DOM：标签在第 1 行第 1 列，开关在第 1 行
    第 2 列靠右，气泡跨两列落在第 2 行 ⇒ 气泡从内容左边缘开始（不再和标签挤同一行），换行后的气泡自然对齐在第一个
    气泡下面。框的左右各留少量余量（10px），上下 8px。 */
-.deliverablesBox { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 6px 8px; align-items: start; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; }
+.deliverablesBox { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 6px 8px; align-items: start; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 8px 10px; background: var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)); }
 /* 框头是按钮（读者说后面有用），所以先把它还原成"像文字"的按钮：字体与颜色继承、无边框、无内边距、可点。
    **必须 `justify-self: start`**：网格项默认 stretch ⇒ 按钮会铺满整列，于是"整行都是可点击状态"（读者的报告 ✗）。
    按内容宽之后，可点区域就只有那几个字本身 ✓。 */
@@ -984,6 +984,24 @@
    token. That one is a core theme token, so it cannot be redefined at the root: it is scoped to the two containers
    the tool content lives in, where the only layer-coloured surface is the pane itself. */
 :global(body) { --viewtune-layer-plate: var(--dsw-alias-bg-layer-1); }
+/* 宿主自己的产物卡颜色 ✓：`--deliverable-fill`（交付卡）与 `--changes-fill`（「已编辑 x 个文件」卡）**都由它挂在
+   自己的根上** ✓ —— 对话页有，**阅读页没有** ✗ ⇒ 这里凡是以 `var(--deliverable-fill)` 取色的规则都会落到别的回退值上 ✓，
+   这正是读者看到的"平衡档的卡片与详细档的卡片缺少底色" ✓，而对话页正常 ✓。
+   数值**照它抄**（不是自选 ✓）：浅色 `--dsw-static-neutral-50` / hover 100 ✓，暗色 850 / 800 ✓ —— 与它的
+   `body[data-ds-dark-theme] .nyYjTG_root` 同一条规则 ✓。写在 body 上与它的作用域一致 ✓；宿主自己根上的规则特异性更高 ✓
+   ⇒ 对话页不会被这两条改动影响 ✓。 */
+:global(body) {
+  --deliverable-fill: var(--dsw-static-neutral-50);
+  --deliverable-hover: var(--dsw-static-neutral-100);
+  --changes-fill: var(--dsw-static-neutral-50);
+  --changes-hover: var(--dsw-static-neutral-100);
+}
+:global(body[data-ds-dark-theme]) {
+  --deliverable-fill: var(--dsw-static-neutral-850);
+  --deliverable-hover: var(--dsw-static-neutral-800);
+  --changes-fill: var(--dsw-static-neutral-850);
+  --changes-hover: var(--dsw-static-neutral-800);
+}
 .root[data-reader-glass] .toolDetails,
 .root[data-reader-glass] .toolPanel {
   --dsw-alias-bg-layer-1: color-mix(in srgb, var(--viewtune-layer-plate, rgba(127,127,127,.1)) var(--glass-code, 25%), transparent);
@@ -1080,9 +1098,10 @@
   -webkit-backdrop-filter: blur(var(--glass-blur-chip));
   backdrop-filter: blur(var(--glass-blur-chip));
 }
-/* 平衡档的两个框（编辑栏 / 交付栏）：框自己就是一块板 ✓，所以它跟着**产物栏**档走 ✓（从前跟着「卡片与面板」✗）。 */
+/* 平衡档的两个框（编辑栏 / 交付栏）：框自己就是一块板 ✓，底色与对话页那张卡**同源** ✓（`--deliverable-fill` ✓），
+   所以在磨砂皮肤下也跟着**产物栏**档走 ✓（从前跟着「卡片与面板」✗）。 */
 .root[data-reader-glass] .deliverablesBox {
-  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
+  background: color-mix(in srgb, var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)) var(--glass-chip, 0%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) var(--glass-chip, 0%), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur-chip));
   backdrop-filter: blur(var(--glass-blur-chip));
