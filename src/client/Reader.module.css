@@ -176,6 +176,10 @@
 .nativeToolRow { min-width: 0; }
 .rowSeparator { flex: none; width: 2px; height: 2px; margin: 0 8px; border-radius: 1px; background: var(--dsw-alias-label-caption); }
 .nativeToolSummary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-tertiary); font-size: 14px; line-height: 24px; }
+/* 差异按钮与地址之间分开一点 ✓（读者要求 ✓）。**关键**：路径是 `flex: 1; min-width: 0` ✓ ⇒ 这段间距挤掉的是**路径的
+   可用宽度** ✓ ⇒ 长地址**更早省略** ✓，而按钮自己的位置**不动** ✓（它靠右端 ✓，`flex: none` 保证不被压 ✓）——
+   正好是读者点名的两条 ✓：分开一点 ✓、但不要为了省略去挪按钮 ✓。 */
+.diffSlot { flex: none; display: inline-flex; align-items: center; margin-left: 10px; }
 .nativeToolRow:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; border-radius: 4px; }
 /* A question set and a delivery are the two calls that read as content rather than as a machine
    step. The question is tertiary and the answer primary, as the product's own card has them. */

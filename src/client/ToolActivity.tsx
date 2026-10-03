@@ -246,13 +246,15 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
       onToggle={() => { onRead(); setOpen(value => !value); }} rowClassName={css.nativeToolRow}
       collapsedContent={<><span className={css.rowSeparator} aria-hidden /><span className={css.nativeToolSummary} title={rowSummary} data-reader-tool-summary>{rowSummary}</span>
         {showState && <span className={css.toolState} data-phase={phase}>{LABEL[phase]}</span>}
-        {diffHunks.length > 0 && <DiffStatButton hunks={diffHunks} label={rowTitle} open={diffOpen}
-          onToggle={() => {
-            if (diffOpen) { setDiffOpen(false); return; }
-            onRead();
-            setDiffVisible(true);
-            setDiffOpen(true);
-          }} />}</>} />
+        {diffHunks.length > 0 && <span className={css.diffSlot}>
+          <DiffStatButton hunks={diffHunks} label={rowTitle} open={diffOpen}
+            onToggle={() => {
+              if (diffOpen) { setDiffOpen(false); return; }
+              onRead();
+              setDiffVisible(true);
+              setDiffOpen(true);
+            }} />
+        </span>}</>} />
     {/* A sibling of the row, never inside it: the row is one clipped 24px line. */}
     {diffVisible && <DiffPanel hunks={diffHunks} open={diffOpen} active={diffActive} motion={motion}
       onActive={setDiffActive} onClosed={() => setDiffVisible(false)} />}

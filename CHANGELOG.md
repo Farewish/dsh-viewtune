@@ -231,6 +231,13 @@
 - **做法** ✓：两处都由 `--dsw-alias-label-tertiary` 提到 **`--dsw-alias-label-secondary`** ✓（`.deliverablesLabel` ✓、`.commitsLabel` ✓）—— 它们是简略档里**仅有的两个区域名** ✓，太淡就只剩内容、看不出这一行说的是什么 ✓。字号与字重不动 ✓（只有颜色变 ✓，符合"颜色重些"✓）。
 - 纯样式 ✓；全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **23/23** ✓、反向自检 **OK（89 例）** ✓。
 
+### 工具行：差异按钮与地址分开一点，且让地址**更早**省略（而不是挪按钮）
+
+- **读者点名的两条** ✓：①流程里 `Edit`/`Write` 这类行，差异按钮与地址**离得太近** ✓，要分开一点 ✓；②地址很长触发省略时，应当让它**更早省略** ✓，**而不是**去调按钮位置 ✓。
+- **前提恰好已经具备** ✓：路径本身就是 `flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap` ✓ ⇒ 在**按钮前面**加一段间距 ✓，被压缩的必然是**路径的可用宽度** ✓ ⇒ 省略发生得更早 ✓；而按钮槽是 `flex: none` ✓ ⇒ 它靠右端、**位置不动** ✓。
+- **做法** ✓：给差异按钮包一层 `css.diffSlot` ✓（`margin-left: 10px` ✓ —— 与分隔点自带的 8px 同一量级 ✓），只有这一处改动 ✓。平衡/卡片档与本页差异面板里的同类按钮不需要改 ✓（那里本来就由 `gap: 12px` 分开 ✓）。
+- 纯样式 ✓；全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **23/23** ✓、反向自检 **OK（89 例）** ✓。
+
 ## 0.5.4 (frost dials per surface, the reader's own settings as the defaults, and a settings page that reads as boxes)
 
 **两处读者报告：① 不管「竖条滚轮」开着还是关着，在竖条上滚轮都会滚动正文，差别只是有没有缓动；② 希望「界面遮罩」拆成侧栏与顶栏，各自调不同透明度。**
