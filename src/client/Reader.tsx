@@ -24,7 +24,7 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
+import { basename, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
 import type { CommitRecord, DeliveredFile, DeliverableDisplay, TurnChange } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -755,20 +755,36 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
 });
 
 /**
- * One git commit, as a bubble: **the message is the label** and the short hash is the tooltip.
+ * One git commit, as a bubble — the reader's chosen shape (option B).
  *
- * That order is the reader's correction — the bubble used to show the hash and keep the message in the `title`, so once
- * the message was readable they still could not see it. A hash tells you a commit exists; the message is the name. The
- * hash falls back to being the label only when no message was readable at all (`UNKNOWN_COMMIT`), where it is the most
- * useful thing left.
+ * **The message is the label**, clamped to one line with an ellipsis so a long English subject cannot stretch the row; the
+ * tooltip carries `hash + message` in full; and a **click copies the short hash**, which is the half you can paste into
+ * `git show`, an editor or a web UI. That is the two jobs the bubble actually has: recognising the commit (message) and
+ * using it (hash).
+ *
+ * The hash becomes the label only when no message was readable (`UNKNOWN_COMMIT`), and then it is also what a click
+ * copies — better than copying the admission itself.
  *
  * One component rather than three copies: the row appears in all three display modes and they must not drift.
  */
 const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitRecord }) {
-  const named = commit.subject !== UNKNOWN_COMMIT;
-  const label = named ? commit.subject : (commit.hash ?? UNKNOWN_COMMIT);
-  const title = commit.hash === undefined ? commit.subject : `${commit.hash} ${commit.subject}`;
-  return <span className={css.deliverableCommit} title={title}>{label}</span>;
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    try {
+      void navigator.clipboard?.writeText(commitClipboard(commit));
+    } catch {
+      // No clipboard permission: stay silent rather than claim a copy that did not happen.
+      return;
+    }
+    setCopied(true);
+    window.setTimeout(() => { setCopied(false); }, 1200);
+  };
+  return (
+    <button type="button" className={css.deliverableCommit} title={commitTitle(commit)}
+      aria-label={`复制提交 ${commitClipboard(commit)}`} onClick={copy}>
+      <span className={css.deliverableCommitText}>{copied ? '已复制' : commitLabel(commit)}</span>
+    </button>
+  );
 });
 
 function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSidebar, turnNumber, sessionId, openChangesReview, openFile, revealFile }: {

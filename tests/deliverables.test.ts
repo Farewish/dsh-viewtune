@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, changesReviewAddress, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, CHANGES_REVIEW_KIND, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS, UNKNOWN_COMMIT } from '../src/client/deliverables.ts';
+import { basename, changesReviewAddress, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, CHANGES_REVIEW_KIND, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS, UNKNOWN_COMMIT } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
@@ -195,6 +195,20 @@ test('a command that merely MENTIONS a commit is not one, and neither is a docum
 
 test('a commit keeps its subject even when the result carries no readable hash', () => {
   assert.deepEqual(turnCommits([tool('bash', { command: 'git commit --message "Only a subject"' })]), [{ subject: 'Only a subject' }]);
+});
+
+test('a commit bubble is labelled with its message, and a click copies its hash — the reader’s choice', () => {
+  // The two jobs: recognising the commit (only the message can do that) and using it (only the hash can be pasted). The
+  // label therefore prefers the message, the clipboard prefers the hash, and the tooltip carries both.
+  assert.equal(commitLabel({ hash: '1a2b3c4', subject: 'Fix the box heading' }), 'Fix the box heading');
+  assert.equal(commitTitle({ hash: '1a2b3c4', subject: 'Fix the box heading' }), '1a2b3c4 Fix the box heading');
+  assert.equal(commitClipboard({ hash: '1a2b3c4', subject: 'Fix the box heading' }), '1a2b3c4');
+  // …and when no message was readable the hash becomes the label too, rather than showing the admission twice.
+  assert.equal(commitLabel({ hash: '1a2b3c4', subject: UNKNOWN_COMMIT }), '1a2b3c4');
+  // A commit with neither still says something true, and copying it copies what is shown.
+  assert.equal(commitLabel({ subject: UNKNOWN_COMMIT }), UNKNOWN_COMMIT);
+  assert.equal(commitTitle({ subject: UNKNOWN_COMMIT }), UNKNOWN_COMMIT);
+  assert.equal(commitClipboard({ subject: UNKNOWN_COMMIT }), UNKNOWN_COMMIT);
 });
 
 test('a result that is only a `git log --oneline -1` line still names the commit — the reader’s own shape', () => {

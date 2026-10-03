@@ -81,6 +81,28 @@ export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths
  */
 export const UNKNOWN_COMMIT = '未读到提交信息';
 
+/**
+ * What a commit's bubble is LABELLED with — the reader's answer to "which shows better?".
+ *
+ * Their purpose is finding the turn's commit, which is two jobs: RECOGNISING it (only the message can do that — seven hex
+ * digits all look alike, which is what they reported) and USING it (only the hash can be pasted into `git show`, an editor
+ * or a web UI). So the message is the label and the hash is what a click copies; the hash becomes the label only when no
+ * message was readable, where it is the most useful thing left.
+ */
+export function commitLabel(commit: CommitRecord): string {
+  return commit.subject === UNKNOWN_COMMIT ? (commit.hash ?? UNKNOWN_COMMIT) : commit.subject;
+}
+
+/** The bubble's tooltip: both halves, hash first, since that is the order a `git log` line reads. */
+export function commitTitle(commit: CommitRecord): string {
+  return commit.hash === undefined ? commit.subject : `${commit.hash} ${commit.subject}`;
+}
+
+/** What a click on a commit's bubble copies: the hash to paste, or the message when there is no hash. */
+export function commitClipboard(commit: CommitRecord): string {
+  return commit.hash ?? commit.subject;
+}
+
 /** One commit a turn made, as much as a client can honestly know about it. */
 export interface CommitRecord {
   /** The short hash git printed, when the tool's result was readable. */

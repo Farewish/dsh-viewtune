@@ -1080,9 +1080,15 @@ const markers = [
   // the reader's own shape: their commits are `git commit -F <file>` and the tool result keeps only the last line, a
   // `git log --oneline -1` line. Pinned as the one component all three modes render plus the honest placeholder constant,
   // because the failure they reported was silent: a bubble labelled 「一次提交」 looks like a message.
-  ['a commit bubble is labelled with the commit’s message, and an unreadable message says so', () => bundle.includes('CommitBubble')
+  ['a commit bubble is labelled with the commit’s message, and a click copies its hash', () => bundle.includes('CommitBubble')
     && bundle.includes('UNKNOWN_COMMIT')
-    && bundle.includes('[0-9a-f]{7,40}')],
+    && bundle.includes('[0-9a-f]{7,40}')
+    // …and the reader's chosen shape (option B): the label is the message, clamped to one line, the tooltip carries both
+    // halves, and a click copies the hash — the half that can be pasted into `git show`, an editor or a web UI.
+    && bundle.includes('commitLabel')
+    && bundle.includes('commitClipboard')
+    && bundle.includes('deliverableCommitText')
+    && bundle.includes('复制提交')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

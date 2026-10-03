@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the commit bubble’s copy helper removed, so the hash the reader needs cannot be taken from the row',
+    // The bubble has two jobs — recognising the commit (the label) and using it (the clipboard). Losing the clipboard half
+    // leaves a message you can read but nothing you can paste.
+    search: 'commitClipboard',
+    replace: 'COMMITCLIPBOARD',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the unreadable-commit placeholder renamed, so a bubble can label itself with nothing readable',
     // The constant exists so a commit whose message could not be read says that, rather than wearing a phrase that reads
     // like a message. Losing its name is how the reader's 「一次提交」 came back looking like a real commit message.
