@@ -1055,6 +1055,15 @@ const markers = [
     && bundle.includes('openChangesReview')
     && bundle.includes('reader-settings-review-in-sidebar')
     && bundle.includes('reviewInSidebar')],
+  // 「产物栏」 (the reader's rename of 「产物标签」) owns the 编辑栏 and the 交付栏 wherever they appear: the reading view's
+  // boxes and cards, and the conversation page's two product cards. Both halves are pinned — the label the settings panel
+  // shows, and the dial reaching the conversation page's two product attributes — because either could be lost by a
+  // tidy-up that looks unrelated.
+  ['the 产物栏 dial governs both product rows, in the reading view and on the conversation page', () => bundle.includes('产物栏')
+    && bundle.includes('--glass-chip')
+    && bundle.includes('--glass-blur-chip')
+    && bundle.includes('data-changed-files')
+    && bundle.includes('data-presented-file')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

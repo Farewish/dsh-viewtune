@@ -110,11 +110,12 @@ test('the page claims code paper and the user bubble, and no other dial', () => 
   assert.ok(css.includes('.md-code-block > :first-child'));
   // The diff paper is code-shaped but rides the DIFF dial, in both views: one kind of paper, one control.
   assert.ok(/\[data-diff\]\s*\{[^}]*--glass-diff/.test(css));
-  // Five dials now, and no sixth: code paper, the diff paper, the bubble, the changed-files card family, and the
-  // chrome that floats over this page. Anything else here would mean the document resolves a property this page has
-  // no business painting — the `blur-` family excepted, because those are the SAME five surfaces' frost, published by
-  // the same two switches and named `--glass-blur-<part>`.
-  assert.equal(/--glass-(?!code|diff|user|card|lane|blur-)/.test(css), false, 'only the dials this page reads');
+  // Six dials now, and no seventh: code paper, the diff paper (which also paints the changed-files card's portaled
+  // DETAIL — a detail is a diff), the bubble, the 产物栏 dial (the two product rows, by the reader's ruling), the cards
+  // and panels this page still shares, and the chrome that floats over it. Anything else here would mean the document
+  // resolves a property this page has no business painting — the `blur-` family excepted, because those are the SAME
+  // surfaces' frost, published by the same two switches and named `--glass-blur-<part>`.
+  assert.equal(/--glass-(?!chip|code|diff|user|card|lane|blur-)/.test(css), false, 'only the dials this page reads');
 });
 
 test('the changed-files card, its portaled detail, and the host’s to-bottom button are dialled by NAME', () => {
@@ -123,13 +124,17 @@ test('the changed-files card, its portaled detail, and the host’s to-bottom bu
   // The card 0.2.0 appends to every answer body: one published attribute, no class name and no token sweep. It paints
   // from a LAYER token, which is exactly why the skin never reached it. Asserted across the selector/declaration line
   // break, because these rules are written one declaration per line.
-  assert.ok(/\[data-changed-files\]\s*\{[^}]*--glass-diff/.test(css), 'the changed-files card rides the DIFF dial');
-  // …and the PER-FILE 产物 cards that the host renders in that same spot (the reader's question: they follow the diff
-  // dial too, and they did not before — the host paints them from a STATIC neutral, `--deliverable-fill`, which no token
-  // sweep could reach). Same construction as the card's header: the host's own variable is READ on the card where it is
+  // The reader's later ruling moved both product rows onto the 产物栏 dial: this card IS the 编辑栏 on this page, and the
+  // per-file cards below are the 交付栏. They used to ride the diff dial under this file's group-by-what-it-is rule; the
+  // ruling overrides that, and the rules' own comments record that it was a decision.
+  assert.ok(/\[data-changed-files\]\s*\{[^}]*--glass-chip/.test(css), 'the changed-files card (编辑栏) rides the 产物栏 dial');
+  assert.ok(/\[data-changed-files\]\s*\{[^}]*backdrop-filter: blur\(var\(--glass-blur-chip\)\)/.test(css), '…with that dial’s frost');
+  // …and the PER-FILE 产物 cards that the host renders in that same spot — the 交付栏 here. They were never dialled at all
+  // before this plugin reached them: the host paints them from a STATIC neutral, `--deliverable-fill`, which no token
+  // sweep could reach. Same construction as the card's header: the host's own variable is READ on the card where it is
   // inherited, never redefined, so no cycle forms; the hover keeps the host's own feedback colour at the same dial.
-  assert.ok(/\[data-presented-file\]\s*\{[^}]*--glass-diff/.test(css), 'the presented-file cards ride the DIFF dial');
-  assert.ok(/\[data-presented-file\]\s*\{[^}]*backdrop-filter: blur\(var\(--glass-blur-diff\)\)/.test(css), '…with the diff dial’s frost');
+  assert.ok(/\[data-presented-file\]\s*\{[^}]*--glass-chip/.test(css), 'the presented-file cards (交付栏) ride the 产物栏 dial');
+  assert.ok(/\[data-presented-file\]\s*\{[^}]*backdrop-filter: blur\(var\(--glass-blur-chip\)\)/.test(css), '…with that dial’s frost');
   assert.ok(css.includes('var(--deliverable-fill, var(--viewtune-layer-plate'), '…reading the host’s own fill, not a hard-coded neutral');
   assert.ok(/\[data-presented-file\]:hover\s*\{[^}]*var\(--deliverable-hover/.test(css), '…and the hover reads the host’s own hover colour');
   // …and its hover DETAIL, which the deliverables package hands to the primitives' HoverCard: that card is PORTALED to
@@ -160,7 +165,7 @@ test('the changed-files card, its portaled detail, and the host’s to-bottom bu
   // where that value is inherited — read, never redefined, so it is not the cycle the snapshot avoids.
   const header = /\[data-changed-files\] \[class\*="_header"\]\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
   assert.ok(header.includes('var(--changes-fill'), `the card header is dialled from the host's own fill: ${header}`);
-  assert.ok(header.includes('--glass-diff'), `…and rides the same diff dial as the body it belongs to: ${header}`);
+  assert.ok(header.includes('--glass-chip'), `…and rides the same 产物栏 dial as the body it belongs to: ${header}`);
   assert.ok(css.includes('[data-changed-files] [class*="_header"]:hover'), 'its hover keeps giving feedback');
   // The diff paper's ROWS: four plates of their own, all on the DIFF dial, in the column AND again on the portaled
   // detail (a token override on the column cannot reach a card portaled to the body). Paired explicitly, because the

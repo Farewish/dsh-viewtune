@@ -1061,12 +1061,17 @@
 /* The selected tab sits a step above the others on the same dial, so one control moves both. */
 .root[data-reader-glass] .diffTab[data-active] { background: color-mix(in srgb, var(--dsw-alias-bg-base, rgba(255,255,255,1)) calc(var(--glass-diff, 20%) + 25%), transparent); }
 /* One chip carries a plate of its own in the base look — the deliverable chip in a turn's product
-   row — so it is the one the 产物标签 dial owns, and the only chip that is always on screen. The
+   row — so it is the one the 产物栏 dial owns, and the only chip that is always on screen. The
    compaction pill has a plate too, so it rides with the cards.
    Two chips are deliberately absent: the tool-state label (「执行中」 and friends) and the `+N -M`
    count have NO resting background in the base look — they are text, and the count only shows a wash
    while hovered or focused. A "transparency" dial that gave either of them one would be inventing a
-   surface rather than letting one show through, which is why they are not wired to any dial at all. */
+   surface rather than letting one show through, which is why they are not wired to any dial at all.
+
+   「产物栏」 owns the 编辑栏 AND the 交付栏, in every display mode, as the reader ruled — so the pills
+   below are joined by the balanced boxes, the cards mode's list card, and the card-shaped chips
+   (a turn's file tiles and its delivered files). All of them read the dial ON the element that
+   paints the plate: the base rules keep their opaque look, and these only apply under the skin. */
 .root[data-reader-glass] .deliverableChip {
   background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-border-l2, rgba(128,128,128,.22)) var(--glass-chip, 0%), transparent);
@@ -1074,6 +1079,31 @@
      should is the reader's call rather than this file's. */
   -webkit-backdrop-filter: blur(var(--glass-blur-chip));
   backdrop-filter: blur(var(--glass-blur-chip));
+}
+/* 平衡档的两个框（编辑栏 / 交付栏）：框自己就是一块板 ✓，所以它跟着**产物栏**档走 ✓（从前跟着「卡片与面板」✗）。 */
+.root[data-reader-glass] .deliverablesBox {
+  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)) var(--glass-chip, 0%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) var(--glass-chip, 0%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-chip));
+  backdrop-filter: blur(var(--glass-blur-chip));
+}
+/* 卡片档的**列表卡**（编辑栏）：宿主把它的底色写死成 `--deliverable-fill` ✓，所以只能读它、不能换它 ✓
+   （与对话页那张卡同一套做法 ✓），再乘上**产物栏**档的百分比 ✓。 */
+.root[data-reader-glass] .changedCard {
+  background: color-mix(in srgb, var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)) var(--glass-chip, 0%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) var(--glass-chip, 0%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-chip));
+  backdrop-filter: blur(var(--glass-blur-chip));
+}
+/* 卡片档里所有**卡形**条目（交付卡与文件磁贴）：同一个来源色 ✓、同一个档 ✓。 */
+.root[data-reader-glass] .deliverableChip[data-style=card] {
+  background: color-mix(in srgb, var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)) var(--glass-chip, 0%), transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) var(--glass-chip, 0%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-chip));
+  backdrop-filter: blur(var(--glass-blur-chip));
+}
+.root[data-reader-glass] .deliverableChip[data-style=card]:hover {
+  background: color-mix(in srgb, var(--deliverable-hover, var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover))) var(--glass-chip, 0%), transparent);
 }
 .root[data-reader-glass] .compactionPill {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) var(--glass-card, 0%), transparent);

@@ -79,7 +79,12 @@ export const GLASS_PARTS: readonly GlassPart[] = [
     id: 'scrollbar', label: '滚动条槽位', property: '--glass-scrollbar', initial: 20,
   },
   {
-    id: 'chip', label: '产物标签', property: '--glass-chip', initial: 35,
+    // 「产物栏」—— the reader renamed this dial (it was 「产物标签」) and ruled that it owns BOTH product rows: the reading
+    // view's 编辑栏 and 交付栏 in all three display modes, and the conversation page's two product cards (the host's
+    // changed-files list and its per-file deliverable cards). The id stays `chip` on purpose: it is the key in the stored
+    // record, so renaming it would silently reset everyone's value to the initial.
+    id: 'chip', label: '产物栏', property: '--glass-chip', initial: 35,
+    hint: '阅读页的编辑栏与交付栏、对话页那两张产物卡',
     blur: { property: '--glass-blur-chip', initial: 5 },
   },
   {

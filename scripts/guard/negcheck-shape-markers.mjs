@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the 产物栏 label renamed in code, so the settings row the reader asked for stops existing',
+    // The dial's LABEL is what the reader named; its id stays `chip` (the stored-record key) on purpose. A one-character
+    // change is enough — the guard pins the label, and nothing else in the plugin would notice it had gone.
+    search: '产物栏',
+    replace: '产物拦',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the guide kind misspelled, so a lone 「开始」 page stops being recognised and is never replaced',
     // The guide tab's kind is the short string the sidebar package declares (`const GUIDE_KIND = "guide"`); comparing it
     // against anything else never matches. That is exactly the bug this mechanism shipped with first — it compared the

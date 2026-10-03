@@ -33,11 +33,14 @@ test('the properties the stylesheet reads are one per part, in percent', () => {
   assert.equal(style['--glass-chip'], '15%');
   // …and a part the record says nothing about carries the initial the shipped defaults are made of.
   assert.equal(style['--glass-card'], `${String(GLASS_PARTS.find(part => part.id === 'card')?.initial ?? -1)}%`);
-  // The counting pills got a dial of their own rather than riding 产物标签: they are the two counters a
-  // reader sees on EVERY turn, while the chips are one turn's deliverables. Checked by name because the
+  // The counting pills got a dial of their own rather than riding 产物栏: they are the two counters a
+  // reader sees on EVERY turn, while the product rows are one turn's deliverables. Checked by name because the
   // stylesheet in TurnMetrics.module.css is what reads it, and that module is not this one.
   assert.ok(isGlassPart('pill'));
   assert.equal(style['--glass-pill'], `${String(GLASS_PARTS.find(part => part.id === 'pill')?.initial ?? -1)}%`);
+  // 产物栏 is the reader's rename of the former 产物标签 dial, and it kept its id: the id is the key in the stored record, so
+  // renaming it would silently reset every reader's value to the initial. Pinned because that is easy to "tidy up" later.
+  assert.equal(GLASS_PARTS.find(part => part.id === 'chip')?.label, '产物栏');
 });
 
 test('the part ids are the closed set the settings rows and the store agree on', () => {
