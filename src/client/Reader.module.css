@@ -533,6 +533,12 @@
 .changedCardChevron, .changedCardChevronOpen { flex: none; color: var(--dsw-alias-label-tertiary); transition: transform 120ms ease; }
 .changedCardChevronOpen { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .changedCardChevron, .changedCardChevronOpen { transition: none; } }
+/* 提交**单开一行** ✓（读者要求：不在"产物"那一行里 ✓）：左边「提交 N」标签 ✓、右边哈希气泡 ✓，三档共用 ✓。
+   它挂在根栅格上 ⇒ 必须**跨满**（根在简略档是「标签 + 内容」两列 ✓），否则会落进第一列 ✓。 */
+.commitsRow { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: 6px; }
+.commitsLabel { flex: none; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; display: inline-flex; align-items: center; gap: 4px; }
+.commitsCount { color: var(--dsw-alias-label-quaternary, var(--dsw-alias-label-tertiary)); font-size: 11px; }
+.commitsList { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
