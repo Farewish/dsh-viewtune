@@ -788,12 +788,16 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   const flat = groups.edited;
   // 三个区域：**编辑**（这一轮动过的文件）、**交付**（我交给你的文件 = 宿主的 `presented`，分享包在这里）与**提交**
   //（这一轮的 git 提交 —— 它单独是一个功能，默认关，开关在「小功能」里）。区域只在有条目时渲染。
-  // **提交不在这三个区域里** ✓：读者要求它**单开一行** ✓（不在"产物"那一行/那一堆框里 ✓），所以它由下面那个
-  // `commitsRow` 渲染 ✓ —— 三档共用同一行 ✓，位置与样子一致 ✓；这里的 `regions` 只留下要在产物区里成框的两项 ✓。
   const regions = [
     { id: 'edited', label: '编辑', hint: '这一轮改过的文件', kind: 'files' as const, count: groups.edited.length },
     { id: 'delivered', label: '交付', hint: '这一轮交给你的文件', kind: 'delivered' as const, count: groups.delivered.length },
+    ...(recordCommits && groups.commits.length > 0
+      ? [{ id: 'commits', label: '提交', hint: '这一轮做过的 git 提交', kind: 'commits' as const, count: groups.commits.length }]
+      : []),
   ];
+  // 详细卡片档里的「提交」要**复用平衡档那个框** ✓（读者要求 ✓），所以这里把它的区域描述取出来一份 ✓ —— 只在这个
+  // 开关打开且真有提交时存在 ✓，其余情况为 undefined ✓（框也就不渲染 ✓）。
+  const commitsRegion = regions.find(region => region.kind === 'commits');
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
   // 「共 x 项编辑」点击展开的总差异面板 ✓（读者要的：悬停或点击都能看 ✓），以及面板里哪些文件的差异被展开了 ✓。
@@ -925,17 +929,27 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                 </div>
               </div>
             )}
+            {/* 提交：**直接复用平衡档那个框** ✓（读者要求「样式换成平衡档那样的，直接复用」✓）—— 框头、展开开关、
+                气泡、底色与档位全都与平衡档同一份实现 ✓，所以两边不会各自漂移 ✓。 */}
+            {commitsRegion !== undefined && (
+              <DeliverablesBox region={commitsRegion} open={boxOpen[commitsRegion.id] === true}
+                onToggle={() => { setBoxOpen(current => ({ ...current, [commitsRegion.id]: current[commitsRegion.id] !== true })); }}>
+                {groups.commits.map((commit, index) => (
+                  <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
+                    {commit.hash ?? commit.subject}
+                  </span>
+                ))}
+              </DeliverablesBox>
+            )}
           </div>
         )}
       </div>
-      {/* **提交单开一行** ✓（读者要求：不要在"产物"那一行里 ✓）—— 三个档位共用这一行 ✓：左边「提交 N」标签 ✓，
-          右边同一串哈希气泡 ✓。开关关着、或这一轮没有提交时，整行不渲染 ✓。 */}
-      {recordCommits && groups.commits.length > 0 && (
+      {/* **简略档**的提交**单开一行** ✓ —— 读者报的正是这一档：提交的标签被放进了产物那一行里（不对 ✓），要单独一行 ✓。
+          这一行**只给简略档** ✓：平衡档与详细档各有自己的提交区（那两个框 ✓），本来就对 ✓，所以与它们无关 ✓（读者
+          点名「和其他的无关」✓）。开关关着、或这一轮没有提交时不渲染 ✓。 */}
+      {display === 'brief' && recordCommits && groups.commits.length > 0 && (
         <div className={css.commitsRow} title="这一轮做过的 git 提交">
-          <span className={css.commitsLabel}>
-            提交
-            <span className={css.commitsCount}>{groups.commits.length}</span>
-          </span>
+          <span className={css.commitsLabel}>提交</span>
           <div className={css.commitsList}>
             {groups.commits.map((commit, index) => (
               <span key={`${commit.hash ?? 'commit'}:${String(index)}`} className={css.deliverableCommit} title={commit.subject}>
