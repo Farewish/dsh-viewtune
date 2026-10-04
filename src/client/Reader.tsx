@@ -44,7 +44,7 @@ import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
-import { insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
+import { HISTORY_STEP_ATTEMPTS, historyStepTarget, insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -1982,30 +1982,27 @@ export function Reader(props: ReaderProps) {
           if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
           setHistoryNote(null);
           try {
-            // The NEAREST unloaded turn: the one just older than the loaded window. `loadThrough` pages until its target is
-            // covered, so one step back costs about one page.
-            const items = timelineItems;
-            let nearest: number | null = null;
-            for (let index = items.length - 1; index >= 0; index -= 1) {
-              const item = items[index]!;
-              if (item.anchor.kind === 'unloaded') { nearest = item.anchor.seq; break; }
-            }
-            // `loadThrough`, NOT `loadOlder` — and this is the measured reason, straight from the reader's console. Two
-            // facts, one conclusion:
-            //   · the failure comes from `loadOlder` itself. Its page shape (50 messages to a page, `HISTORY_PAGE_OPTIONS`)
-            //     puts an event that withdraws the "system-message" materialized "chat" target into a page, the node
-            //     assembler throws, and the error takes the EVENT FEED SUBSCRIBER with it;
-            //   · after that, `loadThrough` still resolves — the fallback logged its target and the code carried on — but it
-            //     lands nothing either, because the feed that would carry it is already gone.
-            // So calling `loadOlder` first poisons everything after it. `loadThrough` uses `JUMP_PAGE_OPTIONS` (200 messages
-            // to a page), which is exactly the shape the reader found working when they jumped far back by hand. Asking it
-            // DIRECTLY is therefore both the working path and the one that avoids the poison.
+            // Every unloaded sequence, ASCENDING (oldest first) — the ladder in `historyStepTarget` counts back from the end.
+            const unloadedSeqs: number[] = [];
+            for (const item of timelineItems) if (item.anchor.kind === 'unloaded') unloadedSeqs.push(item.anchor.seq);
             const renderableBefore = renderableRef.current;
-            if (nearest !== null && props.loadThrough) {
-              await props.loadThrough(nearest);
-            } else {
-              // No jump loader on this face: the older, poisoned-prone route is all there is.
-              await props.loadOlder();
+            let landed = false;
+            // Retry with a growing step. Not for flakiness: the platform failure below depends on whether the requested batch
+            // happens to CONTAIN an event that withdraws the "system-message" materialized "chat" target, and the batch a
+            // request produces depends on where `paginate` cuts. Both loaders die on it — measured, `loadOlder` (50-message
+            // pages) and `loadThrough` (200) alike — so the only lever left is which batch we ask for. The reader's own
+            // experience matches: jumping far back "sometimes" works, and then many loads succeed. `loadThrough` is used
+            // rather than `loadOlder` because it resolves through the same failure and reports it, while `loadOlder`'s own
+            // throw is what killed the feed in the first trace we got.
+            for (let attempt = 0; attempt < HISTORY_STEP_ATTEMPTS && !landed; attempt += 1) {
+              const target = historyStepTarget(unloadedSeqs, attempt);
+              if (target === null) break;
+              if (props.loadThrough) await props.loadThrough(target);
+              else { await props.loadOlder(); }
+              landed = renderableRef.current !== renderableBefore;
+              console.info('[dsh-better-display] history attempt', { attempt, target, landed, renderableTurns: renderableRef.current });
+              // A face without `loadThrough` has no ladder to walk: one press, one page.
+              if (!props.loadThrough) break;
             }
             // ALWAYS reveal. What a page brings in is OLDER turns, which land outside the folding window and are therefore
             // hidden: without this the fetch could succeed and the reader would still see nothing change, which is the
@@ -2013,8 +2010,7 @@ export function Reader(props: ReaderProps) {
             setRevealed(value => value + revealStepOf(foldWindow));
             // What CAN be seen, for the next report: whether the ask landed at all, and what the host still claims.
             console.info('[dsh-better-display] history step', {
-              asked: nearest, landed: renderableRef.current !== renderableBefore,
-              renderableTurns: renderableRef.current, hiddenTurns: hiddenTurnKeys.size,
+              landed, renderableTurns: renderableRef.current, hiddenTurns: hiddenTurnKeys.size,
               hasMore, loadingOlder, openState, state: olderHistoryState(hasMore),
             });
             if (olderHistoryState(hasMore) === 'exhausted') setHistoryNote('exhausted');

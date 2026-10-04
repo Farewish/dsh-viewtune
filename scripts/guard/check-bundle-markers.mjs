@@ -1123,6 +1123,11 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
+  // …and the press keeps trying with a GROWING step, because which batch survives the platform failure depends on where
+  // `paginate` cuts. Measured: both loaders die on it (`loadOlder` at 50-message pages and `loadThrough` at 200 alike), so
+  // the batch we ask for is the only lever. `historyStepTarget` is the ladder; the log label is what a report can quote.
+  ['the history step retries with a growing step instead of one doomed request', () =>
+    bundle.includes('historyStepTarget') && bundle.includes('[dsh-better-display] history attempt')],
   // …and when it runs, it must ask `loadThrough` BEFORE `loadOlder`. Measured from the reader's console: the platform's
   // "system-message withdrew materialized target" failure comes from `loadOlder`'s page shape and takes the event feed
   // subscriber with it, after which even `loadThrough` lands nothing. Calling `loadOlder` first is therefore self-poisoning,
