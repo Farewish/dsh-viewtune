@@ -1029,7 +1029,18 @@
 /* …and the JSON pane (JsonTree, which is what a tool's 「工具输入」 is) paints the LAYER colour rather than a code
    token. That one is a core theme token, so it cannot be redefined at the root: it is scoped to the two containers
    the tool content lives in, where the only layer-coloured surface is the pane itself. */
-:global(body) { --viewtune-layer-plate: var(--dsw-alias-bg-layer-1); }
+/* The code tokens' own SNAPSHOT, taken here for the same reason the layer plate's is: the reading view REDEFINES those two
+   tokens further down (on `.root`, for the skin), so the base colour has to be read from a different element — otherwise
+   the definition would refer to itself. The conversation page takes exactly this snapshot (`conversation-glass.ts`, which
+   is where these names come from), so both views now mix the SAME theme-aware base with the SAME dial.
+   Why it mattered: the reading view never defined these at all, so every rule that reads them fell through to the
+   hard-coded `rgba(0,0,0,.06)` fallback — a colour with no relation to the theme — which is why the same code card had
+   one colour on the conversation page and another here, and why the difference was worst in the dark theme. */
+:global(body) {
+  --viewtune-layer-plate: var(--dsw-alias-bg-layer-1);
+  --viewtune-code-plate: var(--dsw-alias-markdown-code-block);
+  --viewtune-code-banner: var(--dsw-alias-markdown-code-block-banner);
+}
 /* 宿主自己的产物卡颜色 ✓：`--deliverable-fill`（交付卡）与 `--changes-fill`（「已编辑 x 个文件」卡）**都由它挂在
    自己的根上** ✓ —— 对话页有，**阅读页没有** ✗ ⇒ 这里凡是以 `var(--deliverable-fill)` 取色的规则都会落到别的回退值上 ✓，
    这正是读者看到的"平衡档的卡片与详细档的卡片缺少底色" ✓，而对话页正常 ✓。

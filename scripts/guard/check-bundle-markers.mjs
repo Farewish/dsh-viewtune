@@ -1261,8 +1261,17 @@ const markers = [
     /\[data-reader-glass\]\{--dsw-alias-markdown-code-block:color-mix\(in srgb,\s*var\(--viewtune-code-plate/.test(bundle)
     && /--dsw-alias-markdown-code-block-banner:color-mix\(in srgb,\s*var\(--viewtune-code-banner/.test(bundle)],
   ['…and the JSON pane\'s layer colour, scoped to the tool content', () =>
-    /body\{--viewtune-layer-plate:var\(--dsw-alias-bg-layer-1\)\}/.test(bundle)
+    // `[^}]*` because this rule now also carries the code tokens' snapshots — same element, same reason, more values.
+    /body\{--viewtune-layer-plate:var\(--dsw-alias-bg-layer-1\)[^}]*\}/.test(bundle)
     && /--dsw-alias-bg-layer-1:color-mix\(in srgb,\s*var\(--viewtune-layer-plate/.test(bundle)],
+  // …and the code plate's base is snapshotted on that same body rule. The reader reported one code card in two different
+  // colours across the two views; the reading view read `--viewtune-code-plate` in its redefinition but never defined it,
+  // so every rule fell through to a hard-coded, theme-independent fallback. The snapshot must sit on a DIFFERENT element
+  // from the redefinition, or the definition would refer to itself — hence body. The `body{…}` anchor is what makes this
+  // probe specific to this view: the conversation page snapshots the same pair onto its own column, not onto body.
+  ['…and the code plate’s base is snapshotted there too', () =>
+    /body\{[^}]*--viewtune-code-plate:var\(--dsw-alias-markdown-code-block\)/.test(bundle)
+    && /body\{[^}]*--viewtune-code-banner:var\(--dsw-alias-markdown-code-block-banner\)/.test(bundle)],
   // The transcript's own lane carries the same radius now, so the groove is one shape wherever it appears: with the
   // host's 2px inset gone, the radius is what makes it a bar instead of a strip stopping dead at the surfaces above
   // and below it. Its `margin: 0` is part of the same rule and asserted with it.

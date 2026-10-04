@@ -110,8 +110,18 @@ const checks = [
     /\[data-reader-glass\]\{--dsw-alias-markdown-code-block:color-mix\(in srgb,\s*var\(--viewtune-code-plate/.test(css)
     && /--dsw-alias-markdown-code-block-banner:color-mix\(in srgb,\s*var\(--viewtune-code-banner/.test(css)],
   ["…and the JSON pane's layer colour only inside the tool content",
-    /body\{--viewtune-layer-plate:var\(--dsw-alias-bg-layer-1\)\}/.test(css)
+    // `[^}]*` because this rule now carries the code tokens' snapshots as well — same element, same reason, more values.
+    /body\{--viewtune-layer-plate:var\(--dsw-alias-bg-layer-1\)[^}]*\}/.test(css)
     && /--dsw-alias-bg-layer-1:color-mix\(in srgb,\s*var\(--viewtune-layer-plate/.test(css)],
+  // …and the CODE plate's base is snapshotted there too. The reader reported the same code card coming out in one colour on
+  // the conversation page and another here; the cause was that this view read `--viewtune-code-plate` in its redefinition
+  // below but never defined it, so every rule fell through to a hard-coded, theme-independent fallback. The snapshot has to
+  // be on a DIFFERENT element from the redefinition or the definition would refer to itself, which is why it lives on body.
+  // Checked HERE rather than in the bundle marker because this guard reads the reader's own stylesheet: the same two strings
+  // also appear on the conversation side of the bundle, so a bundle pin could not tell "this view lost it".
+  ["…and the code plate's base is snapshotted there too",
+    /body\{[^}]*--viewtune-code-plate:var\(--dsw-alias-markdown-code-block\)/.test(css)
+    && /body\{[^}]*--viewtune-code-banner:var\(--dsw-alias-markdown-code-block-banner\)/.test(css)],
   ["hidden only forces display", hasDecls(css, `${COLLAPSE}[hidden]`, ["display:inline-flex"])],
   ["hidden never hides by itself", !hasDecls(css, `${COLLAPSE}[hidden]`, ["visibility:hidden"])],
   [
