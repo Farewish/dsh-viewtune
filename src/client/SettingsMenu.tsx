@@ -16,6 +16,8 @@ import type { CollapseMode } from './collapse-mode.js';
 import { TURN_FOLD_MAX, turnFoldOf } from './turn-fold.js';
 import { DELIVERABLE_DISPLAYS, deliverableDisplayOf } from './deliverables.js';
 import type { DeliverableDisplay } from './deliverables.js';
+import { entryViewOf } from './entry-policy.js';
+import type { EntryView } from './entry-policy.js';
 import { TEXT_CADENCES, textCadenceOf } from './text-cadence.js';
 import type { TextCadence } from './text-cadence.js';
 import { FOLLOW_MODES, followModeOf } from './reading-scroll.js';
@@ -79,6 +81,8 @@ const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到�
 const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是全部保留';
 /** How the three ways of showing a turn's files differ, in the reader's own terms. */
 const DELIVERABLE_DISPLAY_HINT = '简略更紧凑，详细更像原生卡片';
+/** What the entry row changes, in the reader's own terms. */
+const ENTRY_VIEW_HINT = '新会话先打开哪一页';
 /** What the extra line buys, and that it only ever appears for a turn that committed. */
 const RECORD_COMMITS_HINT = '顺带列出这一轮的 git 提交';
 /** What the other switch changes, in the reader's own terms. */
@@ -135,7 +139,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, entryView, onEntryView, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -166,6 +170,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   /** How a turn's files are shown: 简略气泡 / 平衡 / 详细卡片. */
   deliverableDisplay: DeliverableDisplay;
   onDeliverableDisplay: (next: DeliverableDisplay) => void;
+  /** Which page a brand new session opens on; the caller passes what `entryViewOf` resolved. */
+  entryView: EntryView;
+  onEntryView: (next: EntryView) => void;
   /** Whether the reading view also lists the turn's git commits; off by default. */
   recordCommits: boolean;
   onRecordCommits: (next: boolean) => void;
@@ -458,6 +465,20 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
               <select className={css.settingsSelect} value={deliverableDisplay} aria-label="产物展示方式"
                 onChange={event => { onDeliverableDisplay(deliverableDisplayOf(event.currentTarget.value)); }}>
                 {DELIVERABLE_DISPLAYS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+              </select>
+            </div>
+            {/* Which page a BRAND NEW session opens on. Its own row because it is not about the reading view's contents but
+                about whether the reading view is entered at all: a session that has recorded no view yet is switched to
+                阅读页 (what this plugin has always done), and this is the switch that stops it. 阅读页 first so the shipped
+                default is the first option. */}
+            <div className={css.settingsRow} title={ENTRY_VIEW_HINT} data-ud-check="reader-settings-entry-view">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>新会话默认视图</span>
+              </span>
+              <select className={css.settingsSelect} value={entryView} aria-label="新会话默认视图"
+                onChange={event => { onEntryView(entryViewOf(event.currentTarget.value)); }}>
+                <option value="reader">阅读页</option>
+                <option value="conversation">对话页</option>
               </select>
             </div>
             {/* Its own feature, off by default: a commit is not a file, and the client only sees one when a tool call's

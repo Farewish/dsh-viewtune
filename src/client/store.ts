@@ -4,6 +4,7 @@ import type { ShortcutAction } from './shortcuts.js';
 import type { CollapseMode } from './collapse-mode.js';
 import type { DeliverableOpenMode } from './open-file.js';
 import type { DeliverableDisplay } from './deliverables.js';
+import type { EntryView } from './entry-policy.js';
 import type { TextCadence } from './text-cadence.js';
 import type { FollowMode } from './reading-scroll.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
@@ -62,6 +63,15 @@ export interface ReaderState {
    * opens with, and the other two are departures from it (the brief row says the least, the card says the most).
    */
   deliverableDisplay: DeliverableDisplay;
+  /**
+   * Which page a **brand new session** opens on — 「新会话默认视图」.
+   *
+   * Read through `entryViewOf`, which answers `reader` for anything unrecognised: that is what this plugin has always done
+   * (a session with no recorded view is switched to the reading view), so the setting can only turn that off. It applies to
+   * sessions that have recorded NO view at all: a session the reader has already chosen a tab in is never touched, and a
+   * `?reader` URL is an explicit request that outranks the setting.
+   */
+  entryView: EntryView;
   /**
    * Whether the reading view also lists the turn's **git commits**, beside the files it changed and delivered.
    *
@@ -211,6 +221,8 @@ type ReaderActions = {
   setDeliverableOpenMode: (draft: ReaderState, value: DeliverableOpenMode) => void;
   /** The reading view's deliverable presentation; the caller passes what `deliverableDisplayOf` resolved. */
   setDeliverableDisplay: (draft: ReaderState, value: DeliverableDisplay) => void;
+  /** Which page a brand new session opens on; the caller passes what `entryViewOf` resolved. */
+  setEntryView: (draft: ReaderState, value: EntryView) => void;
   /** Whether the row also lists the turn's git commits; off by default. */
   setRecordCommits: (draft: ReaderState, value: boolean) => void;
   /** Whether the 编辑 heading opens the host's changes review in the sidebar instead of the in-page panel. */
@@ -256,6 +268,9 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // …and its files are shown in the middle of the three ways: the row's density, both lists told apart, and the
       // full card one control away. See `deliverables.ts` for why the middle is where a fresh install opens.
       deliverableDisplay: 'balanced',
+      // …and a brand new session opens on the READING view, which is what this plugin has always done: the setting exists to
+      // turn that off (对话页), so the default must stay 阅读页 — see `entry-policy.ts`.
+      entryView: 'reader',
       // …and git commits are an opt-in line of their own, off until the reader asks for them (小功能 → 记录提交).
       recordCommits: false,
       // …and 「共 x 项编辑」 opens the reading view's own panel until the reader asks for the host's review instead: the
@@ -329,6 +344,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setCollapseMode: (draft, value: CollapseMode) => { draft.collapseMode = value; },
       setDeliverableOpenMode: (draft, value: DeliverableOpenMode) => { draft.deliverableOpenMode = value; },
       setDeliverableDisplay: (draft, value: DeliverableDisplay) => { draft.deliverableDisplay = value; },
+    setEntryView: (draft, value: EntryView) => { draft.entryView = value; },
       setRecordCommits: (draft, value: boolean) => { draft.recordCommits = value; },
       setReviewInSidebar: (draft, value: boolean) => { draft.reviewInSidebar = value; },
       setTextCadence: (draft, value: TextCadence) => { draft.textCadence = value; },

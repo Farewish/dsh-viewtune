@@ -1,6 +1,26 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ReaderEntryPolicy, readerEntryRequested } from '../src/client/entry-policy.js';
+import { entryViewOf, ReaderEntryPolicy, readerEntryRequested } from '../src/client/entry-policy.js';
+
+test('the reader’s setting decides which page a brand new session opens on', () => {
+  // 阅读页 is the shipped default and keeps the behaviour this plugin always had; 对话页 leaves the host's own view alone.
+  assert.equal(new ReaderEntryPolicy(false).select(null, 'reader'), 'reader');
+  assert.equal(new ReaderEntryPolicy(false).select(null, 'conversation'), null);
+  // A session that HAS recorded a view is never touched, whichever the setting says: that is the "do not fight a later tab
+  // choice" rule, and it is what keeps this setting from overriding the reader's own tabs.
+  const toConversation = new ReaderEntryPolicy(false);
+  for (const view of ['chat', 'trajectory', 'other-plugin']) assert.equal(toConversation.select(view, 'conversation'), null);
+  // …and `?reader` still wins over the setting, because it is an explicit request rather than a default.
+  assert.equal(new ReaderEntryPolicy(true).select('chat', 'conversation'), 'reader');
+});
+
+test('the stored entry-view setting resolves defensively, defaulting to the shipped 阅读页', () => {
+  assert.equal(entryViewOf('conversation'), 'conversation');
+  assert.equal(entryViewOf('reader'), 'reader');
+  // Anything unrecognised — absent, a stale value, a hand-edited file — resolves to the shipped default, so the setting can
+  // only turn the old behaviour off, never change what an existing reader sees.
+  for (const stored of [undefined, null, '', 'Reader', 'chat', 0, {}, []]) assert.equal(entryViewOf(stored), 'reader');
+});
 
 test('fresh sessions default to reading, without requiring a special URL', () => {
   const policy = new ReaderEntryPolicy(false);

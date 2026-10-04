@@ -25,6 +25,7 @@ import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllo
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
+import { entryViewOf } from './entry-policy.js';
 import type { CommitRecord, DeliveredFile, DeliverableDisplay, TurnChange } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -1499,6 +1500,9 @@ export function Reader(props: ReaderProps) {
   const foldBefore = props.useStore(state => turnFoldOf(state.collapseBefore));
   // How this view shows a turn's files — 「产物展示」: 简略气泡 / 平衡 / 详细卡片 (see deliverables.ts).
   const deliverableDisplay = props.useStore(state => deliverableDisplayOf(state.deliverableDisplay));
+  // …and which page a BRAND NEW session opens on (阅读页 by default, 对话页 on request). The entry slot reads this from the
+  // host's settings record rather than from this store — see `entry.tsx` — so this read is only for the settings row.
+  const entryView = props.useStore(state => entryViewOf(state.entryView));
   // …and whether the turn's git commits get a line of their own — a separate feature, off by default (小功能 → 记录提交).
   // The comparison sits OUTSIDE the selector, which is the shape the settings guard looks for: a default of false means an
   // absent key is off, so the reader has to say `=== true` (`state.recordCommits) === true`).
@@ -1881,7 +1885,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.5" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.6" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
@@ -1911,6 +1915,7 @@ export function Reader(props: ReaderProps) {
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
           collapseBefore={foldBefore} onCollapseBefore={props.actions.setCollapseBefore}
           deliverableDisplay={deliverableDisplay} onDeliverableDisplay={props.actions.setDeliverableDisplay}
+          entryView={entryView} onEntryView={props.actions.setEntryView}
           recordCommits={recordCommits} onRecordCommits={props.actions.setRecordCommits}
           reviewInSidebar={reviewInSidebar} onReviewInSidebar={props.actions.setReviewInSidebar}
           wallpaper={wallpaperName} wallpaperDim={wallpaperDim}

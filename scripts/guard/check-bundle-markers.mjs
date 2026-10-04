@@ -1093,6 +1093,14 @@ const markers = [
     // instead of an opaque fill.
     && bundle.includes('deliverableCommitCopied')
     && bundle.includes('复制提交')],
+  // 新会话默认视图: a session that has recorded NO view opens on the reading view (the shipped behaviour, so the setting can
+  // only turn it OFF) or on the host's conversation view, as the reader chose. Both halves are pinned — the settings row
+  // itself, and the compiled rule that consults the setting — because the entry slot reads it from the HOST record rather
+  // than from the reader's own store, and that is the half that could silently stop working.
+  ['a brand new session opens on the page the reader chose', () => bundle.includes('新会话默认视图')
+    && bundle.includes('entryViewOf')
+    && bundle.includes('reader-settings-entry-view')
+    && bundle.includes('defaultView === "reader"')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

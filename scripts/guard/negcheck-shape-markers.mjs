@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the entry-view setting stops recognising 阅读页, so a reader who chose it silently lands on the conversation page',
+    // The rule consults the setting for a session that has recorded no view; if the value it compares against is no longer
+    // the stored one, every fresh session falls through to the host's view — the setting would look saved and do nothing.
+    search: 'defaultView === "reader"',
+    replace: 'defaultView === "READER"',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the commit bubble’s copy helper removed, so the hash the reader needs cannot be taken from the row',
     // The bubble has two jobs — recognising the commit (the label) and using it (the clipboard). Losing the clipboard half
     // leaves a message you can read but nothing you can paste.
