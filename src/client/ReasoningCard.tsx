@@ -99,7 +99,12 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    */
   const ownGrowthAt = useRef(performance.now());
   const lastOwnHeight = useRef(-1);
-  const allowed = following && active && motion && !selected && reasoningMode !== 'manual';
+  // `motion` is deliberately NOT part of this. It decides HOW the card follows — a glide while the reader keeps 动效 on, a
+  // direct jump to the newest line when they turn it off (the follow loop's own comment says exactly that: "动效关 … the
+  // first read IS the target and nothing is scheduled"). Treating it as "the feature is off" is the bug the reader found:
+  // they switched 动效 off to test scroll jank and 「跟随最新」 silently stopped working — and so did its own button below.
+  // A cosmetic switch must not turn off a reading behaviour.
+  const allowed = following && active && !selected && reasoningMode !== 'manual';
 
   /**
    * The focus is REQUESTED here and granted above.
@@ -699,7 +704,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       </div>
     </div>
     {(overflow || expanded) && <div className={css.reasonFooter} data-ud-check="reasoning-controls">
-      {active && motion ? <button type="button" className={css.reasonAction} disabled={selected} aria-controls={controls}
+      {/* The control belongs to the FOLLOWING, not to the animation: pausing is just as meaningful when the card jumps to
+          the newest line directly, which is what 动效 off does. Gating it on `motion` hid the button from exactly the
+          readers who had turned animation off — the other half of the bug above. */}
+      {active ? <button type="button" className={css.reasonAction} disabled={selected} aria-controls={controls}
         aria-label={following ? '暂停自动跟随思考' : '继续跟随最新思考'}
         title={selected ? '取消文字选择后可继续跟随' : undefined}
         onClick={() => { if (following) pause(); else { onRead(); setFollowing(true); } }}>

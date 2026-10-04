@@ -1123,6 +1123,13 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
+  // 「跟随最新」 must not be gated on 动效. `motion` decides HOW the card follows (glide, or a direct jump when the reader
+  // turns animation off); it is not "the feature is off". The reader found this by switching 动效 off to test scroll jank:
+  // the follow silently stopped, and the pause/resume button disappeared with it. The assertion is the gate itself, whose
+  // negated form is exactly the bug.
+  ['the reasoning card follows whether or not animation is on', () =>
+    bundle.includes('const allowed = following && active && !selected && reasoningMode !== "manual"')
+    && !bundle.includes('const allowed = following && active && motion &&')],
   // The reading view renders only what is near the viewport. The reader's evidence put the scroll cost on RENDERED volume
   // (folding off and everything drawn scrolls badly; folding on and little drawn is smooth), and the folding window cannot
   // cover the worst case — it hides OLDER turns, while a reader near the front is under pressure from the NEWER turns behind

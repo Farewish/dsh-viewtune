@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the reasoning card’s follow gated on the animation switch again, so 动效 off silently ends the following',
+    // The exact bug the reader found, restored in the artifact: the feature switches off with a cosmetic setting.
+    search: 'const allowed = following && active && !selected',
+    replace: 'const allowed = following && active && motion && !selected',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the viewport-proximity rendering dropped, so every loaded turn is laid out and painted again',
     // Without it a fully loaded session goes back to laying out and painting every turn, which is the scroll cost the reader
     // measured: excluding the turns that are off screen, in both directions.
