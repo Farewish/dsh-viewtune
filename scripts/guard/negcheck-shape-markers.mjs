@@ -259,6 +259,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the window-growth rule for a folded jump renamed, so the rail can only jump to what is already rendered',
+    // Without it a jump into a folded turn loads the records and then has no row to land on — the reported "只能跳到已加载的地方".
+    search: 'revealForTurn',
+    replace: 'REVEALFORTURN',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the rail’s turn spy stops re-running on the folded window, so it pins at the window’s oldest turn again',
     // The effect caches its row list; 自动折叠 changes which rows exist without adding a turn, so without this dependency the
     // cache goes stale and the rail reports the window's edge — the reported "a threshold of 3 leaves it on 倒数第 3".

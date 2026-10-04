@@ -44,7 +44,7 @@ import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
-import { insideWindow, loadOlderOutcome, renderedTurnsOf, revealStepOf, turnFoldOf } from './turn-fold.js';
+import { insideWindow, loadOlderOutcome, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -1844,6 +1844,15 @@ export function Reader(props: ReaderProps) {
   // replaces the request instead of queueing behind the first.
   useLayoutEffect(() => {
     if (pendingReveal === null) return;
+    // A turn the folding window hides has NO ROW, so landing on it cannot succeed however many times this retries — the
+    // window has to grow first. That is the whole reason the rail "could only jump to already-loaded places": the load
+    // brought the records in, and the fold kept them unrendered. Growing it is idempotent, so this pass grows and returns,
+    // and the next pass (this effect re-runs on every commit) lands.
+    const targetIndex = groups.findIndex(group => group.turn === pendingReveal);
+    if (targetIndex >= 0 && hiddenTurnKeys.has(groups[targetIndex]!.key)) {
+      setRevealed(current => revealForTurn(targetIndex, groups.length, foldWindow, current));
+      return;
+    }
     if (revealTurn(pendingReveal)) { setPendingReveal(null); return; }
     if (performance.now() > pendingRevealUntil.current) {
       setPendingReveal(null);

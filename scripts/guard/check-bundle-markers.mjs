@@ -1133,6 +1133,11 @@ const markers = [
   // which rows exist.
   ['the rail’s turn spy re-runs when the folded window changes', () => bundle.includes('[turnSignature, renderedTurns]')
     && bundle.includes('observe(content)')],
+  // A rail jump into a FOLDED turn must grow the window before it can land. The load succeeds — `loadThrough` brings the
+  // records in — but landing means finding the row, and a turn the window hides has none, so the jump silently timed out.
+  // That is the reader's "只能跳到已加载的地方", next to the conversation page's rail working: the host has no folding.
+  ['a jump into a folded turn grows the window instead of timing out', () => bundle.includes('revealForTurn')
+    && bundle.includes('hiddenTurnKeys.has(groups[targetIndex]')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

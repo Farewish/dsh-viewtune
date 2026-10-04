@@ -53,6 +53,23 @@ export function insideWindow(index: number, total: number, rendered: number): bo
 }
 
 /**
+ * How much must be revealed for the turn at `index` to be RENDERED — the reader's own jump, and the reason it used to fail.
+ *
+ * The rail can navigate to any turn in the log, and for one outside the window the load does succeed: `loadThrough` brings
+ * the records in. The jump still could not land, because landing means finding the row — `[data-reader-turn="…"]` — and a
+ * turn the folding window hides has no row at all. So navigation has to grow the window first, and this is by how much:
+ * the window is a count from the TAIL, so the turn at `index` is inside it exactly when `total - 1 - index < rendered`.
+ *
+ * Returns the value `revealed` needs (`0` when the window already covers it, or when the setting is off). The caller takes
+ * the MAXIMUM with what the reader has already revealed, so a jump never hides anything they had opened by hand.
+ */
+export function revealForTurn(index: number, total: number, window: number, revealed: number): number {
+  if (window <= 0 || index < 0 || index >= total) return revealed;
+  const needed = total - index - window;
+  return needed <= revealed ? revealed : needed;
+}
+
+/**
  * What one press of 「加载更早记录」 actually achieved — the outcome of a load whose failure mode is SILENCE.
  *
  * The host's loader resolves without doing anything in several cases: `hasMore` false, its own re-entrancy flag still set,
