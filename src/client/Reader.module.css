@@ -959,8 +959,19 @@
 /* 「继续执行目标」 and its nine siblings: the host's `turn-trigger` record, which is why this turn exists at all. The
    plate, the token and the structure follow the conversation page's own `TurnTriggerNodeView` — a button header with the
    family icon, the title, the time and a chevron that turns, then the explanation and the notification. */
-.turnTrigger { box-sizing: border-box; border: .5px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-turn-trigger-bg, var(--dsw-alias-markdown-code-block)); min-width: 0; transition: background-color .1s; }
-.turnTrigger:hover { background: var(--dsw-alias-turn-trigger-bg-hover, var(--dsw-alias-interactive-bg-hover)); }
+/* A TEXT highlight, not a button one — the reader's own choice, offered after this control looked truncated.
+ *
+ * The plate was the problem twice over. A filled rectangle has edges, so anything that layout or containment does to the
+ * box shows up as a cut-off button rather than as a subtly different label; and the reader's alternative is simply nicer
+ * for a row whose job is to describe what happened below it. So the plate and its hairline are gone, and hovering lifts the
+ * TEXT instead: the row's own colour plus the two labels inside it, which carry colours of their own.
+ *
+ * The skin's dial still paints nothing here; `--dsw-alias-turn-trigger-bg` is left unused by this rule rather than deleted,
+ * because the same token is what the conversation page's own trigger reads. */
+.turnTrigger { box-sizing: border-box; border: 0; border-radius: 12px; min-width: 0; transition: color .1s; }
+.turnTrigger:hover { color: var(--dsw-alias-label-primary); }
+.turnTrigger:hover .turnTriggerTitle { color: var(--dsw-alias-label-primary); }
+.turnTrigger:hover .turnTriggerIcon, .turnTrigger:hover .turnTriggerTime, .turnTrigger:hover .turnTriggerChevron, .turnTrigger:hover .turnTriggerChevronOpen { color: var(--dsw-alias-label-secondary); }
 .turnTriggerHeader { box-sizing: border-box; width: 100%; color: inherit; font: inherit; text-align: left; background: 0 0; border: 0; cursor: pointer; align-items: center; gap: 8px; padding: 8px 12px; display: flex; }
 .turnTriggerHeader:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 12px; }
 .turnTriggerIcon { flex: none; color: var(--dsw-alias-label-tertiary); display: inline-flex; }
