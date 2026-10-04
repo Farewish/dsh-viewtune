@@ -57,3 +57,27 @@ test('mergeTimelineItems prioritizes loaded anchors and preserves deliverable fl
   assert.equal(items[1].anchor.kind, 'unloaded');
   assert.equal(items[1].hasDeliverables, false);
 });
+
+test('a turn present in the node store is loaded even when the windowed navigation omits it', () => {
+  // The host's turn navigation is a WINDOW: once a turn falls outside it, the list stops naming it while its records are
+  // loaded and rendered all the same. Trusting the list alone marked such turns `unloaded`, and that misfiling showed up as
+  // two bugs: clicking the rail at one asked to load something already present (a silent no-op), and the reading view
+  // re-offered its "load everything" escape hatch after everything had been loaded.
+  const outline = [
+    { turn: 1, seq: 100, prompt: 'one', response: 'first' },
+    { turn: 2, seq: 200, prompt: 'two', response: 'second' },
+    { turn: 3, seq: 300, prompt: 'three', response: 'third' },
+  ];
+  const windowsNavigation = [{ turn: 2, anchorKey: 'nav-2', prompt: 'two', response: 'second' }];
+  const fromNodeStore = new Map<number, string>([[2, 'store-2'], [3, 'store-3']]);
+
+  const withoutStore = mergeTimelineItems(windowsNavigation, outline, undefined);
+  assert.equal(withoutStore[0]!.anchor.kind, 'unloaded', 'turn 1 is neither in the window nor in the store');
+  assert.equal(withoutStore[2]!.anchor.kind, 'unloaded', 'turn 3 fell out of the window and nothing else knows it');
+
+  const withStore = mergeTimelineItems(windowsNavigation, outline, undefined, fromNodeStore);
+  assert.equal(withStore[0]!.anchor.kind, 'unloaded');
+  assert.equal(withStore[1]!.anchor.kind, 'loaded', 'the window names turn 2 as well');
+  assert.equal(withStore[2]!.anchor.kind, 'loaded', 'the STORE is what proves turn 3 is loaded');
+  assert.equal(withStore[2]!.anchor.kind === 'loaded' && withStore[2]!.anchor.key, 'store-3', 'and it carries the store key');
+});

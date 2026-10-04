@@ -25,11 +25,18 @@ interface LoadedTurnNavigationItem {
 /**
  * Merge host turn outline with loaded navigation items and turn deliverables.
  * Guarantees strictly ascending turn order and dedupes entries.
+ *
+ * `rendered` is what the NODE STORE holds, keyed by turn number: the host's turn navigation is a WINDOW, so it stops
+ * naming turns as soon as they fall outside it — while the records for them are loaded and rendered all the same. Trusting
+ * the navigation alone therefore marked loaded turns as `unloaded`, which produced two visible bugs: clicking the rail at
+ * such a turn asked to load something already present (a silent no-op), and the reading view's history button decided there
+ * was more to fetch and re-offered its "load everything" escape hatch after everything had been loaded.
  */
 export function mergeTimelineItems(
   loaded: readonly LoadedTurnNavigationItem[] | undefined,
   outline: unknown,
   turnsWithDeliverables?: ReadonlySet<number>,
+  rendered?: ReadonlyMap<number, string>,
 ): readonly TimelineItem[] {
   const byTurn = new Map<number, TimelineItem>();
 
@@ -40,13 +47,15 @@ export function mergeTimelineItems(
       const entry = raw as RawOutlineEntry;
       if (typeof entry.turn !== 'number' || !Number.isSafeInteger(entry.turn) || entry.turn < 0) continue;
       if (typeof entry.seq !== 'number' || !Number.isSafeInteger(entry.seq) || entry.seq < 0) continue;
+      const renderedKey = rendered?.get(entry.turn);
 
       byTurn.set(entry.turn, {
         turn: entry.turn,
         prompt: typeof entry.prompt === 'string' ? entry.prompt.trim() : '',
         response: typeof entry.response === 'string' ? entry.response.trim() : '',
         hasDeliverables: turnsWithDeliverables?.has(entry.turn) ?? false,
-        anchor: { kind: 'unloaded', seq: entry.seq },
+        // Present in the node store = loaded, whatever the windowed navigation list says.
+        anchor: renderedKey === undefined ? { kind: 'unloaded', seq: entry.seq } : { kind: 'loaded', key: renderedKey },
       });
     }
   }

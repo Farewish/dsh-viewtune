@@ -1807,10 +1807,19 @@ export function Reader(props: ReaderProps) {
     return set;
   }, [timeline]);
 
-  // 4. Merged timeline items for the rail
+  // 4. What the NODE STORE holds, by turn number — the ground truth for "is this turn loaded", which the host's windowed
+  // navigation list cannot answer. Passed to the merge below so the rail and the history button stop calling loaded turns
+  // unloaded (that misfiling is what made a rail jump into a loaded turn do nothing, and what re-offered the "load
+  // everything" escape hatch after everything had already been loaded).
+  const renderedTurnKeys = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const group of groups) if (typeof group.turn === 'number') map.set(group.turn, group.key);
+    return map;
+  }, [groups]);
+  // 5. Merged timeline items for the rail
   const timelineItems = useMemo(
-    () => mergeTimelineItems(turnNavigationItems, turnOutline, turnsWithDeliverables),
-    [turnNavigationItems, turnOutline, turnsWithDeliverables],
+    () => mergeTimelineItems(turnNavigationItems, turnOutline, turnsWithDeliverables, renderedTurnKeys),
+    [turnNavigationItems, turnOutline, turnsWithDeliverables, renderedTurnKeys],
   );
   // There is deliberately NO "did the load make progress" measure here, because the platform offers none: the session
   // snapshot carries `hasMore`, `loadingOlder` and `openState` (measured from `SessionSnapshot` in the client runner) but
@@ -2003,9 +2012,10 @@ export function Reader(props: ReaderProps) {
               hasMore, loadingOlder, openState, state: olderHistoryState(hasMore),
             });
             // `landed` is trustworthy: the rendered turns come from the host's node store, so a page that arrives grows it.
-            // Nothing arrived and the host still claims more ⇒ the platform's prepend failure, which this view cannot walk
-            // around (see above) and which the reader deserves to be told about plainly instead of watching nothing happen.
-            if (!landed && olderHistoryState(hasMore) === 'more') setHistoryNote('blocked');
+            // `unloadedSeqs` is trustworthy now too — it comes from the same store, not from the windowed navigation list.
+            // Nothing arrived, the outline still holds turns the store does not, and the host still claims more ⇒ the
+            // platform's prepend failure, which this view cannot walk around and which the reader deserves to be told about.
+            if (!landed && unloadedSeqs.length > 0 && olderHistoryState(hasMore) === 'more') setHistoryNote('blocked');
             else if (olderHistoryState(hasMore) === 'exhausted') setHistoryNote('exhausted');
           } catch { setHistoryNote('failed'); }
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
@@ -2027,11 +2037,15 @@ export function Reader(props: ReaderProps) {
           if (oldest?.anchor.kind !== 'unloaded' || !props.loadThrough) return;
           setHistoryNote(null);
           try {
+            const renderableBefore = renderableRef.current;
             await props.loadThrough(oldest.anchor.seq);
             setRevealed(value => value + revealStepOf(foldWindow));
-            console.info('[dsh-better-display] load to earliest', { target: oldest.anchor.seq, renderableTurns: renderableRef.current, hasMore });
-            // Still claiming more means even this jump did not land: the same honest note, not a claim of success.
-            if (olderHistoryState(hasMore) === 'more') setHistoryNote('blocked');
+            const landed = renderableRef.current !== renderableBefore;
+            console.info('[dsh-better-display] load to earliest', { target: oldest.anchor.seq, landed, renderableTurns: renderableRef.current, hasMore });
+            // Success is decided by what ARRIVED, not by `hasMore`: the host can be left still claiming more (its final page's
+            // state never landed when the feed died), and gating on that is what kept re-offering this button after the
+            // reader had already loaded everything. Nothing arrived ⇒ the same honest note, never a claim of success.
+            if (!landed) setHistoryNote('blocked');
           } catch { setHistoryNote('failed'); }
         }}>一次性加载到最早（较慢）</button>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
