@@ -1217,6 +1217,10 @@ export function Reader(props: ReaderProps) {
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
   const openState = props.useSession(snapshot => snapshot.openState);
+  // `groups.length` is the ground truth for "did a history page land", and it is read through a ref because the click
+  // handler compares it across an `await`. (The session snapshot cannot answer this: it carries `hasMore`, `loadingOlder`
+  // and `openState` and no window edge — see the note by the button.)
+  const renderableRef = useRef(0);
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion) !== false;
@@ -1459,6 +1463,8 @@ export function Reader(props: ReaderProps) {
   const keyHint = (binding: string) => binding === '' ? '' : `（${shortcutLabel(binding)}）`;
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current, cadence: textCadence, blur: revealBlur, words: revealWords }), [motion, textCadence, revealBlur, revealWords]);
   const groups = useMemo(() => groupNodes(order, key => nodes.get(key)), [order, nodes, timeline]);
+  // The renderable turn count, kept in a ref for the history button's "did anything arrive" test (see its click handler).
+  renderableRef.current = groups.length;
   // A "conversation" here is one turn (the question plus its answer), so "收起" folds the
   // turn the reader is currently looking at — not every open turn on the page. The current
   // turn is the uppermost one in the viewport, decided by the same predicate the reading
@@ -1976,12 +1982,29 @@ export function Reader(props: ReaderProps) {
           if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
           setHistoryNote(null);
           try {
+            // Whether a page landed IS observable after all — just not through the session snapshot: the rendered turns come
+            // from the host's node store, so `groups.length` is the ground truth for "did anything arrive". Comparing it
+            // across the await is what lets this button notice the platform failure below.
+            const renderableBefore = renderableRef.current;
             await props.loadOlder();
+            // The platform failure this button can walk around, reported by the reader's console:
+            //   conversation Definition "system-message" withdrew materialized target "chat"; return the same key with
+            //   hidden visibility instead
+            // thrown inside the conversation node assembler while a page is prepended. It kills the event feed subscriber, so
+            // THAT page and every later `loadOlder` resolve without landing anything — the reader's 「卡住」 at a fixed turn.
+            // The rail's jump uses a different page shape (`loadThrough`, 200 messages to a page) and is not tripped by it,
+            // which is why the reader found that jumping far back sometimes works. So: when a press brings nothing, ask for
+            // the OLDEST turn the outline already knows about, which is the same request the rail's first item makes.
+            if (renderableRef.current === renderableBefore && hasMore && props.loadThrough) {
+              const oldest = timelineItems.find(item => item.anchor.kind === 'unloaded');
+              if (oldest?.anchor.kind === 'unloaded') {
+                console.warn('[dsh-better-display] loadOlder landed nothing; falling back to the jump page', { oldestSeq: oldest.anchor.seq });
+                await props.loadThrough(oldest.anchor.seq);
+              }
+            }
             // ALWAYS reveal. What a page brings in is OLDER turns, which land outside the folding window and are therefore
             // hidden: without this the fetch could succeed and the reader would still see nothing change, which is the
-            // reported 「卡住」. Revealing unconditionally is the honest version, because whether the page actually landed
-            // cannot be observed from here (see the note above); it costs nothing when nothing arrived, and it is the same
-            // step the rail's earliest item takes.
+            // reported 「卡住」. Revealing unconditionally is the honest version; it costs nothing when nothing arrived.
             setRevealed(value => value + revealStepOf(foldWindow));
             // What CAN be seen, for the next report. `hasMore` true with no visible growth is the signature of the loading
             // question, and these four numbers settle which side of the seam it is on. On screen only when it is certain:
