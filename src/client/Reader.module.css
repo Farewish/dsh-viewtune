@@ -68,7 +68,10 @@
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 4px var(--reader-inline-pad); border-bottom: .5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; background: var(--dsw-alias-bg-base); position: sticky; top: 0; z-index: 11; margin-top: calc(-1 * var(--reader-top-pad)); margin-inline: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw); padding-left: max(0px, calc(var(--reader-inline-pad) + 50cqw - 50% - var(--reader-toolbar-shift-left)));  padding-right: var(--reader-toolbar-gap-right, 1px); margin-right: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw + var(--reader-toolbar-end-right)); }
 .textButton, .historyButton, .iconButton, .jump, .disclosureButton, .imageOpen, .dialogClose { font: inherit; cursor: pointer; }
 .textButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
-.textButton:hover, .iconButton:hover, .disclosureButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.textButton:hover, .iconButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
+/* The process disclosure got a TEXT highlight instead of a button one (the reader's choice). It keeps the shared button
+ * behaviour above for everything else, and this override is what removes its plate: no plate, nothing to look cut off. */
+.disclosureButton:hover { background: transparent; color: var(--dsw-alias-label-primary); }
 .root button:focus-visible, .root summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
 .turn { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 /* Render only what is near the viewport — the browser's own version of it, one declaration, no JS.
@@ -146,6 +149,11 @@
 .blocks > :last-child { margin-bottom: 0; }
 .blocks :global(.md-table-wide) { max-width: 100%; }
 .disclosure { min-width: 0; }
+/* `margin-left: -6px` STAYS: it pulls the label's text edge back into line with the body beneath it, once the button's own
+ * 6px padding is accounted for. The reader asked for ONE change at a time — the text highlight, which is the option they
+ * recommended — so the other half, moving the button inwards, is deliberately not taken yet. It remains the next thing to
+ * try if the plate was not the whole reason this control looked truncated: the box reaching six pixels outside the turn is
+ * what paint containment on that turn would cut. */
 .disclosureButton { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; border: 0; background: transparent; border-radius: 7px; color: var(--dsw-alias-label-tertiary); font-size: 14px; line-height: 24px; font-weight: 400; padding: 4px 6px; margin-left: -6px; text-align: left; }
 .disclosure[data-reader-status-only] { display: flex; align-items: center; min-height: 32px; }
 .statusText { display: inline-flex; min-width: 0; max-width: 100%; font-size: 14px; line-height: 24px; font-weight: 400; color: var(--dsw-alias-label-secondary); }
