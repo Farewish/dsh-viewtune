@@ -1123,13 +1123,17 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
-  // A load of older history SAYS what it achieved. The host's loader has several silent no-op paths (`hasMore` false, its
-  // own re-entrancy flag, a generation that moved on), so a resolve that changed nothing is indistinguishable from a load
-  // that never ran — which is how the reader got a button that looked broken with nothing said. Pinned as the rule plus the
-  // two sentences that name the two silent outcomes.
-  ['a silent load of older history is reported instead of looking like a broken button', () => bundle.includes('loadOlderOutcome')
+  // Pressing 「加载更早记录」 must REVEAL unconditionally, and claim only what the host STATES. The host's loader has silent
+  // no-op paths (`hasMore` false, its re-entrancy flag, a generation that moved on) and the platform offers no window edge
+  // to tell "landed" from "dropped": `SessionSnapshot` carries `hasMore`, `loadingOlder` and `openState` and nothing more.
+  // Two progress proxies were tried and BOTH lied — a count of loaded turns (the host's turn navigation is windowed, so a
+  // successful load left it unchanged) and `baseSeq` (not on the snapshot at all) — and the first version therefore told
+  // the reader 「没能读到更早的记录」 while skipping the reveal, which is the reported 「卡住」. So the press reveals
+  // regardless (a fetched page lands OUTSIDE the folding window and would otherwise stay hidden), only 「已经是最早」 is
+  // ever said on screen, and the observable facts go to the console for the next report.
+  ['older history is revealed on every press, and only the certain case is claimed', () => bundle.includes('olderHistoryState')
     && bundle.includes('已经是最早的记录')
-    && bundle.includes('没能读到更早的记录')],
+    && bundle.includes('[dsh-better-display] loadOlder')],
   // The rail's reading of "which turn am I on" must re-run when the RENDERED WINDOW changes, not only when a turn is added.
   // 自动折叠 hides and reveals rows without adding a turn, so the effect's cached row list went stale and the rail stopped
   // at the folded window's oldest turn — the reader's report, in their own numbers (a threshold of 3 leaves it on 倒数第 3).

@@ -1,7 +1,7 @@
-/**
- * 「自动折叠更早的轮次」: the count, the window it decides, and the limit of what it can free.
+﻿/**
+ * 銆岃嚜鍔ㄦ姌鍙犳洿鏃╃殑杞銆? the count, the window it decides, and the limit of what it can free.
  *
- * Two things are worth pinning here. The first is that an unusable value means OFF — the behaviour every record
+ * Two things are worth pinning here. The first is that an unusable value means OFF 鈥?the behaviour every record
  * written before this setting existed already had, so nothing a reader already has can start hiding their history
  * because of an upgrade. The second is that the distance is measured from the TAIL and that the window is COMMITTED:
  * `renderedTurnsOf` is the number the view renders between two new turns, and `revealStepOf` only ever adds to it, so
@@ -9,17 +9,25 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { TURN_FOLD_MAX, insideWindow, loadOlderOutcome, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from '../src/client/turn-fold.ts';
+import { TURN_FOLD_MAX, insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from '../src/client/turn-fold.ts';
+
+test('what a load of older history can honestly be said to have achieved', () => {
+  // Two proxies were tried and BOTH lied, because the session snapshot carries no window edge: a count of loaded turns (the
+  // host's turn navigation is windowed, so a successful load left the count unchanged and the button called itself stuck)
+  // and `baseSeq` (not on the snapshot at all). So only what the host STATES is used, and the caller reveals unconditionally.
+  assert.equal(olderHistoryState(true), 'more', 'the host still claims older records 鈥?whether they arrived is not observable');
+  assert.equal(olderHistoryState(false), 'exhausted', 'the one certain case: there is nothing older');
+});
 
 test('a jump into a folded turn grows the window enough to render it', () => {
-  // The rail can navigate anywhere, and the LOAD succeeds — but a turn the window hides has no row, so the landing could
+  // The rail can navigate anywhere, and the LOAD succeeds 鈥?but a turn the window hides has no row, so the landing could
   // never happen however often it retried. This is by how much the window must grow; it counts from the TAIL.
-  assert.equal(revealForTurn(9, 10, 0, 0), 0, 'the setting is off — nothing to reveal');
+  assert.equal(revealForTurn(9, 10, 0, 0), 0, 'the setting is off 鈥?nothing to reveal');
   assert.equal(revealForTurn(9, 10, 3, 0), 0, 'the newest turn is inside a window of three');
-  assert.equal(revealForTurn(7, 10, 3, 0), 0, 'index 7 is the third from the tail — still inside');
+  assert.equal(revealForTurn(7, 10, 3, 0), 0, 'index 7 is the third from the tail 鈥?still inside');
   assert.equal(revealForTurn(6, 10, 3, 0), 1, 'the fourth from the tail needs one revealed');
   assert.equal(revealForTurn(0, 10, 3, 0), 7, 'the oldest needs seven');
-  // …and it never HIDES what the reader opened by hand: the answer is a floor, not a replacement.
+  // 鈥nd it never HIDES what the reader opened by hand: the answer is a floor, not a replacement.
   assert.equal(revealForTurn(6, 10, 3, 5), 5);
   assert.equal(revealForTurn(0, 10, 3, 5), 7);
   // Out-of-range or nonsensical input leaves the reader exactly where they were.
@@ -27,18 +35,7 @@ test('a jump into a folded turn grows the window enough to render it', () => {
   assert.equal(revealForTurn(10, 10, 3, 2), 2);
 });
 
-test('what a load of older history achieved, when the failure mode is silence', () => {
-  // The host's loader resolves WITHOUT doing anything when its `hasMore` is false, when its re-entrancy flag is still set,
-  // or when a generation moved on and the page was dropped. Before this the reader saw a button that looked broken and
-  // nothing else, so the outcome is now named: more turns is progress; nothing more is either the earliest record or a
-  // load that did not arrive, and only the host's own `hasMore` can tell those two apart.
-  assert.equal(loadOlderOutcome(12, 14, true), 'progress');
-  assert.equal(loadOlderOutcome(12, 12, false), 'exhausted', 'nothing more, and the host agrees there is nothing');
-  assert.equal(loadOlderOutcome(12, 12, true), 'stuck', 'nothing more while the host still claims more — the reported silence');
-  // …and a window that somehow shrank (a reload, a new session) is not progress either.
-  assert.equal(loadOlderOutcome(12, 3, true), 'stuck');
-  assert.equal(loadOlderOutcome(0, 0, false), 'exhausted');
-});
+
 
 test('an absent or unusable count is OFF, and a real one is clamped to the ceiling', () => {
   assert.equal(turnFoldOf(0), 0);
@@ -61,7 +58,7 @@ test('OFF renders everything, and a window renders the newest turns plus whateve
   assert.equal(renderedTurnsOf(0, 7), Number.POSITIVE_INFINITY);
   // Nothing revealed yet: exactly the setting.
   assert.equal(renderedTurnsOf(5, 0), 5);
-  // …and each press of the control adds one more band, never fewer turns than the setting promised.
+  // 鈥nd each press of the control adds one more band, never fewer turns than the setting promised.
   assert.equal(renderedTurnsOf(5, revealStepOf(5)), 10);
   assert.equal(renderedTurnsOf(5, revealStepOf(5) * 2), 15);
   // A negative revealed count cannot shrink the window, whatever a caller passes.
@@ -84,8 +81,9 @@ test('the window counts from the tail, so the same turn drifts out of it as the 
   // The same turn (the last one) is inside while the window is the whole conversation, and behind it afterwards.
   assert.equal(insideWindow(total - 1, total, 1), true);
   assert.equal(insideWindow(total - 1, total + 1, 1), false, 'a newer turn pushes it behind the threshold');
-  // A window larger than the conversation keeps everything — the clamp exists so a typo cannot hide the lot.
+  // A window larger than the conversation keeps everything 鈥?the clamp exists so a typo cannot hide the lot.
   for (let index = 0; index < total; index += 1) {
     assert.equal(insideWindow(index, total, TURN_FOLD_MAX), true);
   }
 });
+

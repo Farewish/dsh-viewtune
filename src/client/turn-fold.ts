@@ -70,21 +70,18 @@ export function revealForTurn(index: number, total: number, window: number, reve
 }
 
 /**
- * What one press of 「加载更早记录」 actually achieved — the outcome of a load whose failure mode is SILENCE.
+ * What a load of older history can be said to have achieved — and, honestly, what it cannot.
  *
  * The host's loader resolves without doing anything in several cases: `hasMore` false, its own re-entrancy flag still set,
- * or a generation that moved on so the page was dropped. A resolve that changed nothing is indistinguishable from a load
- * that never ran, and the reader was left with a button that looked broken and nothing said. So the caller counts the
- * loaded turns before and after:
+ * or a generation that moved on so the page was dropped. Distinguishing "the page landed" from "the page was dropped"
+ * needs the window's oldest sequence, and the session snapshot does not carry it (`hasMore`, `loadingOlder` and `openState`
+ * are all it offers), so both proxies that were tried lied: a count of loaded turns (the host's turn navigation is
+ * windowed, so a successful load left it unchanged) and `baseSeq` (not on the snapshot at all).
  *
- *   · more than before            → `progress`  (say nothing; the list grew)
- *   · no more, host says no more  → `exhausted` (the reader is at the earliest record)
- *   · no more, host says MORE     → `stuck`     (something above exists and did not arrive — worth naming, and retryable)
- *
- * The count rather than a sequence number, because it is the reader's own question: did anything new arrive? A page that
- * adds only messages inside a turn the reader already has is, from this control's point of view, no answer at all.
+ * What is left is only what the host STATES: with `hasMore` false there is certainly nothing older, and with it true
+ * something older exists and this call did not settle whether it arrived. The caller therefore reveals unconditionally —
+ * revealing costs nothing when nothing arrived — and says 「已经是最早」 only in the certain case.
  */
-export function loadOlderOutcome(before: number, after: number, hasMore: boolean): 'progress' | 'exhausted' | 'stuck' {
-  if (after > before) return 'progress';
-  return hasMore ? 'stuck' : 'exhausted';
+export function olderHistoryState(hasMore: boolean): 'exhausted' | 'more' {
+  return hasMore ? 'more' : 'exhausted';
 }

@@ -44,7 +44,7 @@ import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
-import { insideWindow, loadOlderOutcome, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
+import { insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -1216,6 +1216,7 @@ export function Reader(props: ReaderProps) {
   const openError = props.useSession(snapshot => snapshot.openError);
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
+  const openState = props.useSession(snapshot => snapshot.openState);
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion) !== false;
@@ -1805,12 +1806,13 @@ export function Reader(props: ReaderProps) {
     () => mergeTimelineItems(turnNavigationItems, turnOutline, turnsWithDeliverables),
     [turnNavigationItems, turnOutline, turnsWithDeliverables],
   );
-  // How many turns the host has actually loaded — the quantity 「加载更早记录」 is trying to grow. Read through a ref as
-  // well, because the click handler has to compare it across an `await`: the state it closed over is the one from the
-  // render that started the load, and the answer arrives in a later one.
-  const loadedTurns = useMemo(() => timelineItems.filter(item => item.anchor.kind === 'loaded').length, [timelineItems]);
-  const loadedTurnsRef = useRef(loadedTurns);
-  loadedTurnsRef.current = loadedTurns;
+  // There is deliberately NO "did the load make progress" measure here, because the platform offers none: the session
+  // snapshot carries `hasMore`, `loadingOlder` and `openState` (measured from `SessionSnapshot` in the client runner) but
+  // NOT the window's oldest sequence, so a plugin cannot tell "the page landed" from "the page was silently dropped".
+  // Two attempts were made and both lied: counting turns whose anchor read `loaded` (the host's turn navigation is
+  // windowed, so a successful load left it unchanged) and reading `baseSeq` (that field is not on the snapshot at all).
+  // So the press REVEALS unconditionally — revealing never hurts, and it is what makes the fetched turns visible — and
+  // the facts that CAN be seen are logged for the reader to send back.
 
   // 5. Active & busy turn tracking
   // Both are written by the single scroll spy above, so there is deliberately no second
@@ -1972,21 +1974,20 @@ export function Reader(props: ReaderProps) {
           // costs nothing and cannot fail. Only when nothing is left to reveal does this read older turns from disk —
           // the reader's own compromise (N rendered, the next band held in memory, anything older read on demand).
           if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
-          const before = loadedTurnsRef.current;
           setHistoryNote(null);
           try {
             await props.loadOlder();
-            // The host's loader has several silent no-op paths (see `loadOlderOutcome`): what it ACHIEVED is the only thing
-            // worth reporting, and comparing the loaded turn count across the await is how this view can see it.
-            const outcome = loadOlderOutcome(before, loadedTurnsRef.current, hasMore);
-            if (outcome === 'progress') {
-              // …and what it just loaded are OLDER turns, so they arrive OUTSIDE the folding window — hidden. Without this
-              // the press really did fetch them and the reader saw nothing change, which is the reported 「卡住」. Revealing
-              // one band is the same step this button already takes when the turns are in hand, and it is exactly what the
-              // rail's earliest item does (through `revealForTurn`), which the reader found working.
-              setRevealed(value => value + revealStepOf(foldWindow));
-              setHistoryNote(null);
-            } else setHistoryNote(outcome);
+            // ALWAYS reveal. What a page brings in is OLDER turns, which land outside the folding window and are therefore
+            // hidden: without this the fetch could succeed and the reader would still see nothing change, which is the
+            // reported 「卡住」. Revealing unconditionally is the honest version, because whether the page actually landed
+            // cannot be observed from here (see the note above); it costs nothing when nothing arrived, and it is the same
+            // step the rail's earliest item takes.
+            setRevealed(value => value + revealStepOf(foldWindow));
+            // What CAN be seen, for the next report. `hasMore` true with no visible growth is the signature of the loading
+            // question, and these four numbers settle which side of the seam it is on. On screen only when it is certain:
+            // the host says there is no more, so the reader is at the earliest record.
+            console.info('[dsh-better-display] loadOlder', { hasMore, loadingOlder, openState, state: olderHistoryState(hasMore), renderableTurns: groups.length, hiddenTurns: hiddenTurnKeys.size });
+            if (olderHistoryState(hasMore) === 'exhausted') setHistoryNote('exhausted');
           } catch { setHistoryNote('failed'); }
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
       {historyNote !== null && <div className={css.notice} role="status">

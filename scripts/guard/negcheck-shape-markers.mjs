@@ -274,11 +274,11 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
-    label: 'the outcome rule for loading older history renamed, so a silent load is silent again',
-    // Without this rule the caller cannot tell "there is nothing older" from "nothing arrived", and the reader is back to a
-    // button that does nothing and says nothing — which is exactly what was reported.
-    search: 'loadOlderOutcome',
-    replace: 'LOADOLDEROUTCOME',
+    label: 'the history-state rule renamed, so a press stops revealing what it fetched',
+    // Without this rule the button has no stated basis at all, and the reveal that makes a fetched page visible is the only
+    // thing standing between "it loaded" and the reader's 「卡住」.
+    search: 'olderHistoryState',
+    replace: 'OLDERHISTORYSTATE',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
