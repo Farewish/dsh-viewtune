@@ -71,6 +71,29 @@
 .textButton:hover, .iconButton:hover, .disclosureButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .root button:focus-visible, .root summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
 .turn { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Render only what is near the viewport — the browser's own version of it, one declaration, no JS.
+ *
+ * The reader's evidence decided this. With folding off, a fully loaded session scrolls badly; with folding on and few
+ * turns rendered, it is far smoother — so the cost is the RENDERED volume. And the folding window cannot cover the case
+ * that matters most: it hides OLDER turns, while a reader sitting near the front is under pressure from the NEWER turns
+ * behind them, which are never folded. `content-visibility: auto` skips layout and paint for the turns off screen in BOTH
+ * directions, which is exactly the shape of the problem.
+ *
+ * `contain-intrinsic-size` is what keeps the scrollbar honest while a turn is skipped, and its value only has to be in the
+ * right ballpark: `auto` makes the browser remember each turn's real size once it has been laid out at least once, so the
+ * estimate converges as the reader moves through the session.
+ *
+ * Two interactions were checked before this went in:
+ *   · jumping to a turn: a skipped turn reports its PLACEHOLDER box, so a landing that reads geometry once can be off. The
+ *     landing therefore writes its best estimate first and corrects on the next frame, by which time the target is near
+ *     enough to the viewport for the browser to have laid it out for real;
+ *   · the turn spy bisects a row list whose off-screen members now report that same placeholder box — always the same
+ *     size, so the comparison stays monotonic and the bisect still converges on the right neighbourhood, with the final
+ *     label read from a row that is on screen and therefore laid out. */
+.root .turn {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
 .turn + .turn { margin-top: 12px; }
 /* 用户气泡的**宽度与排版**全部照抄宿主自己那两条规则 ✓（`dsh-client-ui-chat` 的 `.userStack` / `.bubble` ✓，逐条量出来的 ✓）：
      .userStack { max-width: min(calc(var(--dsh-chat-content-width,748px) * .702), 82%) }

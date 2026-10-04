@@ -274,6 +274,16 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the viewport-proximity rendering dropped, so every loaded turn is laid out and painted again',
+    // Without it a fully loaded session goes back to laying out and painting every turn, which is the scroll cost the reader
+    // measured: excluding the turns that are off screen, in both directions.
+    // Written in the ARTIFACT's form, which is what this mutation rewrites, and with a replacement the minifier keeps: an
+    // earlier attempt flipped the value's case, which the minifier lowercases straight back, leaving the artifact unchanged.
+    search: 'content-visibility:auto;contain-intrinsic-size:auto 320px',
+    replace: 'content-visibility:visible;contain-intrinsic-size:auto 320px',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the blocked-history escape hatch renamed, so the reader is left with a wall and no way past it',
     // The label is the reader's only signal that the far jump exists, and it is the route that has actually worked for them.
     search: '一次性加载到最早',

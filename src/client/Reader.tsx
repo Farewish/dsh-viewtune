@@ -1862,7 +1862,15 @@ export function Reader(props: ReaderProps) {
     if (!targetRow) return false;
     const last = timelineItems.at(-1);
     if (last !== undefined && last.turn === turn) scroll.jump();
-    else { scroll.release(); landTurn(targetRow, scrollerOf(el)); }
+    else {
+      scroll.release();
+      landTurn(targetRow, scrollerOf(el));
+      // The turns carry `content-visibility: auto`, so an off-screen one reports its PLACEHOLDER box and this first landing
+      // can be off by the difference between the estimate and the real height. One frame later the target is near the
+      // viewport and the browser has laid it out for real, so a second landing is exact. Two passes rather than a loop:
+      // the second read is of a real box, so there is nothing left to converge on.
+      requestAnimationFrame(() => { if (targetRow.isConnected) landTurn(targetRow, scrollerOf(el)); });
+    }
     setActiveTurn(turn);
     return true;
   }, [scroll.jump, scroll.release, timelineItems]);

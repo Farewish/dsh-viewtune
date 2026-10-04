@@ -1123,6 +1123,13 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
+  // The reading view renders only what is near the viewport. The reader's evidence put the scroll cost on RENDERED volume
+  // (folding off and everything drawn scrolls badly; folding on and little drawn is smooth), and the folding window cannot
+  // cover the worst case — it hides OLDER turns, while a reader near the front is under pressure from the NEWER turns behind
+  // them, which are never folded. `content-visibility: auto` skips layout and paint off screen in BOTH directions, and
+  // `contain-intrinsic-size` keeps the scrollbar honest while a turn is skipped.
+  ['the reading view renders only what is near the viewport', () =>
+    bundle.includes('content-visibility:auto;contain-intrinsic-size:auto 320px')],
   // When the platform's prepend failure blocks the ordinary step, the view must SAY so and offer the one route the reader
   // found that gets past it — a jump at the far end of the log — with its cost named in the label. Kept separate from the
   // ordinary press on purpose: it fetches the whole history.
