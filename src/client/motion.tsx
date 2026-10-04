@@ -596,6 +596,12 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     cancelFollow.current();
     following.current = false;
     anchor.current = null;
+    // …and this ends the MOUNT grace too (`touched`). A release is a deliberate decision to leave the tail — the rail
+    // landing on an older turn, or the reader themselves — while the general scroll rule deliberately KEEPS `following` on
+    // until the reader has acted (see `scrollTakeover`). Without this line a release was undone by the very next scroll
+    // event, so the content growth from revealing a folded turn pulled the page straight back to the bottom: a rail jump
+    // looked like it did nothing, the first click was spent arming, and only the second one landed.
+    touched.current = true;
     setDetached(true);
   }, []);
   const resume = useCallback(() => {
