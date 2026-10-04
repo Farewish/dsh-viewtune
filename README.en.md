@@ -1,229 +1,335 @@
 # dsh-viewtune
 
-[中文](./README.md)
+**A reading view for DeepSeek Harness.**
 
-A **reading** tab for DeepSeek Harness: while a turn runs you can see the process — thinking as it is written, tools as they run, which step it is on. When a turn finishes successfully the process folds away and the final answer stays. Over that sits an adjustable skin: a wallpaper, a frosted-glass layer, and a panel that keeps its settings inside the reading tab.
+It lays a conversation out for reading: one page per turn, a tunable frosted-glass skin and wallpaper, deliverables and
+diffs readable in place, and scrolling that stays usable in very long sessions. Everything the host already does keeps
+working — this plugin adds its own parts and does not replace the host.
 
-Upstream's Chat / Trajectory tabs, the composer, the model picker, tools and approvals are all untouched; this plugin adds a reading view alongside them.
+[中文](./README.md) · [Settings reference](./docs/settings.en.md) · [Changelog](./CHANGELOG.md)
 
-Targets DeepSeek Harness **0.2.0-rc.2**. Display only — it does not change agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`.
+---
 
-> **Platform version**: **0.5.x** and later target **0.2.0-rc.2**; the **0.4.x** line targets **0.1.5-rc.2**, and the two are **not interchangeable**. The browser half is a pre-built artifact, and it bakes the platform packages' exports into the bundle — 0.2.0 renamed the icons from `IconXxx16/14` to `IconXxxRegular/Medium`, replaced `useSessionPendingInteraction` with `useSessionStatus`, and moved `TurnTailChatData.tokensPerSecond/ttftMs` away. So one artifact serves one platform version: on 0.1.5 it would import an export that no longer exists, and on 0.2.0 it would read a field that has been removed. Staying on 0.1.5 means staying on the 0.4.x line: tag **`v0.4.1`** and the repository's **`dsh-viewtune-0.4.1.tgz`** (measured byte-identical to each other, with `main` parked on that same commit).
+## What it is, and what it is not
+
+**Three things it adds:**
+
+1. **A reading page**: each turn is laid out as one readable page (answer, process, reasoning, tools and deliverables each
+   in their own place), with the reading-side controls that go with it: fold, jump, load history, reveal the answer.
+2. **A tunable skin**: frosted glass (**nine surfaces, each with two dials**: opacity and blur), a wallpaper, and the same
+   skin plus a solid-background mode carried over to the **conversation page**.
+3. **Long-session handling**: a fold window, rendering only what is near the viewport, and plain statements when loading
+   older history fails (instead of a button that appears to do nothing).
+
+**What it is not:**
+
+- **Not a theme replacement**: the host's structure, class names and components stay where they are; this plugin adds its
+  own parts (the reading page) or injects styles (the conversation page).
+- **Not a replacement for the host**: the host's own turn rail, diff panel, review, deliverable cards, goal bar and MCP
+  hosting all still exist; this plugin either uses them or adds its own parts beside them.
+- **It does not guess numbers**: only what can be proven is shown (for example the usage pill). What cannot be proven is
+  left out, and the reason is stated.
+
+---
 
 ## Install
 
-Needs the official `dsh` on PATH (or `npx @deepseek-ai/dsh`) and **pnpm** — `dsh plugin add` runs pnpm inside `$DSH_HOME/profiles/web`.
+Build in the plugin directory first (dependencies are managed by the host with **pnpm**):
 
-```sh
-# from GitHub
-dsh plugin --profile web add github:Farewish/dsh-viewtune
-
-# or from a local directory / tarball
-dsh plugin --profile web add ./dsh-viewtune
-dsh plugin --profile web add ./dsh-viewtune-0.5.5.tgz
+```bash
+npm run build
 ```
 
-**With more than one Harness version on the machine**, two details bite (this repository installed once into an environment where 0.1.5 and 0.2.0 coexist):
+Then add **this directory** to the host as a plugin (`--profile web` is the default Web profile):
 
-- **`DSH_HOME` must point at the instance you are installing into.** If the shell already exports another instance's `DSH_HOME` (for example because you are running a 0.1.5 session), calling the 0.2.0 `dsh` installs the plugin into **the instance that is running**. Override it explicitly first: `$env:DSH_HOME='D:\DSH\homes\0.2.0-rc.2'` (Windows PowerShell).
-- **`pnpm` may not be on PATH**, while the desktop launcher ships one: add its `tools` directory (e.g. `D:\DSH\in.dsh-plug.dsh-launcher\tools`) to `PATH`. Without it the CLI only says `'pnpm' is not recognized`; the detailed diagnostics land in `<profile>\.plugin-manager\logs\operation-*\pnpm.log`.
+```bash
+# add (run from the directory that CONTAINS dsh-viewtune)
+dsh plugin --profile web add ./dsh-viewtune
 
-**Restart the Host** and reload the page afterwards: `dsh plugin add` only writes the profile, it does not hot-mount a running process.
-
-Remove it with:
-
-```sh
+# remove
 dsh plugin --profile web remove dsh-viewtune
 ```
 
-Three things that are easy to get wrong:
+A packed tarball works too: after `npm run build`, `npm pack` produces a `.tgz`, and the same command with that file in
+place of `./dsh-viewtune` installs it.
 
-- `dsh.bundle` is captured **at boot**; do not hand-write the same insert into the profile's `cordis.patch.yml`, or it mounts twice.
-- The compiled `lib/` is **committed**, so installing needs no `prepare` and no `allowBuilds` in the profile.
-- Do not install this alongside upstream `dsh-better-display`: both bundle patches insert the same entry id, and mounting both duplicates it. `remove` this one first.
+**Restart the Host** afterwards (or reload as the host prompts). Then:
 
-## What a turn looks like
+- **viewtune ⚙** appears in the sidebar — that is every setting;
+- which page a **brand new session** opens on is decided by 「新会话默认视图」 (the default is the **reading page**);
+- the shipped state is already the values a reader settled on: skin on, the bundled wallpaper filling the window, cards
+  and code blocks frosted from the start — nothing has to be adjusted first.
 
-A conversation is a sequence of **turns** (a prompt plus its answer), and the reading view is organised by that unit:
+---
 
-- **Three ways to show a turn's files** (功能 → 小功能 → 「产物展示」): **brief** is that row in its original shape (the newest eight plus a `+N 个文件` count); **balanced** (the default) gives **what the turn edited** and **what it delivered** a box each — a delivery is what the assistant explicitly handed over, plus the files a tool call says it created; the first line of a box reads 「共 N 项编辑 / 新增」 and then chips run to the end of that line, later lines start under the first chip, and each box has its own expand switch on the right; **two rows by default**, everything after it is opened, and each item wears its own file-type icon. The box heading is a button, kept for a feature to come. **detailed cards** renders each item in the host's card shape (60px, a type-icon tile, a type caption, two columns).
-- **The process is visible**: thinking, tool calls, subagents and progress are rendered live, so a long turn is more than a spinner; a turn that **finished successfully** folds its process away and keeps the answer, while a running or unfinished one stays open.
-- **A turn that something else woke up says so**: when a turn was not started from the composer but by a notification — a goal continuing, a task message, an external event / webhook, a scheduled run, a background job's state — the reading view shows an expandable row above it: **icon + why this turn started + the time**, and opening it gives the explanation, the notification's own text, and 「查看原始记录」. The titles and the icons are the conversation page's own, one for one (a goal says 「继续执行目标」 there and here), so the two views never tell two stories about one record.
-- **Every user message comes first**: a turn may open with a system prompt and carry several user / steering messages. They are all rendered, in source order, above the process disclosure — with or without a system prompt, the order is the same:
+## What a turn looks like (reading page)
 
-  ```
-  your messages → the disclosure (用时 X 秒, clickable) → the process (system prompt / thinking cards / tools / answer)
-  ```
+Top to bottom:
 
-- **Short and long thinking share one frame**: a short thinking card no longer loses its border just because nothing overflowed; heading and body padding match the long one.
-- **A wait clock**: while the model is thinking or streaming, the status row shows how long *this turn* has been with the model. It shows **nothing for the first 3 seconds** (most waits are shorter, and a number appearing immediately only pulls the eye), and adds a 「暂未响应」 badge past ten. It is anchored to the **last handover** — a tool returning, context injected, a command finishing, your own message — not to the start of the turn, so a fresh wait does not inherit the minutes the tools already spent; and it does not tick while a tool is running, because then the tool is busy, not the model.
-- **A steps pill**: the action row under an answer says which step this answer landed on and how many the turn has, and opens the turn's process record in Chinese prose rather than raw JSON.
-- **Changed-line counts**: a tool row that changed files ends with `+N -M` (additions green, deletions red) and opens a per-file diff panel. The counts prefer the host's own `meta.diffs` and only fall back to the call's arguments — and only for the **three tools that actually mutate files**, because several unrelated tools carry a field named `content`; files changed by a child call count towards the row too.
-- **Interactive mcp-app cards**: an ````mcp-app```` code block in an answer becomes a live card inside `<iframe sandbox="allow-scripts allow-forms">` — deliberately **without** `allow-same-origin`; the card can fill the composer with the next prompt over JSON-RPC. See [`skills/generative-mcpapps/`](skills/generative-mcpapps/).
-- **The wheel over a thinking card belongs to the browser**: the card scrolls natively and chains to the transcript natively at its edge. The one notch that crosses the bottom edge and does not fit is dropped (at most one, once per gesture) — that is the price of never taking a notch away from the browser; a short card with no overflow intercepts nothing at all.
+| Place | Content |
+| --- | --- |
+| Top | **Toolbar** (session information on the left, viewtune ⚙ and the collapse button on the right); sticky |
+| Each turn | **Your message** (bubble) → **process** (reasoning card, tool rows, diffs) → **answer** → **deliverables** (交付 / 编辑 / 提交) |
+| Right | **Turn rail**: every turn of the session is on it; click to go there; the turn being read is marked as you read |
+| Floating | The **「回到最新」** pill, shown only when you have actually left the tail **and** there is content below |
 
-## Toolbar and the collapse control
+**The process folds.** Each turn's process is shown on demand: the line above the answer is that turn's process, click to
+expand, click again to collapse. 「自动收起更早流程」 and 「自动折叠更早的轮次」 control folding of the **process** and of
+**whole turns** respectively.
 
-- **One pinned lane**: 「收起」 and 「viewtune ⚙」 sit in a strip across the top of the reading view, spanning it edge to edge — the divider reaches as far as the host's top bar does, while both controls stay at the text's left edge. It is **pinned under the top bar** as part of the chrome rather than floating over the prose, so it is reachable at any scroll depth.
-- **One control, three modes**: 收起 and 全部收起 are merged into one button, because the reading column's left edge has room for exactly one control. When both actions apply, the main button folds **the turn you are reading** and the double chevron beside it folds everything at once (its tooltip and accessible name are 「全部收起」, word for word); when only one applies the button **is** that action, with no chevron. The settings can pin it to a single action.
-- **Its scope is the current turn**: the same predicate the reading scroll uses to pick an anchor, and when the viewport straddles two turns it takes **the upper one**.
-- Shortcuts **Alt+C / Alt+Shift+C**, rebindable in the settings. If the button disappears because it collapsed itself, focus goes to **the toolbar's other control** rather than the document body.
+**The fold window is recalculated only when a new turn starts, never while you read** — so the page is not rearranged
+under you mid-sentence. To see older turns, use the button above that turn to bring more of them into view.
 
-## The goal bar (the line above the composer)
+---
 
-The host's own goal bar is ONE line: anything longer is ellipsised, and it offers no way to see the whole thing. This plugin gives it an expand / collapse:
+## The conversation page has its own copy (separate switch)
 
-- **Click the bar to expand it, click again to collapse.** The whole bar is the control, except the host's own parts: the resume / edit / pause / clear buttons, and the edit field while it is open.
-- Expanded, the bar **grows** (it is pinned to `height: 36px`), the objective **wraps** instead of being ellipsised, and it is capped at **40vh with its own scrollbar** so a very long goal cannot take the screen; the action buttons stay on the first line.
-- The **little marker at the end** is drawn in CSS (borders, not a glyph — a text chevron's weight and alignment belong to whatever font is in force, a lesson this repository learned the hard way) and flips when expanded. It is `pointer-events: none`, so clicking it clicks the bar underneath and works like the rest.
-- **Dragging to select the goal does not toggle it**: that click was a copy, not a fold.
-- **Nothing is inserted into the host's DOM.** The bar re-renders with its React tree, so an inserted node would be dropped by the next render. The feature is one attribute on `<html>` (`data-viewtune-goal-expanded`), a stylesheet, and one delegated capture-phase click — the same division of labour as the wallpaper and the skin.
-- It is a **mode, not a preference**: it lasts for the session and resets on reload, and there is no separate switch for it.
+- **Frosted glass and user bubbles** follow the nine dials above;
+- **Solid background mode**: theme background plus a fade above the composer, independent of the skin;
+- The host's own 「回到底部」 button and the reading page's 「回到最新」 pill **share one floor**: a dial turned all the way
+  down still cannot make either invisible.
+
+---
+
+## Reading page in detail
+
+### Answer and Markdown
+
+The answer renders block by block: headings, lists, tables, quotes, task lists, footnotes and fenced code blocks; a code
+block's language label, line numbers and copy button keep the host's structure. Three things are this plugin's own:
+
+- **CJK emphasis**: `**bold**` / `*italic*` are decided with Chinese punctuation and mixed CJK/Latin text in mind
+  (`markdown/cjkFriendlyStrong.ts`);
+- **Math**: rendered with KaTeX, and a syntax the renderer cannot handle does not take the whole paragraph down
+  (`markdown/katex.tsx`, `mathCompatibility.ts`);
+- **Incremental parsing**: when text arrives in a stream, only the changed part is re-parsed (`markdown/incremental.ts`).
+
+### The reasoning card
+
+A turn's reasoning is rendered as one card:
+
+- **Follow mode** is a choice: follow the latest (continuous) or manual; the **pace** is adjustable;
+- The **pause / resume** button sits at the bottom of the card. Scrolling inside the card or making a selection pauses the
+  following; returning to the latest resumes it;
+- **Focus expand**: the card being written into expands to show its content; scrolling inside the card keeps it expanded
+  (that counts as reading it);
+- **Scrollable reading**: content taller than the card scrolls on its own, without moving the page.
+
+### Tool rows and diffs
+
+A tool call renders as a row (name, argument summary, state, duration); expanding it shows input, result and structure.
+Failed, interrupted and refused calls each get their own mark. Diffs render separately: a panel that opens in place,
+inline diffs, a line-number gutter, and a 「增删 N 行」 statistics button.
+
+### Process folding and the collapse button
+
+- 「**自动收起更早流程**」: older turns show their answer only, with the process collapsed;
+- 「**自动折叠更早的轮次**」: only the newest turns are rendered; older ones are fetched with the button above the turn;
+- 「**收起按钮的行为**」 has three options: collapse the previous turn / collapse all / default (`collapse-mode.ts`). The
+  toolbar button and the keyboard shortcuts share that one behaviour.
+
+### Revealing the answer
+
+- 「**逐词显现**」: arriving text is revealed word by word instead of appearing as a whole;
+- 「**逐词显现的模糊**」: blur during that reveal (**off by default** — the cost of repainting every frame is the reader's
+  own trade-off to make);
+- 「**正文更新节奏**」: follow the display's refresh rate, or a fixed 60 per second (the default is to follow the display).
+
+### Native rows and MCP
+
+- **Context rows**: context the host records (system prompt, recalled content) is rendered with the host's own row style;
+- **Tool rows and question cards**: the same structures the host uses; this plugin lays them out on the reading page;
+- **MCP app frames**: an MCP app (a web-based tool, for example) runs in its own frame, resizable, with the same message
+  channel the host uses.
+
+### Goal bar, toolbar and shortcuts
+
+- **Goal bar**: the line above the composer keeps the host's structure; this plugin adjusts how it is displayed;
+- **Toolbar**: one sticky line, session information on the left, viewtune ⚙ and the collapse button on the right;
+- **Shortcuts**: this plugin has two bindings (collapse the current turn, collapse all), recorded on the **快捷键** page;
+- **Strip wheel**: how the mouse wheel behaves over scrollbar-shaped areas (a horizontal list, for example).
+
+---
+
+## Deliverables and diffs
+
+- **Deliverable display**: brief / balanced / cards, deciding how a turn's deliverables are drawn;
+- **Delivery bubbles**: clicking one follows 「产物用侧边栏打开」 — the host's review panel, or an external open;
+- **Diffs**: a panel that opens in place plus **inline diffs**; 「差异在侧边栏审查」 hands it to the host's own review panel;
+- **Commits**: with 「记录 git 提交」 on, a turn ends with a 「提交」 row of bubbles (message as the label, short hash in the
+  tooltip, click to copy).
+
+---
+
+## History and the turn rail (how it differs from the host)
+
+**First, what belongs to the host**: the host's conversation page **already has** a turn rail. It lists every turn of the
+session and it loads older history too. This plugin provides one on the **reading page** as well, and differs in these
+places:
+
+| Situation | What this plugin does |
+| --- | --- |
+| The target turn is **folded** | The fold window is enlarged first so the row exists, and only then does the jump land (without it there is no row to land on) |
+| Loading older history **failed or brought nothing** | The interface **says so** (「没能读到更早的记录…」) instead of doing nothing |
+| The host says there is **nothing older** | It displays 「已经是最早的记录。」 |
+| A region **cannot be fetched** | It offers one alternative with its cost written in the label: 「一次性加载到最早（较慢）」 — it fetches the whole history while still rendering only what needs rendering |
+| A conversation too **short to scroll** | 「回到最新」 does not appear (there is nothing below to return to) |
+
+> One kind of "cannot be fetched" **is not this plugin's**: the host's event feed is killed by an event that withdraws a
+> materialized target, after which no history page lands — and because every request pages contiguously back from the
+> window's oldest sequence, **no target avoids it either**. The full stack, the derivation and reproduction steps are in
+> [`_tmp/issue-platform-history-feed.md`](./_tmp/issue-platform-history-feed.md); the defect is on the host's side.
+
+---
+
+## Performance: why long sessions stay usable
+
+Three parts, each with its own job:
+
+1. **The fold window** limits **how many turns are rendered** (recalculated when a new turn starts, never while reading);
+2. **Rendering near the viewport only**: turns far from the viewport are skipped by the browser for layout and paint
+   (`content-visibility`); the placeholder height declares the **block axis only** (declaring width as well squeezes the
+   controls inside a turn). **The turn being written is exempt** — the reasoning card follows itself inside its own
+   subtree, and containment there breaks that;
+3. **The rail's reading** is a binary search over the rendered rows (logarithmic), and it re-measures only when the window
+   actually changes.
+
+> The cost is stated: the **first** time a turn enters the viewport, the browser has to lay it out (a large turn carries
+> cards, diffs and reasoning). That can be reduced, not removed — doing the same viewport rendering in JS would not remove
+> it either.
+
+---
 
 ## The settings panel
 
-Opened by 「viewtune ⚙」, with **three pages** (arrows, Home and End move between them):
+Open it with **viewtune ⚙** on the right of the toolbar. It has **three pages** (arrow keys move between them, `Home` and
+`End` jump to the first and last):
 
-- **视效** (look): motion, the frosted glass, its nine dials, and the wallpaper.
-- **功能** (behaviour): what this plugin does to the app, in three groups separated by a hairline — **小功能**: the **strip wheel**, **产物用侧边栏打开**, **产物展示方式** (three modes — brief, balanced and cards — deciding how a turn's deliverables are drawn), **新会话默认视图** (reading page or conversation page: which one a brand new session opens on), **记录 git 提交** (a 「提交」 row of bubbles at the end of a turn), **差异在侧边栏审查**, **自动收起更早流程**, **自动折叠更早的轮次** (a text field: how many of the newest turns are shown, older ones fetched through the button, `0` meaning all of them), and the **collapse button** (its third option is 「默认」, the shipped behaviour); **正文显示**: the **per-word reveal**, its **blur**, the **reveal cadence**; **流程展示设置**: the **follow mode**, the **reasoning card's follow mode**, its **pace**, and **焦点思考展开**. A setting that only means something under another one (the blur, the pace) is indented under it and greyed out while it does not apply.
-- **快捷键**: recording for this plugin's two bindings (click a key to record, Escape cancels, clearing drops it; combinations without a modifier, or ones the browser already owns, are refused). What the collapse button DOES is a behaviour, so it lives on 功能 instead, under 小功能 (its third option is 「默认」, the shipped behaviour).
+- **视效** (look): motion, frosted glass (nine surfaces), wallpaper;
+- **功能** (behaviour): small features (how deliverables open, how they are displayed, which page a new session opens on,
+  recording git commits, reviewing diffs in the sidebar, collapsing earlier processes, folding earlier turns, what the
+  collapse button does), the answer display (per-word reveal, its blur, its cadence), and the process display (follow
+  mode, the reasoning card's follow mode, its pace, focus expand);
+- **快捷键**: recording for this plugin's two bindings.
 
-One layout rule: a preference is a row and a new subject is a page, so the lane never grows a control wider; and **only an option whose label does not say it all carries a description**, which rides the row's `title` — the browser's own hover box, the same mechanism the button and 收起 use — so it takes no space. Genuine **state** (a system override, a recording in progress, a refused combination) is written in the row instead.
+**Every row, every default, and what each of the nine glass surfaces covers is in
+[`docs/settings.en.md`](./docs/settings.en.md).**
 
-**The defaults are this plugin's shipped ones, written from the reader's own tuned settings** (see below: the skin on, the wallpaper shipped with it, the window scope, a reveal cadence fixed at 60 per second, **cards frosted and the toolbar crisp**). A stored record only carries the keys a reader **changed**; anything missing falls back to those defaults.
+One layout rule: a preference is a row and a new subject is a page, so the toolbar never grows a control wider; **only an
+option whose label does not say it all carries a description**, and that description rides the row's `title` (the
+browser's own hover box), taking no space.
 
-### Frosted glass
+---
 
-With it on, the toolbar, cards, tool frames and code blocks stop painting plates of their own and let the wallpaper and the host's skin through; labels like paths and counts stay transparent until hovered or focused. **Nine dials under the switch** set each surface's opacity, and eight of them carry a second dial for FROST:
+## What it does when it cannot say
 
-| Dial | What it moves | Frost (initial) |
-| --- | --- | --- |
-| 工具栏 | the top lane's plate, the 「回到最新」 pill floating over the prose, and the host's own 「回到底部」 button on the conversation page | 0px (no frost; the pill and the button ride three quarters of it, so they are 0 too) |
-| 用户气泡 | your own message's background | 3px |
-| 卡片与面板 | reasoning cards, tool frames, the system prompt, note boxes, the changed-files card | 8px |
-| 代码块 | fenced code blocks | 25px |
-| 差异面板 | the diff panel and its add/remove row tints (gutters included), its file tabs, inline diffs in a tool's result, and the conversation page's 「已编辑 x 个文件」 card with its header and hover detail — **plus the per-file 产物 cards the host renders in that same spot, hover colour included** | 25px |
-| 滚动条槽位 | the rightmost scrollbar's track | — (the groove is a scrollbar pseudo-element, where `backdrop-filter` does nothing, so there is no such dial) |
-| 产物标签 | the product-file chips at the end of a turn | 5px |
-| 用量与步骤胶囊 | the two counters, 「用量 … tok」 and 「… 个步骤」 | 2px |
-| 输入框 | the host composer's plate (both the reading page and the conversation page) | 10px |
+- **State is written in the row**: a system override, a recording in progress, a refused combination — written where it
+  applies;
+- **A missing number is left missing**: the host reports usage only when it can **prove** a turn's accounting; this plugin
+  follows that, does not guess, does not estimate, and does not add a badge of its own;
+- **It does not claim success**: a history note appears only when it is certain (the host explicitly says there is nothing
+  older); what cannot be done is stated as such.
 
-`0%` paints nothing at all there; `100%` is the opaque plate of the skin-off look. Surfaces are grouped by what they **are** rather than where they sit (diff paper follows the diff dial wherever it is drawn), and **only surfaces that already have a plate get a dial** — the tool-state label and the `+N -M` count have no resting background, so they are wired to none.
+---
 
-**Each surface is one box with two dials inside it**: the box's first line is the surface's name, and the two lines under it **name their own dial** — 「透明度」 decides how much of the wallpaper shows through, 「模糊值」 decides whether what shows is the photograph or a wash of it (`0px` is glass only; above that it is 磨砂). The column in the table is the **shipped** value, and it is the reader's own tuned look: out of the box the cards, code blocks, diff paper and the composer **are** frosted while the toolbar stays crisp — so the name "frosted glass" is true the first time you open this plugin, with nothing to dial first. Turning a frost dial to 0 has the plugin **remove the property** rather than write `0px`: `backdrop-filter: blur(0px)` is not `none`, so writing it would create a stacking context and put the paint in the compositor for nothing.
+## Known limits
 
-The same skin can reach the **conversation page** (its own switch): the code blocks and user bubbles there follow these dials, and so do 0.2.0's 「已编辑 x 个文件」 card (with the change detail that pops up on hover) and the host's own 「回到底部」 button — they are painted from tokens this skin never dialled, which is why they used to ignore it. A third, independent switch makes the **conversation page a solid page** (the theme's base colour plus a fade above the composer). 「回到底部」 shares the pill's **floor**: dialled all the way down it still does not disappear.
+- **Chinese interface**: the host offers a localisation seat and this plugin borrows it to translate two host strings, but
+  the plugin's **own** copy is not localised — a full zh/en split needs a locale provider edge in the plugin (a Host
+  restart). That is a trade-off, not an oversight.
+- **Settings are written as one whole record**: no revision, no timestamp. Two windows changing settings at once means the
+  later write silently overwrites the earlier one. Accepted because this record is one reader's own preferences; fixing it
+  would mean revisions and a conflict policy, more machinery than the thing it protects.
+- **A change made in the few hundred milliseconds before the stored record arrives is rolled back**: settings are read
+  once at startup; until that read answers, changes cannot be sent, and the arriving record then overwrites them.
+- **Observability attributes**: several `data-reader-*` / `data-ud-check` have no reader inside this plugin. They are the
+  observation points for the workspace scripts (`render-dump.mjs`, `feature-matrix.mjs`, and others), and the only way to
+  run a real page and see where the state machine got to.
+- **One platform defect** (the "cannot be fetched" above): the plugin can work around it, not fix it.
 
-### Wallpaper
+---
 
-The plugin **ships a default wallpaper** (`assets/sample-gradient.png`), which the host puts into the reader's folder on first activation — a fresh install opens looking like this, with no picture to find first.
+## Who it is for
 
-- **Images live in the plugin's own folder**: 「打开文件夹」 creates and opens it (drop files in, then 「刷新」 turns them into a thumbnail list); click one to use it, 「清除」 to go back to **none** — which is a different thing from *no record at all*: the first means you want no wallpaper, the second falls back to the shipped one. Replacing a file under the same name updates both the thumbnail and the backdrop.
-- **The browser is never told where that folder is**: it asks for a name, and the host half answers only for image extensions inside that one folder (no svg).
-- A **压暗** dial mixes the image toward the theme's background so prose stays readable on top; with the skin on, the cards blur exactly this image.
-- The **scope** defaults to the **whole window**: the left column and the top bar show it too (their own plates step aside), and the colours around the composer follow. Turning 「铺满整个窗口」 off restricts it to the reading column, where the image **fills the reading page** (the MAX ratio of image ÷ target, centred, overflow cropped, small images scaled up). The window scope fills with `cover`.
-- A **界面遮罩** box, in the window scope, sets how opaque those two columns stay over their copy of the image — they carry nothing but text, so `0%` is prose straight on a photograph. The image is painted once and the scrim counted once for the window, so the reading area is never darker than the columns beside it. Each of the two surfaces is its own box with 「透明度」 and 「模糊值」: they ship at **25% + 15px** (sidebar) and **25% + 5px** (top bar), two separate frosts because the two faces look at different things.
-- The **fade band above the composer** turns the host's opaque gradient into a mask over the same backdrop, so content still fades out smoothly — just into your picture instead of into a colour. All three pages (reading, conversation, trajectory) use the same lift.
+- Reading a conversation **as reading**: one turn at a time, the process on demand, deliverables and diffs visible in place;
+- **Long sessions**: folding, jumping and history loading, with scrolling that stays usable;
+- A consistent look across the **reading page and the conversation page**: frosted glass, wallpaper, solid background;
+- Accepting some limits in exchange for **certainty**: only what can be proven is shown, a failed load is stated, and what
+  cannot be done is said to be impossible.
 
-### The reveal
+**It may not suit you if** you want a theme package (it ships a skin, but its work is the reading page's layout and
+interaction); or a fully English interface (the plugin's own copy is Chinese, see the limits); or a replacement for the
+host's own rail, diff panel or deliverable cards (this plugin uses them or adds its own parts beside them).
 
-Three choices govern how a streaming message grows:
-
-- **Reveal cadence** (default: **a fixed 60 per second**). One publication is one whole render of the growing node: the Markdown tail re-parsed, word identities rebuilt, new word elements mounted, and then the layout every follower below measures. Following the display's refresh rate means **four times** that work on a 240Hz screen, with a pace that depends on whatever the last frame cost. **Following the screen refresh** is therefore the explicit option, and its cost is stated in that row's own description; both cadences drive the **same reveal trajectory** (the advance is a function of the clock), so the fixed one merely samples it less often. Measured on one machine and one page streaming the same kind of long answer: **3430 → 4435–4568 frames per 20s (≈171 → 222–228fps), dropped frames 4 → 2, long tasks 0**, with an idle page back at 4800 (240Hz).
-- **Reveal blur** (default **off**): the reference recipe fades each word in while resolving a 1px blur, and `filter` is **not a property the compositor can animate on its own** — so every animating word repaints its own area on every frame, and with a 350ms reveal and ~50 words per second arriving, a dozen of those repaints overlap. Off, only the fade remains (crisp appearance rather than clearing up).
-- **Per-word reveal** (default on): off, the text simply appears, and **no word identities or timeline are built at all** (not just the animation: the segmentation and the birth table go too, and the Markdown path drops its reveal hooks entirely). The pace still comes from the stream buffer, so it still writes itself out.
-- **Follow mode** (default: **the direct write**). Writing the tail directly writes once per growth, so the scroll spy, the anchor compensation and every measurement around it are never woken by a per-frame write — that is the reader's own choice and it is what ships. Switching to **the per-frame glide** trades that for a slide instead of a jump: a write every frame, each one firing a scroll event. The choice reaches the CARD'S OWN growth too: with the glide, a 「焦点思考展开」 card EASES into each new line instead of stepping to it, and its bottom edge stays where it was (the compensation chases that easing frame by frame); with the direct write — the shipped default — the height lands at once, as it always did — as it also does with 「动效」 off or under a reduced-motion preference.
-- **自动收起更早流程** (default **on**). On, and while a turn is streaming, only the turn that is growing keeps its process open: every other turn starts folded — including one that ended without completing, and including the ones you had opened yourself, because a newly started turn clears the stored expansion choices. A folded process **unmounts** its content rather than hiding it, so with this on the other processes take no part in rendering or layout. Opening one yourself still holds until the next turn starts. This is the reader's own setting, adopted as the shipped default.
-- **自动折叠更早的轮次** (default **0**, i.e. nothing is folded): type N and only the newest N turns are DISPLAYED at all — a hidden turn takes its user message, its process and its answer with it, and older ones come back through **「加载更早记录」** (the button keeps its name: it is the same job either way). It differs from the setting above in both halves: that one folds a turn's **process**, and only while something streams; this one folds **whole turns**, at rest as well. **It only takes effect when a NEW turn starts** (so an edit to N in the panel waits for the next turn), which is what keeps a turn you are reading from being pulled away by the next one. The button **serves what is already loaded first** — instant, no disk read — and only then reads older history from disk. One limit this plugin cannot lift, stated rather than left to be discovered: it decides what it does not DISPLAY, but it cannot free the session records the HOST holds. The field commits on **Enter, on blur, or when the panel is closed** (clicking outside) — closing is an exit too, so a number typed and then abandoned by clicking away is not thrown out; `0` (or clearing it) keeps every turn.
-- **The reasoning card's own follow mode** (default **跟随最新**). Inside the card the movement has always been one fixed cadence: two lines every 840ms, gliding for 500ms (about 2.4 lines/second, roughly a reading pace, which is why it deliberately falls behind a burst). 自动滚动 keeps exactly that (the 840ms hold, and its rest after each step). 跟随最新 does NOT: it aims at the newest line with a short 180ms step and no rest, because the target is recomputed only when a step begins — inheriting the long hold would mean a latency of one hold plus one step rather than one step. 手动滚动 never moves the card on its own. Takeover, the edge fades and the follow/manual handoff are identical in all three.
-- **Its pace** (default **3 lines/second**), four presets. The pace is quantised to whole lines, so each preset's step lands on a whole line under the 840ms cadence (3 lines/second is about 2.5 lines per step, which is the step you see); the shipped preset is the reader's own, and a record with no such key falls back to the **standard 2 lines/second** — the step this card has always taken.
-- **焦点思考展开** (default **on**). On, and the reasoning card that is being written into grows to show its content, up to the ceiling 展开阅读 reaches (`min(60vh, 560px)`). A card asks for the focus while it is the one being written into and you are sitting at the bottom of the transcript; scrolling back up does NOT release it, and only taking the card over, asking for the full height with 展开阅读, or — in 跟随最新 only — the thinking ending returns it to the small card (the other two modes keep their height). Exactly one card holds it, the newest request wins, and while it does the PAGE stops following the tail — but the focus follows the CARD'S OWN growth: when its own text stops and narration or a tool card starts streaming, the focus is handed back at once and the page resumes following. The growth is quantised to whole lines, so the layout below it changes per line rather than per publication; with the per-frame glide each line EASES in, and with the direct write it lands at once (see the follow-mode row); the ceiling stays in the stylesheet, and an expanded card draws no edge masks at all.
-
-### The follow, and 回到最新
-
-- **Following happens only while a turn is running** (the same `status === 'open'` the status line and the wait clock read). With nothing running, no amount of new content will pull you back to the bottom — that is only a fight with your own scrolling.
-- **A turn keeps following for ~1.5s after it closes**: a turn does not end when its answer does — the deliverables row, the metrics and the action row are laid out AFTER it, and without that beat they land below the viewport and you have to scroll again.
-- **Three kinds of "not moving" are three different things**: (1) **you took over** — a wheel, a touch, PageUp/Home/Up, or your own scroll backwards — the follow goes off and 回到最新 appears; (2) **the follow is suspended** (while 「焦点思考展开」 is growing a card, the page deliberately does not move with it) — the page is only paused, content growing elsewhere is NOT read as you having scrolled away, and the follow picks itself up the moment the suspension ends; (3) **you are typing in the view** (an input or a contenteditable) — the follow waits, but that is not a takeover and no pill appears.
-- **The 回到最新 pill appears only after (1).** Clicking it goes to the newest line and resumes following. Case (2) must not raise it — it used to, and once raised it never went away, which was one of the bugs fixed here.
-
-### The strip wheel
-
-The two handles that set the reading column's width belong to the **shell** and sit **beside** the scroller rather than inside it, so a wheel over them used to do nothing at all. With this switch on (the default) the gesture is forwarded to the transcript:
-
-- **Notch by notch**, a critically damped spring carries the scroller — for a lone notch and for every landing — and its two ends (a flick, a single notch) are the feel to tune.
-- **A continuous roll** (intervals of 0.06–0.20 s, about 5–16 notches a second) is carried at the **wheel's own pace** instead: the current notch over the average of the last three intervals. That is what the browser does at a steady hand speed; slower and faster rolls stay notch by notch, because at those speeds ordinary scrolling is not even either.
-- A roll needs **two intervals** before it counts as one, and a **pause past 0.2 s** ends it. With the switch off, the event is left exactly as it was found — the behaviour of not having the feature.
+---
 
 ## Where the settings live
 
-- One copy in the **browser** (`localStorage`) and one on the **host** (`<instance home>/viewtune-settings.json`). The host's is the one that survives a restart: the GUI is served on an ephemeral port, `localStorage` is keyed by **origin** (scheme + host + port), and a browser-only copy is therefore a new, empty one on every launch — reported as "every time I quit DSH, all of viewtune's settings are reset".
-- Changes are written to the host **debounced**, flushed on the way out, and only an **accepted** write is broadcast to the app-wide surfaces (the wallpaper, the scrollbar gutter's dial).
+They are stored in the **host's** plugin record (`/better-display/settings`), which the host commits to disk:
 
-## Known limits (and what it shows when it cannot say)
+- **Only the keys a reader changed are written**; untouched settings are absent and fall back to the shipped value;
+- **Reads are defensive**: when a record written by an earlier version lacks a key added later, every reader treats a
+  missing key as the shipped value, so an upgrade cannot lose a reader's choices;
+- **Whole-record writes**: every change PUTs the entire record (the cost is described under Known limits).
 
-- **One kind of "cannot read it back" is not this plugin's.** The host's event feed is killed by an event that withdraws a materialized target (in the console: `conversation Definition "system-message" withdrew materialized target "chat"`), after which **no** history page lands — and because every request pages contiguously back from the window's oldest sequence, **no target avoids it either**. All this plugin can do is say so when the ordinary press brings nothing (rather than leaving a button that looks broken) and offer one **escape hatch with its cost in the label**: 「一次性加载到最早」, which takes the route that has worked in practice. The full stack, the derivation and the reproduction steps are in `_tmp/issue-platform-history-feed.md`; the defect is the platform's.
-- **The moment a turn first enters the viewport.** To keep long sessions scrollable, turns far from the viewport are **skipped by the browser** for layout and paint (`content-visibility`), and the price is that such a turn is laid out **when it arrives** (a large one carries cards, diff blocks and reasoning). That cost happens **once per turn**, and the **turn being written is exempt** — without the exemption the reasoning card's 「跟随最新」 breaks, because its following happens inside the card's own subtree. The placeholder height is this run's own average, which keeps that moment as small as it can be.
-- **A turn truncated by the history window** shows no step **number**. The host pages by message count, so the topmost turn may be partially loaded and its step count is a local sum, incomparable with the absolute steps in the process record; a too-small denominator misleads, so nothing is shown — a **「步骤记录」** badge appears instead, whose tooltip says 「请完全加载该轮次记录后查看」. It is an **explanation**, not a control: no click, no hover highlight, and no estimated number anywhere.
-- **The usage pill occasionally does not appear**, deliberately: the host only reports usage when it can **prove** the turn's accounting. This plugin follows that rather than guessing, and **adds no badge of its own** for it — a missing number is a missing number.
-- **The interface copy is Chinese only.** The host offers a locale seat, and this plugin already borrows it to translate two host strings (`message.contextRecall` / `message.contextInjection`), but the plugin's **own** copy is not localised: a full zh/en split needs a locale provider edge in the plugin, which needs a Host restart. That is a trade-off, not an oversight.
-- **Settings are written as one whole record — no revision, no timestamp.** Every change PUTs the entire record and the host commits it by writing a temporary file and renaming it. The cost is stated because it is real: **two windows or tabs changing settings at once means the later write silently overwrites the earlier one** (no merge, no conflict notice). Accepted because this record is one reader's own preferences and two windows changing the same row at the same time is unlikely; fixing it would mean revisions and a conflict policy, more machinery than the thing it protects.
-- **A change made in the few hundred milliseconds before the stored record arrives is rolled back.** Settings are read once at startup (`loadHostSettings`); until it answers, changes **cannot be sent** (the writer stays unarmed until the read has a result) and the arriving record then overwrites them. On a slow host that is how the first few hundred milliseconds of a session are lost. A related measurable waste: `hydrate` itself changes state, so the record just read is immediately PUT back (byte-identical). Both are left alone: separating "the reader just changed this" from "this came from the record" is a state machine of its own, for a window of a few hundred milliseconds. **The cost is written here because it exists.**
-- **`data-*` attributes with no consumer are a deliberate observability surface**: `data-reasoning-mode` / `-from` / `-target` / `-began` / `-moving`, several `data-ud-check` and `data-reader-*` are read by nothing inside this plugin. They are the handles for the workspace's scripts (`render-dump.mjs`, `feature-matrix.mjs`, `verify-patched-instance.mjs`, `probe-linked-host.mjs`, `marker-scan.mjs` all read them), and the only way to "run a real page and see where the state machine got to".
+---
 
 ## Development
 
 ### Build
 
-The browser half is the pre-built `lib/client.js`, which the Host loads directly, and the repository commits it — so **installing and sharing need no build**:
-
-```sh
-npm ci --legacy-peer-deps   # install from the committed package-lock.json (why the flag is required: below)
-npm run build               # src/ -> lib/client.js and lib/dsh-viewtune.js
-npm run typecheck           # tsc -p tsconfig.json --noEmit, against the real declarations
+```bash
+npm run build
 ```
 
-Use the lockfile rather than a bare `npm install`: `tsdown`, `lightningcss` and `typescript` are all on `^` ranges, and only the lockfile pins the toolchain that **reproduces the committed `lib/`** — which is exactly what `verify-build` does inside `npm run guard`. Reach for `npm install` only when a dependency changed, to rewrite the lockfile.
+### Layout of the client
 
-`--legacy-peer-deps` is forced by **the upstream packages' own peer declarations**, which this repository cannot fix. The 0.2.0 generation of `@deepseek-ai/dsh-*` dev dependencies (and their peers) are pinned at `0.2.0-rc.2`, and several of them declare their peers as ranges (`^0.2.0-rc.2`). On the 0.1.5 generation the registry resolved such a range to `0.1.5-rc.3`, so a bare `npm ci` failed with `ERESOLVE`; the resolver now accepts that set, and the failure has merely changed shape — **the peers are not in the lockfile**: `EUSAGE: Missing: @deepseek-ai/dsh-agent@0.2.0-rc.2 from lock file`, followed by dozens of the same for transitive peers.
+| File | What it owns |
+| --- | --- |
+| `Reader.tsx` | The reading page: a turn's layout, folding, buttons, history interaction |
+| `ReasoningCard.tsx` | The reasoning card: following, reading, focus, expansion |
+| `motion.tsx` | Motion and following: scroll takeover, anchor compensation, cadence |
+| `SettingsMenu.tsx` / `store.ts` / `settings-sync.ts` | The settings panel, state, and the host record |
+| `deliverables.ts` / `DiffPanel.tsx` / `ToolActivity.tsx` | Deliverables, diffs, tool rows |
+| `TimelineRail.tsx` / `projection.ts` / `turn-fold.ts` | The rail, the process projection, the fold window |
+| `glass.ts` / `conversation-glass.ts` / `composer-glass.ts` / `app-backdrop.ts` | The glass dials and injected styles |
+| `markdown/` / `native/` | Markdown rendering (CJK, KaTeX, incremental parsing) and the host's native rows |
+| `reader-*`, `turn-*`, `text-cadence.ts` and others | Small reading behaviours (each file's header says why it exists) |
 
-Both commands were measured, so the conclusion is stated rather than guessed: `npm ci --legacy-peer-deps --dry-run` **passes** ✓ and a bare `npm ci --dry-run` **fails** (EUSAGE) ✗. What this repository installs is therefore **the tree in its lockfile** — `tsdown`, `lightningcss`, `typescript`, `react` and the 13 platform packages — with the flag telling npm not to auto-install the peers on top. That tree is enough to build, typecheck and test (all three run in the chain), but it is **not** what a default `npm install` produces: pulling every peer in installs a larger tree that has never been verified here. To reproduce the committed `lib/`, use the command above.
+### Checks
 
-Upstream's `tsdown.config.ts` takes `externalClientBundle` from a Harness adapter that is not published, so it cannot run in a clone. This repository ports its real implementation (the official preset's `clientBundle()`, Harness tag `dsh-v0.1.5-rc.2`) into [`scripts/client-bundle.mjs`](scripts/client-bundle.mjs). The artifact contract is unchanged, so every assertion about the artifact still holds — and **that was re-checked against 0.2.0**: its client module system still registers bundles as `window.__ModuleLoader__.load({ id, factory })` and still claims its injected styles through `data-plugin` / `data-plugin-css`, matching this repository's artifact shape item by item (read out of 0.2.0's own `dsh-client-modules`). The ported preset was therefore left alone: it decides the artifact's shape, and the shape did not change.
-
-Remember to **commit `lib/` with the source**: what other people install is that artifact, not a local build.
-
-### Changing the code
-
-Change `src/`, then `npm run build`. Two identity markers in the artifact must match `package.json`'s `name` exactly, or the whole page fails with `loaded without registering "<id>" via __ModuleLoader__.load`:
-
-- the row id in `window.__ModuleLoader__.load({ id })` (the Host derives it from the installed manifest's package name);
-- each CSS module's `tagId` prefix and the `data-plugin` of its `document.createElement("style")` (HMR removes this plugin's styles by plugin id).
-
-`tests/stock-install.test.ts` guards both, and checks that this file and `README.md` install the same package by name.
-
-> **Keep a cloned checkout outside `node_modules`.** `dsh plugin add` runs pnpm in the profile directory, and pnpm prunes directories under `node_modules` that `package.json` does not declare — the checkout, `.git` included, can be deleted with them.
-
-### Verification
-
-Two layers, because they answer different questions:
-
-```sh
-npm test        # source layer: Node's own test runner, every test file (35 today)
-npm run guard   # artifact layer: 23 invariants, against the built lib/client.js and lib/dsh-viewtune.js
+```bash
+npm run build
+node ../verify-types.mjs                       # TYPES OK
+node ../run-plugin-tests.mjs                   # test cases
+node scripts/guard/run.mjs                     # artifact guard (invariants)
+node scripts/guard/negcheck-shape-markers.mjs  # reverse check (a mutation must be refused)
 ```
 
-`npm run guard` inspects the **artifacts**: the module table's registered id and `require()` set, the injected CSS literal, turn render order, the collapse control's shape and fade, the toolbar geometry, the settings panel's three pages and the width of its sliding bar, the shipped wallpaper's three spellings and the file itself, the **Host half**'s route decisions (the cap on each unauthenticated body, a body reader that always settles, a failed disk write answering as a failure, the wallpaper route's revalidation and `ETag`), **whether every name the artifact reads off a platform package actually exists** (the icon names, label fields and hook names 0.2.0-rc.2 replaced are exactly this class: the typecheck guards the source, and the artifact is a separate set of bytes — a name that is not exported renders nothing at all), the correspondence between `src/` and the artifact, and **"a rebuild still reproduces the contract shape"**. That last one is the only proof of source/artifact agreement available here — byte equality is not (the CSS class hash in `lib/client.js` is derived from the artifact's own absolute path: the same stylesheet in two directories measured `voucca_` and `ED26sW_`), so it compares the registered id, the `require()` set, exports, the CSS literals and every stylesheet rule with the build-specific naming normalised away — and it now prints both lengths instead of letting one word, "reproduces", imply byte equality.
+**All four must be green before a commit.** Every marker in the guard corresponds to a bug that actually happened. The
+reverse check rewrites the artifact into the broken shape and requires the guard to go **red** and the artifact to be
+**restored byte-identically**; it has itself been corrected twice (a mutation the minifier undid, and a search string
+written in the source's spacing rather than the artifact's), and both are recorded in the changelog.
 
-One premise is worth stating: **parsing (`node --check` passing) is not correctness**. This repository's history is largely direct edits of a minified artifact, which produced syntax that was perfectly legal and still threw at runtime because a reference had been deleted — a class of error only a "is this name declared" check catches, or a rebuild exposes. Both are in `npm run guard`, and every new assertion has been **negative-tested** (fed a doctored artifact to prove it really fails). That table of negative checks lives in the repository, so anyone can run it:
+---
 
-```sh
-node scripts/guard/negcheck-shape-markers.mjs   # 61 cases: each reverts one fix in the artifact and requires its guards to fail
-```
+## Versioning
 
-It is deliberately **not** part of `npm run guard`: every case spawns one to three fresh guard processes, so the whole table takes minutes, while `npm run guard` is the fast gate that runs after every build. A `SKIP` in that table counts as a failure — it means the artifact no longer carries the asserted shape (the assertion is running on nothing), or already carries the reverted one (the case tests something other than what it says).
+- A tagged version's **bytes are fixed**: one version number never corresponds to two different byte streams, so any
+  change starts a new version number;
+- `CHANGELOG.md` is written **in time order** and keeps the entries that were **tried and then withdrawn**, with their
+  reasons — why a path does not work is information;
+- One commit does one thing: a fix and a refinement are kept apart, and a change is made one item at a time, so locating a
+  regression does not begin by withdrawing the refinement.
 
-## License
+---
 
-MIT, see [LICENSE](LICENSE).
+## Origin and licence
 
-It started from [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT): the reading tab, the streaming motion and the Markdown rendering come from there. The presentation and Markdown parts derive from DeepSeek Harness (MIT). Motion references [Transitions.dev](https://transitions.dev/). The default wallpaper shipped with the package is `assets/sample-gradient.png`, made for this repository, and released under the same MIT as the code.
+MIT, see [LICENSE](./LICENSE).
+
+It started from [`aa2246740/dsh-better-display`](https://github.com/aa2246740/dsh-better-display) (MIT): the **reading
+tab, the streaming motion and the Markdown rendering** come from there; this plugin differs from it substantially by now.
+Parts of the presentation and the Markdown rendering derive from DeepSeek Harness (MIT). Motion references
+[Transitions.dev](https://transitions.dev/). The default wallpaper shipped with the package,
+`assets/sample-gradient.png`, was made for this repository and is released under the same MIT as the code.
