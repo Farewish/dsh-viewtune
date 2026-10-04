@@ -1889,7 +1889,12 @@ export function Reader(props: ReaderProps) {
     if (!el) return;
 
     if (item.anchor.kind === 'loaded') {
-      revealTurn(item.turn);
+      // A LOADED turn is not necessarily a RENDERED turn: the folding window may hide it, and a hidden turn has no row, so
+      // landing on it cannot succeed. This used to try the landing directly and return, which is why clicking a folded
+      // turn's mark did nothing at all — the reader's Case 2, next to Case 1 where folding is off and every mark works.
+      // Handing it to the converge path below is the fix: that path grows the window until the row exists, then lands.
+      pendingRevealUntil.current = performance.now() + REVEAL_RETRY_MS;
+      setPendingReveal(item.turn);
       return;
     }
 
