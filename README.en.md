@@ -177,8 +177,9 @@ places:
 
 > One kind of "cannot be fetched" **is not this plugin's**: the host's event feed is killed by an event that withdraws a
 > materialized target, after which no history page lands — and because every request pages contiguously back from the
-> window's oldest sequence, **no target avoids it either**. The full stack, the derivation and reproduction steps are in
-> [`_tmp/issue-platform-history-feed.md`](./_tmp/issue-platform-history-feed.md); the defect is on the host's side.
+> window's oldest sequence, **no target avoids it either**. This has been filed with DeepSeek Harness itself, with the full
+> stack, the derivation and reproduction steps. This repository does not copy that write-up, because it describes the
+> host's behaviour rather than this plugin's implementation.
 
 ---
 
