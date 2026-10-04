@@ -740,12 +740,18 @@ const markers = [
   // reported through their effects — a 「回到最新」 pill that appeared and vanished with every notch at the bottom of the
   // page, and a transcript still pulled to the bottom with nothing running (「在没有进行中的轮次的情况下，不应有自动吸附」) —
   // so this pins the shapes that produce them rather than restating the rule, which lives in `reading-scroll.ts` and is
-  // tested directly there. Two things are load-bearing: the follower consults `liveRef` in the FRAME LOOP and in the
+  // tested directly there. Two things are load-bearing: the follower consults that one question in the FRAME LOOP and in the
   // RESIZE OBSERVER (gating one leaves the other path still following), and the wheel handler asks `wheelAtBottom`
   // before it treats the gesture as a takeover.
-  ['the tail-follow runs while the layout is still producing, and a wheel at the bottom is not a takeover', () =>
-    bundle.includes('!producingRef.current || suspendedRef.current ||')
-    && bundle.includes('producingRef.current && !suspendedRef.current && following.current')
+  //
+  // …and since a long session opened at the TOP, the question is a NAMED predicate rather than the bare `producingRef`
+  // test: `mayFollow` is "a live turn, OR a reader who has not acted yet", because until the reader acts the session's own
+  // history is still arriving and that growth has to be followed (see `scrollTakeover`). Pinning the name is deliberate —
+  // the two call sites must keep asking the SAME question, and a pin on their text could be satisfied by changing one.
+  ['the tail-follow asks one question in both paths, and a wheel at the bottom is not a takeover', () =>
+    bundle.includes('mayFollow')
+    && bundle.includes('!mayFollow() || suspendedRef.current ||')
+    && bundle.includes('mayFollow() && !suspendedRef.current && following.current')
     && bundle.includes('motion, live')
     && bundle.includes('producingRef.current = liveRef.current || now - endedAt.current < OUTPUT_TAIL_MS;')
     // …and the state it reads is written in a LAYOUT effect, so it is current for the commit that caused the growth
@@ -1101,6 +1107,11 @@ const markers = [
     && bundle.includes('entryViewOf')
     && bundle.includes('reader-settings-entry-view')
     && bundle.includes('defaultView === "reader"')],
+  // The tail-follow's own rule, in the module that states it: a scroll POSITION is not a takeover until the READER has
+  // acted — an upward move counts, a downward one never does. Without it a long session opens at the TOP, because its
+  // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
+  ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
+    && bundle.includes('isNearTail')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

@@ -9,7 +9,27 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FOLLOW_MODES, FOLLOW_TAIL_PX, firstRowPastIndex, firstRowWhere, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from '../src/client/reading-scroll.ts';
+import { FOLLOW_MODES, FOLLOW_TAIL_PX, firstRowPastIndex, firstRowWhere, followModeOf, isNearTail, scrollTakeover, wheelAtBottom, wheelClaimsScroll } from '../src/client/reading-scroll.ts';
+
+test('a scroll POSITION is not a takeover before the reader has acted — the mount bug', () => {
+  // Mount: the scroller sits at 0 while a long session's history is still arriving, so "not at the bottom" is the LAYOUT
+  // talking. Reading it as intent disarmed the follow, skipped the first tail write and treated every later growth as the
+  // reader holding their place — which opened long sessions at the TOP (a short one fits its first paint, so it opened
+  // correctly, and that is why the bug needed a long session).
+  assert.deepEqual(scrollTakeover({ scrollTop: 0, previousTop: 0, atBottom: false, touched: false }),
+    { touched: false, following: true, detached: false }, 'the follow survives the mount, and the pill stays quiet');
+  // Once the reader has acted, the old rule is back, unchanged.
+  assert.deepEqual(scrollTakeover({ scrollTop: 0, previousTop: 0, atBottom: false, touched: true }),
+    { touched: true, following: false, detached: true });
+  assert.deepEqual(scrollTakeover({ scrollTop: 500, previousTop: 500, atBottom: true, touched: true }),
+    { touched: true, following: true, detached: false });
+  // An UPWARD move is the reader even before anything else — the rule this file already used for the suspension. A
+  // downward one is not, because our own writes, a focused card and a layout change all move down.
+  assert.deepEqual(scrollTakeover({ scrollTop: 300, previousTop: 400, atBottom: false, touched: false }),
+    { touched: true, following: false, detached: true });
+  assert.deepEqual(scrollTakeover({ scrollTop: 400, previousTop: 300, atBottom: false, touched: false }),
+    { touched: false, following: true, detached: false });
+});
 
 test('a wheel takes scroll control unless it has nowhere to go', () => {
   // ANY direction, any size. The listener also sees wheels that bubbled out of the reasoning card, and treating a

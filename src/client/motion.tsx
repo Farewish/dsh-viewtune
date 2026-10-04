@@ -9,7 +9,7 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
  * The follower's policy lives in its own module (see `reading-scroll.ts`), imported here because the follower uses it
  * and re-exported because this is where every reader of these names looks for them.
  */
-import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
+import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, scrollTakeover, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 import type { FollowMode } from './reading-scroll.js';
 export { ANCHOR_LINE_OFFSET_PX, FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
@@ -369,6 +369,15 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
    * state of the commit that caused the growth.
    */
   const producingRef = useRef(false);
+  /**
+   * Whether the READER has acted at all yet — a wheel, a page key, a touch, or a move upward.
+   *
+   * Before that, no scroll POSITION is evidence of intent: on mount the scroller sits at 0 while a session's history is
+   * still arriving, and reading that as "the reader left the tail" is what opened long sessions at the TOP (see
+   * `scrollTakeover`). Deliberately a ref rather than state: `onScroll` reads it on every scroll event and must not
+   * re-render.
+   */
+  const touched = useRef(false);
   const endedAt = useRef(0);
   const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
   const cancelFollow = useRef<() => void>(() => {});
@@ -400,6 +409,8 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     let followFrame = 0;
     let lastFrameAt = 0;
     let lastWrittenTop: number | null = null;
+    /** The last position this handler saw, so an upward move can be told from a layout change — see `scrollTakeover`. */
+    let lastSeenTop = 0;
     /** The last position seen while suspended, so a scroll that did not move BACKWARDS can be told from a takeover. */
     let lastSuspendedTop = 0;
     cancelFollow.current = () => {
@@ -438,9 +449,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       }
       lastSuspendedTop = scroll.scrollTop;
       const atBottom = isNearTail(scroll.scrollTop, scroll.scrollHeight, scroll.clientHeight);
-      following.current = atBottom;
-      setDetached(!atBottom);
-      if (!atBottom) { cancelAnimationFrame(followFrame); followFrame = 0; }
+      // The verdict is the pure rule in `reading-scroll.ts`: an upward move is the reader, and before the reader has done
+      // anything at all the follow stays on so the tail write — and the growth after it — can still land.
+      const verdict = scrollTakeover({ scrollTop: scroll.scrollTop, previousTop: lastSeenTop, atBottom, touched: touched.current });
+      lastSeenTop = scroll.scrollTop;
+      touched.current = verdict.touched;
+      following.current = verdict.following;
+      setDetached(verdict.detached);
+      if (!atBottom && verdict.touched) { cancelAnimationFrame(followFrame); followFrame = 0; }
       // The anchor is only ever READ while the reader holds their own place — see the observer below, whose
       // compensation branch is the only consumer. This handler runs once per streamed chunk (the follow loop
       // writes `scrollTop`, which fires a scroll event), so capturing here while following was a
@@ -454,7 +470,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // the downward one that finds the scroller already at its tail: nothing can move, so it is
       // not a takeover, and treating it as one is what made the pill flicker here (see wheelAtBottom).
       const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
-      if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY)) { following.current = false; setDetached(true); capture(); }
+      if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY)) { touched.current = true; following.current = false; setDetached(true); capture(); }
     };
     const onTouch = () => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
@@ -463,7 +479,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       if (event.target instanceof HTMLElement && event.target.closest('textarea,input,[contenteditable=true]')) return;
       if (['PageUp', 'Home', 'ArrowUp'].includes(event.key)) {
         cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
-        following.current = false; setDetached(true); capture();
+        touched.current = true; following.current = false; setDetached(true); capture();
       }
     };
     /**
@@ -494,6 +510,15 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
      * "it stops at the answer's last line". The wheel, touch, keyboard and selection rules are untouched: those are
      * the reader reading, and they still take over.
      */
+    /**
+     * Whether the follower may move the page at all.
+     *
+     * A LIVE turn is the original reason (`producingRef`, see its note) — plus the mount case: until the reader has acted,
+     * the session's own history is still arriving, so growth has to be followed or a long session opens at the TOP (see
+     * `scrollTakeover`). Named once because BOTH the frame loop and the resize observer must ask the same question:
+     * gating one and not the other is the bug this file's marker pins.
+     */
+    const mayFollow = () => producingRef.current || !touched.current;
     const typingInside = () => {
       const active = document.activeElement;
       return active instanceof HTMLElement && content.contains(active)
@@ -502,8 +527,9 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     };
     const follow = (now: number) => {
       followFrame = 0;
-      // A follower with nothing to follow: see the `producingRef` note on this hook.
-      if (!producingRef.current || suspendedRef.current || !following.current || selected() || typingInside()) return;
+      // A follower with nothing to follow: see the `producingRef` note on this hook — and `touched`, which keeps the
+      // follower alive until the reader has acted at all (the mount case).
+      if (!mayFollow() || suspendedRef.current || !following.current || selected() || typingInside()) return;
       const gap = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
       const limit = scroll.scrollTop + gap;
       const delta = Math.min(48, Math.max(1, now - lastFrameAt));
@@ -529,7 +555,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // refs are written in layout effects, so this reads the state of the commit that caused this growth.
       const now = performance.now();
       producingRef.current = liveRef.current || now - endedAt.current < OUTPUT_TAIL_MS;
-      if (producingRef.current && !suspendedRef.current && following.current && !typingInside()) {
+      if (mayFollow() && !suspendedRef.current && following.current && !typingInside()) {
         if (!motion || followMode === 'snap') writeTop(scroll.scrollHeight, scroll.scrollHeight - scroll.clientHeight);
         else if (!followFrame) { lastFrameAt = performance.now(); followFrame = requestAnimationFrame(follow); }
       } else if (!following.current && anchor.current?.element.isConnected) {

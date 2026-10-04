@@ -107,6 +107,38 @@ export function firstRowWhere<T>(rows: ArrayLike<T>, passes: (row: T, index: num
 export const ANCHOR_LINE_OFFSET_PX = 8;
 
 /**
+ * What a SCROLL EVENT means — the rule the mount used to get wrong.
+ *
+ * `onScroll` is the follower's general path, and all a bare position can say is "the scroller is not at the bottom".
+ * Reading that as intent was the bug: on mount the scroller sits at 0 while a session's history is still ARRIVING, so a
+ * transcript taller than the viewport reported "the reader has left the tail" before the reader had done anything at all.
+ * The follow was disarmed, the first tail write was skipped, and the growth that followed was treated as the reader
+ * holding their place — so a long session opened at the TOP while a short one (whose first paint already fits) opened
+ * correctly at the bottom.
+ *
+ * Two facts make a position legible, and this file already used the first one for the suspension:
+ *   · only an UPWARD move can be the reader — everything this hook, a focused card or a layout change writes moves DOWN;
+ *   · a reader who has not acted has not taken over, whatever the layout did.
+ *
+ * Once `touched` is true the rule collapses to the old one (`following = atBottom`), so nothing about an engaged
+ * reader's behaviour changes — and `detached` stays quiet until then, so the 「回到最新」 pill does not flash at a reader
+ * who never left.
+ */
+export function scrollTakeover(input: {
+  /** Where the scroller is now. */
+  scrollTop: number;
+  /** Where it was when this was last asked. */
+  previousTop: number;
+  /** Whether the new position is close enough to the tail — see `isNearTail`. */
+  atBottom: boolean;
+  /** Whether the reader has already acted: a wheel, a page key, a touch, or an upward move seen here. */
+  touched: boolean;
+}): { touched: boolean; following: boolean; detached: boolean } {
+  const touched = input.touched || input.scrollTop < input.previousTop;
+  return { touched, following: input.atBottom || !touched, detached: !input.atBottom && touched };
+}
+
+/**
  * The index of the first row whose bottom edge has passed a line, or `rows.length` when none has.
  *
  * Rows are in document order and block rows do not overlap, so their bottom edges increase down the list and the

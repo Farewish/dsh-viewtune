@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the tail-follow’s takeover rule renamed out of the bundle, so a mount position can disarm the follow again',
+    // That rule is what tells a layout position from the reader's own move. Losing it is how a long session opened at the
+    // TOP: the follow was disarmed by the mount's own scroll position, before the reader had done anything at all.
+    search: 'scrollTakeover',
+    replace: 'SCROLLTAKEOVER',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the entry-view setting stops recognising 阅读页, so a reader who chose it silently lands on the conversation page',
     // The rule consults the setting for a session that has recorded no view; if the value it compares against is no longer
     // the stored one, every fresh session falls through to the host's view — the setting would look saved and do nothing.
