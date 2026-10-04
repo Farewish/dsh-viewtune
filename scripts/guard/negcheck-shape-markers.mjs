@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the outcome rule for loading older history renamed, so a silent load is silent again',
+    // Without this rule the caller cannot tell "there is nothing older" from "nothing arrived", and the reader is back to a
+    // button that does nothing and says nothing — which is exactly what was reported.
+    search: 'loadOlderOutcome',
+    replace: 'LOADOLDEROUTCOME',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the user bubble stops following the host’s content width, so its cap freezes at the default again',
     // A frozen cap looks right only at the default chat width; the host's own bubble follows the variable, and the reader's
     // complaint was that the two pages were not the same length.

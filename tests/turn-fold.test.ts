@@ -9,7 +9,20 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { TURN_FOLD_MAX, insideWindow, renderedTurnsOf, revealStepOf, turnFoldOf } from '../src/client/turn-fold.ts';
+import { TURN_FOLD_MAX, insideWindow, loadOlderOutcome, renderedTurnsOf, revealStepOf, turnFoldOf } from '../src/client/turn-fold.ts';
+
+test('what a load of older history achieved, when the failure mode is silence', () => {
+  // The host's loader resolves WITHOUT doing anything when its `hasMore` is false, when its re-entrancy flag is still set,
+  // or when a generation moved on and the page was dropped. Before this the reader saw a button that looked broken and
+  // nothing else, so the outcome is now named: more turns is progress; nothing more is either the earliest record or a
+  // load that did not arrive, and only the host's own `hasMore` can tell those two apart.
+  assert.equal(loadOlderOutcome(12, 14, true), 'progress');
+  assert.equal(loadOlderOutcome(12, 12, false), 'exhausted', 'nothing more, and the host agrees there is nothing');
+  assert.equal(loadOlderOutcome(12, 12, true), 'stuck', 'nothing more while the host still claims more — the reported silence');
+  // …and a window that somehow shrank (a reload, a new session) is not progress either.
+  assert.equal(loadOlderOutcome(12, 3, true), 'stuck');
+  assert.equal(loadOlderOutcome(0, 0, false), 'exhausted');
+});
 
 test('an absent or unusable count is OFF, and a real one is clamped to the ceiling', () => {
   assert.equal(turnFoldOf(0), 0);

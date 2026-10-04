@@ -1119,6 +1119,13 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
+  // A load of older history SAYS what it achieved. The host's loader has several silent no-op paths (`hasMore` false, its
+  // own re-entrancy flag, a generation that moved on), so a resolve that changed nothing is indistinguishable from a load
+  // that never ran — which is how the reader got a button that looked broken with nothing said. Pinned as the rule plus the
+  // two sentences that name the two silent outcomes.
+  ['a silent load of older history is reported instead of looking like a broken button', () => bundle.includes('loadOlderOutcome')
+    && bundle.includes('已经是最早的记录')
+    && bundle.includes('没能读到更早的记录')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

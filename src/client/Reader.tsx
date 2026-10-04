@@ -44,7 +44,7 @@ import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
-import { insideWindow, renderedTurnsOf, revealStepOf, turnFoldOf } from './turn-fold.js';
+import { insideWindow, loadOlderOutcome, renderedTurnsOf, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -1769,7 +1769,10 @@ export function Reader(props: ReaderProps) {
     scroll.resume();
   }, [focusedCard, scroll.resume]);
   const [pinnedKeys, selectedProcessKeys] = usePinnedSelections(root, PINNED_SELECTORS);
-  const [historyError, setHistoryError] = useState(false);
+  // What to say about the last attempt to read older history, if anything — see `loadOlderOutcome`. Three outcomes, three
+  // sentences, because the host's loader can fail by doing NOTHING AT ALL, and a reader staring at an unchanged list
+  // cannot tell "there is nothing older" from "nothing arrived".
+  const [historyNote, setHistoryNote] = useState<'exhausted' | 'stuck' | 'failed' | null>(null);
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
   // 2. Whole-log turn outline projection
@@ -1791,6 +1794,12 @@ export function Reader(props: ReaderProps) {
     () => mergeTimelineItems(turnNavigationItems, turnOutline, turnsWithDeliverables),
     [turnNavigationItems, turnOutline, turnsWithDeliverables],
   );
+  // How many turns the host has actually loaded — the quantity 「加载更早记录」 is trying to grow. Read through a ref as
+  // well, because the click handler has to compare it across an `await`: the state it closed over is the one from the
+  // render that started the load, and the answer arrives in a later one.
+  const loadedTurns = useMemo(() => timelineItems.filter(item => item.anchor.kind === 'loaded').length, [timelineItems]);
+  const loadedTurnsRef = useRef(loadedTurns);
+  loadedTurnsRef.current = loadedTurns;
 
   // 5. Active & busy turn tracking
   // Both are written by the single scroll spy above, so there is deliberately no second
@@ -1827,6 +1836,10 @@ export function Reader(props: ReaderProps) {
     if (revealTurn(pendingReveal)) { setPendingReveal(null); return; }
     if (performance.now() > pendingRevealUntil.current) {
       setPendingReveal(null);
+      // The rail asked to land on a turn the host never brought in — the silent case this whole note exists for (the host's
+      // `loadThrough` resolves having done nothing when its `hasMore` is false). Warn for the console, and say it on screen
+      // for the reader, who otherwise watches a jump that simply does not happen.
+      setHistoryNote('stuck');
       console.warn('[dsh-better-display] jump target never rendered:', pendingReveal);
     }
   });
@@ -1939,10 +1952,21 @@ export function Reader(props: ReaderProps) {
           // costs nothing and cannot fail. Only when nothing is left to reveal does this read older turns from disk —
           // the reader's own compromise (N rendered, the next band held in memory, anything older read on demand).
           if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
-          setHistoryError(false);
-          try { await props.loadOlder(); } catch { setHistoryError(true); }
+          const before = loadedTurnsRef.current;
+          setHistoryNote(null);
+          try {
+            await props.loadOlder();
+            // The host's loader has several silent no-op paths (see `loadOlderOutcome`): what it ACHIEVED is the only thing
+            // worth reporting, and comparing the loaded turn count across the await is how this view can see it.
+            const outcome = loadOlderOutcome(before, loadedTurnsRef.current, hasMore);
+            setHistoryNote(outcome === 'progress' ? null : outcome);
+          } catch { setHistoryNote('failed'); }
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
-      {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
+      {historyNote !== null && <div className={css.notice} role="status">
+        {historyNote === 'exhausted' ? '已经是最早的记录。'
+          : historyNote === 'stuck' ? '没能读到更早的记录：宿主那边还有更早的内容，但这次没能取回，可再试一次。'
+          : '历史记录加载失败，可再次尝试；现有内容未改变。'}
+      </div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
