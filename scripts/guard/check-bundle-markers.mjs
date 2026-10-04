@@ -1123,11 +1123,17 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
-  // …and when that fallback runs, it must ask for the NEAREST unloaded turn, never the oldest. `loadThrough` pages until its
-  // target is covered, so the oldest target pulls the whole history in one press — the reader's "一次加载出来太多被卡爆了".
-  // One step back costs one page.
-  ['the history fallback steps one page, never sweeps the log', () => bundle.includes('nearestUnloadedSeq')
-    && !bundle.includes('oldestSeq:')],
+  // …and when it runs, it must ask `loadThrough` BEFORE `loadOlder`. Measured from the reader's console: the platform's
+  // "system-message withdrew materialized target" failure comes from `loadOlder`'s page shape and takes the event feed
+  // subscriber with it, after which even `loadThrough` lands nothing. Calling `loadOlder` first is therefore self-poisoning,
+  // and the order is the whole point — `loadThrough` pages at 200 messages, the shape the reader found working by hand.
+  // Asserted on the FIRST occurrence of each prop name, which is the order in the click handler.
+  ['the history step asks the jump loader before the paging one, so it cannot poison its own feed', () =>
+    bundle.includes('[dsh-better-display] history step')
+    && bundle.includes('olderHistoryState')
+    && bundle.includes('已经是最早的记录')
+    && bundle.indexOf('props.loadThrough') >= 0
+    && bundle.indexOf('props.loadThrough') < bundle.indexOf('props.loadOlder')],
   // Pressing 「加载更早记录」 must REVEAL unconditionally, and claim only what the host STATES. The host's loader has silent
   // no-op paths (`hasMore` false, its re-entrancy flag, a generation that moved on) and the platform offers no window edge
   // to tell "landed" from "dropped": `SessionSnapshot` carries `hasMore`, `loadingOlder` and `openState` and nothing more.
@@ -1138,7 +1144,7 @@ const markers = [
   // ever said on screen, and the observable facts go to the console for the next report.
   ['older history is revealed on every press, and only the certain case is claimed', () => bundle.includes('olderHistoryState')
     && bundle.includes('已经是最早的记录')
-    && bundle.includes('[dsh-better-display] loadOlder')],
+    && bundle.includes('revealStepOf(foldWindow)')],
   // The rail's reading of "which turn am I on" must re-run when the RENDERED WINDOW changes, not only when a turn is added.
   // 自动折叠 hides and reveals rows without adding a turn, so the effect's cached row list went stale and the rail stopped
   // at the folded window's oldest turn — the reader's report, in their own numbers (a threshold of 3 leaves it on 倒数第 3).

@@ -1982,43 +1982,41 @@ export function Reader(props: ReaderProps) {
           if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
           setHistoryNote(null);
           try {
-            // Whether a page landed IS observable after all — just not through the session snapshot: the rendered turns come
-            // from the host's node store, so `groups.length` is the ground truth for "did anything arrive". Comparing it
-            // across the await is what lets this button notice the platform failure below.
+            // The NEAREST unloaded turn: the one just older than the loaded window. `loadThrough` pages until its target is
+            // covered, so one step back costs about one page.
+            const items = timelineItems;
+            let nearest: number | null = null;
+            for (let index = items.length - 1; index >= 0; index -= 1) {
+              const item = items[index]!;
+              if (item.anchor.kind === 'unloaded') { nearest = item.anchor.seq; break; }
+            }
+            // `loadThrough`, NOT `loadOlder` — and this is the measured reason, straight from the reader's console. Two
+            // facts, one conclusion:
+            //   · the failure comes from `loadOlder` itself. Its page shape (50 messages to a page, `HISTORY_PAGE_OPTIONS`)
+            //     puts an event that withdraws the "system-message" materialized "chat" target into a page, the node
+            //     assembler throws, and the error takes the EVENT FEED SUBSCRIBER with it;
+            //   · after that, `loadThrough` still resolves — the fallback logged its target and the code carried on — but it
+            //     lands nothing either, because the feed that would carry it is already gone.
+            // So calling `loadOlder` first poisons everything after it. `loadThrough` uses `JUMP_PAGE_OPTIONS` (200 messages
+            // to a page), which is exactly the shape the reader found working when they jumped far back by hand. Asking it
+            // DIRECTLY is therefore both the working path and the one that avoids the poison.
             const renderableBefore = renderableRef.current;
-            await props.loadOlder();
-            // The platform failure this button can walk around, reported by the reader's console:
-            //   conversation Definition "system-message" withdrew materialized target "chat"; return the same key with
-            //   hidden visibility instead
-            // thrown inside the conversation node assembler while a page is prepended. It kills the event feed subscriber, so
-            // THAT page and every later `loadOlder` resolve without landing anything — the reader's 「卡住」 at a fixed turn.
-            // The rail's jump uses a different page shape (`loadThrough`, 200 messages to a page) and is not tripped by it,
-            // which is why the reader found that jumping far back sometimes works. So: when a press brings nothing, ask for
-            // the OLDEST turn the outline already knows about, which is the same request the rail's first item makes.
-            if (renderableRef.current === renderableBefore && hasMore && props.loadThrough) {
-              // The NEAREST unloaded turn — the one just older than the loaded window — NOT the oldest. Asking for the
-              // oldest made `loadThrough` pull every page in between: one press swept the entire history in, which is the
-              // "一次加载出来太多被卡爆了" the reader hit. `loadThrough` pages until its target is covered, so a target one
-              // step back costs one page, and it still uses the page shape that walks around the platform failure above.
-              const items = timelineItems;
-              let nearest: number | null = null;
-              for (let index = items.length - 1; index >= 0; index -= 1) {
-                const item = items[index]!;
-                if (item.anchor.kind === 'unloaded') { nearest = item.anchor.seq; break; }
-              }
-              if (nearest !== null) {
-                console.warn('[dsh-better-display] loadOlder landed nothing; stepping forward with the jump page', { nearestUnloadedSeq: nearest });
-                await props.loadThrough(nearest);
-              }
+            if (nearest !== null && props.loadThrough) {
+              await props.loadThrough(nearest);
+            } else {
+              // No jump loader on this face: the older, poisoned-prone route is all there is.
+              await props.loadOlder();
             }
             // ALWAYS reveal. What a page brings in is OLDER turns, which land outside the folding window and are therefore
             // hidden: without this the fetch could succeed and the reader would still see nothing change, which is the
             // reported 「卡住」. Revealing unconditionally is the honest version; it costs nothing when nothing arrived.
             setRevealed(value => value + revealStepOf(foldWindow));
-            // What CAN be seen, for the next report. `hasMore` true with no visible growth is the signature of the loading
-            // question, and these four numbers settle which side of the seam it is on. On screen only when it is certain:
-            // the host says there is no more, so the reader is at the earliest record.
-            console.info('[dsh-better-display] loadOlder', { hasMore, loadingOlder, openState, state: olderHistoryState(hasMore), renderableTurns: groups.length, hiddenTurns: hiddenTurnKeys.size });
+            // What CAN be seen, for the next report: whether the ask landed at all, and what the host still claims.
+            console.info('[dsh-better-display] history step', {
+              asked: nearest, landed: renderableRef.current !== renderableBefore,
+              renderableTurns: renderableRef.current, hiddenTurns: hiddenTurnKeys.size,
+              hasMore, loadingOlder, openState, state: olderHistoryState(hasMore),
+            });
             if (olderHistoryState(hasMore) === 'exhausted') setHistoryNote('exhausted');
           } catch { setHistoryNote('failed'); }
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}

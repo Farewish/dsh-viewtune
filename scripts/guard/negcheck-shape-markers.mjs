@@ -274,10 +274,11 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
-    label: 'the history fallback sweeping the whole log again renamed back to the bounded step',
-    // Reverting the bound is what made one press load every page from the first turn to the last.
-    search: 'nearestUnloadedSeq',
-    replace: 'NEARESTUNLOADEDSEQ',
+    label: 'the history step’s log label renamed, so the order assertion that guards the feed has nothing to stand on',
+    // The label is what the order assertion anchors to; without it the button could be reordered back to calling `loadOlder`
+    // first, which is the self-poisoning order the reader's console exposed.
+    search: 'history step',
+    replace: 'HISTORY STEP',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
