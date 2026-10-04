@@ -38,6 +38,8 @@ const GUARDS = [
   ['selftest-pill-scope.mjs', 'that checker is able to fail (it is fed a known-bad bundle)'],
   ['check-stylesheet-classes.mjs', 'every CSS-module class the sources use has a rule, and the checker is able to fail'],
   ['check-settings-fallbacks.mjs', 'every boolean setting default and its defensive reader agree, bar the declared inversions'],
+  ['check-doc-links.mjs', 'every relative link in the shipped documents resolves on disk'],
+  ['selftest-doc-links.mjs', 'that checker is able to fail (it is fed a document with a dead link)'],
   ['check-host-markers.mjs', 'the HOST bundle keeps its own invariants (body caps, settle paths, revalidation)'],
   ['check-platform-exports.mjs', 'every platform member the artifact reads off the installed packages actually exists'],
   ['verify-session-changes.mjs', 'the reading-view changes survive compilation'],
