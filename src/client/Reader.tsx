@@ -1979,7 +1979,14 @@ export function Reader(props: ReaderProps) {
             // The host's loader has several silent no-op paths (see `loadOlderOutcome`): what it ACHIEVED is the only thing
             // worth reporting, and comparing the loaded turn count across the await is how this view can see it.
             const outcome = loadOlderOutcome(before, loadedTurnsRef.current, hasMore);
-            setHistoryNote(outcome === 'progress' ? null : outcome);
+            if (outcome === 'progress') {
+              // …and what it just loaded are OLDER turns, so they arrive OUTSIDE the folding window — hidden. Without this
+              // the press really did fetch them and the reader saw nothing change, which is the reported 「卡住」. Revealing
+              // one band is the same step this button already takes when the turns are in hand, and it is exactly what the
+              // rail's earliest item does (through `revealForTurn`), which the reader found working.
+              setRevealed(value => value + revealStepOf(foldWindow));
+              setHistoryNote(null);
+            } else setHistoryNote(outcome);
           } catch { setHistoryNote('failed'); }
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
       {historyNote !== null && <div className={css.notice} role="status">

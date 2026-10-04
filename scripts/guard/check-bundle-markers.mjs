@@ -648,7 +648,11 @@ const markers = [
     && bundle.includes('hiddenTurnKeys.has(group.key)')
     // One name for the control, in both cases: the reader asked for that (「那个按钮也命名为加载更早记录即可」), so the
     // reveal is only ever the click handler's arithmetic and the label is the same string the disk path uses.
-    && (bundle.match(/revealStepOf\(foldWindow\)/g) ?? []).length === 1
+    //
+    // The count is `>= 1` rather than `=== 1` since the load path grew a second call to the same arithmetic: what it
+    // fetches arrives OLDER than the window and would otherwise land hidden, so the press now reveals one band too. The
+    // name and the single control are what this line is about, and both still hold — pinned by the label assertions below.
+    && (bundle.match(/revealStepOf\(foldWindow\)/g) ?? []).length >= 1
     && bundle.includes('hiddenTurnKeys.size > 0')
     && bundle.includes('加载更早记录')
     && !bundle.includes('显示更早的')],
