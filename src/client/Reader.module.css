@@ -75,7 +75,13 @@
 .userCluster { display: flex; flex-direction: column; align-self: flex-end; align-items: flex-end; max-width: min(525px, 82%); gap: 8px; min-width: 0; margin-bottom: 4px; }
 .userImages { display: flex; flex-direction: column; align-items: flex-end; max-width: 100%; min-width: 0; }
 .userImages .imageFigure { align-self: flex-end; }
-.user { align-self: flex-end; max-width: 100%; padding: 10px 16px; border-radius: 22px; background: var(--dsw-specific-bubble); color: var(--dsw-alias-label-primary); line-height: 24px; overflow-wrap: anywhere; box-sizing: border-box; }
+/* The user's own bubble. Every property here is the host's own (`dsh-client-ui-chat`'s `.bubble`), read from its
+   stylesheet — and `white-space: pre-wrap` is the one that keeps the reader's newlines. It was missing, while the user's
+   text is rendered as MARKDOWN (see `Blocks.tsx`), where a single newline is a soft break that collapses: the reported
+   「换行不能正确显示」. The host's bubble carries both halves (pre-wrap AND its own text), which is why the conversation page
+   looked right and this view did not. A reader's plain message has no indentation to preserve, so pre-wrap costs nothing
+   here, and a fenced block inside it keeps its own `pre` rules. */
+.user { align-self: flex-end; max-width: 100%; padding: 10px 16px; border-radius: 22px; background: var(--dsw-specific-bubble); color: var(--dsw-alias-label-primary); line-height: 24px; overflow-wrap: anywhere; box-sizing: border-box; white-space: pre-wrap; }
 .user .blocks { gap: 10px; }
 .answer { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .readingText { min-width: 0; }

@@ -1,8 +1,15 @@
 # Changelog
 
-## 0.5.6 (a brand new session opens on the page the reader chose, and a long one lands at the tail)
+## 0.5.6 (a brand new session opens on the page the reader chose, a long one lands at the tail, and the user's newlines survive)
 
-**一个设置：新会话默认视图（阅读页 / 对话页），外加一个开局位置的修复。** 0.5.5 已经打标并推送 ✓、字节已冻结 ✓，所以这些改动另起一个版本号 —— 同一个版本号指两份不同的字节，是这个项目自己记过教训的坑（见 0.5.0→0.5.1 那条 ✓）。
+**一个设置、两个修复。** 0.5.5 已经打标并推送 ✓、字节已冻结 ✓，所以这些改动另起一个版本号 —— 同一个版本号指两份不同的字节，是这个项目自己记过教训的坑（见 0.5.0→0.5.1 那条 ✓）。
+
+### 修复：阅读页里用户气泡的换行被合并
+
+- **读者报告** ✓：阅读页里**用户气泡内的换行不能正确显示** ✓。
+- **根因（两件事凑在一起）** ✓：①用户文本走的是 **markdown** 渲染 ✓（`Blocks.tsx` 里 `source === 'user'` ⇒ `MarkdownText` ✓），而 markdown 里**单个换行是软换行、会被合并** ✗；②插件的 `.user` 把宿主气泡的属性基本都照抄了 ✓（同一个 `--dsw-specific-bubble` ✓、圆角 ✓、内边距 ✓、行高 ✓），**唯独漏了 `white-space: pre-wrap`** ✗ —— 而量到的宿主 `.Sixlwa_bubble`（`dsh-client-ui-chat` ✓）**正是带着这一条** ✓✓。宿主两半都有 ✓ ⇒ 对话页正常 ✓、阅读页塌行 ✓。
+- **修法** ✓：给 `.user` 补上宿主那一条 `white-space: pre-wrap` ✓（它会被里面的 markdown 继承 ✓ ⇒ 换行显示出来 ✓）。普通消息没有缩进要保留 ✓、围栏代码块自带 `pre` 规则 ✓ ⇒ 代价可忽略 ✓；**steering（补充消息）**走同一条路径 ✓，一并修好 ✓。
+- 纯样式一行 ✓（无纯逻辑可单测 ✓，本条如实记在这里 ✓ —— 编译后的类名带路径哈希、声明顺序也会被重排 ✓，钉它会假红 ✗）。全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **23/23** ✓、反向自检 **OK（91 例）** ✓。
 
 ### 修复：长会话在阅读页开局停在**最上**，而不是最新处
 
