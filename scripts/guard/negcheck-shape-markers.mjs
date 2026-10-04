@@ -274,13 +274,6 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
-    label: 'the history step’s retry ladder renamed, so one doomed request is all a press gets',
-    // Without the ladder a single batch that contains the offending event ends the press entirely — the reported 「卡住」.
-    search: 'historyStepTarget',
-    replace: 'HISTORYSTEPTARGET',
-    guards: ['scripts/guard/check-bundle-markers.mjs'],
-  },
-  {
     label: 'the history step’s log label renamed, so the order assertion that guards the feed has nothing to stand on',
     // The label is what the order assertion anchors to; without it the button could be reordered back to calling `loadOlder`
     // first, which is the self-poisoning order the reader's console exposed.

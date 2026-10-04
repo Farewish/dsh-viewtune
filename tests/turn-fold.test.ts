@@ -9,24 +9,8 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { HISTORY_STEP_ATTEMPTS, TURN_FOLD_MAX, historyStepTarget, insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from '../src/client/turn-fold.ts';
-test('the history step ladder walks back further on each attempt', () => {
-  // Both loaders die on the same platform failure, and which batch survives depends on where `paginate` cuts, so the only
-  // lever left is which batch we ASK for. The list is ascending (oldest first), so its end is the nearest unloaded turn.
-  // Ascending, so the END is the nearest unloaded turn; the rungs are 0, 1, 3 and 7 steps back from it.
-  const unloaded = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-  assert.equal(historyStepTarget(unloaded, 0), 100, 'the nearest unloaded turn, one page back');
-  assert.equal(historyStepTarget(unloaded, 1), 90);
-  assert.equal(historyStepTarget(unloaded, 2), 70);
-  assert.equal(historyStepTarget(unloaded, 3), 30);
-  // Past the ladder there is nothing NEW to ask for: repeating the deepest rung would send the same request again and call
-  // it a retry. `null` is the caller's signal to stop asking, and so is running out of log.
-  assert.equal(historyStepTarget(unloaded, 4), null);
-  assert.equal(historyStepTarget(unloaded, 99), null);
-  assert.equal(historyStepTarget([10], 1), null);
-  assert.equal(historyStepTarget([], 0), null);
-  assert.equal(HISTORY_STEP_ATTEMPTS, 4);
-});
+import { TURN_FOLD_MAX, insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from '../src/client/turn-fold.ts';
+
 
 test('what a load of older history can honestly be said to have achieved', () => {
   // Two proxies were tried and BOTH lied, because the session snapshot carries no window edge: a count of loaded turns (the

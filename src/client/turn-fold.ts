@@ -69,30 +69,7 @@ export function revealForTurn(index: number, total: number, window: number, reve
   return needed <= revealed ? revealed : needed;
 }
 
-/**
- * Which unloaded turn to ask for on the Nth attempt at reading older history — the walk around a platform defect.
- *
- * Measured from the reader's console: BOTH loaders trip the same failure. `loadOlder` (50-message pages) and `loadThrough`
- * (200-message pages) each died in `ConversationNodeAssembler` with "system-message withdrew materialized target chat",
- * killing the event feed subscriber so the batch never landed. Page size is not the variable — whether the requested batch
- * HAPPENS TO CONTAIN the offending event is. The reader's own experience says the same thing from the other side: jumping
- * far back "sometimes" works, and then many loads succeed, which is exactly a batch that stepped over the event.
- *
- * So the attempts grow the step: one turn back, then two, four, eight. Each asks for a different batch, and one of them
- * excludes the event. `unloaded` is every unloaded sequence ASCENDING (oldest first), `attempt` is 0-based; `null` means the
- * ladder has run out of log, which is the caller's signal to stop asking.
- */
-export function historyStepTarget(unloaded: readonly number[], attempt: number): number | null {
-  const ladder = [0, 1, 3, 7];
-  // Past the ladder there is nothing new to ask for: repeating the deepest rung would send the same request twice and call
-  // it a retry. `null` is the caller's signal to stop.
-  if (attempt < 0 || attempt >= ladder.length) return null;
-  const index = unloaded.length - 1 - ladder[attempt]!;
-  return index >= 0 ? unloaded[index]! : null;
-}
 
-/** How many attempts the ladder above is worth before the caller stops and says so. */
-export const HISTORY_STEP_ATTEMPTS = 4;
 
 /**
  * What a load of older history can be said to have achieved — and, honestly, what it cannot.

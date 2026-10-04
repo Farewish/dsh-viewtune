@@ -44,7 +44,7 @@ import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
-import { HISTORY_STEP_ATTEMPTS, historyStepTarget, insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
+import { insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps, TurnProcessChatData } from './types.js';
@@ -1790,7 +1790,7 @@ export function Reader(props: ReaderProps) {
   // What to say about the last attempt to read older history, if anything — see `loadOlderOutcome`. Three outcomes, three
   // sentences, because the host's loader can fail by doing NOTHING AT ALL, and a reader staring at an unchanged list
   // cannot tell "there is nothing older" from "nothing arrived".
-  const [historyNote, setHistoryNote] = useState<'exhausted' | 'stuck' | 'failed' | null>(null);
+  const [historyNote, setHistoryNote] = useState<'exhausted' | 'blocked' | 'stuck' | 'failed' | null>(null);
   // 1. Navigation items from Chat snapshot
   const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
   // 2. Whole-log turn outline projection
@@ -1982,42 +1982,36 @@ export function Reader(props: ReaderProps) {
           if (hiddenTurnKeys.size > 0) { setRevealed(value => value + revealStepOf(foldWindow)); return; }
           setHistoryNote(null);
           try {
-            // Every unloaded sequence, ASCENDING (oldest first) — the ladder in `historyStepTarget` counts back from the end.
+            // Every unloaded sequence, ASCENDING (oldest first); the last one is the nearest unloaded turn.
             const unloadedSeqs: number[] = [];
             for (const item of timelineItems) if (item.anchor.kind === 'unloaded') unloadedSeqs.push(item.anchor.seq);
+            const target = unloadedSeqs.length > 0 ? unloadedSeqs[unloadedSeqs.length - 1]! : null;
             const renderableBefore = renderableRef.current;
-            let landed = false;
-            // Retry with a growing step. Not for flakiness: the platform failure below depends on whether the requested batch
-            // happens to CONTAIN an event that withdraws the "system-message" materialized "chat" target, and the batch a
-            // request produces depends on where `paginate` cuts. Both loaders die on it — measured, `loadOlder` (50-message
-            // pages) and `loadThrough` (200) alike — so the only lever left is which batch we ask for. The reader's own
-            // experience matches: jumping far back "sometimes" works, and then many loads succeed. `loadThrough` is used
-            // rather than `loadOlder` because it resolves through the same failure and reports it, while `loadOlder`'s own
-            // throw is what killed the feed in the first trace we got.
-            for (let attempt = 0; attempt < HISTORY_STEP_ATTEMPTS && !landed; attempt += 1) {
-              const target = historyStepTarget(unloadedSeqs, attempt);
-              if (target === null) break;
-              if (props.loadThrough) await props.loadThrough(target);
-              else { await props.loadOlder(); }
-              landed = renderableRef.current !== renderableBefore;
-              console.info('[dsh-better-display] history attempt', { attempt, target, landed, renderableTurns: renderableRef.current });
-              // A face without `loadThrough` has no ladder to walk: one press, one page.
-              if (!props.loadThrough) break;
-            }
-            // ALWAYS reveal. What a page brings in is OLDER turns, which land outside the folding window and are therefore
-            // hidden: without this the fetch could succeed and the reader would still see nothing change, which is the
-            // reported 「卡住」. Revealing unconditionally is the honest version; it costs nothing when nothing arrived.
+            // `loadThrough` and NOT `loadOlder`, for a measured reason: `loadOlder`'s own throw is what killed the feed in the
+            // first trace we got, and `loadThrough` resolves through the same failure and lets this view report it.
+            if (target !== null && props.loadThrough) await props.loadThrough(target);
+            else await props.loadOlder();
+            const landed = renderableRef.current !== renderableBefore;
             setRevealed(value => value + revealStepOf(foldWindow));
-            // What CAN be seen, for the next report: whether the ask landed at all, and what the host still claims.
+            // A ladder of farther targets used to live here, on the theory that a different batch might step over the event
+            // that breaks the prepend. It was removed after the evidence refuted the theory: `paginate` walks BACKWARDS from
+            // the window's oldest sequence, so every batch is contiguous from there — if the offending event lies between the
+            // target and the window base, EVERY target contains it. Measured: four targets spanning 778 sequences
+            // (49787, 49697, 49467, 49009) all failed identically, with `hasMore` still true and 34 turns rendered.
             console.info('[dsh-better-display] history step', {
-              landed, renderableTurns: renderableRef.current, hiddenTurns: hiddenTurnKeys.size,
+              target, landed, renderableTurns: renderableRef.current, hiddenTurns: hiddenTurnKeys.size,
               hasMore, loadingOlder, openState, state: olderHistoryState(hasMore),
             });
-            if (olderHistoryState(hasMore) === 'exhausted') setHistoryNote('exhausted');
+            // `landed` is trustworthy: the rendered turns come from the host's node store, so a page that arrives grows it.
+            // Nothing arrived and the host still claims more ⇒ the platform's prepend failure, which this view cannot walk
+            // around (see above) and which the reader deserves to be told about plainly instead of watching nothing happen.
+            if (!landed && olderHistoryState(hasMore) === 'more') setHistoryNote('blocked');
+            else if (olderHistoryState(hasMore) === 'exhausted') setHistoryNote('exhausted');
           } catch { setHistoryNote('failed'); }
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
       {historyNote !== null && <div className={css.notice} role="status">
         {historyNote === 'exhausted' ? '已经是最早的记录。'
+          : historyNote === 'blocked' ? '更早的记录暂时读不出来：宿主的事件馈送被一个「撤回物化目标」的事件打断了，这段历史要等平台侧修复才能读取。'
           : historyNote === 'stuck' ? '没能读到更早的记录：宿主那边还有更早的内容，但这次没能取回，可再试一次。'
           : '历史记录加载失败，可再次尝试；现有内容未改变。'}
       </div>}
