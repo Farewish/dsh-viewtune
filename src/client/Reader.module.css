@@ -151,6 +151,9 @@
 .blocks > :first-child { margin-top: 0; }
 .blocks > :last-child { margin-bottom: 0; }
 .blocks :global(.md-table-wide) { max-width: 100%; }
+/* The arrow sits 2px lower, by the reader's eye. `position: relative` keeps it out of layout: the label, the padding and
+ * the row's rhythm are untouched, and only the drawn chevron moves — the 用时 beside it stays where it is. */
+.disclosureButton svg { position: relative; top: 2px; }
 .disclosure { min-width: 0; }
 /* `margin-left: -6px` STAYS: it pulls the label's text edge back into line with the body beneath it, once the button's own
  * 6px padding is accounted for. The reader asked for ONE change at a time — the text highlight, which is the option they
