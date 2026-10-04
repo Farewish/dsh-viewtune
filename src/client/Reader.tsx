@@ -878,8 +878,11 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   };
 
   const chips = (paths: readonly string[], open: (path: string) => void = path => { openFile?.(path); }, delivered?: readonly DeliveredFile[]) => paths.map(path => (
+    // `full` — the inline `width: 100%` — belongs to the CARDS mode only, where a delivery is the host's own full-width card.
+    // Applied everywhere, as it was, every delivered bubble inside the BALANCED box stretched into a wide bar: that is the
+    // 「大框」 the reader reported, and why that box looked nothing like 编辑's, whose chips are ordinary pills.
     <DeliverableChip key={path} path={path} display={display} description={delivered?.find(entry => entry.path === path)?.description}
-      full={delivered?.some(entry => entry.path === path) === true} openFile={open} revealFile={revealFile} />
+      full={display === 'cards' && delivered?.some(entry => entry.path === path) === true} openFile={open} revealFile={revealFile} />
   ));
   // 气泡的点击回到"打开文件本体" ✓，由「产物用侧边栏打开」开关决定外部还是侧边栏 ✓ —— 行内的 `openFile` 已经按开关路由
   //（`props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' })` ✓），所以这里不需要任何特例 ✓。
@@ -922,17 +925,6 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
             {regions.filter(region => region.count > 0).map(region => {
               const open = boxOpen[region.id] === true;
               const edited = region.kind === 'files';
-              // 交付：**不再是大框** ✓（读者要求：做成编辑里那样的气泡 ✓）—— 一行「交付」标签 + 同一串气泡 ✓，与详细卡片档
-              // 的提交行同形 ✓（样式也是同一组声明 ✓）。**只换这一块** ✓：编辑仍是框（框头可点 ✓、可就地展开面板 ✓）、
-              // 提交仍是框 ✓，三者的先后顺序也不变（编辑 → 交付 → 提交 ✓）。
-              if (region.kind === 'delivered') {
-                return <div key={region.id} className={css.deliveriesRow} title={region.hint}>
-                  <span className={css.deliveriesLabel}>交付</span>
-                  <div className={css.deliveriesList}>
-                    {chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)}
-                  </div>
-                </div>;
-              }
               return (
                 <DeliverablesBox key={region.id} region={region} open={open}
                   // 编辑框：框头是按钮，点它交给宿主的检视器（第一个改动的调用 ✓ —— 宿主自己的 review 入口不对 View 开放 ✓，
@@ -945,9 +937,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   onHeadingClick={edited ? openReview : undefined}                  panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
+                    : region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble — the message as the
-                    // label, the short hash in the tooltip (see `CommitBubble`). (交付 is no longer rendered through this box
-                    // at all — see the delivered branch above.)
+                    // label, the short hash in the tooltip (see `CommitBubble`).
                     : groups.commits.map((commit, index) => (
                       <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
                     ))}
