@@ -922,6 +922,17 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
             {regions.filter(region => region.count > 0).map(region => {
               const open = boxOpen[region.id] === true;
               const edited = region.kind === 'files';
+              // 交付：**不再是大框** ✓（读者要求：做成编辑里那样的气泡 ✓）—— 一行「交付」标签 + 同一串气泡 ✓，与详细卡片档
+              // 的提交行同形 ✓（样式也是同一组声明 ✓）。**只换这一块** ✓：编辑仍是框（框头可点 ✓、可就地展开面板 ✓）、
+              // 提交仍是框 ✓，三者的先后顺序也不变（编辑 → 交付 → 提交 ✓）。
+              if (region.kind === 'delivered') {
+                return <div key={region.id} className={css.deliveriesRow} title={region.hint}>
+                  <span className={css.deliveriesLabel}>交付</span>
+                  <div className={css.deliveriesList}>
+                    {chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)}
+                  </div>
+                </div>;
+              }
               return (
                 <DeliverablesBox key={region.id} region={region} open={open}
                   // 编辑框：框头是按钮，点它交给宿主的检视器（第一个改动的调用 ✓ —— 宿主自己的 review 入口不对 View 开放 ✓，
@@ -934,9 +945,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                   onHeadingClick={edited ? openReview : undefined}                  panel={edited && changesOpen ? <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} /> : undefined}
                   onToggle={() => { setBoxOpen(current => ({ ...current, [region.id]: !open })); }}>
                   {edited ? chips(groups.edited)
-                    : region.kind === 'delivered' ? chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble — the message as the
-                    // label, the short hash in the tooltip (see `CommitBubble`).
+                    // label, the short hash in the tooltip (see `CommitBubble`). (交付 is no longer rendered through this box
+                    // at all — see the delivered branch above.)
                     : groups.commits.map((commit, index) => (
                       <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
                     ))}

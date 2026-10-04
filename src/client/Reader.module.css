@@ -556,10 +556,12 @@
 .deliverablesRegions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 /* **简略档**的提交行 ✓（读者要求：不要在产物那一行里 ✓，单开一行「提交」✓）：左边标签 ✓、右边哈希气泡 ✓。
    它挂在根栅格上 ✓ ⇒ 必须**跨满**（根在简略档是「标签 + 内容」两列 ✓），否则会落进标签那一列 ✓。 */
-.commitsRow { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: 6px; }
-/* 「提交」与「产物」同一档 ✓（读者要求两处都重些 ✓）。 */
-.commitsLabel { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
-.commitsList { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+/* 平衡档的**交付**行 ✓（读者要求：不要大框 ✓，要编辑里那样的气泡 ✓）—— 与详细卡片档的提交行**共用同一组声明** ✓，
+   它们本来就是同一个形状：一行标签 + 一串气泡 ✓。 */
+.commitsRow, .deliveriesRow { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: 6px; }
+/* 「提交 / 交付」与「产物」同一档 ✓（读者要求两处都重些 ✓）。 */
+.commitsLabel, .deliveriesLabel { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+.commitsList, .deliveriesList { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .deliverablesTotalRow { display: flex; align-items: center; gap: 10px; }
 .deliverablesTotal { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .deliverablesToggle { border: 1px solid transparent; border-radius: 6px; background: 0 0; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer; padding: 1px 8px; }
