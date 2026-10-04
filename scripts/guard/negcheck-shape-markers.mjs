@@ -286,8 +286,8 @@ const cases = [
     // measured: excluding the turns that are off screen, in both directions.
     // Written in the ARTIFACT's form, which is what this mutation rewrites, and with a replacement the minifier keeps: an
     // earlier attempt flipped the value's case, which the minifier lowercases straight back, leaving the artifact unchanged.
-    search: 'content-visibility:auto;contain-intrinsic-size:auto 320px',
-    replace: 'content-visibility:visible;contain-intrinsic-size:auto 320px',
+    search: 'content-visibility:auto;contain-intrinsic-block-size:auto 320px}',
+    replace: 'content-visibility:visible;contain-intrinsic-block-size:auto 320px}',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {

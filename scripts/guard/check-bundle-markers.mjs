@@ -1136,12 +1136,16 @@ const markers = [
   // them, which are never folded. `content-visibility: auto` skips layout and paint off screen in BOTH directions, and
   // `contain-intrinsic-size` keeps the scrollbar honest while a turn is skipped.
   ['the reading view renders only what is near the viewport', () =>
-    bundle.includes('content-visibility:auto;contain-intrinsic-size:auto 320px')
+    // BLOCK axis only, and the shorthand is denied on purpose: `contain-intrinsic-size: auto 320px` takes one value and
+    // applies it to BOTH axes, which gave every skipped turn an intrinsic WIDTH of 320px. Its contents laid out at that
+    // width and the process toggle's header squeezed its title to nothing — the reader's "the toggle is truncated".
+    bundle.includes('content-visibility:auto;contain-intrinsic-block-size:auto 320px}')
+    && !bundle.includes('contain-intrinsic-size:auto 320px')
     // …with the LIVE turn exempt. `content-visibility` implies `contain: layout paint`, and the reasoning card follows
     // itself from INSIDE that subtree — it measures its own height, writes its inner scroller and drives a transform. The
     // reader reported 「跟随最新」 breaking right after the viewport change went in, and this exemption is the fix. The live
     // turn is on screen while it is written, so it was never a candidate for skipping.
-    && bundle.includes('[data-live]{content-visibility:visible;contain-intrinsic-size:auto}')],
+    && bundle.includes('[data-live]{content-visibility:visible;contain-intrinsic-block-size:auto}')],
   // When the platform's prepend failure blocks the ordinary step, the view must SAY so and offer the one route the reader
   // found that gets past it — a jump at the far end of the log — with its cost named in the label. Kept separate from the
   // ordinary press on purpose: it fetches the whole history.

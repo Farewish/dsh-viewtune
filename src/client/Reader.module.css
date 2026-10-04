@@ -92,11 +92,12 @@
  *     label read from a row that is on screen and therefore laid out. */
 .root .turn {
   content-visibility: auto;
-  /* A plain estimate again. A sampled, per-scroll value lived here for one commit and is withdrawn: writing that custom
-     property on every scroll frame re-sized every skipped turn, so the transcript's own height moved while the reasoning
-     card's follower was compensating inside it. Fine-tuning the number is not worth perturbing the one card that measures
-     itself. */
-  contain-intrinsic-size: auto 320px;
+  /* BLOCK axis only (`contain-intrinsic-block-size`), never the shorthand: `contain-intrinsic-size: auto 320px` takes a
+     single value and applies it to BOTH axes, so a skipped turn was given an intrinsic WIDTH of 320px as well as a height.
+     Its contents then laid out at that width — the process toggle's header squeezes its title to nothing, because the title
+     carries `min-width: 0` — and the reader reported exactly that: the toggle looked truncated. A turn is a full-width row
+     in a column; only its height is ever unknown. */
+  contain-intrinsic-block-size: auto 320px;
 }
 /* …EXCEPT the turn being written into. `content-visibility` implies `contain: layout paint` on the element, and the
  * reasoning card does its own following INSIDE this subtree: it measures its own height, writes its inner scroller's
@@ -106,7 +107,7 @@
  * costs the optimisation nothing and gives the following card back its footing. */
 .root .turn[data-live] {
   content-visibility: visible;
-  contain-intrinsic-size: auto;
+  contain-intrinsic-block-size: auto;
 }
 .turn + .turn { margin-top: 12px; }
 /* 用户气泡的**宽度与排版**全部照抄宿主自己那两条规则 ✓（`dsh-client-ui-chat` 的 `.userStack` / `.bubble` ✓，逐条量出来的 ✓）：
