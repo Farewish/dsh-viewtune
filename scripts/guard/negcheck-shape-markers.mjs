@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the user bubble stops following the host’s content width, so its cap freezes at the default again',
+    // A frozen cap looks right only at the default chat width; the host's own bubble follows the variable, and the reader's
+    // complaint was that the two pages were not the same length.
+    search: '--dsh-chat-content-width',
+    replace: '--dsh-chat-content-WIDTH',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the tail-follow’s takeover rule renamed out of the bundle, so a mount position can disarm the follow again',
     // That rule is what tells a layout position from the reader's own move. Losing it is how a long session opened at the
     // TOP: the follow was disarmed by the mount's own scroll position, before the reader had done anything at all.

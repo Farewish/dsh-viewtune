@@ -72,7 +72,15 @@
 .root button:focus-visible, .root summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
 .turn { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .turn + .turn { margin-top: 12px; }
-.userCluster { display: flex; flex-direction: column; align-self: flex-end; align-items: flex-end; max-width: min(525px, 82%); gap: 8px; min-width: 0; margin-bottom: 4px; }
+/* 用户气泡的**宽度与排版**全部照抄宿主自己那两条规则 ✓（`dsh-client-ui-chat` 的 `.userStack` / `.bubble` ✓，逐条量出来的 ✓）：
+     .userStack { max-width: min(calc(var(--dsh-chat-content-width,748px) * .702), 82%) }
+     .bubble    { border-radius: var(--dsw-radius-xl); font-size: var(--dsh-content-font-size,14px);
+                  line-height: calc(22px + var(--dsh-content-font-delta,0px)); word-break: break-word; padding: 10px 16px }
+   从前这里是**写死的 `min(525px, 82%)`** ✗（525 恰好等于默认 748 × 0.702 ✓，所以默认下看着接近 ✓，但宿主那份会随
+   `--dsh-chat-content-width` 变化 ✓、我们不会 ✗）；字号/行高也没跟宿主 ✓（我们 24px、宿主 22px + delta ✓）。
+   `overflow-wrap: anywhere` 也换成了宿主的 `word-break: break-word` ✓ —— `anywhere` 会**参与 min-content 计算** ✓，
+   于是同一个词能让盒子更窄 ✗，这也正是"同样情况下比对话页短"的一个来源 ✓。 */
+.userCluster { display: flex; flex-direction: column; align-self: flex-end; align-items: flex-end; max-width: min(calc(var(--dsh-chat-content-width, 748px) * .702), 82%); gap: 8px; min-width: 0; margin-bottom: 4px; }
 .userImages { display: flex; flex-direction: column; align-items: flex-end; max-width: 100%; min-width: 0; }
 .userImages .imageFigure { align-self: flex-end; }
 /* The user's own bubble. Every property here is the host's own (`dsh-client-ui-chat`'s `.bubble`), read from its
@@ -81,7 +89,7 @@
    「换行不能正确显示」. The host's bubble carries both halves (pre-wrap AND its own text), which is why the conversation page
    looked right and this view did not. A reader's plain message has no indentation to preserve, so pre-wrap costs nothing
    here, and a fenced block inside it keeps its own `pre` rules. */
-.user { align-self: flex-end; max-width: 100%; padding: 10px 16px; border-radius: 22px; background: var(--dsw-specific-bubble); color: var(--dsw-alias-label-primary); line-height: 24px; overflow-wrap: anywhere; box-sizing: border-box; white-space: pre-wrap; }
+.user { align-self: flex-end; max-width: 100%; padding: 10px 16px; border-radius: var(--dsw-radius-xl); background: var(--dsw-specific-bubble); color: var(--dsw-alias-label-primary); font-size: var(--dsh-content-font-size, 14px); line-height: calc(22px + var(--dsh-content-font-delta, 0px)); word-break: break-word; box-sizing: border-box; white-space: pre-wrap; }
 .user .blocks { gap: 10px; }
 .answer { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .readingText { min-width: 0; }

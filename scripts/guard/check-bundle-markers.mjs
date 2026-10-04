@@ -1107,6 +1107,13 @@ const markers = [
     && bundle.includes('entryViewOf')
     && bundle.includes('reader-settings-entry-view')
     && bundle.includes('defaultView === "reader"')],
+  // The reader's own bubble is the host's bubble: the same cap (which follows the host's chat-content width instead of a
+  // frozen 525px), the same font size and line height, the same radius, and the same break rule. Pinned on the variable the
+  // cap reads — that is the half the conversation page had and this view did not, and a fixed cap only looked right at the
+  // default content width.
+  ['the user bubble is sized and set like the host’s own', () => bundle.includes('--dsh-chat-content-width')
+    && bundle.includes('--dsh-content-font-delta')
+    && bundle.includes('word-break:break-word')],
   // The tail-follow's own rule, in the module that states it: a scroll POSITION is not a takeover until the READER has
   // acted — an upward move counts, a downward one never does. Without it a long session opens at the TOP, because its
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
