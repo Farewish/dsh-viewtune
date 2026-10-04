@@ -1674,18 +1674,25 @@ export function Reader(props: ReaderProps) {
   // screen — and this effect would then tear down and re-run a forced measurement (a getBoundingClientRect, a
   // querySelectorAll and two setStates) for a row set that did not move. A turn that grows does not move the rows
   // ABOVE it, and those are the ones the reading line is measured against; position changes arrive through the scroll
-  // listener and the ResizeObserver on the scroller, both of which this effect installs and neither of which depends
-  // on the dependency list. (Text deltas alone do not rebuild `groups` at all: its deps — the node store, the order
-  // array and the timeline — keep their identity across a delta, so only the growing node itself is replaced.)
+  // listener and the ResizeObserver, both of which this effect installs. (Text deltas alone do not rebuild `groups` at all:
+  // its deps — the node store, the order array and the timeline — keep their identity across a delta, so only the growing
+  // node itself is replaced.)
+  //
+  // `renderedTurns` is in the dependency list for the reason this effect's own premise was wrong: it used to assume that
+  // "a turn being added is the only thing that can add, remove or re-key a row", and 自动折叠 breaks exactly that — the
+  // window hides and reveals turns WITHOUT any turn being added, so the cached row list went stale and the effect never
+  // re-ran. The rail then reported the turn at the stale list's edge, which is the reported "it stops at the folded
+  // window's oldest turn". Re-running re-queries the rows (below) and re-measures, which is also what makes a reveal move
+  // the rail: a prepend keeps `scrollTop` and fires no scroll event, so nothing else would have noticed.
   const turnSignature = useMemo(() => groups.map(group => group.turn).join('|'), [groups]);
   useLayoutEffect(() => {
     const content = root.current;
     if (!content) return;
     const scroller = content.closest<HTMLElement>('[data-conversation-scroll]') ?? content;
-    // One query per ROW SET, not per frame. This effect re-runs whenever `turnSignature` changes — a turn being added
-    // is the only thing that can add, remove or re-key a row element (keys are the turn numbers, and a node arriving
-    // inside a turn leaves its row element alone) — so the list stays valid for the life of the effect. Querying
-    // inside `measure` allocated a whole NodeList on every scroll frame.
+    // One query per ROW SET, not per frame. This effect re-runs whenever `turnSignature` or the rendered window changes —
+    // together those are the only things that can add, remove or re-key a row element (keys are the turn numbers, a node
+    // arriving inside a turn leaves its row element alone, and the window decides which rows exist at all) — so the list
+    // stays valid for the life of the effect. Querying inside `measure` allocated a whole NodeList on every scroll frame.
     const rows = content.querySelectorAll<HTMLElement>('[data-reader-turn]');
     const measure = () => {
       const viewportTop = scroller.getBoundingClientRect().top;
@@ -1726,12 +1733,16 @@ export function Reader(props: ReaderProps) {
     scroller.addEventListener('scroll', schedule, { passive: true });
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     observer?.observe(scroller);
+    // …and the CONTENT, not only the scroller: a transcript that grows inside a fixed scrollport fires nothing on the
+    // scrollport's own box, and that growth is exactly what a reveal or a history page does. Watching only the scroller was
+    // the second half of the stale-rail bug above.
+    observer?.observe(content);
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame);
       scroller.removeEventListener('scroll', schedule);
       observer?.disconnect();
     };
-  }, [turnSignature]);
+  }, [turnSignature, renderedTurns]);
   const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null);
   /**
    * The reader coming back to the bottom ends a pin — and with it the focus that pin was holding.

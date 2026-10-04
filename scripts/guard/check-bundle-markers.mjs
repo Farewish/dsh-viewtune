@@ -1126,6 +1126,13 @@ const markers = [
   ['a silent load of older history is reported instead of looking like a broken button', () => bundle.includes('loadOlderOutcome')
     && bundle.includes('已经是最早的记录')
     && bundle.includes('没能读到更早的记录')],
+  // The rail's reading of "which turn am I on" must re-run when the RENDERED WINDOW changes, not only when a turn is added.
+  // 自动折叠 hides and reveals rows without adding a turn, so the effect's cached row list went stale and the rail stopped
+  // at the folded window's oldest turn — the reader's report, in their own numbers (a threshold of 3 leaves it on 倒数第 3).
+  // Pinned on the dependency list itself, which is the invariant: these two are together the only things that can change
+  // which rows exist.
+  ['the rail’s turn spy re-runs when the folded window changes', () => bundle.includes('[turnSignature, renderedTurns]')
+    && bundle.includes('observe(content)')],
   // 「开始」 in the sidebar: when a deliverable opens into the column and the ONLY page there is the shipped guide, it is
   // REPLACED rather than left beside it — via `openResource(address, { replaceTab })`, the host's own "take this tab's
   // place and close it in the same step". The guide is identified by the identity the sidebar package publishes

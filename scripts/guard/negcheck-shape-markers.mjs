@@ -259,6 +259,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the rail’s turn spy stops re-running on the folded window, so it pins at the window’s oldest turn again',
+    // The effect caches its row list; 自动折叠 changes which rows exist without adding a turn, so without this dependency the
+    // cache goes stale and the rail reports the window's edge — the reported "a threshold of 3 leaves it on 倒数第 3".
+    search: '[turnSignature, renderedTurns]',
+    replace: '[turnSignature, RENDEREDTURNS]',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the outcome rule for loading older history renamed, so a silent load is silent again',
     // Without this rule the caller cannot tell "there is nothing older" from "nothing arrived", and the reader is back to a
     // button that does nothing and says nothing — which is exactly what was reported.
