@@ -1758,6 +1758,21 @@ export function Reader(props: ReaderProps) {
   }, [turnSignature, renderedTurns]);
   const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null);
   /**
+   * Whether there is anything below to return TO.
+   *
+   * 「回到最新」 means "go back down", so it is meaningless when the transcript does not scroll at all — and the reader
+   * photographed exactly that: a two-line exchange with the pill sitting under it. `scroll.detached` is about the reader's
+   * relation to the tail and stays as it is (the focus handoff reads it too); this is measured separately, from the
+   * scrollport, and only gates the pill. Measured on the commits that can change either side of the answer, and never
+   * during render, where reading layout would be a mistake.
+   */
+  const [roomBelow, setRoomBelow] = useState(false);
+  useLayoutEffect(() => {
+    if (!scroll.detached) { setRoomBelow(false); return; }
+    const port = root.current?.closest<HTMLElement>('[data-conversation-scroll]');
+    setRoomBelow(port !== null && port !== undefined && port.scrollHeight - port.clientHeight > 24);
+  }, [scroll.detached, groups.length]);
+  /**
    * The reader coming back to the bottom ends a pin — and with it the focus that pin was holding.
    *
    * An EDGE, not a level: while the reader is reading inside a card the page is already at the bottom, so "the page is
@@ -2113,7 +2128,7 @@ export function Reader(props: ReaderProps) {
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>
       </div>}
-      {scroll.detached && <div className={css.jumpDock}><button type="button" className={css.jump} onClick={scroll.jump}>↓ 回到最新</button></div>}
+      {scroll.detached && roomBelow && <div className={css.jumpDock}><button type="button" className={css.jump} onClick={scroll.jump}>↓ 回到最新</button></div>}
     </div>
   </div></StreamMotionContext.Provider>;
 }
