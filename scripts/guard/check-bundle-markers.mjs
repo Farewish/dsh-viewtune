@@ -1129,7 +1129,7 @@ const markers = [
   // them, which are never folded. `content-visibility: auto` skips layout and paint off screen in BOTH directions, and
   // `contain-intrinsic-size` keeps the scrollbar honest while a turn is skipped.
   ['the reading view renders only what is near the viewport', () =>
-    bundle.includes('content-visibility:auto;contain-intrinsic-size:auto 320px')],
+    bundle.includes('content-visibility:auto;contain-intrinsic-size:auto var(--reader-turn-height,320px)')],
   // When the platform's prepend failure blocks the ordinary step, the view must SAY so and offer the one route the reader
   // found that gets past it — a jump at the far end of the log — with its cost named in the label. Kept separate from the
   // ordinary press on purpose: it fetches the whole history.

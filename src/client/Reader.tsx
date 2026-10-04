@@ -1221,6 +1221,9 @@ export function Reader(props: ReaderProps) {
   // handler compares it across an `await`. (The session snapshot cannot answer this: it carries `hasMore`, `loadingOlder`
   // and `openState` and no window edge — see the note by the button.)
   const renderableRef = useRef(0);
+  // The run's own average turn height, published to CSS as `--reader-turn-height` for `contain-intrinsic-size` (see the
+  // `measure` sampler below). 320 is the stylesheet's fallback until the first sample lands.
+  const turnHeight = useRef(320);
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion) !== false;
@@ -1730,6 +1733,22 @@ export function Reader(props: ReaderProps) {
         const next = active ?? first;
         return previous === next ? previous : next;
       });
+      // Keep the skipped turns' height estimate close to this session's reality. `contain-intrinsic-size` uses it for every
+      // turn that has not been laid out yet, and a wrong estimate costs a correction — and a visible shift — the moment one
+      // arrives, which is the short jolt the reader reported after the viewport change. The rows crossing the reading line
+      // are laid out for real, so they are the honest sample. Written only on a real change: a style write per scroll frame
+      // would trade one hitch for another.
+      let sampled = 0;
+      let total = 0;
+      for (let index = Math.max(0, past - 3); index < Math.min(rows.length, past + 3); index += 1) {
+        total += rows[index]!.offsetHeight;
+        sampled += 1;
+      }
+      const average = sampled === 0 ? 0 : Math.round(total / sampled);
+      if (average > 0 && Math.abs(average - turnHeight.current) > turnHeight.current * 0.15) {
+        turnHeight.current = average;
+        content.style.setProperty('--reader-turn-height', `${average}px`);
+      }
     };
     measure();
     let frame = 0;

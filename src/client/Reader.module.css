@@ -92,7 +92,11 @@
  *     label read from a row that is on screen and therefore laid out. */
 .root .turn {
   content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
+  /* The estimate is this session's own average turn height, published by the reader (`--reader-turn-height`) from the rows
+     crossing the reading line — the ones laid out for real. A fixed number was the first cut, and it cost exactly the hitch
+     the reader reported: every turn that had never been laid out used the wrong height, so arriving at one meant a
+     correction and a visible shift. The fallback keeps the declaration valid before the first measurement. */
+  contain-intrinsic-size: auto var(--reader-turn-height, 320px);
 }
 .turn + .turn { margin-top: 12px; }
 /* 用户气泡的**宽度与排版**全部照抄宿主自己那两条规则 ✓（`dsh-client-ui-chat` 的 `.userStack` / `.bubble` ✓，逐条量出来的 ✓）：
