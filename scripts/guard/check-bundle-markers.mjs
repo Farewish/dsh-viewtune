@@ -1123,6 +1123,13 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
+  // When the platform's prepend failure blocks the ordinary step, the view must SAY so and offer the one route the reader
+  // found that gets past it — a jump at the far end of the log — with its cost named in the label. Kept separate from the
+  // ordinary press on purpose: it fetches the whole history.
+  ['a blocked history load is named, with the earliermost jump offered beside it', () =>
+    bundle.includes('更早的记录暂时读不出来')
+    && bundle.includes('一次性加载到最早')
+    && bundle.includes('[dsh-better-display] load to earliest')],
   // …and when it runs, it must ask `loadThrough` BEFORE `loadOlder`. Measured from the reader's console: the platform's
   // "system-message withdrew materialized target" failure comes from `loadOlder`'s page shape and takes the event feed
   // subscriber with it, after which even `loadThrough` lands nothing. Calling `loadOlder` first is therefore self-poisoning,

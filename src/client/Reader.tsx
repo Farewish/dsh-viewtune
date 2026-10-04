@@ -2011,10 +2011,29 @@ export function Reader(props: ReaderProps) {
         }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
       {historyNote !== null && <div className={css.notice} role="status">
         {historyNote === 'exhausted' ? '已经是最早的记录。'
-          : historyNote === 'blocked' ? '更早的记录暂时读不出来：宿主的事件馈送被一个「撤回物化目标」的事件打断了，这段历史要等平台侧修复才能读取。'
+          : historyNote === 'blocked' ? '更早的记录暂时读不出来：宿主的事件馈送被一个「撤回物化目标」的事件打断了。可以试一次下面的「一次性加载到最早」，代价是把整段历史都取回来，会慢一些。'
           : historyNote === 'stuck' ? '没能读到更早的记录：宿主那边还有更早的内容，但这次没能取回，可再试一次。'
           : '历史记录加载失败，可再次尝试；现有内容未改变。'}
       </div>}
+      {/* The reader's own finding, and the only route that has ever got past the platform failure: a jump at the FAR end of
+          the log has landed where a near one could not. I could not explain it from the source — `paginate` walks backwards
+          from the window base, so every batch is contiguous from there and all of them span the offending event — and the
+          reader's observation outranks my reasoning. So it is offered as a deliberate escape hatch with its cost in the
+          label, never as what the ordinary press does: it fetches the whole history, and the folding window stays where it
+          is, so only the usual band renders. */}
+      {historyNote === 'blocked' && <button type="button" className={css.historyButton}
+        onClick={async () => {
+          const oldest = timelineItems.find(item => item.anchor.kind === 'unloaded');
+          if (oldest?.anchor.kind !== 'unloaded' || !props.loadThrough) return;
+          setHistoryNote(null);
+          try {
+            await props.loadThrough(oldest.anchor.seq);
+            setRevealed(value => value + revealStepOf(foldWindow));
+            console.info('[dsh-better-display] load to earliest', { target: oldest.anchor.seq, renderableTurns: renderableRef.current, hasMore });
+            // Still claiming more means even this jump did not land: the same honest note, not a claim of success.
+            if (olderHistoryState(hasMore) === 'more') setHistoryNote('blocked');
+          } catch { setHistoryNote('failed'); }
+        }}>一次性加载到最早（较慢）</button>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}

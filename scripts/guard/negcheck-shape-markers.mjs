@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the blocked-history escape hatch renamed, so the reader is left with a wall and no way past it',
+    // The label is the reader's only signal that the far jump exists, and it is the route that has actually worked for them.
+    search: '一次性加载到最早',
+    replace: '一次性加载到最晚',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the history step’s log label renamed, so the order assertion that guards the feed has nothing to stand on',
     // The label is what the order assertion anchors to; without it the button could be reordered back to calling `loadOlder`
     // first, which is the self-poisoning order the reader's console exposed.
