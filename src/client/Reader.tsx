@@ -159,6 +159,10 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
   return <>{parts.map((part, index) => part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
+      {/* `step` is the HOST's number for this assistant step (`turn.steps`), never a count of anything this view renders.
+          A reasoning block is content INSIDE a step, so an empty one can neither add a step nor shift a number: dropping its
+          card removes a blank row and nothing else. Verified against the three places the count is read — the boundary's
+          `latestStep`, the pill's `totalSteps` (`turn.steps.length`) and this label — all of which come from the host. */}
       <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} focusKey={nodeKey} focused={focused} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && index === parts.length - 1 && data.blocks.at(-1)?.kind === 'reasoning'}
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
