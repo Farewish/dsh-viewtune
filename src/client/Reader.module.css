@@ -98,6 +98,16 @@
      correction and a visible shift. The fallback keeps the declaration valid before the first measurement. */
   contain-intrinsic-size: auto var(--reader-turn-height, 320px);
 }
+/* …EXCEPT the turn being written into. `content-visibility` implies `contain: layout paint` on the element, and the
+ * reasoning card does its own following INSIDE this subtree: it measures its own height, writes its inner scroller's
+ * `scrollTop` and drives a reference transform, all from a `ResizeObserver` on the card (`ReasoningCard.tsx`). Landing that
+ * machinery inside a contained subtree is what broke 「跟随最新」 — the reader reported it right after the viewport change
+ * went in. The live turn is on screen while it is being written, so it was never a candidate for skipping anyway: this
+ * costs the optimisation nothing and gives the following card back its footing. */
+.root .turn[data-live] {
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
+}
 .turn + .turn { margin-top: 12px; }
 /* 用户气泡的**宽度与排版**全部照抄宿主自己那两条规则 ✓（`dsh-client-ui-chat` 的 `.userStack` / `.bubble` ✓，逐条量出来的 ✓）：
      .userStack { max-width: min(calc(var(--dsh-chat-content-width,748px) * .702), 82%) }

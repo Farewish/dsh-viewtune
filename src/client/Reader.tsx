@@ -997,7 +997,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, focusedCard, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; focusedCard: string | null; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -1144,7 +1144,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const showTerminalNotice = terminal && !hasTurnError && boundary.reason !== 'interrupted' && boundary.reason !== 'aborted';
   // The duration stays on the process disclosure rather than becoming its own
   // row: the disclosure label is what expands and folds the process.
-  return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
+  return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined} data-live={live === true ? '' : undefined}>
     {turnUserKeys.map(userKey => <BlockBoundary key={userKey}><MainNode {...shared} boundary={boundary} nodeKey={userKey} /></BlockBoundary>)}
     {hasProcess && <Disclosure open={expanded} onToggle={() => setExpanded(!wantsProcess)} controls={flowId} buttonRef={processButton}
       label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
@@ -2100,7 +2100,7 @@ export function Reader(props: ReaderProps) {
         }}>一次性加载到最早（较慢）</button>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} live={group.turn !== null && group.turn === liveTurn} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (
