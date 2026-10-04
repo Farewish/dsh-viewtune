@@ -1821,6 +1821,18 @@ export function Reader(props: ReaderProps) {
     () => mergeTimelineItems(turnNavigationItems, turnOutline, turnsWithDeliverables, renderedTurnKeys),
     [turnNavigationItems, turnOutline, turnsWithDeliverables, renderedTurnKeys],
   );
+  /**
+   * A note about older history is only true while older history is still missing.
+   *
+   * `timelineItems` covers the WHOLE log (that is what the outline projection is), and since a turn counts as loaded when
+   * the node store holds it, zero unloaded items means every turn the log has is rendered. Any note on screen at that point
+   * is stale, and leaving it there was the reader's report: 「没能读到更早的记录」 stayed up after 「一次性加载到最早」 had in
+   * fact loaded everything. This is also what keeps the blocked note from outliving the block.
+   */
+  const unloadedOutlineTurns = useMemo(() => timelineItems.filter(item => item.anchor.kind === 'unloaded').length, [timelineItems]);
+  useEffect(() => {
+    if (unloadedOutlineTurns === 0) setHistoryNote(current => current === null ? current : null);
+  }, [unloadedOutlineTurns]);
   // There is deliberately NO "did the load make progress" measure here, because the platform offers none: the session
   // snapshot carries `hasMore`, `loadingOlder` and `openState` (measured from `SessionSnapshot` in the client runner) but
   // NOT the window's oldest sequence, so a plugin cannot tell "the page landed" from "the page was silently dropped".
@@ -1870,7 +1882,13 @@ export function Reader(props: ReaderProps) {
       setRevealed(current => revealForTurn(targetIndex, groups.length, foldWindow, current));
       return;
     }
-    if (revealTurn(pendingReveal)) { setPendingReveal(null); return; }
+    if (revealTurn(pendingReveal)) {
+      setPendingReveal(null);
+      // A jump that landed disproves any note about history being unreachable — 「没能读到更早的记录」 in particular is set by
+      // THIS effect's timeout, so it must not outlive the next successful jump either.
+      setHistoryNote(current => current === 'stuck' ? null : current);
+      return;
+    }
     if (performance.now() > pendingRevealUntil.current) {
       setPendingReveal(null);
       // The rail asked to land on a turn the host never brought in — the silent case this whole note exists for (the host's
