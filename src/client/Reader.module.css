@@ -71,7 +71,10 @@
 .textButton:hover, .iconButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
 /* The process disclosure got a TEXT highlight instead of a button one (the reader's choice). It keeps the shared button
  * behaviour above for everything else, and this override is what removes its plate: no plate, nothing to look cut off. */
-.disclosureButton:hover { background: transparent; color: var(--dsw-alias-label-primary); }
+/* …and it reaches the CHILDREN too. Setting `color` on the button only lit the arrow, because that is the one part drawn
+ * with `currentColor`; the label and the 用时 beside it carry colours of their own, so a parent colour never touches them.
+ * The reader saw exactly that. `*` is deliberate here: the whole label is the control, so every part of it should lift. */
+.disclosureButton:hover, .disclosureButton:hover * { background: transparent; color: var(--dsw-alias-label-primary); }
 .root button:focus-visible, .root summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
 .turn { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 /* Render only what is near the viewport — the browser's own version of it, one declaration, no JS.
