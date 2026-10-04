@@ -109,6 +109,13 @@ const checks = [
   ["the host primitive code blocks take the code dial",
     /\[data-reader-glass\]\{--dsw-alias-markdown-code-block:color-mix\(in srgb,\s*var\(--viewtune-code-plate/.test(css)
     && /--dsw-alias-markdown-code-block-banner:color-mix\(in srgb,\s*var\(--viewtune-code-banner/.test(css)],
+  // …and the block's own plate applies that dial ONCE, from the snapshot. Mixing `--dsw-alias-markdown-code-block` there —
+  // which the redefinition above has ALREADY dialled — left the base at 25% of 25%, and the reader saw this view's code card
+  // come out visibly lighter than the conversation page's. The negative half is the load-bearing one: the token must not
+  // appear in this rule at all. Order-independent, because lightningcss reorders the declarations inside it.
+  ["the code block's plate applies the dial once, from the snapshot",
+    /\.md-code-block\{[^}]*background:color-mix\(in srgb, var\(--viewtune-code-plate/.test(css)
+    && !/\.md-code-block\{[^}]*background:color-mix\(in srgb, var\(--dsw-alias-markdown-code-block/.test(css)],
   ["…and the JSON pane's layer colour only inside the tool content",
     // `[^}]*` because this rule now carries the code tokens' snapshots as well — same element, same reason, more values.
     /body\{--viewtune-layer-plate:var\(--dsw-alias-bg-layer-1\)[^}]*\}/.test(css)

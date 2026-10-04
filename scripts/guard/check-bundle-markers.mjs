@@ -1409,7 +1409,10 @@ const markers = [
     // minifier puts in a `background` shorthand): pinning one of them only makes a version bump look
     // like a regression.
     && /\.md-code-block pre\{background:(?:transparent|#0000|0 0)\s*!important\}/.test(readerCss)
-    && /--dsl-code-block-banner-background-color:color-mix\(in srgb,\s*var\(--dsw-alias-markdown-code-block-banner[^}]*var\(--glass-code/.test(readerCss)
+    // The banner's own token, from the SNAPSHOT — the same correction the block's plate needed: this token has already been
+    // dialled once by the redefinition, and mixing it again would leave the base at a fraction of the intended tint (that
+    // is what made this view's code card lighter than the conversation page's).
+    && /--dsl-code-block-banner-background-color:color-mix\(in srgb,\s*var\(--viewtune-code-banner[^}]*var\(--glass-code/.test(readerCss)
     // The JSON record cards: our wrapper, and both of the primitive's plates inside it.
     && /_jsonCard (?:button|pre)\{background:color-mix\(in srgb,\s*var\(--dsw-alias-(?:bg-module-platform|markdown-code-block)/.test(readerCss)
     && bundle.includes('"jsonCard"')

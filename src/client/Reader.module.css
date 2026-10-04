@@ -1070,8 +1070,13 @@
   -webkit-backdrop-filter: blur(var(--glass-blur-code));
   backdrop-filter: blur(var(--glass-blur-code));
 }
+/* …and the block's own plate, mixed from the SNAPSHOT (`--viewtune-code-plate`), never from the token. Reading
+   `--dsw-alias-markdown-code-block` here mixed an ALREADY-dialled value a second time: the redefinition above turns that
+   token into `host @ 25%`, and `color-mix(... 25%)` of that leaves the host at ~6% — which is why this view's code card
+   came out visibly LIGHTER than the conversation page's, whose plate is one application of the dial. The dial applies once,
+   and the snapshot is how. (The `<pre>` note below is the same lesson for the inner plate.) */
 .root[data-reader-glass] :global(.md-code-block) {
-  background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent) !important;
+  background: color-mix(in srgb, var(--viewtune-code-plate, rgba(0,0,0,.06)) var(--glass-code, 25%), transparent) !important;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur-code));
   backdrop-filter: blur(var(--glass-blur-code));
@@ -1086,7 +1091,9 @@
   background-color: transparent;
 }
 .root[data-reader-glass] :global(.md-code-block) {
-  --dsl-code-block-banner-background-color: color-mix(in srgb, var(--dsw-alias-markdown-code-block-banner, rgba(0,0,0,.04)) var(--glass-code, 25%), transparent);
+  /* The BANNER's token, from ITS snapshot for the same reason as the plate above: the token has already been dialled once
+     by the redefinition, and mixing it again would leave the base at a fraction of the intended tint. */
+  --dsl-code-block-banner-background-color: color-mix(in srgb, var(--viewtune-code-banner, rgba(0,0,0,.04)) var(--glass-code, 25%), transparent);
 }
 /* …and the plate INSIDE the block. The block paints one plate, but its body element paints another of
    its own — `background: var(--dsl-code-block-background)`, and `.shiki` with `!important` — so a fence
