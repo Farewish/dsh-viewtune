@@ -92,11 +92,11 @@
  *     label read from a row that is on screen and therefore laid out. */
 .root .turn {
   content-visibility: auto;
-  /* The estimate is this session's own average turn height, published by the reader (`--reader-turn-height`) from the rows
-     crossing the reading line — the ones laid out for real. A fixed number was the first cut, and it cost exactly the hitch
-     the reader reported: every turn that had never been laid out used the wrong height, so arriving at one meant a
-     correction and a visible shift. The fallback keeps the declaration valid before the first measurement. */
-  contain-intrinsic-size: auto var(--reader-turn-height, 320px);
+  /* A plain estimate again. A sampled, per-scroll value lived here for one commit and is withdrawn: writing that custom
+     property on every scroll frame re-sized every skipped turn, so the transcript's own height moved while the reasoning
+     card's follower was compensating inside it. Fine-tuning the number is not worth perturbing the one card that measures
+     itself. */
+  contain-intrinsic-size: auto 320px;
 }
 /* …EXCEPT the turn being written into. `content-visibility` implies `contain: layout paint` on the element, and the
  * reasoning card does its own following INSIDE this subtree: it measures its own height, writes its inner scroller's

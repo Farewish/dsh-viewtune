@@ -1129,7 +1129,7 @@ const markers = [
   // them, which are never folded. `content-visibility: auto` skips layout and paint off screen in BOTH directions, and
   // `contain-intrinsic-size` keeps the scrollbar honest while a turn is skipped.
   ['the reading view renders only what is near the viewport', () =>
-    bundle.includes('content-visibility:auto;contain-intrinsic-size:auto var(--reader-turn-height,320px)')
+    bundle.includes('content-visibility:auto;contain-intrinsic-size:auto 320px')
     // …with the LIVE turn exempt. `content-visibility` implies `contain: layout paint`, and the reasoning card follows
     // itself from INSIDE that subtree — it measures its own height, writes its inner scroller and drives a transform. The
     // reader reported 「跟随最新」 breaking right after the viewport change went in, and this exemption is the fix. The live
