@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the history fallback sweeping the whole log again renamed back to the bounded step',
+    // Reverting the bound is what made one press load every page from the first turn to the last.
+    search: 'nearestUnloadedSeq',
+    replace: 'NEARESTUNLOADEDSEQ',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the history-state rule renamed, so a press stops revealing what it fetched',
     // Without this rule the button has no stated basis at all, and the reveal that makes a fetched page visible is the only
     // thing standing between "it loaded" and the reader's 「卡住」.

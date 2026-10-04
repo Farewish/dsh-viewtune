@@ -1123,6 +1123,11 @@ const markers = [
   // history arrives after the first paint and the mount's own position was read as the reader leaving the tail.
   ['a scroll position is not a takeover before the reader has acted', () => bundle.includes('scrollTakeover')
     && bundle.includes('isNearTail')],
+  // …and when that fallback runs, it must ask for the NEAREST unloaded turn, never the oldest. `loadThrough` pages until its
+  // target is covered, so the oldest target pulls the whole history in one press — the reader's "一次加载出来太多被卡爆了".
+  // One step back costs one page.
+  ['the history fallback steps one page, never sweeps the log', () => bundle.includes('nearestUnloadedSeq')
+    && !bundle.includes('oldestSeq:')],
   // Pressing 「加载更早记录」 must REVEAL unconditionally, and claim only what the host STATES. The host's loader has silent
   // no-op paths (`hasMore` false, its re-entrancy flag, a generation that moved on) and the platform offers no window edge
   // to tell "landed" from "dropped": `SessionSnapshot` carries `hasMore`, `loadingOlder` and `openState` and nothing more.

@@ -1996,10 +1996,19 @@ export function Reader(props: ReaderProps) {
             // which is why the reader found that jumping far back sometimes works. So: when a press brings nothing, ask for
             // the OLDEST turn the outline already knows about, which is the same request the rail's first item makes.
             if (renderableRef.current === renderableBefore && hasMore && props.loadThrough) {
-              const oldest = timelineItems.find(item => item.anchor.kind === 'unloaded');
-              if (oldest?.anchor.kind === 'unloaded') {
-                console.warn('[dsh-better-display] loadOlder landed nothing; falling back to the jump page', { oldestSeq: oldest.anchor.seq });
-                await props.loadThrough(oldest.anchor.seq);
+              // The NEAREST unloaded turn — the one just older than the loaded window — NOT the oldest. Asking for the
+              // oldest made `loadThrough` pull every page in between: one press swept the entire history in, which is the
+              // "一次加载出来太多被卡爆了" the reader hit. `loadThrough` pages until its target is covered, so a target one
+              // step back costs one page, and it still uses the page shape that walks around the platform failure above.
+              const items = timelineItems;
+              let nearest: number | null = null;
+              for (let index = items.length - 1; index >= 0; index -= 1) {
+                const item = items[index]!;
+                if (item.anchor.kind === 'unloaded') { nearest = item.anchor.seq; break; }
+              }
+              if (nearest !== null) {
+                console.warn('[dsh-better-display] loadOlder landed nothing; stepping forward with the jump page', { nearestUnloadedSeq: nearest });
+                await props.loadThrough(nearest);
               }
             }
             // ALWAYS reveal. What a page brings in is OLDER turns, which land outside the folding window and are therefore
