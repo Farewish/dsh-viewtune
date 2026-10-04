@@ -1,7 +1,7 @@
 {
   "name": "dsh-viewtune",
   "version": "0.5.6",
-  "description": "A calmer reading view for DeepSeek Harness: native process details, live reasoning, and clean final answers. (Relayout fork of aa2246740/dsh-better-display: framed short reasoning, native-scroll reasoning card with edge handoff, all user/context messages above the process disclosure.)",
+  "description": "A reading view for DeepSeek Harness: one turn per page with its process, reasoning and deliverables in place, a tunable frosted-glass skin and wallpaper, and handling for very long sessions. Started from aa2246740/dsh-better-display.",
   "type": "module",
   "license": "MIT",
   "main": "lib/dsh-viewtune.js",
@@ -105,6 +105,7 @@
     "tsdown.config.ts",
     "README.md",
     "README.en.md",
+    "docs",
     "DESIGN.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
