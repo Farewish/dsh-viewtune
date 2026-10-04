@@ -37,6 +37,27 @@ test('reasoning and body retain original order, content and identities across st
   assert.deepEqual(append.slice(0, 3), segments);
 });
 
+test('a reasoning segment with nothing in it is dropped, so no blank 思考 card is drawn', () => {
+  // Upstream can leave an empty reasoning block behind — a step that closed right after it opened — and a segment for it
+  // renders a card HEADER (「思考」 and its 步骤 number) with no body at all: the empty row the reader photographed at the
+  // end of a process. Nothing is lost by dropping it, because a step that is genuinely still thinking is announced by the
+  // status line (「正在思考」) rather than by an empty card.
+  const empty: AssistantBlock = { kind: 'reasoning', text: '' };
+  const blank: AssistantBlock = { kind: 'reasoning', text: '   \n  ' };
+  assert.deepEqual(assistantSegments([empty]), [], 'an empty one alone is not a segment');
+  assert.deepEqual(assistantSegments([blank]), [], 'whitespace is empty too');
+  // A real reasoning block still gets its segment, and the order around it is untouched. The empty block merges into the
+  // SAME segment — segments are runs of adjacent kinds — so the surviving segment still STARTS at index 0 and carries both
+  // blocks; the filter is about whether the run has content at all, not about tidying inside it.
+  const real: AssistantBlock = { kind: 'reasoning', text: '有内容的思考' };
+  const segments = assistantSegments([empty, real, text]);
+  assert.deepEqual(segments.map(part => [part.kind, part.start]), [['reasoning', 0], ['body', 2]]);
+  assert.deepEqual(segments[0].blocks, [empty, real]);
+  // An empty BODY segment is left alone: that case is `hasVisibleBody`'s business, not this filter's.
+  const emptyBody: AssistantBlock = { kind: 'text', text: '' };
+  assert.deepEqual(assistantSegments([emptyBody]).map(part => part.kind), ['body']);
+});
+
 test('a settled step alone never means final or disposable', () => {
   assert.equal(isEarlierNarration(assistant(), { ...active, latestStep: 0 }), false);
   assert.equal(isEarlierNarration(assistant(), { ...active, status: 'unknown' }), false);

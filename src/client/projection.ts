@@ -81,6 +81,18 @@ export function hasVisibleBody(blocks: readonly AssistantBlock[]): boolean {
   return blocks.some(block => block.kind === 'image' || block.kind === 'other' || (block.kind === 'text' && block.text.trim() !== ''));
 }
 
+/**
+ * A reasoning segment with nothing written in it is not a segment.
+ *
+ * It renders a card HEADER — 「思考」 with its 步骤 number — and no body at all, which is the empty row the reader saw at the
+ * end of a process. Upstream can leave such a block behind (a step that closed right after it opened), and there is nothing
+ * for the reader to read in it: while a step is genuinely still thinking, the status line above the process already says
+ * 「正在思考」, so dropping the empty card loses no information and removes a blank row.
+ */
+function hasReasoningBody(blocks: readonly AssistantBlock[]): boolean {
+  return blocks.some(block => typeof (block as { text?: unknown }).text === 'string' && (block as { text: string }).text.trim() !== '');
+}
+
 /** Keep native block order. In particular, never lift a later Think above text. */
 export function assistantSegments(blocks: readonly AssistantBlock[]): { kind: 'reasoning' | 'body'; start: number; blocks: AssistantBlock[] }[] {
   const segments: ReturnType<typeof assistantSegments> = [];
@@ -94,7 +106,7 @@ export function assistantSegments(blocks: readonly AssistantBlock[]): { kind: 'r
       segments.push(previous);
     }
   });
-  return segments;
+  return segments.filter(segment => segment.kind !== 'reasoning' || hasReasoningBody(segment.blocks));
 }
 
 export function toolFailed(block: ToolCallBlock): boolean {
