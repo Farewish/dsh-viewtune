@@ -1162,6 +1162,14 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
+  // 「展开后底端对齐输入栏顶」: opening a card brings its bottom to the composer, ON by default. The write happens on the size
+  // animation's own settle (the deadline covers the no-animation path), and it releases the page first — the reader's own move
+  // must not be undone by the follower pulling back to the tail. The composer's seat is found by the host's own class
+  // fragment, which is how the stylesheet names it too.
+  ['opening a card lines its bottom up with the composer, once its new height is real', () =>
+    bundle.includes('scroller.scrollTop += delta;')
+    && bundle.includes('onLeaveTail();\n')
+    && bundle.includes('"[class*=\\"_composerSeat\\"]"')],
   // Reading INSIDE a card holds that place, so the PAGE stops following too — otherwise every change to the card's height
   // was absorbed by snapping the page to its bottom, and when the pin ended (returning to the bottom is what ends it) the
   // card gave up its focused height and the content was carried upward by that much. The reader: 「应该滑到哪里就是哪里，

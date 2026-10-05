@@ -180,6 +180,17 @@ export interface ReaderState {
    */
   reasoningFold: boolean;
   /**
+   * Whether opening a reasoning card also brings its BOTTOM to the top of the composer — 「展开后底端对齐输入栏顶」.
+   *
+   * ON by default: the reader asked for the behaviour itself, not for a switch to discover. Read defensively (`!== false`),
+   * so a record written before it existed keeps it on.
+   *
+   * What it is for: an expanded card is capped (`min(60vh, 560px)`), so on a short window the part of it below the fold is
+   * out of reach. Aligning its bottom to the composer puts the whole card in view at once, and the alignment is the reader's
+   * own move — the page stops following at that moment, exactly as it does when they close a card.
+   */
+  expandBottomAlign: boolean;
+  /**
    * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
    *
    * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
@@ -250,6 +261,7 @@ type ReaderActions = {
   setReasoningRate: (draft: ReaderState, value: number) => void;
   setFocusExpand: (draft: ReaderState, value: boolean) => void;
   setReasoningFold: (draft: ReaderState, value: boolean) => void;
+  setExpandBottomAlign: (draft: ReaderState, value: boolean) => void;
   /** Drop every stored expansion choice, so each turn falls back to its default. */
   clearExpanded: (draft: ReaderState) => void;
   setStripWheel: (draft: ReaderState, value: boolean) => void;
@@ -325,6 +337,9 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // …and a card is NOT folded to one line unless the reader asks for it: the fold changes the SHAPE of every reasoning
       // card, so it ships off and every record written before it keeps the cards it had.
       reasoningFold: false,
+      // …and opening a card DOES bring its bottom to the composer by default: the reader asked for the behaviour, so a fresh
+      // install (and every record written before the switch) opens with it.
+      expandBottomAlign: true,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
@@ -373,6 +388,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
       setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },
       setReasoningFold: (draft, value: boolean) => { draft.reasoningFold = value; },
+      setExpandBottomAlign: (draft, value: boolean) => { draft.expandBottomAlign = value; },
       clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },

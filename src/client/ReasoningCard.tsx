@@ -32,7 +32,7 @@ const HEIGHT_CHASE_MS = 400;
 const CHASE_STILL_FRAMES = 4;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, focusKey, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, alignBottom, focusKey, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
   reasoningMode: ReasoningFollowMode; rate: number;
   focusExpand: boolean; fold: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
@@ -46,6 +46,8 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * deliberate decision to stop following, exactly like a rail jump, so it takes the same release.
    */
   onLeaveTail: () => void;
+  /** Whether opening this card also brings its BOTTOM to the composer's top — 「展开后底端对齐输入栏顶」, on by default. */
+  alignBottom: boolean;
   /**
    * Whether the READER is still at the page's tail — the follower's own `detached`, inverted.
    *
@@ -772,12 +774,35 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // …and the reader-initiated resize is over: the page may compensate growth again. See `toggleReading` for why this
       // marker exists at all; the deadline in that handler is the backstop for the 动效-off path, where no animation runs.
       cardRoot()?.removeAttribute('data-reader-resizing');
+      // …and if this resize was the reader OPENING the card, this is the moment its new height is real, so the bottom can be
+      // lined up with the composer. See `alignCardBottom`.
+      if (pendingAlign.current) { pendingAlign.current = false; alignCardBottom(); }
     };
     animation.onfinish = settle;
     const deadline = window.setTimeout(settle, 300 + 240);
     return () => { window.clearTimeout(deadline); };
   }, [expanded, folded, motion, selected]);
   useEffect(() => () => resize.current?.cancel(), []);
+
+  /**
+   * Bring this card's BOTTOM to the top of the composer — 「展开后底端对齐输入栏顶」.
+   *
+   * An expanded card is capped (`min(60vh, 560px)`), so on a short window the part below the fold is out of reach; aligning
+   * its bottom puts the whole card in view at once. It is the reader's own move, so the page stops following here — without
+   * that the follower would pull straight back to the tail — and the browser clamps the write to the scroller's own range.
+   */
+  const alignCardBottom = (): void => {
+    const root = cardRoot();
+    const port = viewport.current;
+    const scroller = port?.closest<HTMLElement>('[data-conversation-scroll]') ?? null;
+    if (root === null || port === null || scroller === null) return;
+    const seat = scroller.querySelector<HTMLElement>('[class*="_composerSeat"]');
+    const limit = seat !== null ? seat.getBoundingClientRect().top : scroller.getBoundingClientRect().bottom;
+    const delta = root.getBoundingClientRect().bottom - limit;
+    if (Math.abs(delta) < 1) return;
+    scroller.scrollTop += delta;
+    onLeaveTail();
+  };
 
   const toggleReading = () => {
     // Resize the same transcript without changing follow intent or position.
@@ -813,7 +838,17 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       window.setTimeout(() => root.removeAttribute('data-reader-resizing'), 600);
     }
     setExpanded(value => !value);
+    /**
+     * …and opening the card also lines its bottom up with the composer, once the new height is really in place: the size
+     * animation's own settle is what calls it (see the resize effect), and this deadline is the backstop for the path with
+     * no animation to settle — 动效 off, where that effect returns before arming anything.
+     */
+    if (alignBottom && !expanded) {
+      pendingAlign.current = true;
+      window.setTimeout(() => { if (pendingAlign.current) { pendingAlign.current = false; alignCardBottom(); } }, 600);
+    }
   };
+  const pendingAlign = useRef(false);
 
   // …and the folded card is pinned to its FIRST line. `allowed` above stops the follower from driving it any further, but a
   // card that was already following sits at its old scroll offset, so the one visible line would still be a later one. A

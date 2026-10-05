@@ -139,10 +139,10 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, ...render }: SeatProps & {
+const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, ...render }: SeatProps & {
   motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
   reasoningFollow: ReasoningFollowMode; reasoningRate: number;
-  focusExpand: boolean; reasoningFold: boolean; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
+  focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
   onLeaveTail: () => void;
   /** Whether this card is pinning the focus it holds (the reader is reading inside it) — see the Reader's `pinnedCard`. */
   onFocusPin: (key: string, pinned: boolean) => void;
@@ -164,7 +164,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
           A reasoning block is content INSIDE a step, so an empty one can neither add a step nor shift a number: dropping its
           card removes a blank row and nothing else. Verified against the three places the count is read — the boundary's
           `latestStep`, the pill's `totalSteps` (`turn.steps.length`) and this label — all of which come from the host. */}
-      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} fold={reasoningFold} focusKey={nodeKey} onLeaveTail={onLeaveTail} focused={focused} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail}>
+      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} fold={reasoningFold} alignBottom={expandBottomAlign} focusKey={nodeKey} onLeaveTail={onLeaveTail} focused={focused} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && index === parts.length - 1 && data.blocks.at(-1)?.kind === 'reasoning'}
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
@@ -1002,7 +1002,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -1159,7 +1159,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
+        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
       </Fragment> : <Fragment key={item.key}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
@@ -1567,6 +1567,9 @@ export function Reader(props: ReaderProps) {
   // keeps the cards it had. An individual card's open/closed state is that card's own component state and never part of the
   // record, which is exactly what 「不记忆」 asks for.
   const reasoningFold = props.useStore(state => state.reasoningFold) === true;
+  // 「展开后底端对齐输入栏顶」: opening a card also brings its bottom to the composer's top. ON by default — the reader asked
+  // for the behaviour itself — and read defensively (`!== false`), which is what an ON default means.
+  const expandBottomAlign = props.useStore(state => state.expandBottomAlign) !== false;
   /**
    * The card that holds the focus, by node key, and the grants it hands out.
    *
@@ -2029,6 +2032,7 @@ export function Reader(props: ReaderProps) {
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}
             reasoningFold={reasoningFold} onReasoningFold={props.actions.setReasoningFold}
+            expandBottomAlign={expandBottomAlign} onExpandBottomAlign={props.actions.setExpandBottomAlign}
           collapseBefore={foldBefore} onCollapseBefore={props.actions.setCollapseBefore}
           deliverableDisplay={deliverableDisplay} onDeliverableDisplay={props.actions.setDeliverableDisplay}
           entryView={entryView} onEntryView={props.actions.setEntryView}
@@ -2113,7 +2117,7 @@ export function Reader(props: ReaderProps) {
         }}>一次性加载到最早（较慢）</button>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} onLeaveTail={scroll.release} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} live={group.turn !== null && group.turn === liveTurn} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} onLeaveTail={scroll.release} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} live={group.turn !== null && group.turn === liveTurn} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (

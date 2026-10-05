@@ -79,6 +79,8 @@ const REASONING_RATE_HINT = '自动滚动时每秒前进的行数';
 const FOCUS_EXPAND_HINT = '正在写入的思考卡随内容长高，最多到展开阅读那么高';
 /** What folding every reasoning card to one line does, as that row's `title` box. */
 const REASONING_FOLD_HINT = '每张思考卡折成一行，点展开可看全文';
+/** What opening a card does to the page, as that row's `title` box. */
+const EXPAND_BOTTOM_HINT = '展开后卡片底端贴到输入栏顶上';
 /** What the turn window buys, as that row's `title` box: behaviour only, and short (the copy check caps it at 28). */
 const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是全部保留';
 /** How the three ways of showing a turn's files differ, in the reader's own terms. */
@@ -141,7 +143,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, entryView, onEntryView, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, reasoningFold, onReasoningFold, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, entryView, onEntryView, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, reasoningFold, onReasoningFold, expandBottomAlign, onExpandBottomAlign, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -205,6 +207,8 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onFocusExpand: (next: boolean) => void;
   reasoningFold: boolean;
   onReasoningFold: (next: boolean) => void;
+  expandBottomAlign: boolean;
+  onExpandBottomAlign: (next: boolean) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
   wallpaper: string;
   /** How far the wallpaper is mixed toward the theme's background. */
@@ -623,6 +627,13 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>思考卡折叠成一行</span>
               </span>
               <Switch checked={reasoningFold} onChange={onReasoningFold} label="思考卡折叠成一行" />
+            </div>
+            {/* What opening a card does to the PAGE. On by default, because the reader asked for the behaviour itself. */}
+            <div className={css.settingsRow} title={EXPAND_BOTTOM_HINT} data-ud-check="reader-settings-expand-bottom">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>展开后贴住输入栏</span>
+              </span>
+              <Switch checked={expandBottomAlign} onChange={onExpandBottomAlign} label="展开后贴住输入栏" />
             </div>
           </>
           : <>
