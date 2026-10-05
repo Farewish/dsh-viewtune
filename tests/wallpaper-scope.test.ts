@@ -147,6 +147,17 @@ test('the stylesheet is gated, and every copy of the IMAGE is viewport-anchored'
   const headerFrost = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome-header-blur') && rule.includes('::before')) ?? '';
   assert.ok(headerFrost.includes('backdrop-filter: blur(var(--viewtune-wallpaper-chrome-header-blur))'), 'the frost lives on the bar’s ::before');
   assert.ok(headerFrost.includes('z-index: -1'), '…behind the bar’s content, which is what the isolate is for');
+  // …and the LEFT COLUMN obeys the same rule, for the reader's report that the host's own hover descriptions in this column
+  // came out truncated. `backdrop-filter` on the column itself makes it a backdrop root AND a stacking context, so a
+  // descendant's paint is confined to the column — the two hazards above, on the surface the reader was looking at when
+  // they reported it. The column keeps its scrim image (a background confines nothing), isolates itself so the pseudo has
+  // the stacking context it needs to sit behind the content, and carries no filter of its own. No `z-index` on the column:
+  // unlike the bar, it competes with no sticky lane of ours.
+  assert.ok(!sidebarChrome.includes('backdrop-filter:'), 'the frost must NOT sit on the sidebar column: that would confine its descendants');
+  assert.ok(sidebarChrome.includes('isolation: isolate'), 'the column isolates itself rather than filtering itself');
+  const sidebarFrost = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome-sidebar-blur') && rule.includes('::before')) ?? '';
+  assert.ok(sidebarFrost.includes('backdrop-filter: blur(var(--viewtune-wallpaper-chrome-sidebar-blur))'), 'the frost lives on the column’s ::before');
+  assert.ok(sidebarFrost.includes('z-index: -1'), '…behind the column’s content');
   // …and the Windows title-bar strip is chrome too: with `[data-windows-titlebar]` the layout paints that strip
   // ABOVE the frame's own background, from the sidebar-fill token this file makes transparent, so it showed the
   // photograph with no scrim at all until it was given one. It sits at the TOP of the window, so it takes the
