@@ -782,14 +782,18 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const deadline = window.setTimeout(settle, 300 + 240);
     return () => { window.clearTimeout(deadline); };
   }, [expanded, folded, motion, selected]);
-  useEffect(() => () => resize.current?.cancel(), []);
+  useEffect(() => () => { window.cancelAnimationFrame(alignFrame.current); resize.current?.cancel(); }, []);
 
   /**
    * Bring this card's BOTTOM to the top of the composer — 「展开后底端对齐输入栏顶」.
    *
    * An expanded card is capped (`min(60vh, 560px)`), so on a short window the part below the fold is out of reach; aligning
-   * its bottom puts the whole card in view at once. It is the reader's own move, so the page stops following here — without
-   * that the follower would pull straight back to the tail — and the browser clamps the write to the scroller's own range.
+   * its bottom puts the whole card in view. It is the reader's own move, so the page stops following here — without that the
+   * follower would pull straight back to the tail.
+   *
+   * TWO conditions the reader asked for: it moves NOTHING when the card, where it already is, sits fully inside the visible
+   * band — 「页面能装下原位置展开后的思考卡片就不用移动」 — and when it does move, it EASES there instead of jumping. The
+   * easing starts once the size animation has settled, which is the slight ordering asked for: open first, then line up.
    */
   const alignCardBottom = (): void => {
     const root = cardRoot();
@@ -797,12 +801,28 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const scroller = port?.closest<HTMLElement>('[data-conversation-scroll]') ?? null;
     if (root === null || port === null || scroller === null) return;
     const seat = scroller.querySelector<HTMLElement>('[class*="_composerSeat"]');
-    const limit = seat !== null ? seat.getBoundingClientRect().top : scroller.getBoundingClientRect().bottom;
-    const delta = root.getBoundingClientRect().bottom - limit;
+    const band = scroller.getBoundingClientRect();
+    const limit = seat !== null ? seat.getBoundingClientRect().top : band.bottom;
+    const rect = root.getBoundingClientRect();
+    if (rect.top >= band.top && rect.bottom <= limit) return;
+    const delta = rect.bottom - limit;
     if (Math.abs(delta) < 1) return;
-    scroller.scrollTop += delta;
     onLeaveTail();
+    cancelAnimationFrame(alignFrame.current);
+    if (!motion) { scroller.scrollTop += delta; return; }
+    const from = scroller.scrollTop;
+    const started = performance.now();
+    const DURATION = 280;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - started) / DURATION);
+      // Cubic ease-out, the shape of the size animation beside it: away from the press quickly, settling at the end.
+      const eased = 1 - (1 - t) ** 3;
+      scroller.scrollTop = from + delta * eased;
+      if (t < 1) alignFrame.current = requestAnimationFrame(step);
+    };
+    alignFrame.current = requestAnimationFrame(step);
   };
+  const alignFrame = useRef(0);
 
   const toggleReading = () => {
     // Resize the same transcript without changing follow intent or position.

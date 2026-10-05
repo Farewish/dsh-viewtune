@@ -1169,7 +1169,13 @@ const markers = [
   ['opening a card lines its bottom up with the composer, once its new height is real', () =>
     bundle.includes('scroller.scrollTop += delta;')
     && bundle.includes('onLeaveTail();\n')
-    && bundle.includes('"[class*=\\"_composerSeat\\"]"')],
+    && bundle.includes('"[class*=\\"_composerSeat\\"]"')
+    // …and the two conditions the reader added afterwards: NOTHING moves when the card already fits where it is, and a move
+    // that does happen is EASED (cubic ease-out over `DURATION`, from the scroller's own offset) instead of jumping. The
+    // easing also gives the ordering asked for — open first, then line up — because it starts from the size animation's
+    // settle rather than from the press.
+    && bundle.includes('rect.top >= band.top && rect.bottom <= limit')
+    && bundle.includes('scroller.scrollTop = from + delta * eased;')],
   // Reading INSIDE a card holds that place, so the PAGE stops following too — otherwise every change to the card's height
   // was absorbed by snapping the page to its bottom, and when the pin ended (returning to the bottom is what ends it) the
   // card gave up its focused height and the content was carried upward by that much. The reader: 「应该滑到哪里就是哪里，
