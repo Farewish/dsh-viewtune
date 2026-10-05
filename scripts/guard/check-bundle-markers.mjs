@@ -134,9 +134,13 @@ function atRuleBody(css, prelude) {
 }
 
 const markers = [
-  ['short-thinking-frame', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded])`, ['background:var(--dsw-alias-bg-module-platform)', 'border-color:var(--dsw-alias-border-l2)', 'border-radius:12px'])],
-  ['short-thinking-heading-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded]) ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
-  ['short-thinking-text-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded]) ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
+  // The plate only exists with the glass OFF, and that exclusion is a bug fix: at (0,4,0) it used to beat the glass card rule
+  // at (0,3,0), so a focused card in its preview state — not open, nothing to scroll — showed an opaque plate, leaving the
+  // frost nothing to show through until the expansion started. Scoped to the root without the glass attribute, the two are
+  // mutually exclusive instead of competing.
+  ['short-thinking-frame', () => cssDecls(`${sel('root')}:not([data-reader-glass]) ${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded])`, ['background:var(--dsw-alias-bg-module-platform)', 'border-color:var(--dsw-alias-border-l2)', 'border-radius:12px'])],
+  ['short-thinking-heading-padding', () => cssDecls(`${sel('root')}:not([data-reader-glass]) ${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded]) ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
+  ['short-thinking-text-padding', () => cssDecls(`${sel('root')}:not([data-reader-glass]) ${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded]) ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
   // The wheel implementation is verified behaviourally by test-wheel-handler.mjs (it extracts the
   // compiled handler and drives every notch shape through it). What is left to assert here is the
   // one rule that survived four attempts at "improving" on the browser:

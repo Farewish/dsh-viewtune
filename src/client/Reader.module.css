@@ -379,9 +379,17 @@
    card measures FROM its height: the measurement flipped `overflow`, the padding changed, the height changed, and the one
    visible line flickered between two states forever. Reported after a process had already ENDED, which is why it could not
    be the streaming machinery: it is a measurement loop, and it needs no input to keep running. */
-.reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); border-radius: 12px; }
-.reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) .reasonHeading { padding: 10px 16px 0; }
-.reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) .reasonText { padding: 8px 16px 16px; }
+/* …and their SECOND exclusion, which is a bug fix of its own: the glass. This plate is opaque by design, and it is a
+   four-part attribute selector — specificity (0,4,0) — so it beat `.root[data-reader-glass] .reasonCard` at (0,3,0) and the
+   card showed an opaque plate whenever it was neither open nor scrolling. That is exactly the state a focused card sits in
+   before it grows, so with the glass on the card had NOTHING to show through and its frost did nothing — until the expansion
+   started, `data-expanded` became true, this rule stopped matching, and the glass appeared all at once. The reader reported
+   precisely that. Scoped to the root WITHOUT the glass attribute instead of adding specificity: the plate exists to give a
+   card a surface when the glass is off, and with the glass on that surface is the glass's own, so the two must be mutually
+   exclusive rather than one winning a contest. */
+.root:not([data-reader-glass]) .reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); border-radius: 12px; }
+.root:not([data-reader-glass]) .reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) .reasonHeading { padding: 10px 16px 0; }
+.root:not([data-reader-glass]) .reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) .reasonText { padding: 8px 16px 16px; }
 .reasonLabel { font-weight: 500; }
 .reasonViewport {
   position: relative;

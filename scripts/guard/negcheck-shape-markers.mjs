@@ -295,6 +295,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the opaque short-thinking plate back at (0,4,0), so a focused card shows no frost until it expands',
+    // The exact selector that beat the glass rule: the root exclusion removed. Written against the LOCAL class name (`_root`),
+    // which no build rewrites — the hash in front of it is derived from the artifact's own path.
+    search: '_root:not([data-reader-glass]) .',
+    replace: '',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the page compensating the growth of a card the READER just resized, so it expands upward again',
     // The exact branch the reader's report came from: the compensation back, with its stand-down removed.
     search: '!(content.querySelector("[data-reader-resizing]") !== null) && Math.abs(delta) > .5',
