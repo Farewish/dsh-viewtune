@@ -422,6 +422,14 @@ const markers = [
   // against the window. THE WINDOW WINS at both ends: `gutter − 8px` is where the shift stops making sense, and `max(0px, …)`
   // leaves the pill where it was in a narrow window instead of pushing it out of view. The gutter is computed, not measured:
   // `.root` is the inline-size container and the column is `min(chat-content-width, container − 2 × inline-pad)` centred in it.
+  // An OPEN card's ceiling is the stylesheet's AND the room below its own top: the stylesheet's is viewport-relative
+  // (`min(60vh, 560px)`), and a card starting halfway down the window has only part of that room beneath it, so it overshot the
+  // composer and the tail of its own text sat behind it. Both original terms are kept in the value written, because the reader
+  // asked for the CAP to stay exactly as it is — this can only lower the ceiling, never raise it. `room` comes off the measured
+  // gap minus the card's own chrome (`height − viewportHeight`), so it holds whatever the stylesheet does to those parts.
+  ['an open card is clamped to the room between its top and the composer, cap unchanged', () =>
+    bundle.includes('min(560px, 60vh, ${String(Math.max(120, Math.round(room)))}px)')
+    && bundle.includes('const chrome = box.height - port.clientHeight;')],
   ['the jump pill hugs the column, and never leaves the window', () =>
     readerCss.includes('--jump-gutter:calc((100cqw - min(')
     && readerCss.includes('transform:translateX(calc(min(100%, max(0px, var(--jump-gutter) - 8px)) + 16px))')
