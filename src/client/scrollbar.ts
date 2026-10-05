@@ -92,6 +92,15 @@ export function scrollbarStyleCss(): string {
     `   once already. Scoped through the COMPOSER rather than by the scroller's own class name, which is a per-build`,
     `   hash (uV2eYG_scroll in this build); the composer's seat is what the card and its field live inside. */`,
     `[class*="composer" i] [class*="_scroll"]::-webkit-scrollbar-track { border-radius: 999px !important; }`,
+    `/* …and the ARROW BUTTONS are hidden, which this sheet never said anything about until the reader found them. On Windows a`,
+    `   classic scrollbar draws an up and a down triangle at the ends of its slot; with the track and the thumb made invisible`,
+    `   those two arrows were the only part of the scrollbar still painted, so they stood on their own — beside the reasoning`,
+    `   card's own controls, since that viewport's scrollbar is what they belong to — and they vanished the moment the content`,
+    `   stopped overflowing, when the whole scrollbar did. The reader worked the mechanism out themselves: 「滑动槽的上下分别有`,
+    `   一个正三角形和倒三角形 … 折叠成一行之后，滑动条和滑动槽看不见了，但两个三角形还在」. Hidden here rather than styled,`,
+    `   because a groove this plugin paints has no use for arrow buttons: the wheel, the keyboard and the rail all still scroll`,
+    `   every one of these containers. */`,
+    `::-webkit-scrollbar-button { display: none !important; }`,
   ].join('\n');
 }
 

@@ -417,6 +417,13 @@ const markers = [
   // offset plus the view's inline padding and adds the same amount back as its own padding, so it reads
   // as one band with the shell's header rule while 收起 and the gear stay exactly where the text
   // starts. "Fixed under the top bar" is chrome; a lane that scrolls away is not what was asked.
+  // The scrollbar's ARROW BUTTONS are hidden. This plugin styles every groove in the app but had never said anything about the
+  // buttons, and on Windows a classic scrollbar draws an up and a down triangle at the ends of its slot: with the track and the
+  // thumb made invisible, those two arrows were the only part of the scrollbar still painted — standing on their own beside the
+  // reasoning card's controls until the content stopped overflowing and the whole scrollbar went with it. The reader diagnosed
+  // it before we did.
+  ['the browser’s own scrollbar arrow buttons are hidden', () =>
+    bundle.includes('::-webkit-scrollbar-button')],
   // The bar is a full-width sticky lane, so it used to swallow every click and wheel event on the strip of transcript it covers,
   // and text under it could not be selected. `pointer-events: none` on the bar with `auto` on the interactive ELEMENTS is the
   // whole of it — the plate, the border and the frosted background keep painting, only the controls take input. Scoped to the
