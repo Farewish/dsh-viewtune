@@ -562,7 +562,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
         const delta = anchor.current.element.getBoundingClientRect().top - anchor.current.top;
         // The metrics are read here, before the write: reading them after would be the same forced layout this branch
         // used to pay for nothing.
-        if (Math.abs(delta) > .5) writeTop(scroll.scrollTop + delta, scroll.scrollHeight - scroll.clientHeight);
+        //
+        // …AND NOT WHILE THE READER IS RESIZING A CARD THEMSELVES. This compensation keeps the anchored element fixed,
+        // which is right for text arriving on its own and wrong for a card the reader just opened: a card ABOVE the anchor
+        // was pushed off the top (it looked like it expanded upward) while one below stayed put — 「靠上就向上扩张，靠下就向下
+        // 扩张，应该统一向下」. The card publishes `data-reader-resizing` for the length of its own resize, and the capture
+        // below still runs, so the new layout becomes the baseline that later growth is measured against.
+        const resizing = content.querySelector('[data-reader-resizing]') !== null;
+        if (!resizing && Math.abs(delta) > .5) writeTop(scroll.scrollTop + delta, scroll.scrollHeight - scroll.clientHeight);
       }
       // Only worth capturing when the anchor is what holds the reader's place. While following, the anchor is not
       // read at all — and this fires once per streamed chunk, so the scan was pure cost on the one path where the

@@ -48,6 +48,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   pageAtTail: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
+  /**
+   * The card's own root element, for the one attribute a reader-initiated resize publishes.
+   *
+   * Looked up from the viewport rather than held in a ref of its own: the root already carries
+   * `data-reader-reasoning-card`, and one more ref would be one more thing this component can get wrong.
+   */
+  const cardRoot = (): HTMLElement | null => viewport.current?.closest<HTMLElement>('[data-reader-reasoning-card]') ?? null;
   const track = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const controls = useId();
@@ -692,6 +699,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       resize.current = null; animation.cancel();
       port.style.maxHeight = ''; port.style.height = '';
       lastHeight.current = port.clientHeight;
+      // …and the reader-initiated resize is over: the page may compensate growth again. See `toggleReading` for why this
+      // marker exists at all; the deadline in that handler is the backstop for the 动效-off path, where no animation runs.
+      cardRoot()?.removeAttribute('data-reader-resizing');
     };
     animation.onfinish = settle;
     const deadline = window.setTimeout(settle, 300 + 240);
@@ -707,6 +717,24 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     // press has to hand the focus back, or the button would do nothing at all. That is the reader's report — after taking a
     // focused card over by reading inside it, the toggle never came back and there was no way to close the card.
     if (focused && !expanded) { onFocusChange(focusKey, false); return; }
+    /**
+     * …and THIS resize is the reader's own doing, so the page must not drag itself to keep some other anchor still.
+     *
+     * The reading view compensates growth while the reader holds their own place (`motion.tsx`, the observer's compensation
+     * branch), which keeps the element they are looking at fixed — and that is right for text arriving on its own. For a card
+     * the reader just opened it produced the opposite of what they asked for: the card sits ABOVE that anchor, so
+     * compensating the anchor's downward move pushed the card's top off screen and the card appeared to expand UPWARD, while
+     * a card below the anchor appeared to expand downward — 「靠上就向上扩张，靠下就向下扩张，应该统一向下」.
+     *
+     * So the card publishes a marker for as long as this resize lasts, and the compensation stands down while it is set,
+     * still re-capturing its anchor so later growth is measured from the new layout. Cleared both by the resize animation's
+     * own settle and by a deadline, because with 动效 off there is no animation to settle (`settle` returns early then).
+     */
+    const root = cardRoot();
+    if (root !== null) {
+      root.setAttribute('data-reader-resizing', '');
+      window.setTimeout(() => root.removeAttribute('data-reader-resizing'), 600);
+    }
     setExpanded(value => !value);
   };
 

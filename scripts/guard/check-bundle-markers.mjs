@@ -1151,6 +1151,14 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
+  // A card the READER resizes must not have that growth compensated by the page. The reading view keeps the element the
+  // reader is looking at fixed while text arrives on its own, which is right — but for a card the reader just opened it did
+  // the opposite of what they asked: a card ABOVE that anchor was pushed off the top (it looked like it expanded upward)
+  // while one below stayed put — 「靠上就向上扩张，靠下就向下扩张，应该统一向下」. The card publishes this marker for the length
+  // of its own resize, and the compensation branch stands down while it is set, still re-capturing its anchor.
+  ['a card the reader resizes stops the page from compensating that growth', () =>
+    bundle.includes('root.setAttribute("data-reader-resizing", "")')
+    && bundle.includes('!(content.querySelector("[data-reader-resizing]") !== null) && Math.abs(delta) > .5')],
   // A markdown newline text node is invisible where whitespace collapses and a REAL line in the user's own bubble, whose
   // CSS is `white-space: pre-wrap`. The reader's report: ordered-list items gained a blank line between them in the reading
   // page and not on the conversation page. The renderer used to interleave `'\n'` between list items, after a trailing

@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the page compensating the growth of a card the READER just resized, so it expands upward again',
+    // The exact branch the reader's report came from: the compensation back, with its stand-down removed.
+    search: '!(content.querySelector("[data-reader-resizing]") !== null) && Math.abs(delta) > .5',
+    replace: 'Math.abs(delta) > .5',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the reader’s own message handed back to the host component, whose block newlines the bubble then shows',
     // The exact branch the reader's empty line came from, restored as a shape the marker denies.
     search: 'case "text": return ',
