@@ -168,6 +168,18 @@ export interface ReaderState {
    */
   focusExpand: boolean;
   /**
+   * Whether a reasoning card is folded to a SINGLE LINE — the icon, 「思考」, as much of the text as fits on that line, and
+   * the toggle that opens it — while it is neither focused nor deliberately opened.
+   *
+   * OFF by default, so a record written before this existed keeps every card the size it has always been. Read defensively
+   * (`=== true`), which is what an OFF default means: an absent key is off.
+   *
+   * The reader's own words for it: 「思考卡片自动折叠成一行 ... 不记忆」. Nothing is remembered per card on purpose — the
+   * open/closed state of a card is one component's state (the `expanded` argument below), never part of the record, so a
+   * card that was opened mid-turn is back to one line the next time that turn is built.
+   */
+  reasoningFold: boolean;
+  /**
    * Whether a wheel over the toolbar's two column handles is forwarded to the transcript.
    *
    * On by default, because that IS the behaviour the reader asked for and then tuned over many rounds: the handles
@@ -237,6 +249,7 @@ type ReaderActions = {
   setReasoningFollow: (draft: ReaderState, value: ReasoningFollowMode) => void;
   setReasoningRate: (draft: ReaderState, value: number) => void;
   setFocusExpand: (draft: ReaderState, value: boolean) => void;
+  setReasoningFold: (draft: ReaderState, value: boolean) => void;
   /** Drop every stored expansion choice, so each turn falls back to its default. */
   clearExpanded: (draft: ReaderState) => void;
   setStripWheel: (draft: ReaderState, value: boolean) => void;
@@ -309,6 +322,9 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       reasoningFollow: 'latest', reasoningRate: 3,
       // …and the focused card grows, which is what the reader who asked for all of these opens with.
       focusExpand: true,
+      // …and a card is NOT folded to one line unless the reader asks for it: the fold changes the SHAPE of every reasoning
+      // card, so it ships off and every record written before it keeps the cards it had.
+      reasoningFold: false,
       // The wallpaper this plugin ships, and the scrim the reader settled on for it (see wallpaper.ts for both). The
       // window scope below means it carries the whole app rather than only the reading column.
       wallpaper: DEFAULT_WALLPAPER, wallpaperDim: WALLPAPER_DIM_INITIAL,
@@ -356,6 +372,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setReasoningFollow: (draft, value: ReasoningFollowMode) => { draft.reasoningFollow = value; },
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
       setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },
+      setReasoningFold: (draft, value: boolean) => { draft.reasoningFold = value; },
       clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
       setWallpaper: (draft, value: string) => { draft.wallpaper = value; },

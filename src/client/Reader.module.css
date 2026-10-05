@@ -354,6 +354,18 @@
   background: var(--dsw-alias-bg-module-platform);
   scroll-margin-block: 16px calc(var(--dsh-composer-height, 152px) + 16px);
 }
+/* 「思考卡折叠成一行」: the card is ONE line — the icon, 「思考」, as much of the text as fits, and the toggle that opens it.
+   The card is a column by default (heading, viewport, footer), so the fold turns it into a ROW and lets the viewport take
+   the middle; the text is CLIPPED to that line rather than hidden, which is what 「能放多少放多少」 asks for. The two states
+   that outrank the fold are the ones the reader is looking at on purpose: a card they opened, and the card holding the
+   focus (both are decided in `ReasoningCard.tsx`, which is also where 「不记忆」 is satisfied — the open state is the card's
+   own component state, never part of the record). */
+.reasonFoldIcon { flex: none; align-self: center; color: var(--dsw-alias-label-secondary); }
+.reasonCard[data-folded] { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; }
+.reasonCard[data-folded] .reasonHeading { flex: none; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
+.reasonCard[data-folded] .reasonViewport { flex: 1 1 auto; min-width: 0; max-height: 20px; overflow: hidden; }
+.reasonCard[data-folded] .reasonText { padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reasonCard[data-folded] .reasonFooter { flex: none; padding: 0; margin: 0; }
 .reasonHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 16px 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }
 .reasonCard[data-overflow=false][data-expanded=false] { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); border-radius: 12px; }
 .reasonCard[data-overflow=false][data-expanded=false] .reasonHeading { padding: 10px 16px 0; }

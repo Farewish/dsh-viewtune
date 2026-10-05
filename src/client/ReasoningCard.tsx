@@ -32,10 +32,10 @@ const HEIGHT_CHASE_MS = 400;
 const CHASE_STILL_FRAMES = 4;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, focusKey, focused, onFocusChange, onFocusPin, pageAtTail }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, focusKey, focused, onFocusChange, onFocusPin, pageAtTail }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
   reasoningMode: ReasoningFollowMode; rate: number;
-  focusExpand: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
+  focusExpand: boolean; fold: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
   /** Whether this card is PINNING the focus it holds — the reader is reading inside it (see the pin effect). */
   onFocusPin: (key: string, pinned: boolean) => void;
   /**
@@ -691,10 +691,17 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     setExpanded(value => !value);
   };
 
-  return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-ud-motion="reader-reasoning-size">
+  // 「思考卡折叠成一行」: folded unless the reader opened THIS card or it is the one holding the focus. The two states that
+  // win over the fold are the two the reader is looking at on purpose — the card they opened, and the card being written
+  // into — so the fold never hides the content someone is actually reading, and nothing here is remembered: `expanded` is
+  // this component's own state, so every remount starts folded again.
+  const folded = fold && !expanded && !focused;
+
+  return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-folded={folded ? '' : undefined} data-ud-motion="reader-reasoning-size">
     <div className={css.reasonHeading} data-reader-reasoning-heading data-ud-check="reasoning-identity">
+      {folded && <svg className={css.reasonFoldIcon} width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"><path d="M8 2.5a4 4 0 0 0-2.3 7.3v1.7h4.6v-1.7A4 4 0 0 0 8 2.5Z" /><path d="M6.4 13.5h3.2" /></svg>}
       <span className={css.reasonLabel} data-reader-reasoning-label>思考</span>
-      <span>步骤 {step}</span>
+      {!folded && <span>步骤 {step}</span>}
     </div>
     <div ref={viewport} id={controls} className={css.reasonViewport} data-reader-reasoning-scroll data-edges={edges}
       data-ud-motion="reader-reasoning-scroll" role="region" aria-label={`步骤 ${step} 的思考${overflow ? '，可滚动阅读' : ''}`}
@@ -703,11 +710,11 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         <div ref={content} className={css.reasonText} data-reader-reasoning-text>{children}</div>
       </div>
     </div>
-    {(overflow || expanded) && <div className={css.reasonFooter} data-ud-check="reasoning-controls">
+    {(overflow || expanded || folded) && <div className={css.reasonFooter} data-ud-check="reasoning-controls">
       {/* The control belongs to the FOLLOWING, not to the animation: pausing is just as meaningful when the card jumps to
           the newest line directly, which is what 动效 off does. Gating it on `motion` hid the button from exactly the
           readers who had turned animation off — the other half of the bug above. */}
-      {active ? <button type="button" className={css.reasonAction} disabled={selected} aria-controls={controls}
+      {folded ? null : active ? <button type="button" className={css.reasonAction} disabled={selected} aria-controls={controls}
         aria-label={following ? '暂停自动跟随思考' : '继续跟随最新思考'}
         title={selected ? '取消文字选择后可继续跟随' : undefined}
         onClick={() => { if (following) pause(); else { onRead(); setFollowing(true); } }}>
