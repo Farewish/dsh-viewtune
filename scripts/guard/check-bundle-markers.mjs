@@ -597,7 +597,11 @@ const markers = [
     readerCss.includes(`[data-motion=off] ${sel('reasonCard')}[data-focus=true] ${sel('reasonViewport')},`)
     && /prefers-reduced-motion[^}]*reasonCard\[data-focus=true\][^{]*\{transition:none\}/.test(readerCss)],
   ['the card requests the focus when it is the one being written into at the bottom of the transcript', () => bundle.includes('onFocusChange(focusKey, true)') && bundle.includes('isNearTail(scroller.scrollTop')],
-  ['…and hands it back when it stops being written into, on 展开阅读, and on unmount — but NOT when the reader takes the CARD over', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 3],
+  ['…and hands it back when it stops being written into, on 展开阅读, and on unmount — but NOT when the reader takes the CARD over', () => (bundle.match(/onFocusChange\(focusKey, false\)/g) ?? []).length === 4],
+  // FOUR places now, not three: the toggle hands the focus back as well. A card held open by the FOCUS has nothing to toggle
+  // in `expanded`, so its 收起 press releases the focus instead — without that it would do nothing at all, which is what the
+  // reader found after taking a card over: no toggle ever came back, and the card could not be closed. The takeover itself
+  // still must NOT be a release; reading inside a card is reading it, which the pin below pins down.
   ['…with the newest request winning unless a card is pinned, so exactly one card can hold the focus', 'pinRef.current === null ? key : current'],
   // The reader's own rule for 「焦点思考展开」, settled after the card's takeover turned out to be the wrong release: scrolling
   // INSIDE a card is READING it, so the card stays open under them, no newer card's request takes the focus away, and the

@@ -699,6 +699,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     // Resize the same transcript without changing follow intent or position.
     // Wheel, selection and viewport focus still explicitly pause following.
     onRead();
+    // A card that is tall because of the FOCUS has nothing to toggle in `expanded`: the focus is what holds it open, so the
+    // press has to hand the focus back, or the button would do nothing at all. That is the reader's report — after taking a
+    // focused card over by reading inside it, the toggle never came back and there was no way to close the card.
+    if (focused && !expanded) { onFocusChange(focusKey, false); return; }
     setExpanded(value => !value);
   };
 
@@ -737,17 +741,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">{following ? <path d="M5.5 4v8m5-8v8" /> : <path d="M8 3v10m-4-4 4 4 4-4" />}</svg>
         {following ? '暂停跟随' : '跟随最新'}
       </button> : <span className={css.reasonCaption}>{expanded ? '手动阅读' : '可滚动阅读'}</span>}
-      {/* …but NOT while 「焦点思考展开」 is the reason this card is tall. The reader reported the result: a card that is
-          already open offering a button that says 展开阅读. The `expanded` state already flips the label to 收起, and that
-          stays as it is; the case that looked wrong is FOCUS, which is a different state — pressing a collapse button there
-          would only be undone by the focus logic that grew the card. So the control is withdrawn for as long as the card
-          holds the focus and returns the moment it loses it, which is exactly when it means something again. `focused`
-          implies `focusExpand`: the focus effect returns early when the setting is off. */}
-      {!focused && <button type="button" className={css.reasonAction} aria-expanded={expanded} aria-controls={controls}
-        aria-label={expanded ? '收起完整思考' : '展开阅读完整思考'} onClick={toggleReading}>
-        {expanded ? '收起' : '展开阅读'}
-        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">{expanded ? <path d="m4 10 4-4 4 4" /> : <path d="m4 6 4 4 4-4" />}</svg>
-      </button>}
+      {/* The toggle is offered whenever the card is TALL — because the reader opened it, or because the focus holds it open —
+          and the label says which way that press goes. It is shown for a focused card too: hiding it there was the previous
+          attempt, and it left a reader who had taken the card over with no way to close it at all. */}
+      <button type="button" className={css.reasonAction} aria-expanded={expanded || focused} aria-controls={controls}
+        aria-label={expanded || focused ? '收起完整思考' : '展开阅读完整思考'} onClick={toggleReading}>
+        {expanded || focused ? '收起' : '展开阅读'}
+        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">{expanded || focused ? <path d="m4 10 4-4 4 4" /> : <path d="m4 6 4 4 4-4" />}</svg>
+      </button>
     </div>}
   </div>;
 }
