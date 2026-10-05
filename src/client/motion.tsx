@@ -571,7 +571,21 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
         // 扩张，应该统一向下」. The card publishes `data-reader-resizing` for the length of its own resize, and the capture
         // below still runs, so the new layout becomes the baseline that later growth is measured against.
         const resizing = content.querySelector('[data-reader-resizing]') !== null;
-        if (!resizing && Math.abs(delta) > .5) writeTop(scroll.scrollTop + delta, scroll.scrollHeight - scroll.clientHeight);
+        /**
+         * …AND ONLY FOR GROWTH. A negative delta is content ABOVE the anchor getting shorter, and compensating THAT pulled the
+         * page up under the reader — measured in their own log with this library armed:
+         *
+         *     [vt-scroll] writeTop 1826 -> 1727  d=-99  scrollH=3435  band=76..901
+         *       at writeTop …  <-  at ResizeObserver.<anonymous> …
+         *
+         * …which is this branch. What shrank is the one thing that changes while nothing streams: an off-screen turn's
+         * `content-visibility` placeholder swapping for its real height, which lands exactly when the reader stops scrolling
+         * and the browser lays the row out. Their words for what should happen instead — 「应该滑到哪里就是哪里」 — are the
+         * rule read literally: the scroll position they chose stands, and the content may shift a little for it. Growth is
+         * still compensated, because that is the case this branch exists for (text arriving below must not push the page
+         * down under someone reading above it), and the capture below still advances the baseline either way.
+         */
+        if (!resizing && delta > .5) writeTop(scroll.scrollTop + delta, scroll.scrollHeight - scroll.clientHeight);
       }
       // Only worth capturing when the anchor is what holds the reader's place. While following, the anchor is not
       // read at all — and this fires once per streamed chunk, so the scan was pure cost on the one path where the

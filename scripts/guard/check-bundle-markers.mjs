@@ -1213,7 +1213,12 @@ const markers = [
   // of its own resize, and the compensation branch stands down while it is set, still re-capturing its anchor.
   ['a card the reader resizes stops the page from compensating that growth', () =>
     bundle.includes('root.setAttribute("data-reader-resizing", "")')
-    && bundle.includes('!(content.querySelector("[data-reader-resizing]") !== null) && Math.abs(delta) > .5')],
+    // …and only for GROWTH: a negative delta is content above the anchor getting shorter, and compensating that pulled the page
+    // UP under the reader — their own armed log showed `writeTop 1826 -> 1727 d=-99` coming from this very observer. What
+    // shrinks while nothing streams is a skipped turn's placeholder swapping for its real height, which lands right after they
+    // stop scrolling. 「应该滑到哪里就是哪里」 is the rule read literally: the scroll position they chose stands, and the content
+    // may shift a little instead.
+    && bundle.includes('!(content.querySelector("[data-reader-resizing]") !== null) && delta > .5) writeTop(')],
   // A markdown newline text node is invisible where whitespace collapses and a REAL line in the user's own bubble, whose
   // CSS is `white-space: pre-wrap`. The reader's report: ordered-list items gained a blank line between them in the reading
   // page and not on the conversation page. The renderer used to interleave `'\n'` between list items, after a trailing

@@ -295,6 +295,14 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'compensating a SHRINK again, so content above the reader pulls the page up after they stop scrolling',
+    // The exact branch their armed log caught: `writeTop 1826 -> 1727 d=-99` from this observer. The search is the artifact's
+    // own compiled shape — the bundler inlines `const resizing` into the condition, so the source form does not appear.
+    search: '&& delta > .5) writeTop(scroll.scrollTop + delta',
+    replace: '&& Math.abs(delta) > .5) writeTop(scroll.scrollTop + delta',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the opaque short-thinking plate back at (0,4,0), so a focused card shows no frost until it expands',
     // The exact selector that beat the glass rule: the root exclusion removed. Written against the LOCAL class name (`_root`),
     // which no build rewrites — the hash in front of it is derived from the artifact's own path.
@@ -304,9 +312,10 @@ const cases = [
   },
   {
     label: 'the page compensating the growth of a card the READER just resized, so it expands upward again',
-    // The exact branch the reader's report came from: the compensation back, with its stand-down removed.
-    search: '!(content.querySelector("[data-reader-resizing]") !== null) && Math.abs(delta) > .5',
-    replace: 'Math.abs(delta) > .5',
+    // The CARD side of that invariant, so this case stays distinct from the growth-only one below, which owns the other half of
+    // the same condition. The marker asserts both, and either one going missing fails it.
+    search: 'root.setAttribute("data-reader-resizing", "")',
+    replace: 'root.setAttribute("data-reader-resizing-off", "")',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
