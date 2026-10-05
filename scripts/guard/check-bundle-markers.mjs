@@ -424,7 +424,7 @@ const markers = [
   // `.root` is the inline-size container and the column is `min(chat-content-width, container − 2 × inline-pad)` centred in it.
   ['the jump pill hugs the column, and never leaves the window', () =>
     readerCss.includes('--jump-gutter:calc((100cqw - min(')
-    && readerCss.includes('transform:translateX(min(100%, max(0px, calc(var(--jump-gutter) - 8px))))')],
+    && readerCss.includes('transform:translateX(calc(min(100%, max(0px, var(--jump-gutter) - 8px)) + 10px))')],
   // The scrollbar's ARROW BUTTONS are hidden. This plugin styles every groove in the app but had never said anything about the
   // buttons, and on Windows a classic scrollbar draws an up and a down triangle at the ends of its slot: with the track and the
   // thumb made invisible, those two arrows were the only part of the scrollbar still painted — standing on their own beside the

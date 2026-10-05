@@ -561,7 +561,7 @@
  * `min(chat-content-width, container − 2 × inline-pad)` centred in it, so half the difference is the space on the right. */
 .jumpDock {
   --jump-gutter: calc((100cqw - min(var(--dsh-chat-content-width, 748px), 100cqw - 2 * var(--reader-inline-pad))) / 2);
-  transform: translateX(min(100%, max(0px, calc(var(--jump-gutter) - 8px))));
+  transform: translateX(calc(min(100%, max(0px, var(--jump-gutter) - 8px)) + 10px));
 }
 .deliverablesRoot { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; column-gap: 10px; margin-top: 14px; font-size: 13px; line-height: 22px; }
 /* 「产物」/「提交」这两行的行首标签：颜色**比三级再重一档** ✓（读者要求「颜色重些」✓）—— 用 secondary ✓：
