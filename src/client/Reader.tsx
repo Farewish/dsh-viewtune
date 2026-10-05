@@ -2143,7 +2143,9 @@ export function Reader(props: ReaderProps) {
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>
       </div>}
-      {scroll.detached && roomBelow && <div className={css.jumpDock}><button type="button" className={css.jump} onClick={scroll.jump}>↓ 回到最新</button></div>}
+      {/* The reader asked to see the pill with its words dropped, so it is the arrow alone. The accessible name and the tooltip
+          still say what it does — and the button keeps the same target size, the same padding and the same click. */}
+      {scroll.detached && roomBelow && <div className={css.jumpDock}><button type="button" className={css.jump} aria-label="回到最新" title="回到最新" onClick={scroll.jump}>↓</button></div>}
     </div>
   </div></StreamMotionContext.Provider>;
 }
