@@ -66,6 +66,13 @@
    carry, the whole lane (panel included) painted UNDER the rail, and the panel's own z-index could not
    lift it: that only orders it inside this context. A guard compares the two numbers. */
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 4px var(--reader-inline-pad); border-bottom: .5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; background: var(--dsw-alias-bg-base); position: sticky; top: 0; z-index: 11; margin-top: calc(-1 * var(--reader-top-pad)); margin-inline: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw); padding-left: max(0px, calc(var(--reader-inline-pad) + 50cqw - 50% - var(--reader-toolbar-shift-left)));  padding-right: var(--reader-toolbar-gap-right, 1px); margin-right: calc(-1 * var(--reader-inline-pad) + 50% - 50cqw + var(--reader-toolbar-end-right)); }
+/* 「工具栏能不能做点击穿透」 — YES: the bar is a full-width sticky lane, so without this it swallowed every click and wheel event
+ * on the strip of transcript it covers, and text under it could not be selected. `pointer-events: none` on the bar and `auto` on
+ * the things that are actually interactive is the whole of it: the plate, the border and the frosted background keep painting,
+ * but only the controls take input. Scoped to the interactive ELEMENTS rather than the two groups, because a group's own empty
+ * space is as inert as the bar's. */
+.toolbar { pointer-events: none; }
+.toolbar :is(button, a, select, input, textarea, [role=button], [tabindex]) { pointer-events: auto; }
 .textButton, .historyButton, .iconButton, .jump, .disclosureButton, .imageOpen, .dialogClose { font: inherit; cursor: pointer; }
 .textButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
 .textButton:hover, .iconButton:hover { background: var(--dsw-alias-interactive-bg-hover); }

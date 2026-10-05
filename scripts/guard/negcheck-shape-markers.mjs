@@ -295,6 +295,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the toolbar swallowing clicks again, over the strip of transcript it covers',
+    // The controls' pointer-events restored: written against the LOCAL class name, which no build rewrites.
+    search: '_toolbar :is(button,a,select',
+    replace: '_toolbar-off :is(button,a,select',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'compensating a SHRINK again, so content above the reader pulls the page up after they stop scrolling',
     // The exact branch their armed log caught: `writeTop 1826 -> 1727 d=-99` from this observer. The search is the artifact's
     // own compiled shape — the bundler inlines `const resizing` into the condition, so the source form does not appear.

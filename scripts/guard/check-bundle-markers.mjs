@@ -417,6 +417,13 @@ const markers = [
   // offset plus the view's inline padding and adds the same amount back as its own padding, so it reads
   // as one band with the shell's header rule while 收起 and the gear stay exactly where the text
   // starts. "Fixed under the top bar" is chrome; a lane that scrolls away is not what was asked.
+  // The bar is a full-width sticky lane, so it used to swallow every click and wheel event on the strip of transcript it covers,
+  // and text under it could not be selected. `pointer-events: none` on the bar with `auto` on the interactive ELEMENTS is the
+  // whole of it — the plate, the border and the frosted background keep painting, only the controls take input. Scoped to the
+  // elements rather than the two groups, because a group's own empty space is as inert as the bar's.
+  ['the toolbar lets a click through, and only its controls take one', () =>
+    hasDecls(readerCss, sel('toolbar'), ['pointer-events:none'])
+    && readerCss.includes(`${sel('toolbar')} :is(button,a,select`)],
   ['the toolbar pins under the top bar', () =>
     hasDecls(readerCss, sel('toolbar'), ['position:sticky', 'top:0'])],
   ['the toolbar spans the view, pins both its controls and sits flush when pinned', () => {
