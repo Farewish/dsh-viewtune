@@ -1156,7 +1156,12 @@ const markers = [
     // BLOCK axis only, and the shorthand is denied on purpose: `contain-intrinsic-size: auto 320px` takes one value and
     // applies it to BOTH axes, which gave every skipped turn an intrinsic WIDTH of 320px. Its contents laid out at that
     // width and the process toggle's header squeezed its title to nothing — the reader's "the toggle is truncated".
-    bundle.includes('content-visibility:auto;contain-intrinsic-block-size:auto 320px}')
+    // …and the turn carries 6px of CLIP TOLERANCE on the inline-start edge. Paint containment clips a descendant to the
+    // PADDING box, and two rows inside every turn deliberately start 6px to the left (`.answerActions`, and the
+    // `.disclosureButton` whose `margin-left: -6px` the reader asked to keep) so their hover plates line up with the body
+    // text — the reader's report that the leftmost copy button's plate came out cut, which arrived with the viewport change
+    // above. The padding moves the clip boundary out; the negative margin keeps every child exactly where it was.
+    bundle.includes('content-visibility:auto;contain-intrinsic-block-size:auto 320px;margin-left:-6px;padding-left:6px}')
     && !bundle.includes('contain-intrinsic-size:auto 320px')
     // …with the LIVE turn exempt. `content-visibility` implies `contain: layout paint`, and the reasoning card follows
     // itself from INSIDE that subtree — it measures its own height, writes its inner scroller and drives a transform. The

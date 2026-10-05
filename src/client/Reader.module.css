@@ -104,6 +104,16 @@
      carries `min-width: 0` — and the reader reported exactly that: the toggle looked truncated. A turn is a full-width row
      in a column; only its height is ever unknown. */
   contain-intrinsic-block-size: auto 320px;
+  /* …and 6px of CLIP TOLERANCE on the inline-start edge, from the reader's report that the leftmost copy button's hover
+     plate came out cut. `content-visibility` implies `contain: layout paint`, so a descendant painting outside this box is
+     clipped — and two rows inside every turn deliberately start 6px to the LEFT (`.answerActions`, and the
+     `.disclosureButton` whose `margin-left: -6px` the reader asked to keep) so their hover plates line up with the body
+     text. Padding widens the PADDING box, which is the box paint containment clips against, while the matching negative
+     margin keeps the content box — and therefore every child position — exactly where it was. Only the LEFT is padded: in
+     LTR an overflow to the left is not scrollable, so this adds no horizontal scroll range, and the right edge is
+     unchanged. */
+  padding-left: 6px;
+  margin-left: -6px;
 }
 /* …EXCEPT the turn being written into. `content-visibility` implies `contain: layout paint` on the element, and the
  * reasoning card does its own following INSIDE this subtree: it measures its own height, writes its inner scroller's
