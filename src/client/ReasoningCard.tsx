@@ -717,7 +717,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       <span className={css.reasonLabel} data-reader-reasoning-label>思考</span>
       {!folded && <span>步骤 {step}</span>}
     </div>
-    <div ref={viewport} id={controls} className={css.reasonViewport} data-reader-reasoning-scroll data-edges={folded ? 'none' : edges}
+    <div ref={viewport} id={controls} className={css.reasonViewport} data-reader-reasoning-scroll data-edges={edges}
       data-ud-motion="reader-reasoning-scroll" role="region" aria-label={`步骤 ${step} 的思考${overflow ? '，可滚动阅读' : ''}`}
       tabIndex={overflow ? 0 : undefined} onPointerDown={pause} onFocus={pause}>
       <div ref={track} className={css.reasonTrack} data-reader-reasoning-track>
