@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState }
 import type { ReactNode, RefObject } from 'react';
 import css from './Reader.module.css';
 import { StreamMotionContext } from './streaming.js';
+import { logScroll } from './scroll-log.js';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
 
@@ -495,6 +496,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
      */
     const writeTop = (top: number, limit: number) => {
       const value = Math.max(0, Math.min(top, limit));
+      logScroll('writeTop', scroll, scroll.scrollTop, value);
       scroll.scrollTop = value;
       lastWrittenTop = value;
     };
@@ -596,6 +598,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     following.current = true;
     setDetached(false);
     if (port.current) {
+      logScroll('jump', port.current, port.current.scrollTop, port.current.scrollHeight);
       port.current.scrollTop = port.current.scrollHeight;
     }
   }, []);
@@ -626,6 +629,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     cancelFollow.current();
     anchor.current = null;
     setDetached(false);
+    logScroll('resume', scroll, scroll.scrollTop, scroll.scrollHeight);
     scroll.scrollTop = scroll.scrollHeight;
   }, []);
   return { detached, jump, release, resume };

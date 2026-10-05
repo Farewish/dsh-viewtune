@@ -4,6 +4,7 @@ import { REASON_HOLD, REASON_LATEST_STEP, REASON_STEP, reasoningTarget, stepLine
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { focusedHeight } from './focus-expand.js';
 import { isNearTail } from './reading-scroll.js';
+import { logScroll } from './scroll-log.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -268,7 +269,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * it is exactly what the reader asked for: they are at the bottom, by the precondition of this very call.
      */
     const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
-    if (scroller !== null && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight;
+    if (scroller !== null && scroller !== undefined) {
+      logScroll('grant-tail-gap', scroller, scroller.scrollTop, scroller.scrollHeight);
+      scroller.scrollTop = scroller.scrollHeight;
+    }
     // The card has already grown in this commit (the ceiling changed with the focus), and the height recorded before the
     // request is what that jump has to be measured against.
     //
@@ -503,6 +507,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
        * growth that happened while they were away (one jump), and it resumes on the next line.
        */
       if (!pageAtTailRef.current) return;
+      logScroll('card-compensate', scroller, scroller.scrollTop, scroller.scrollTop + grew);
       scroller.scrollTop += grew;
     };
     const chaseHeight = (target: number): void => {
@@ -802,14 +807,22 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     if (root === null || port === null || scroller === null) return;
     const seat = scroller.querySelector<HTMLElement>('[class*="_composerSeat"]');
     const band = scroller.getBoundingClientRect();
-    const limit = seat !== null ? seat.getBoundingClientRect().top : band.bottom;
+    /**
+     * …stopping SHORT of the composer by the height of the fade band above it, which the reader reported covering the last
+     * sliver of the card — 「那个对齐上移一些，因为底部有渐变，会挡一点」. The band's height is this plugin's own constant on
+     * the seat (`--viewtune-wallpaper-fade-lift`, the lift its `::before` is drawn with), so it is READ rather than guessed:
+     * a reader who tuned that fade gets an alignment that respects what they tuned.
+     */
+    const fade = seat === null ? Number.NaN : Number.parseFloat(getComputedStyle(seat).getPropertyValue('--viewtune-wallpaper-fade-lift'));
+    const inset = Number.isFinite(fade) ? fade : 36;
+    const limit = (seat !== null ? seat.getBoundingClientRect().top : band.bottom) - inset;
     const rect = root.getBoundingClientRect();
     if (rect.top >= band.top && rect.bottom <= limit) return;
     const delta = rect.bottom - limit;
     if (Math.abs(delta) < 1) return;
     onLeaveTail();
     cancelAnimationFrame(alignFrame.current);
-    if (!motion) { scroller.scrollTop += delta; return; }
+    if (!motion) { logScroll('align-instant', scroller, scroller.scrollTop, scroller.scrollTop + delta); scroller.scrollTop += delta; return; }
     const from = scroller.scrollTop;
     const started = performance.now();
     const DURATION = 280;
@@ -817,6 +830,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const t = Math.min(1, (now - started) / DURATION);
       // Cubic ease-out, the shape of the size animation beside it: away from the press quickly, settling at the end.
       const eased = 1 - (1 - t) ** 3;
+      if (t >= 1) logScroll('align-eased', scroller, scroller.scrollTop, from + delta);
       scroller.scrollTop = from + delta * eased;
       if (t < 1) alignFrame.current = requestAnimationFrame(step);
     };
