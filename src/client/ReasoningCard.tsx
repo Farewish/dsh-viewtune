@@ -326,6 +326,18 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    */
   const pin = focused && !following;
   useEffect(() => { onFocusPin(focusKey, pin); }, [pin, focusKey, onFocusPin]);
+  /**
+   * …and while the reader is INSIDE this card, the PAGE stops following them too.
+   *
+   * Reading inside a card is a decision to hold this place, so the page must stay where they put it. Without this the page
+   * was still following, and every change to the card's height was absorbed by snapping the page to its bottom: the reader
+   * scrolled down, the pin ended (returning to the bottom is what ends it), the card gave up its focused height, and the
+   * content was carried upward by exactly that much — 「应该滑到哪里就是哪里，而不是还要被动上移一段」. With the page detached
+   * first, the anchor compensation keeps the visible content still through that change, animated or not.
+   *
+   * The reader's own close button takes the same release (see `toggleReading`), for the same reason and in the same words.
+   */
+  useEffect(() => { if (pin) onLeaveTail(); }, [pin, onLeaveTail]);
 
   const pause = useCallback(() => {
     stopFollow.current();

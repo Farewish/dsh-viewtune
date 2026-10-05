@@ -1162,6 +1162,13 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
+  // Reading INSIDE a card holds that place, so the PAGE stops following too — otherwise every change to the card's height
+  // was absorbed by snapping the page to its bottom, and when the pin ended (returning to the bottom is what ends it) the
+  // card gave up its focused height and the content was carried upward by that much. The reader: 「应该滑到哪里就是哪里，
+  // 而不是还要被动上移一段」. The close button takes the same release, and both are pinned here.
+  ['a card the reader reads inside releases the page, so no later resize drags them', () =>
+    bundle.includes('if (pin) onLeaveTail();')
+    && bundle.includes('onLeaveTail();\n')],
   // The fold to one line is a size change like opening the card, so it has to animate like one. The resize animation's ref
   // used to hold `expanded` alone, which meant a card folding when the focus ended switched to its one-line row in a single
   // frame — 「由大卡片变为一行折叠没有动画」. Both halves are pinned: the combined state, and the effect depending on `folded`.
