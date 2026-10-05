@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the reader’s own message handed back to the host component, whose block newlines the bubble then shows',
+    // The exact branch the reader's empty line came from, restored as a shape the marker denies.
+    search: 'case "text": return ',
+    replace: 'case "text": return source === "user" ? null : ',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'a newline text node put back after every hard break, so a `pre-wrap` bubble gains a line',
     // The exact defect the reader reported, restored in the artifact: `<br>` followed by a newline text node.
     search: 'case "break": return ',

@@ -1130,6 +1130,14 @@ const markers = [
   ['the reasoning card follows whether or not animation is on', () =>
     bundle.includes('const allowed = following && active && !selected && reasoningMode !== "manual"')
     && !bundle.includes('const allowed = following && active && motion &&')],
+  // The reading page's own message goes through this plugin's renderer, not the host's component. The host's `MarkdownText`
+  // separates block children with newline text nodes, which is invisible where whitespace collapses and an anonymous LINE BOX
+  // inside the user's bubble, whose CSS is `white-space: pre-wrap` (kept so the reader's own line breaks show). That is the
+  // empty line the reader reported between their opening paragraph and their numbered list, and the `source === 'user'`
+  // branch is what put the host's renderer on that path.
+  ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
+    bundle.includes('case "text": return ')
+    && !bundle.includes('source === "user" ?')],
   // A markdown newline text node is invisible where whitespace collapses and a REAL line in the user's own bubble, whose
   // CSS is `white-space: pre-wrap`. The reader's report: ordered-list items gained a blank line between them in the reading
   // page and not on the conversation page. The renderer used to interleave `'\n'` between list items, after a trailing

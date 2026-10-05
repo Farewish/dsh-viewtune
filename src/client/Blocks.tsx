@@ -2,10 +2,10 @@ import { Component, Fragment, memo, useEffect, useLayoutEffect, useRef, useState
 import type { ReactNode } from 'react';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock, UserMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { JsonBlock, MarkdownText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
+import { JsonBlock, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
 import { formatMessageClock } from './message-chrome.js';
-import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
+import { truncatedJsonLabel } from './primitive-labels.js';
 import type { BlockRenderProps, ReaderBlockOwner } from './types.js';
 import { useStreamingText } from './streaming.js';
 import { MotionMarkdown, MotionPlainText } from './word-motion.js';
@@ -131,7 +131,13 @@ function ReadingReasoning({ text, streaming, holdFormatting, startedAt, interrup
 
 function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], fillComposer: BlockRenderProps['fillComposer'], holdFormatting: boolean, presentation: TextPresentation, fileMentions?: BlockRenderProps['fileMentions']): ReactNode {
   switch (block.kind) {
-    case 'text': return source === 'user' ? <MarkdownText text={block.text} labels={markdownLabels} /> : <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={fileMentions} />;
+    // The reader's own message goes through THIS pipeline too, and that is a fix rather than a shortcut. The host's
+    // `MarkdownText` separates block children with newline text nodes, which is invisible while whitespace collapses — but
+    // the user's bubble is `white-space: pre-wrap` (so that the reader's own line breaks show), and there a text node that is
+    // only a newline, sitting between two blocks, gets an anonymous line box of its own: the empty line the reader reported
+    // between their opening paragraph and their numbered list. This renderer emits no such newlines between blocks, and
+    // keeps the soft breaks inside a paragraph as text, which is exactly the split that bubble needs.
+    case 'text': return <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={fileMentions} />;
     case 'image': return <ImageBlock attachment={block.attachment} loadImage={loadImage} />;
     case 'reasoning': return <ReadingReasoning text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} />;
     case 'tool-call': return <JsonBlock label={`工具参数 · ${block.name}`} payload={block.argsRaw} truncatedLabel={truncatedJsonLabel} />;
