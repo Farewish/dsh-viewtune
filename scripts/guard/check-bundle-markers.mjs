@@ -1151,6 +1151,13 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
+  // A FOLDED card takes no part in the focus machinery. Both entry points have to stand down: the request effect, and the
+  // idle beat that takes the focus BACK after a pause in growth. With only the request gated, the beat reclaimed the focus
+  // for a folded card, `folded` went false, the card unfolded, the focus was released again, and the card folded — a cycle
+  // the reader saw as the one line flickering between two different parts of the reasoning.
+  ['a folded card neither requests the focus nor has it taken back by the idle beat', () =>
+    bundle.includes('if (expanded || folded || !focusExpand) return;')
+    && bundle.includes('|| expanded || folded || !focusExpand) return;')],
   // Closing the card the reader is reading must not throw them to the newest line. The page's follow is only SUSPENDED while
   // a card holds the focus, so handing that focus back resumed it and the follower snapped the page down the instant 收起 was
   // pressed — the reader's 「点击收起似乎会立刻跳转到最新」. Closing is a decision to stop following, so it takes the same

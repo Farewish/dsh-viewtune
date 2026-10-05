@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'a folded card left in the focus machinery, so the idle beat takes the focus back and it unfolds and refolds forever',
+    // The exact cycle the reader saw as a flickering line: the stand-down removed from both entry points at once.
+    search: 'expanded || folded || !focusExpand',
+    replace: 'expanded || !focusExpand',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'closing the focused card handing the focus back without releasing the page, so it snaps to the newest line',
     // The exact order the reader's report came from: the focus hand-back with the release removed.
     search: 'onLeaveTail();',

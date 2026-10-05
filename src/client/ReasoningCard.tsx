@@ -144,7 +144,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * the effect below, which says the same thing where it is done.)
    */
   useEffect(() => {
-    if (expanded || !focusExpand) return;
+    if (expanded || folded || !focusExpand) return;
     if (focused) {
       // The focus ends when this card is no longer the one being written into — in EVERY mode. It is the focus, not the
       // height, that suspends the page's tail-follow, and a card that has finished thinking must not keep the page
@@ -252,7 +252,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * room for text that is arriving, and text that arrives without crossing a line has nothing to make room for.
    */
   useEffect(() => {
-    if (!active || !following || expanded || !focusExpand) return;
+    if (!active || !following || expanded || folded || !focusExpand) return;
     const IDLE_MS = 600;
     const check = window.setInterval(() => {
       const idle = performance.now() - ownGrowthAt.current > IDLE_MS;
@@ -755,13 +755,17 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
 
   // …and the folded card is pinned to its FIRST line. `allowed` above stops the follower from driving it any further, but a
   // card that was already following sits at its old scroll offset, so the one visible line would still be a later one. A
-  // folded card is clipped to a single line by the stylesheet, so all that is needed here is the offset it is clipped at.
+  // folded card is clipped to a single line by the stylesheet, so all that is needed here is the offset it is clipped at —
+  // AND the reference transform cleared, because the follower renders by translating the track, and a translate left behind
+  // by the moment before the fold would put a different line in that one visible row.
   useLayoutEffect(() => {
     if (!folded) return;
     const port = viewport.current;
     if (port === null) return;
     stopFollow.current = () => {};
     port.scrollTop = 0;
+    const line = track.current;
+    if (line !== null) { line.style.transition = 'none'; line.style.transform = 'none'; }
   }, [folded]);
 
   return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-folded={folded ? '' : undefined} data-ud-motion="reader-reasoning-size">
