@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'a newline text node put back after every hard break, so a `pre-wrap` bubble gains a line',
+    // The exact defect the reader reported, restored in the artifact: `<br>` followed by a newline text node.
+    search: 'case "break": return ',
+    replace: 'case "break": return (0, react_jsx_runtime.jsx)("br", {}), "\\n"; /* mutated */',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the reasoning card’s follow gated on the animation switch again, so 动效 off silently ends the following',
     // The exact bug the reader found, restored in the artifact: the feature switches off with a cosmetic setting.
     search: 'const allowed = following && active && !selected',

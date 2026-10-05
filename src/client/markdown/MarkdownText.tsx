@@ -52,7 +52,9 @@ function renderSettled(
     false,
   )
   const section = renderFootnoteSection(context)
-  return section === null ? blocks : [...blocks, '\n', section]
+  // No newline text node before the footnote section: invisible while whitespace collapses, a real line in a `pre-wrap`
+  // bubble. Same defect as the list-item and block-wrap newlines in `render.tsx`.
+  return section === null ? blocks : [...blocks, section]
 }
 
 /**

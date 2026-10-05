@@ -180,13 +180,11 @@ export function renderBlocks(
  * @returns The interleaved children.
  */
 export function wrapBlockChildren(elements: readonly ReactNode[], edges: boolean): ReactNode[] {
-  const wrapped: ReactNode[] = []
-  for (const element of elements) {
-    if (edges || wrapped.length > 0) wrapped.push('\n')
-    wrapped.push(element)
-  }
-  if (edges && elements.length > 0) wrapped.push('\n')
-  return wrapped
+  // Only the elements. hast's loose wrap also interleaves newline text nodes, and those are invisible while whitespace
+  // collapses — but the user's own bubble is `white-space: pre-wrap`, where each one becomes a real line. Same defect as
+  // the list-item newlines below, from the same reader report.
+  void edges
+  return [...elements]
 }
 
 /**
@@ -240,8 +238,10 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'thematicBreak':
       return <hr key={key} />
     case 'break':
-      // The replaced pipeline emitted a newline text node after each <br>.
-      return <Fragment key={key}><br />{'\n'}</Fragment>
+      // `<br>` and nothing else. The replaced pipeline emitted a newline text node after each one, which is invisible in
+      // ordinary content (HTML collapses whitespace) and a SECOND visible line in the user's own bubble, whose CSS is
+      // `white-space: pre-wrap`. Same defect as the list-item newlines above, found in the same reader report.
+      return <br key={key} />
     case 'strong':
       return <strong key={key}>{renderChildren(node.children, context)}</strong>
     case 'emphasis':
@@ -405,20 +405,18 @@ function renderListItem(
       entries.unshift({ paragraph: [checkbox] })
     }
   }
-  // Newline placement and tight-paragraph unwrapping mirror
-  // mdast-util-to-hast's list-item handler: a newline before every child
-  // except a tight leading paragraph, and after a trailing non-paragraph
-  // (or any trailing child when loose).
+  // Tight-paragraph unwrapping mirrors mdast-util-to-hast's list-item handler: a tight leading paragraph is not wrapped in
+  // its own `<p>`. The NEWLINE text nodes that handler also emits are deliberately NOT reproduced: HTML collapses
+  // whitespace, so they are invisible in ordinary content, but the user's own bubble is `white-space: pre-wrap`, where every
+  // one of them shows as a real line. That is the reader's report — ordered-list items gained a blank line between them in
+  // the reading page and not on the conversation page, whose bubble is rendered by the host's own renderer.
   const parts: ReactNode[] = []
   for (const [index, entry] of entries.entries()) {
     const isParagraph = 'paragraph' in entry
-    if (loose || index !== 0 || !isParagraph) parts.push('\n')
     if (!isParagraph) parts.push(entry.element)
     else if (loose) parts.push(<p key={`p-${index}`}>{entry.paragraph}</p>)
     else parts.push(<Fragment key={`p-${index}`}>{entry.paragraph}</Fragment>)
   }
-  const tail = entries[entries.length - 1]
-  if (tail !== undefined && (loose || !('paragraph' in tail))) parts.push('\n')
   return (
     <li key={key} className={task ? 'task-list-item' : undefined}>
       {parts}

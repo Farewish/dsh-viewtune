@@ -1130,6 +1130,15 @@ const markers = [
   ['the reasoning card follows whether or not animation is on', () =>
     bundle.includes('const allowed = following && active && !selected && reasoningMode !== "manual"')
     && !bundle.includes('const allowed = following && active && motion &&')],
+  // A markdown newline text node is invisible where whitespace collapses and a REAL line in the user's own bubble, whose
+  // CSS is `white-space: pre-wrap`. The reader's report: ordered-list items gained a blank line between them in the reading
+  // page and not on the conversation page. The renderer used to interleave `'\n'` between list items, after a trailing
+  // non-paragraph, around block children, and after every `<br>` — all four are gone, and the two shapes here are the ones
+  // that survive compilation as recognisable text.
+  ['no markdown text node prints a newline where the bubble shows whitespace', () =>
+    bundle.includes('case "break": return ')
+    && !bundle.includes('jsx)("br", {}), "\\n"')
+    && !bundle.includes('parts.push("\\n")')],
   // The reading view renders only what is near the viewport. The reader's evidence put the scroll cost on RENDERED volume
   // (folding off and everything drawn scrolls badly; folding on and little drawn is smooth), and the folding window cannot
   // cover the worst case — it hides OLDER turns, while a reader near the front is under pressure from the NEWER turns behind
