@@ -417,6 +417,13 @@ const markers = [
   // offset plus the view's inline padding and adds the same amount back as its own padding, so it reads
   // as one band with the shell's header rule while 收起 and the gear stay exactly where the text
   // starts. "Fixed under the top bar" is chrome; a lane that scrolls away is not what was asked.
+  // A folded card's clipping window is EXACTLY one line tall, so any offset that is not a multiple of the line height leaves a
+  // half-drawn line in it — 「让每次移动都是一行的宽度，这样才能保障每一行都完全显示，而不是被截断」. The height is read from the
+  // text (`line-height` is the stylesheet's to change), with the passive listener snapping after the fact because React attaches
+  // wheel handlers passively at the root, so `preventDefault` there would do nothing.
+  ['the folded line only ever sits on a whole line, so nothing is left half shown', () =>
+    hasDecls(readerCss, `${sel('reasonCard')}[data-folded] ${sel('reasonViewport')}`, ['height:24px'])
+    && bundle.includes('const snapped = Math.round(port.scrollTop / line) * line;')],
   // The bar is a full-width sticky lane, so it used to swallow every click and wheel event on the strip of transcript it covers,
   // and text under it could not be selected. `pointer-events: none` on the bar with `auto` on the interactive ELEMENTS is the
   // whole of it — the plate, the border and the frosted background keep painting, only the controls take input. Scoped to the
