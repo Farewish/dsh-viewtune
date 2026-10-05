@@ -2147,7 +2147,7 @@ export function Reader(props: ReaderProps) {
           and the same stroked chevron the reasoning card's controls use is here instead, so the two read as one set. The
           accessible name and the tooltip still say what it does, and the click is unchanged. */}
       {scroll.detached && roomBelow && <div className={css.jumpDock}><button type="button" className={css.jump} aria-label="回到最新" title="回到最新" onClick={scroll.jump}>
-        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v10m-4-4 4 4 4-4" /></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m3 6.5 5 5 5-5" /></svg>
       </button></div>}
     </div>
   </div></StreamMotionContext.Provider>;

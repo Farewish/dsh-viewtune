@@ -425,9 +425,11 @@ const markers = [
   ['the jump pill hugs the column, and never leaves the window', () =>
     readerCss.includes('--jump-gutter:calc((100cqw - min(')
     && readerCss.includes('transform:translateX(calc(min(100%, max(0px, var(--jump-gutter) - 8px)) + 16px))')
-    // …and it is a perfect circle once the words are gone: equal sides, the radius to match, the arrow centred by flex, and
-    // `padding` dropped with the words, because a square with padding is an oval.
-    && readerCss.includes('border-radius:50%;justify-content:center;align-items:center;width:32px;height:32px;padding:0')],
+    // …and it is a perfect circle once the words are gone, SQUARE BY CONSTRUCTION: `box-sizing: border-box` plus `aspect-ratio`,
+    // because the 1px border grows a content-box box — `width: 32px` beside it measured 34 tall and the circle came out an oval,
+    // which the reader sent a screenshot of. `padding` went with the words, since a square with padding is an oval too.
+    && readerCss.includes('box-sizing:border-box;aspect-ratio:1;border-radius:50%;flex:none')
+    && readerCss.includes('width:32px;height:32px;padding:0')],
   // The scrollbar's ARROW BUTTONS are hidden. This plugin styles every groove in the app but had never said anything about the
   // buttons, and on Windows a classic scrollbar draws an up and a down triangle at the ends of its slot: with the track and the
   // thumb made invisible, those two arrows were the only part of the scrollbar still painted — standing on their own beside the

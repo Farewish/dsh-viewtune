@@ -729,11 +729,13 @@
 .deliverablesShowFolder { border: 1px solid transparent; background: transparent; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 7px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; transition: all 150ms ease; }
 .deliverablesShowFolder:hover { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-interactive-bg-hover); border-color: var(--dsw-alias-border-l2); }
 .deliverablesShowFolder[data-status=opened] { color: var(--dsw-alias-state-success-primary, #10b981); border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #10b981) 30%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #10b981) 8%, transparent); }
-.jump { transform: translateY(-100%); border: 1px solid var(--dsw-alias-border-l2); border-radius: 50%; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; box-shadow: 0 2px 8px var(--dsw-alias-border-l1); width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-/* The pill is a PERFECT CIRCLE now that its words are gone: equal sides, the radius to match, and the arrow centred by flex
-   rather than by the line box — `padding` had to go with the words, because a square with padding is an oval. It is kept in the
-   rule above rather than split into a second one, which is what the toolbar-geometry guard reads (`rule('jump')`), and a second
-   rule would have handed it a box with none of the type it compares. */
+.jump { transform: translateY(-100%); border: 1px solid var(--dsw-alias-border-l2); border-radius: 50%; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; box-shadow: 0 2px 8px var(--dsw-alias-border-l1); box-sizing: border-box; aspect-ratio: 1 / 1; flex: none; width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+/* The pill is a PERFECT CIRCLE now that its words are gone, and it is SQUARE by construction rather than by arithmetic: the
+   `1px` border grows a `content-box` box, so `width: 32px` beside it measured 34 tall and the circle came out an oval — the
+   reader sent a screenshot of exactly that (「现在是图二，不圆」). `box-sizing: border-box` plus `aspect-ratio` is what makes the
+   two axes agree whatever the border or the icon does, and the arrow is centred by flex rather than by the line box.
+   Kept in this one rule rather than split out: the toolbar-geometry guard reads it by class (`rule('jump')`) to compare type
+   with the collapse control, and a second rule with the same class would hand it a box with none of the type it reads. */
 [data-motion=off] .chevron, [data-motion=off] .imageOpen img, [data-motion=off] .processMeta { transition: none; }
 @media (prefers-reduced-motion: reduce) { .chevron, .imageOpen img, .processMeta { transition: none; } }
 @media (pointer: coarse) { .disclosureButton { min-height: 44px; } }
