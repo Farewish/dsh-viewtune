@@ -894,29 +894,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const port = viewport.current;
     if (port === null) return;
     stopFollow.current = () => {};
-    /**
-     * …and every offset the folded window can sit at is a WHOLE LINE — 「让每次移动都是一行的宽度，这样才能保障每一行都完全
-     * 显示，而不是被截断」. The clipping window is exactly one line tall, so any offset that is not a multiple of the line height
-     * leaves a half-drawn line in it. The height is READ from the text rather than assumed: `line-height` is the stylesheet's
-     * to change, and a hard-coded 24 would silently start truncating the day it moved.
-     *
-     * Snapping after the fact (a passive scroll listener) rather than preventing the wheel: React attaches wheel handlers
-     * passively at the root, so `preventDefault` there does nothing, and the snap lands within the same frame either way.
-     */
-    const text = content.current ?? port;
-    const parsed = Number.parseFloat(getComputedStyle(text).lineHeight);
-    const line = Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
-    const pin = () => {
-      const snapped = Math.round(port.scrollTop / line) * line;
-      if (snapped !== port.scrollTop) { logScroll('fold-snap', port, port.scrollTop, snapped); port.scrollTop = snapped; }
-      // The reference transform the follower renders with, cleared on every step: the follower is off while folded, but a
-      // translate left over from the moment before the fold would put a different line in that one visible row.
-      const rail = track.current;
-      if (rail !== null) { rail.style.transition = 'none'; rail.style.transform = 'none'; }
-    };
-    pin();
-    port.addEventListener('scroll', pin, { passive: true });
-    return () => port.removeEventListener('scroll', pin);
+    port.scrollTop = 0;
+    const line = track.current;
+    if (line !== null) { line.style.transition = 'none'; line.style.transform = 'none'; }
   }, [folded]);
 
   return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-folded={folded ? '' : undefined} data-ud-motion="reader-reasoning-size">
