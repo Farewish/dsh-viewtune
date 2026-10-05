@@ -155,6 +155,13 @@ test('the stylesheet is gated, and every copy of the IMAGE is viewport-anchored'
   // unlike the bar, it competes with no sticky lane of ours.
   assert.ok(!sidebarChrome.includes('backdrop-filter:'), 'the frost must NOT sit on the sidebar column: that would confine its descendants');
   assert.ok(sidebarChrome.includes('isolation: isolate'), 'the column isolates itself rather than filtering itself');
+  // …and the column paints ABOVE the top bar (ours sits at 12, for the reading view's sticky lane at 11). Under
+  // `[data-windows-titlebar]` the host floats the sidebar's collapse toggle at the window's top-left, inside the bar's
+  // strip, so its hover description overlaps the bar — and with the bar above, that description was covered by the bar's
+  // scrim and frost. Measured from the reader's report, and from the host's own rule for that toggle
+  // (`[data-windows-titlebar] .hHd-Xa_toggle{top:…;left:12px;position:fixed}`). z-index moves nothing here: it does not
+  // affect fixed positioning, it only settles which of two side-by-side surfaces paints over the other where they meet.
+  assert.ok(sidebarChrome.includes('z-index: 13'), 'the column paints above the top bar, whose strip the sidebar toggle shares');
   const sidebarFrost = rules.find(rule => rule.includes('--viewtune-wallpaper-chrome-sidebar-blur') && rule.includes('::before')) ?? '';
   assert.ok(sidebarFrost.includes('backdrop-filter: blur(var(--viewtune-wallpaper-chrome-sidebar-blur))'), 'the frost lives on the column’s ::before');
   assert.ok(sidebarFrost.includes('z-index: -1'), '…behind the column’s content');
