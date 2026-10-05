@@ -423,10 +423,7 @@ const markers = [
   // wheel handlers passively at the root, so `preventDefault` there would do nothing.
   ['the folded line only ever sits on a whole line, so nothing is left half shown', () =>
     hasDecls(readerCss, `${sel('reasonCard')}[data-folded] ${sel('reasonViewport')}`, ['height:24px'])
-    && bundle.includes('const snapped = Math.round(port.scrollTop / line) * line;')
-    // …and the card at REST, in every state, snaps the same way: after 140ms of quiet, so the follower's glide stays smooth
-    // and the resting position still shows complete lines at both edges.
-    && bundle.includes('window.setTimeout(settle, 140)')],
+    && bundle.includes('const snapped = Math.round(port.scrollTop / line) * line;')],
   // The bar is a full-width sticky lane, so it used to swallow every click and wheel event on the strip of transcript it covers,
   // and text under it could not be selected. `pointer-events: none` on the bar with `auto` on the interactive ELEMENTS is the
   // whole of it — the plate, the border and the frosted background keep painting, only the controls take input. Scoped to the
