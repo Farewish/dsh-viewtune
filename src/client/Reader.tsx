@@ -2143,9 +2143,12 @@ export function Reader(props: ReaderProps) {
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>
       </div>}
-      {/* The reader asked to see the pill with its words dropped, so it is the arrow alone. The accessible name and the tooltip
-          still say what it does — and the button keeps the same target size, the same padding and the same click. */}
-      {scroll.detached && roomBelow && <div className={css.jumpDock}><button type="button" className={css.jump} aria-label="回到最新" title="回到最新" onClick={scroll.jump}>↓</button></div>}
+      {/* The reader asked to see the pill with its words dropped, then as a perfect circle with a drawn arrow: the glyph is gone
+          and the same stroked chevron the reasoning card's controls use is here instead, so the two read as one set. The
+          accessible name and the tooltip still say what it does, and the click is unchanged. */}
+      {scroll.detached && roomBelow && <div className={css.jumpDock}><button type="button" className={css.jump} aria-label="回到最新" title="回到最新" onClick={scroll.jump}>
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v10m-4-4 4 4 4-4" /></svg>
+      </button></div>}
     </div>
   </div></StreamMotionContext.Provider>;
 }
