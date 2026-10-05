@@ -4,7 +4,6 @@ import { REASON_HOLD, REASON_LATEST_STEP, REASON_STEP, reasoningTarget, stepLine
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { focusedHeight } from './focus-expand.js';
 import { isNearTail } from './reading-scroll.js';
-import { logScroll } from './scroll-log.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -270,7 +269,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      */
     const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
     if (scroller !== null && scroller !== undefined) {
-      logScroll('grant-tail-gap', scroller, scroller.scrollTop, scroller.scrollHeight);
       scroller.scrollTop = scroller.scrollHeight;
     }
     // The card has already grown in this commit (the ceiling changed with the focus), and the height recorded before the
@@ -507,7 +505,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
        * growth that happened while they were away (one jump), and it resumes on the next line.
        */
       if (!pageAtTailRef.current) return;
-      logScroll('card-compensate', scroller, scroller.scrollTop, scroller.scrollTop + grew);
       scroller.scrollTop += grew;
     };
     const chaseHeight = (target: number): void => {
@@ -822,7 +819,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     if (Math.abs(delta) < 1) return;
     onLeaveTail();
     cancelAnimationFrame(alignFrame.current);
-    if (!motion) { logScroll('align-instant', scroller, scroller.scrollTop, scroller.scrollTop + delta); scroller.scrollTop += delta; return; }
+    if (!motion) { scroller.scrollTop += delta; return; }
     const from = scroller.scrollTop;
     const started = performance.now();
     const DURATION = 280;
@@ -830,7 +827,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const t = Math.min(1, (now - started) / DURATION);
       // Cubic ease-out, the shape of the size animation beside it: away from the press quickly, settling at the end.
       const eased = 1 - (1 - t) ** 3;
-      if (t >= 1) logScroll('align-eased', scroller, scroller.scrollTop, from + delta);
       scroller.scrollTop = from + delta * eased;
       if (t < 1) alignFrame.current = requestAnimationFrame(step);
     };

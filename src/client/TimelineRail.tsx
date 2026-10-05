@@ -4,7 +4,6 @@ import {
 } from 'react';
 import type { TimelineItem } from './timeline.js';
 import { useMotionAllowed } from './motion.js';
-import { logScroll } from './scroll-log.js';
 import css from './TimelineRail.module.css';
 
 interface TimelineRailProps {
@@ -126,7 +125,6 @@ export const TimelineRail = memo(function TimelineRail({
       // instant jump — the same landing, without the animation.
       scroller.scrollTo({ top: target, behavior: allowMotion ? 'smooth' : 'auto' });
     } else {
-      logScroll('rail-landing', scroller, scroller.scrollTop, target);
       scroller.scrollTop = target;
     }
     syncScrollState();

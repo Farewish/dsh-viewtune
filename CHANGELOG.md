@@ -2,6 +2,13 @@
 
 ## 未发布（下一版）
 
+### 移除：临时的滚动写入诊断日志（它已经完成使命）
+
+- **读者要求** ✓：「移除滚动诊断日志吧」✓ ⇒ 已删 `src/client/scroll-log.ts` ✓，并去掉**全部**调用与 import ✓（`motion.tsx` 的 `writeTop`/`jump`/`resume` ✓、`ReasoningCard.tsx` 的 `card-compensate`/`grant-tail-gap`/`align-instant`/`align-eased` ✓、`TimelineRail.tsx` 的 `rail-landing` ✓）⇒ 源码里**再无 `logScroll` / `scroll-log` 引用** ✓（实测为空 ✓）。
+- **它的价值已兑现** ✓：正是它抓出了"被动上移"的真因 ✓ —— `[vt-scroll] writeTop 1826 -> 1727 d=-99 … at ResizeObserver` ✓ ⇒ 我们的**锚点补偿**在补偿一次**变矮** ✗ ⇒ 才改成**只补偿增长** ✓（`fb1ed90` ✓）。诊断代码本身**不再需要** ✓。
+- **不再保留的** ✓：`localStorage` 的那个开关也随之失效 ✓（再无读取它的代码 ✓）。
+- 全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **25/25** ✓、反向自检 **OK（107 例）** ✓。
+
 ### 试改：「回到最新」圆内的箭头**缩小**（16 → 13）
 
 - **读者要求** ✓：「里面的**箭头缩小一些**」✓ ⇒ 折角箭头的 SVG 从 `16` 缩到 **`13`** ✓（路径与 `viewBox` 不变 ✓ 所以只是整体等比缩小 ✓），描边仍 `1.6` ✓、圆仍 `32px` ✓。
