@@ -274,10 +274,10 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
-    label: 'a folded card left in the focus machinery, so the idle beat takes the focus back and it unfolds and refolds forever',
-    // The exact cycle the reader saw as a flickering line: the stand-down removed from both entry points at once.
-    search: 'expanded || folded || !focusExpand',
-    replace: 'expanded || !focusExpand',
+    label: 'the step the process shows as newest left foldable, so a folded card can never claim the focus and 焦点思考展开 dies',
+    // The exact shape that broke it: the fold without the `!active` exclusion.
+    search: 'const folded = fold && !expanded && !focused && !active;',
+    replace: 'const folded = fold && !expanded && !focused;',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {

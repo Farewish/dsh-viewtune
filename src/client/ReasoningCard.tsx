@@ -81,7 +81,22 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * `allowed` below as well: a folded card must not be driven by the follower, or the one visible line would be whichever
    * line the follower last scrolled to instead of the FIRST line, which is what the reader asked to see.
    */
-  const folded = fold && !expanded && !focused;
+  /**
+   * 「思考卡折叠成一行」: folded unless the card is one the reader is looking at on purpose.
+   *
+   * FOUR reasons to stay open, and the fourth is what keeps 「焦点思考展开」 alive. `active` is the step the process is showing
+   * as its newest (`processOpen && open && step === latestStep`), which is exactly the card that may CLAIM the focus — and
+   * `folded` requires `!focused`, so a folded card could never claim it: with the request gated on `folded` the expansion
+   * simply stopped working the moment the fold switch was on (the reader reported exactly that). Excluding `active` here
+   * instead settles both ends at once: the card being written into is never folded, so it can take the focus as it always
+   * did, while the COMPLETED cards of the same process — the ones the reader asked to fold — are folded and take no part in
+   * the focus machinery at all, which is also what stopped the folded line from flickering.
+   *
+   * `expanded` is the reader having opened this card, and `focused` is the card holding the focus (including a card they
+   * have taken over by reading inside it). Nothing here is remembered: `expanded` is this component's own state, so every
+   * remount starts folded again.
+   */
+  const folded = fold && !expanded && !focused && !active;
   const stopFollow = useRef<() => void>(() => {});
   /**
    * The compensation, reachable from the effects outside the follower's own.
@@ -144,7 +159,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * the effect below, which says the same thing where it is done.)
    */
   useEffect(() => {
-    if (expanded || folded || !focusExpand) return;
+    if (expanded || !focusExpand) return;
     if (focused) {
       // The focus ends when this card is no longer the one being written into — in EVERY mode. It is the focus, not the
       // height, that suspends the page's tail-follow, and a card that has finished thinking must not keep the page
@@ -252,7 +267,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * room for text that is arriving, and text that arrives without crossing a line has nothing to make room for.
    */
   useEffect(() => {
-    if (!active || !following || expanded || folded || !focusExpand) return;
+    if (!active || !following || expanded || !focusExpand) return;
     const IDLE_MS = 600;
     const check = window.setInterval(() => {
       const idle = performance.now() - ownGrowthAt.current > IDLE_MS;

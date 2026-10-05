@@ -373,9 +373,15 @@
 .reasonCard[data-folded] .reasonText { padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reasonCard[data-folded] .reasonFooter { flex: none; padding: 0; margin: 0; }
 .reasonHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 16px 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }
-.reasonCard[data-overflow=false][data-expanded=false] { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); border-radius: 12px; }
-.reasonCard[data-overflow=false][data-expanded=false] .reasonHeading { padding: 10px 16px 0; }
-.reasonCard[data-overflow=false][data-expanded=false] .reasonText { padding: 8px 16px 16px; }
+/* The preview's own plate and padding, for a card with nothing to scroll and nothing opened — and NOT for a folded one. The
+   fold gives the card a one-line row whose padding is its own (see the `[data-folded]` block below), so these three rules
+   matching a folded card meant the card's padding — and therefore its measured height — depended on `overflow`, which the
+   card measures FROM its height: the measurement flipped `overflow`, the padding changed, the height changed, and the one
+   visible line flickered between two states forever. Reported after a process had already ENDED, which is why it could not
+   be the streaming machinery: it is a measurement loop, and it needs no input to keep running. */
+.reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); border-radius: 12px; }
+.reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) .reasonHeading { padding: 10px 16px 0; }
+.reasonCard[data-overflow=false][data-expanded=false]:not([data-folded]) .reasonText { padding: 8px 16px 16px; }
 .reasonLabel { font-weight: 500; }
 .reasonViewport {
   position: relative;

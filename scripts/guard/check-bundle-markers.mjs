@@ -134,9 +134,9 @@ function atRuleBody(css, prelude) {
 }
 
 const markers = [
-  ['short-thinking-frame', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]`, ['background:var(--dsw-alias-bg-module-platform)', 'border-color:var(--dsw-alias-border-l2)', 'border-radius:12px'])],
-  ['short-thinking-heading-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
-  ['short-thinking-text-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false] ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
+  ['short-thinking-frame', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded])`, ['background:var(--dsw-alias-bg-module-platform)', 'border-color:var(--dsw-alias-border-l2)', 'border-radius:12px'])],
+  ['short-thinking-heading-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded]) ${sel('reasonHeading')}`, ['padding:10px 16px 0'])],
+  ['short-thinking-text-padding', () => cssDecls(`${sel('reasonCard')}[data-overflow=false][data-expanded=false]:not([data-folded]) ${sel('reasonText')}`, ['padding:8px 16px 16px'])],
   // The wheel implementation is verified behaviourally by test-wheel-handler.mjs (it extracts the
   // compiled handler and drives every notch shape through it). What is left to assert here is the
   // one rule that survived four attempts at "improving" on the browser:
@@ -1151,13 +1151,14 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
-  // A FOLDED card takes no part in the focus machinery. Both entry points have to stand down: the request effect, and the
-  // idle beat that takes the focus BACK after a pause in growth. With only the request gated, the beat reclaimed the focus
-  // for a folded card, `folded` went false, the card unfolded, the focus was released again, and the card folded — a cycle
-  // the reader saw as the one line flickering between two different parts of the reasoning.
-  ['a folded card neither requests the focus nor has it taken back by the idle beat', () =>
-    bundle.includes('if (expanded || folded || !focusExpand) return;')
-    && bundle.includes('|| expanded || folded || !focusExpand) return;')],
+  // A folded card is never the one the process shows as its NEWEST step, and that exclusion is what keeps 「焦点思考展开」 alive:
+  // the fold requires `!focused`, so gating the focus REQUEST on `folded` means a folded card can never claim the focus — the
+  // expansion silently stopped working the moment the fold switch was on, which the reader reported. Excluding `active`
+  // settles both ends: the card being written into is never folded (so it takes the focus as before), and the COMPLETED cards
+  // of the same process fold and take no part in the focus machinery — which is also what stopped the folded line flickering.
+  ['a folded card is never the step the process shows as newest, which keeps 焦点思考展开 alive', () =>
+    bundle.includes('const folded = fold && !expanded && !focused && !active;')
+    && bundle.includes('if (expanded || !focusExpand) return;')],
   // Closing the card the reader is reading must not throw them to the newest line. The page's follow is only SUSPENDED while
   // a card holds the focus, so handing that focus back resumed it and the follower snapped the page down the instant 收起 was
   // pressed — the reader's 「点击收起似乎会立刻跳转到最新」. Closing is a decision to stop following, so it takes the same
