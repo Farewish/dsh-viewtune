@@ -417,13 +417,14 @@ const markers = [
   // offset plus the view's inline padding and adds the same amount back as its own padding, so it reads
   // as one band with the shell's header rule while 收起 and the gear stay exactly where the text
   // starts. "Fixed under the top bar" is chrome; a lane that scrolls away is not what was asked.
-  // 「回到最新」 lives in the gutter to the RIGHT of the text column, and THE WINDOW WINS: the shift is floored at 0px, so a
-  // narrow window — where that gutter has shrunk away — leaves the pill where it was instead of pushing it out of view, and the
-  // 24px keeps its distance from the edge while the gutter is wide. The gutter is computed, not measured: `.root` is the
-  // inline-size container and the column is `min(chat-content-width, container − 2 × inline-pad)` centred in it.
-  ['the jump pill sits in the gutter, but never outside the window', () =>
+  // 「回到最新」 lives just outside the text column and HUGS its right edge while there is room: the shift is the pill's own width
+  // (`100%` of a dock that shrink-wraps to it), so its left edge lands on the column's right edge rather than being parked
+  // against the window. THE WINDOW WINS at both ends: `gutter − 8px` is where the shift stops making sense, and `max(0px, …)`
+  // leaves the pill where it was in a narrow window instead of pushing it out of view. The gutter is computed, not measured:
+  // `.root` is the inline-size container and the column is `min(chat-content-width, container − 2 × inline-pad)` centred in it.
+  ['the jump pill hugs the column, and never leaves the window', () =>
     readerCss.includes('--jump-gutter:calc((100cqw - min(')
-    && readerCss.includes('transform:translateX(max(0px, calc(var(--jump-gutter)')],
+    && readerCss.includes('transform:translateX(min(100%, max(0px, calc(var(--jump-gutter) - 8px))))')],
   // The scrollbar's ARROW BUTTONS are hidden. This plugin styles every groove in the app but had never said anything about the
   // buttons, and on Windows a classic scrollbar draws an up and a down triangle at the ends of its slot: with the track and the
   // thumb made invisible, those two arrows were the only part of the scrollbar still painted — standing on their own beside the

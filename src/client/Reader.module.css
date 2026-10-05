@@ -552,14 +552,16 @@
 .imageDialog img { max-width: 82vw; max-height: 75vh; display: block; object-fit: contain; }
 .dialogClose { position: absolute; right: 8px; top: 4px; border: 0; background: transparent; color: inherit; width: 32px; height: 32px; border-radius: 8px; font-size: 24px; }
 .jumpDock { position: sticky; bottom: calc(var(--dsh-composer-height, 152px) + 16px); align-self: flex-end; height: 0; z-index: 8; }
-/* 「回到最新」 sits OUT of the text column — the reader asked for it to leave the body's own area — and moves into the gutter to
- * the column's right. THE WINDOW WINS: the shift is `max(0px, …)`, so a narrow window (where that gutter has shrunk to nothing)
- * leaves the pill exactly where it was rather than pushing it out of view, and the 24px keeps a margin from the edge even when
- * the gutter is wide. The gutter is computed rather than measured: `.root` is the inline-size container, and the column is
+/* 「回到最新」 sits OUT of the text column — the reader asked for it to leave the body's own area — and HUGS the column's right
+ * edge when there is room: the shift is the pill's own width (`100%` of the dock, which shrink-wraps to the pill), so its LEFT
+ * edge lands exactly on the column's right edge and it is not parked against the window instead.
+ * THE WINDOW WINS as the floor and the ceiling: the gutter is where the shift stops making sense (`gutter − 8px` keeps a margin
+ * from the edge when space is tight), and `max(0px, …)` leaves the pill exactly where it was in a narrow window, rather than
+ * pushing it out of view. The gutter is computed, not measured: `.root` is the inline-size container and the column is
  * `min(chat-content-width, container − 2 × inline-pad)` centred in it, so half the difference is the space on the right. */
 .jumpDock {
   --jump-gutter: calc((100cqw - min(var(--dsh-chat-content-width, 748px), 100cqw - 2 * var(--reader-inline-pad))) / 2);
-  transform: translateX(max(0px, calc(var(--jump-gutter) - 24px)));
+  transform: translateX(min(100%, max(0px, calc(var(--jump-gutter) - 8px))));
 }
 .deliverablesRoot { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; column-gap: 10px; margin-top: 14px; font-size: 13px; line-height: 22px; }
 /* 「产物」/「提交」这两行的行首标签：颜色**比三级再重一档** ✓（读者要求「颜色重些」✓）—— 用 secondary ✓：
