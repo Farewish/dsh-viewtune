@@ -274,6 +274,13 @@ const cases = [
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },
   {
+    label: 'the fold left out of the size state, so it switches in one frame instead of animating',
+    // The shape that produced the reader's 「没有动画」: the ref and the effect watching `expanded` alone.
+    search: '`${String(expanded)}:${String(folded)}`',
+    replace: '`${String(expanded)}:${String(expanded)}`',
+    guards: ['scripts/guard/check-bundle-markers.mjs'],
+  },
+  {
     label: 'the step the process shows as newest left foldable, so a folded card can never claim the focus and 焦点思考展开 dies',
     // The exact shape that broke it: the fold without the `!active` exclusion.
     search: 'const folded = fold && !expanded && !focused && !active;',

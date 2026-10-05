@@ -72,7 +72,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const [edges, setEdges] = useState('none');
   const lastHeight = useRef(0);
   const resize = useRef<Animation | null>(null);
-  const previousExpanded = useRef(expanded);
   /**
    * 「思考卡折叠成一行」: folded unless the reader opened THIS card or it is the one holding the focus. The two states that win
    * over the fold are the two the reader is looking at on purpose — the card they opened, and the card being written into —
@@ -97,6 +96,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * remount starts folded again.
    */
   const folded = fold && !expanded && !focused && !active;
+  /**
+   * The card's SIZE state, as the two things that change its viewport's height: the reader having opened it, and the fold to
+   * one line. Both must animate, and the fold did not: this ref used to hold `expanded` alone, so a card that folded when the
+   * focus ended switched to its one-line row in a single frame — the reader's 「由大卡片变为一行折叠没有动画」. A string,
+   * because either can change while the other stays put. Declared after `folded` because it reads it.
+   */
+  const previousSize = useRef(`${String(expanded)}:${String(folded)}`);
   const stopFollow = useRef<() => void>(() => {});
   /**
    * The compensation, reachable from the effects outside the follower's own.
@@ -696,8 +702,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   useLayoutEffect(() => {
     const port = viewport.current;
     if (!port) return;
-    const changed = expanded !== previousExpanded.current;
-    previousExpanded.current = expanded;
+    const sizeState = `${String(expanded)}:${String(folded)}`;
+    const changed = sizeState !== previousSize.current;
+    previousSize.current = sizeState;
     const from = resize.current ? port.clientHeight : lastHeight.current;
     resize.current?.cancel(); resize.current = null;
     port.style.maxHeight = ''; port.style.height = '';
@@ -729,7 +736,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     animation.onfinish = settle;
     const deadline = window.setTimeout(settle, 300 + 240);
     return () => { window.clearTimeout(deadline); };
-  }, [expanded, motion, selected]);
+  }, [expanded, folded, motion, selected]);
   useEffect(() => () => resize.current?.cancel(), []);
 
   const toggleReading = () => {

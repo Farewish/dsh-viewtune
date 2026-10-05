@@ -1151,6 +1151,12 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
+  // The fold to one line is a size change like opening the card, so it has to animate like one. The resize animation's ref
+  // used to hold `expanded` alone, which meant a card folding when the focus ended switched to its one-line row in a single
+  // frame — 「由大卡片变为一行折叠没有动画」. Both halves are pinned: the combined state, and the effect depending on `folded`.
+  ['the fold to one line animates, because it is tracked as a size change beside the card being opened', () =>
+    bundle.includes('const previousSize = (0, react.useRef)(`${String(expanded)}:${String(folded)}`)')
+    && bundle.includes('const sizeState = `${String(expanded)}:${String(folded)}`;')],
   // A folded card is never the one the process shows as its NEWEST step, and that exclusion is what keeps 「焦点思考展开」 alive:
   // the fold requires `!focused`, so gating the focus REQUEST on `folded` means a folded card can never claim the focus — the
   // expansion silently stopped working the moment the fold switch was on, which the reader reported. Excluding `active`
