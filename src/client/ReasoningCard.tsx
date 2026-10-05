@@ -32,12 +32,20 @@ const HEIGHT_CHASE_MS = 400;
 const CHASE_STILL_FRAMES = 4;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, focusKey, focused, onFocusChange, onFocusPin, pageAtTail }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, focusKey, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
   reasoningMode: ReasoningFollowMode; rate: number;
   focusExpand: boolean; fold: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
   /** Whether this card is PINNING the focus it holds — the reader is reading inside it (see the pin effect). */
   onFocusPin: (key: string, pinned: boolean) => void;
+  /**
+   * Leave the page's tail on the reader's behalf, when they close the card themselves.
+   *
+   * The page's follow is only SUSPENDED while a card holds the focus, so handing that focus back resumed it and snapped the
+   * page to the newest line the instant 收起 was pressed — the reader's report. Closing the card one is reading is a
+   * deliberate decision to stop following, exactly like a rail jump, so it takes the same release.
+   */
+  onLeaveTail: () => void;
   /**
    * Whether the READER is still at the page's tail — the follower's own `detached`, inverted.
    *
@@ -716,7 +724,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     // A card that is tall because of the FOCUS has nothing to toggle in `expanded`: the focus is what holds it open, so the
     // press has to hand the focus back, or the button would do nothing at all. That is the reader's report — after taking a
     // focused card over by reading inside it, the toggle never came back and there was no way to close the card.
-    if (focused && !expanded) { onFocusChange(focusKey, false); return; }
+    if (focused && !expanded) {
+      // …and leave the tail on the reader's behalf FIRST: handing the focus back on its own ends the follow's suspension,
+      // and the follower then snapped the page to the newest line — the reader's 「点击收起似乎会立刻跳转到最新」. Closing
+      // the card is a decision to stop following, so it releases the page exactly as a rail jump does.
+      onLeaveTail();
+      onFocusChange(focusKey, false);
+      return;
+    }
     /**
      * …and THIS resize is the reader's own doing, so the page must not drag itself to keep some other anchor still.
      *

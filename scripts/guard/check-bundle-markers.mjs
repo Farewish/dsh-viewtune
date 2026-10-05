@@ -1151,6 +1151,15 @@ const markers = [
   ['the reader’s own message is rendered by this plugin’s renderer, not the host component', () =>
     bundle.includes('case "text": return ')
     && !bundle.includes('source === "user" ?')],
+  // Closing the card the reader is reading must not throw them to the newest line. The page's follow is only SUSPENDED while
+  // a card holds the focus, so handing that focus back resumed it and the follower snapped the page down the instant 收起 was
+  // pressed — the reader's 「点击收起似乎会立刻跳转到最新」. Closing is a decision to stop following, so it takes the same
+  // release a rail jump takes, and it has to happen BEFORE the focus is handed back.
+  ['closing the focused card releases the page instead of snapping it to the tail', () =>
+    bundle.includes('onLeaveTail();')
+    && bundle.includes('onLeaveTail,')
+    // The JSX compiles to a props object, so the release is pinned there rather than as an attribute.
+    && bundle.includes('onLeaveTail: scroll.release')],
   // A card the READER resizes must not have that growth compensated by the page. The reading view keeps the element the
   // reader is looking at fixed while text arrives on its own, which is right — but for a card the reader just opened it did
   // the opposite of what they asked: a card ABOVE that anchor was pushed off the top (it looked like it expanded upward)
