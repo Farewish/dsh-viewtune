@@ -58,6 +58,15 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const lastHeight = useRef(0);
   const resize = useRef<Animation | null>(null);
   const previousExpanded = useRef(expanded);
+  /**
+   * 「思考卡折叠成一行」: folded unless the reader opened THIS card or it is the one holding the focus. The two states that win
+   * over the fold are the two the reader is looking at on purpose — the card they opened, and the card being written into —
+   * so the fold never hides the content someone is actually reading. Nothing here is remembered: `expanded` is this
+   * component's own state, so every remount starts folded. Declared here rather than at the render because it gates
+   * `allowed` below as well: a folded card must not be driven by the follower, or the one visible line would be whichever
+   * line the follower last scrolled to instead of the FIRST line, which is what the reader asked to see.
+   */
+  const folded = fold && !expanded && !focused;
   const stopFollow = useRef<() => void>(() => {});
   /**
    * The compensation, reachable from the effects outside the follower's own.
@@ -104,7 +113,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   // first read IS the target and nothing is scheduled"). Treating it as "the feature is off" is the bug the reader found:
   // they switched 动效 off to test scroll jank and 「跟随最新」 silently stopped working — and so did its own button below.
   // A cosmetic switch must not turn off a reading behaviour.
-  const allowed = following && active && !selected && reasoningMode !== 'manual';
+  const allowed = following && active && !selected && reasoningMode !== 'manual' && !folded;
 
   /**
    * The focus is REQUESTED here and granted above.
@@ -691,11 +700,16 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     setExpanded(value => !value);
   };
 
-  // 「思考卡折叠成一行」: folded unless the reader opened THIS card or it is the one holding the focus. The two states that
-  // win over the fold are the two the reader is looking at on purpose — the card they opened, and the card being written
-  // into — so the fold never hides the content someone is actually reading, and nothing here is remembered: `expanded` is
-  // this component's own state, so every remount starts folded again.
-  const folded = fold && !expanded && !focused;
+  // …and the folded card is pinned to its FIRST line. `allowed` above stops the follower from driving it any further, but a
+  // card that was already following sits at its old scroll offset, so the one visible line would still be a later one. A
+  // folded card is clipped to a single line by the stylesheet, so all that is needed here is the offset it is clipped at.
+  useLayoutEffect(() => {
+    if (!folded) return;
+    const port = viewport.current;
+    if (port === null) return;
+    stopFollow.current = () => {};
+    port.scrollTop = 0;
+  }, [folded]);
 
   return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-folded={folded ? '' : undefined} data-ud-motion="reader-reasoning-size">
     <div className={css.reasonHeading} data-reader-reasoning-heading data-ud-check="reasoning-identity">
