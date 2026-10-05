@@ -404,7 +404,14 @@ const markers = [
     const filled = (bundle.match(/fill: "both"/g) ?? []).length;
     const settles = (bundle.match(/let settled = false;/g) ?? []).length;
     const deadlines = (bundle.match(/clearTimeout\(deadline\)/g) ?? []).length;
-    return filled === 3 && settles === deadlines && deadlines === 4;
+    // FOUR filled sites and FIVE settles now: the reasoning card's RELEASE animation joined them, so a focused card that
+    // loses the focus slides back to its preview height instead of giving up that room in one frame — the frame the reader
+    // saw as the page jumping upward by a fixed distance once the pin ended. It arms the same `300 + 240` deadline and
+    // settles through the same `settled` guard, but it does NOT clear a `deadline` variable: it sits in a branch of a layout
+    // effect whose other path returns no cleanup, and returning a cleanup from one path only is a React warning, while the
+    // early `settled` guard already makes a late fire a no-op. Hence `settles === deadlines + 1`, pinned so the next animated
+    // surface has to make that decision consciously too.
+    return filled === 4 && settles === deadlines + 1 && deadlines === 4;
   }],
   // The toolbar pins UNDER THE TOP BAR and spans the view: it cancels the reading column's centring
   // offset plus the view's inline padding and adds the same amount back as its own padding, so it reads

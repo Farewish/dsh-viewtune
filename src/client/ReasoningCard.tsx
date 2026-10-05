@@ -223,7 +223,35 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     if (!focused) {
       focusHeight.current = 0;
       focusRendered.current = 0;
-      viewport.current?.style.removeProperty('height');
+      const port = viewport.current;
+      // The height the focus was holding, before the stylesheet's own ceiling takes over again.
+      const from = port?.clientHeight ?? 0;
+      if (resize.current !== null) { resize.current.cancel(); resize.current = null; }
+      port?.style.removeProperty('height');
+      /**
+       * …and the shrink is ANIMATED, for the reader's report: after taking a card's focus over and scrolling to the bottom,
+       * the page jumped upward by a fixed distance the moment the pin ended. What jumps is this: releasing the focus drops the
+       * ceiling from `min(60vh, 560px)` back to the preview, the card loses that height in one frame, and the page — which is
+       * sitting at its bottom — is carried up with it. Animating the same change lets the follower ride the height down frame
+       * by frame instead, so the page slides rather than jumps. Gated on `motion` like every other size change here, and it
+       * writes nothing when the card was already at its natural height.
+       */
+      const to = port?.clientHeight ?? 0;
+      if (port !== null && port !== undefined && motion && from > 1 && Math.abs(to - from) >= 1) {
+        port.style.maxHeight = 'none';
+        const animation = port.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: 300, easing: EASING, fill: 'both' });
+        resize.current = animation;
+        let settled = false;
+        const settle = () => {
+          if (settled || resize.current !== animation) return;
+          settled = true;
+          resize.current = null; animation.cancel();
+          port.style.maxHeight = ''; port.style.height = '';
+          lastHeight.current = port.clientHeight;
+        };
+        animation.onfinish = settle;
+        window.setTimeout(settle, 300 + 240);
+      }
       return;
     }
     /**
