@@ -363,9 +363,13 @@
 .reasonFoldIcon { flex: none; align-self: center; color: var(--dsw-alias-label-secondary); }
 .reasonCard[data-folded] { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; }
 .reasonCard[data-folded] .reasonHeading { flex: none; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
-/* TEMPORARY (the reader asked to see this state again): the 20px ceiling with the scroller's own fade still applied — the
-   state before the height and mask fix. `f21b225` is re-applied on request; nothing else changed. */
-.reasonCard[data-folded] .reasonViewport { flex: 1 1 auto; min-width: 0; max-height: 20px; overflow: hidden; }
+/* One line EXACTLY: `.reasonText` has `line-height: 24px`, so a shorter ceiling cuts into the glyphs (the reader saw the
+   bottom half of the line clipped) and the fade ramp the scroller wears would land on top of it (they saw the lower half
+   blurred by a gradient). The mask is cleared here explicitly: it outspecifics `[data-edges=…]`, and
+   `[data-following=true][data-overflow=true]` cannot match a folded card because the follower is off for one. The reader
+   later confirmed the ramp is not a permanent feature of the card at all — it appears while content loads — which is why
+   this state is the one kept, with no `data-edges` override: the expanded card keeps reading the real edges. */
+.reasonCard[data-folded] .reasonViewport { flex: 1 1 auto; min-width: 0; height: 24px; max-height: 24px; overflow: hidden; mask-image: none; -webkit-mask-image: none; }
 .reasonCard[data-folded] .reasonText { padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reasonCard[data-folded] .reasonFooter { flex: none; padding: 0; margin: 0; }
 .reasonHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 16px 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }

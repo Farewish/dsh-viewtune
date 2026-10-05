@@ -871,14 +871,18 @@ const markers = [
     // both of the things this function exists for. What is pinned is the INJECTION: reverting to `return trimmed;` takes
     // this call out of the artifact and fails here.
     bundle.includes('trimmed.replace(/<html([^>]*)>/i,')],
-  ['…and the grant closes the tail gap and takes the ceiling jump out of the space above, both before paint', () =>
+  ['…and the grant closes the tail gap before paint', () =>
     // The reader's report pins this one: while a card holds the focus the page's follow is suspended, so the slack
     // `isNearTail` allows (72px) was never closed and the card's bottom — reading row included — sat behind the
-    // composer's edge; clicking 回到最新, which writes the maximum, made it "just exactly complete". The ceiling jump of
-    // that same commit was also painted one frame before it was compensated, which is why both happen in a layout effect.
+    // composer's edge; clicking 回到最新, which writes the maximum, made it "just exactly complete". That is why the tail
+    // gap is closed in a layout effect, before paint.
+    //
+    // NOT pinned any more, on purpose: the compensation of that same commit's ceiling jump. Holding the card's bottom in
+    // place meant a card that grew when the focus was granted grew UPWARD — the reader's 「有时会向上展开而不是向下展开，应该
+    // 统一向下」. It is gone from this effect. It cannot be pinned as an ABSENCE either, because `compensateNow.current()`
+    // still exists and must: the observer calls it for the per-line growth during streaming, which grows downward already.
     bundle.includes('scroller.scrollTop = scroller.scrollHeight;')
-    && bundle.includes('compensateNow.current = compensateHeight;')
-    && bundle.includes('compensateNow.current();')],
+    && bundle.includes('compensateNow.current = compensateHeight;')],
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted
