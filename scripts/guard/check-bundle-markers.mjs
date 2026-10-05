@@ -886,7 +886,12 @@ const markers = [
     // 统一向下」. It is gone from this effect. It cannot be pinned as an ABSENCE either, because `compensateNow.current()`
     // still exists and must: the observer calls it for the per-line growth during streaming, which grows downward already.
     bundle.includes('scroller.scrollTop = scroller.scrollHeight;')
-    && bundle.includes('compensateNow.current = compensateHeight;')],
+    && bundle.includes('compensateNow.current = compensateHeight;')
+    && bundle.includes('compensateNow.current();')],
+    // The `compensateNow.current()` in this effect was removed once and is BACK: that attempt was aimed at the reader's
+    // report about expanding a COMPLETED card in the current flow (which grows up when it sits above the reading position and
+    // down when below it — the page's own scroll anchoring, not this jump). Left out of the marker on purpose is any claim
+    // about a focused card's growth direction; that question belongs to the fix for the completed-card case.
   ['a long wait earns its badge', '"data-reader-wait-badge"'],
   // The readout renders nothing at all until the wait is worth a number, and carries a width floor so
   // the seconds counting up cannot push the chevron that sits after the label. Pinned by the emitted

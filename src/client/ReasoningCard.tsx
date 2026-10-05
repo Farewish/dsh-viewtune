@@ -203,11 +203,15 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      */
     const scroller = viewport.current?.closest<HTMLElement>('[data-conversation-scroll]');
     if (scroller !== null && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight;
-    // …and the ceiling jump itself is deliberately NOT compensated any more. Compensating it held the card's BOTTOM where it
-    // was, so a card that grew at the moment the focus was granted grew UPWARD — the reader's report: 「有时会向上展开而不是
-    // 向下展开，应该统一向下」. Without it the card keeps its TOP and takes the new height out of the space BELOW, which is
-    // the one direction they asked for. The tail gap above is still closed before paint: that is a different correction, and
-    // the reader's earlier report — a bottom cut off behind the composer with no pill to fix it — is what it exists for.
+    // The card has already grown in this commit (the ceiling changed with the focus), and the height recorded before the
+    // request is what that jump has to be measured against.
+    //
+    // RESTORED, after one attempt removed it. That attempt was aimed at a DIFFERENT report — the reader's 「展开本流程中已经
+    // 完成的思考卡，靠上就向上长、靠下就向下长，应该统一向下」 — and the mechanism for THAT is the page's own scroll
+    // anchoring (the reading view sets `overflow-anchor: none` and compensates itself), not this grant-time jump. Changing
+    // this one only moved where a FOCUSED card's growth came from, which is not what was asked, so it is back as it was
+    // until the real fix lands.
+    compensateNow.current();
   }, [focused]);
   // A card that unmounts while focused must hand the focus back, or the follower below would stay suspended forever.
   useEffect(() => () => { onFocusChange(focusKey, false); }, [focusKey, onFocusChange]);
