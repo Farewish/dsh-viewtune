@@ -7,6 +7,10 @@ import { isNearTail } from './reading-scroll.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
+/** Daylight kept above the card's top and below its bottom inside the band the toolbar and the composer leave. */
+const MARGIN = 8;
+/** Where compression stops on a small window — 「窗口过于小的时候卡片不用再压缩」。 */
+const FIT_FLOOR = 160;
 
 /** How long after the last wheel notch a gesture counts as finished. */
 const WHEEL_IDLE_MS = 140;
@@ -901,9 +905,15 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    *
    * The stylesheet's ceiling is viewport-relative (`min(60vh, 560px)`), and a card that starts halfway down the window has only
    * part of that room below it, so the card overshot the composer and the tail of its own text sat behind it. Both original terms
-   * are kept in the value written here — `min(560px, 60vh, room)` — because the reader asked for the cap to stay exactly as it is:
-   * this can only make the ceiling smaller, never larger. `room` is measured rather than assumed: the card's own chrome (heading,
-   * footer, padding) comes off the gap as `height − viewportHeight`, which stays true whatever the stylesheet does to those.
+   * are kept in the value written here — `min(560px, 60vh, band)` — because the reader asked for the cap to stay exactly as it is:
+   * this can only make the ceiling smaller, never larger.
+   *
+   * `band` is the space the TOOLBAR and the COMPOSER leave between them, not the room below wherever the card happens to be, and
+   * that is what makes the reader's ideal reachable: with the height equal to the band, the bottom alignment below lands the card
+   * with its top on the toolbar as well, both ends inset by `MARGIN`. When the cap binds instead, the band is the larger of the
+   * two, the bottom still aligns and the top simply floats — and when the window is small, `FIT_FLOOR` is where the compression
+   * stops. The card's own chrome (heading, footer, padding) comes off the band as `height − viewportHeight`, which stays true
+   * whatever the stylesheet does to those parts.
    *
    * Re-measured when the window resizes, and the inline value is removed when the card closes, so the preview goes back to the
    * stylesheet's own ceiling.
@@ -915,11 +925,20 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const fit = () => {
       const scroller = port.closest<HTMLElement>('[data-conversation-scroll]');
       const seat = scroller?.querySelector<HTMLElement>('[class*="_composerSeat"]') ?? null;
-      const limit = seat !== null ? seat.getBoundingClientRect().top : (scroller?.getBoundingClientRect().bottom ?? 0);
+      const toolbar = scroller?.querySelector<HTMLElement>('[data-ud-check="reader-toolbar"]') ?? null;
+      const view = scroller?.getBoundingClientRect();
+      /**
+       * The band the card is allowed to fill: the toolbar's bottom edge down to the composer's top, each pulled in by
+       * `MARGIN` — 「对齐之后卡片顶端也恰好对齐顶栏或工具栏（可以留适当的距离）」, which is what this makes true whenever the band
+       * fits under the cap, because the height is the BAND rather than whatever room was left below the card's old position.
+       */
+      const band = (seat !== null ? seat.getBoundingClientRect().top : (view?.bottom ?? 0)) - MARGIN
+        - ((toolbar !== null ? toolbar.getBoundingClientRect().bottom : (view?.top ?? 0)) + MARGIN);
       const box = root.getBoundingClientRect();
       const chrome = box.height - port.clientHeight;
-      const room = limit - box.top - chrome - 8;
-      port.style.maxHeight = `min(560px, 60vh, ${String(Math.max(120, Math.round(room)))}px)`;
+      // Both bounds at once, as the reader described them: `FIT_FLOOR` is where compression stops on a small window, and
+      // `min(560px, 60vh)` is where expansion stops on a large one. The band can only lower the ceiling, never raise it.
+      port.style.maxHeight = `min(560px, 60vh, ${String(Math.max(FIT_FLOOR, Math.round(band - chrome)))}px)`;
     };
     fit();
     window.addEventListener('resize', fit);

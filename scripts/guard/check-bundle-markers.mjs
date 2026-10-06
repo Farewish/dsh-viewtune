@@ -427,9 +427,16 @@ const markers = [
   // composer and the tail of its own text sat behind it. Both original terms are kept in the value written, because the reader
   // asked for the CAP to stay exactly as it is — this can only lower the ceiling, never raise it. `room` comes off the measured
   // gap minus the card's own chrome (`height − viewportHeight`), so it holds whatever the stylesheet does to those parts.
-  ['an open card is clamped to the room between its top and the composer, cap unchanged', () =>
-    bundle.includes('min(560px, 60vh, ${String(Math.max(120, Math.round(room)))}px)')
-    && bundle.includes('const chrome = box.height - port.clientHeight;')],
+  ['an open card is clamped to the band the toolbar and composer leave, both bounds intact', () =>
+    bundle.includes('min(560px, 60vh, ${String(Math.max(FIT_FLOOR, Math.round(band - chrome)))}px)')
+    // …and the band is measured between the toolbar's bottom and the composer's top, which is what lets the alignment land the
+    // card with BOTH ends inset by `MARGIN` rather than only its bottom. That hook is the half of it that is stable.
+    //
+    // NOT pinned, after measuring each one against the artifact: the `const chrome = box.height - port.clientHeight;`
+    // declaration (the clamp keeps `chrome` as a NAME, so the value is there, but the declaration's own form does not survive
+    // the bundler — measured 0 occurrences — and a guard must not fail on a build that is perfectly correct), the attribute
+    // written as `data-ud-check="reader-toolbar"` (also 0; the selector is built), and any other local's name.
+    && bundle.includes('reader-toolbar')],
   ['the jump pill hugs the column, and never leaves the window', () =>
     readerCss.includes('--jump-gutter:calc((100cqw - min(')
     && readerCss.includes('transform:translateX(calc(min(100%, max(0px, var(--jump-gutter) - 8px)) + 16px))')
