@@ -422,6 +422,14 @@ const markers = [
   // against the window. THE WINDOW WINS at both ends: `gutter − 8px` is where the shift stops making sense, and `max(0px, …)`
   // leaves the pill where it was in a narrow window instead of pushing it out of view. The gutter is computed, not measured:
   // `.root` is the inline-size container and the column is `min(chat-content-width, container − 2 × inline-pad)` centred in it.
+  // The right column joins the wallpaper in two places the reader named separately: its tab strip and the page's OWN header row
+  // below it (「貌似还差一行」 after the strip went dark). Both are painted from the top bar's scrim variables, so the three read as
+  // one bar; the header selectors are scoped to the pane BODY's first two levels, because `[class*="_header"]` alone also matches
+  // a terminal block's header and one of those can live inside the document itself.
+  ['the right column’s strip and page header join the top bar scrim', () =>
+    bundle.includes('[data-rightbar-col] [data-dockkit-strip]')
+    && bundle.includes('[data-rightbar-col] [class*="_paneBody"] > [class*="_header"]')
+    && bundle.includes('[class*="_paneBody"] > * > [class*="_header"]')],
   // An OPEN card's ceiling is the stylesheet's AND the room below its own top: the stylesheet's is viewport-relative
   // (`min(60vh, 560px)`), and a card starting halfway down the window has only part of that room beneath it, so it overshot the
   // composer and the tail of its own text sat behind it. Both original terms are kept in the value written, because the reader
