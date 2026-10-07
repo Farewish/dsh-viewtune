@@ -21,7 +21,13 @@ export const RIGHTBAR_GLASS_STYLE_ID = 'dsh-viewtune-rightbar-glass';
 
 /** The pane the right-hand windows open into, and the column boxes that paint over the wallpaper. */
 const PANE = '[data-dockkit-pane]';
-const COLUMN = '[data-rightbar-col], [data-rightbar-collapsed]';
+/**
+ * The column boxes, ONE PER ENTRY, each already carrying the scope. A single string with a comma inside it cannot be interpolated
+ * behind a prefix: `html[attr] A, B` scopes only `A`, so the second selector escaped the wallpaper gate entirely — the artifact
+ * showed `html[data-viewtune-wallpaper] [data-rightbar-col], [data-rightbar-collapsed]`, and the panel kept its gradient because
+ * the host's own rule on that frame has the same specificity and there was nothing left to outrank it with.
+ */
+const COLUMN = ['[data-rightbar-col]', '[data-rightbar-collapsed]'];
 
 /**
  * The stylesheet. The dial's NAME is spelled out rather than interpolated from the part table, exactly as in
@@ -31,8 +37,8 @@ const COLUMN = '[data-rightbar-col], [data-rightbar-collapsed]';
 export function rightbarGlassCss(): string {
   return [
     `/* The frame's gradient goes only while a wallpaper is set: with none there is nothing to reveal, and the theme's own`,
-    `   background is what the column should keep. */`,
-    `html[${WALLPAPER_ATTRIBUTE}] ${COLUMN} { background-image: none !important; }`,
+    `   background is what the column should keep. Every box is scoped on its own — see COLUMN. */`,
+    ...COLUMN.map(box => `html[${WALLPAPER_ATTRIBUTE}] ${box} { background-image: none !important; }`),
     `/* …and the pane carries the dial's wash. */`,
     `html[${GLASS_ATTRIBUTE}] ${PANE} {`,
     `  background-color: color-mix(in srgb, var(--dsw-alias-bg-base, #000) var(--glass-rightbar, 0%), transparent) !important;`,
