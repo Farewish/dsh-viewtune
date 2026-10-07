@@ -763,6 +763,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     }
     // max-height otherwise clamps the very first collapse frame to the new cap.
     port.style.maxHeight = 'none';
+    /**
+     * …and the page must not read this shrink as the reader scrolling away. A shrinking card lowers `scrollHeight`, the browser
+     * clamps `scrollTop` to match, and that upward move is exactly what `scrollTakeover` calls a takeover — so once the reader had
+     * touched the wheel at all, a card folding to one line turned the follow off. The marker already means "a size is being
+     * animated here" (the reader-initiated expand sets it too, and `settle` clears it either way); the follower stands down on it.
+     * Reported as 「自动跟随会在思考卡片变成一行的时候跟丢」 with 焦点思考 off, where this fold is the only size change there is.
+     */
+    cardRoot()?.setAttribute('data-reader-resizing', '');
     const animation = port.animate([{ height: `${from}px` }, { height: `${target}px` }], { duration: 300, easing: EASING, fill: 'both' });
     resize.current = animation;
     // `fill: 'both'` holds the height this animation started from, and the `max-height: none`

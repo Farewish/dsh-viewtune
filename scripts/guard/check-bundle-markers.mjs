@@ -1255,6 +1255,15 @@ const markers = [
   // of its own resize, and the compensation branch stands down while it is set, still re-capturing its anchor.
   ['a card the reader resizes stops the page from compensating that growth', () =>
     bundle.includes('root.setAttribute("data-reader-resizing", "")')
+    /**
+     * …and the SAME marker is what keeps a fold from ending the follow. A shrinking card lowers `scrollHeight`, the browser clamps
+     * `scrollTop`, and the follower reads that upward move as the reader taking over — so once the wheel had been touched at all, a
+     * card folding to one line switched the follow off: 「自动跟随会在思考卡片变成一行的时候跟丢」, reported with 焦点思考 off, where
+     * this fold is the only size change there is. The card now publishes the marker for the FOLD as well, and the scroll verdict
+     * stands down while it is set.
+     */
+    && bundle.includes('cardRoot()?.setAttribute("data-reader-resizing", "")')
+    && bundle.includes('if (content.querySelector("[data-reader-resizing]") !== null) {')
     // …and only for GROWTH: a negative delta is content above the anchor getting shorter, and compensating that pulled the page
     // UP under the reader — their own armed log showed `writeTop 1826 -> 1727 d=-99` coming from this very observer. What
     // shrinks while nothing streams is a skipped turn's placeholder swapping for its real height, which lands right after they

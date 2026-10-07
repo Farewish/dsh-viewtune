@@ -438,6 +438,19 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // Our easing frames must not be mistaken for a user leaving the bottom.
       if (lastWrittenTop !== null && Math.abs(scroll.scrollTop - lastWrittenTop) < 1) return;
       /**
+       * A card animating its own height is not the reader either. A SHRINK lowers `scrollHeight`, the browser clamps `scrollTop`
+       * to match, and that upward move is what `scrollTakeover` reads as a takeover — so with 焦点思考 off and 思考卡折叠成一行 on,
+       * a card folding to one line switched the follow off whenever the reader had touched the wheel before: 「自动跟随会在思考
+       * 卡片变成一行的时候跟丢」. The fold marks the card `data-reader-resizing` while it animates (the reader's own expand does
+       * too, and the card clears it when the size settles), so the verdict waits. The positions are still recorded, so the next
+       * real move is judged against where the layout actually is rather than against the clamp.
+       */
+      if (content.querySelector('[data-reader-resizing]') !== null) {
+        lastSeenTop = scroll.scrollTop;
+        lastSuspendedTop = scroll.scrollTop;
+        return;
+      }
+      /**
        * A suspension is not a takeover: while the caller has the follow suspended, what opens the gap is content
        * arriving below the reader — not the reader leaving. Only a scroll that moves UP can be the reader, and
        * everything this hook or a focused card writes moves DOWN. So while suspended, a position that did not move
