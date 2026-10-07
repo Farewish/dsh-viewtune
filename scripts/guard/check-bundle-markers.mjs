@@ -429,7 +429,11 @@ const markers = [
   ['the right column’s strip and page header join the top bar scrim', () =>
     bundle.includes('[data-rightbar-col] [data-dockkit-strip]')
     && bundle.includes('[data-rightbar-col] [class*="_paneBody"] > [class*="_header"]')
-    && bundle.includes('[class*="_paneBody"] > * > [class*="_header"]')],
+    && bundle.includes('[class*="_paneBody"] > * > [class*="_header"]')
+    // …and the ANY-DEPTH form, which is the one that actually reaches the document preview's row: the two-level cut was reported
+    // as 「没变」. Pinned because it is the deliberate trade — inside the pane body only, so the transcript's own terminal headers
+    // are never touched, at the cost of a terminal BLOCK inside a document in this column being scrimmed as well.
+    && bundle.includes('[data-rightbar-col] [class*="_paneBody"] [class*="_header"]')],
   // An OPEN card's ceiling is the stylesheet's AND the room below its own top: the stylesheet's is viewport-relative
   // (`min(60vh, 560px)`), and a card starting halfway down the window has only part of that room beneath it, so it overshot the
   // composer and the tail of its own text sat behind it. Both original terms are kept in the value written, because the reader
