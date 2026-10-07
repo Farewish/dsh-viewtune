@@ -73,6 +73,10 @@
  * space is as inert as the bar's. */
 .toolbar { pointer-events: none; }
 .toolbar :is(button, a, select, input, textarea, [role=button], [tabindex]) { pointer-events: auto; }
+/* ...and the SETTINGS PANEL, a div that matched none of those: it hangs off the gear INSIDE this bar, so the bar's
+   pointer-events:none reached it and the whole panel - clicks AND the wheel - went through it. One rule is enough:
+   pointer-events inherits, so its rows, switches and scrollers take input again with it. */
+.toolbar .settingsPanel { pointer-events: auto; }
 .textButton, .historyButton, .iconButton, .jump, .disclosureButton, .imageOpen, .dialogClose { font: inherit; cursor: pointer; }
 .textButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
 .textButton:hover, .iconButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
