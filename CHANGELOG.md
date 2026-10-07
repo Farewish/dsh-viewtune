@@ -1,6 +1,9 @@
 # Changelog
 
-## 未发布（下一版）
+## 0.5.7 (the pill as a circle, cards that fit the window, and a settings panel that takes its own clicks back)
+
+> 本版接着 0.5.7 那个只改了 README 的发布点，把这一批工作并进同一个版本号；tag 已随之移到本提交。
+
 
 ### 补（第 2 件的**理想形态**）：高度按「**可见带**」算 —— 上下两端都能对齐，且上下界都有
 
