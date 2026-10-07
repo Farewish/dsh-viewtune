@@ -19,6 +19,7 @@ import { installScrollbarStyle } from './scrollbar.js';
 import { installComposerWheel } from './composer-wheel.js';
 import { installResizerWheel } from './resizer-wheel.js';
 import { installComposerGlass } from './composer-glass.js';
+import { installRightbarGlass } from './rightbar-glass.js';
 import { installAppBackdrop } from './app-backdrop.js';
 import { installConversationGlass } from './conversation-glass.js';
 import { installConversationSolid } from './conversation-solid.js';
@@ -79,6 +80,9 @@ export function apply(ctx: Context): void {
   // The host's input box, transparent like the rest of the skin — it follows the skin's master switch rather than the
   // conversation one, because it is on screen in both views. See composer-glass.ts for the two host facts it rests on.
   ctx.effect(() => installComposerGlass(document), 'dsh-viewtune: composer glass');
+  // The right column's page: the pane the right-hand windows open into, on the 「右侧栏面板」 dial. Its own top strip is
+  // merged into the top bar's scrim by wallpaper-scope.ts rather than styled here. See rightbar-glass.ts.
+  ctx.effect(() => installRightbarGlass(document), 'dsh-viewtune: rightbar glass');
   /**
    * The backdrop's app-wide half, published once per activation rather than by the reading view.
    *

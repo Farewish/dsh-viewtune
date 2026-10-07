@@ -66,7 +66,7 @@ test('the frost is a dial per surface, and a surface at 0 is left UNSET rather t
   // is a scrollbar pseudo-element where the property does nothing, and a row that moves nothing is worse than no row.
   assert.deepEqual(
     GLASS_PARTS.filter(part => part.blur !== undefined).map(part => part.id),
-    ['lane', 'user', 'card', 'code', 'diff', 'chip', 'pill', 'input'],
+    ['lane', 'user', 'card', 'code', 'diff', 'chip', 'pill', 'input', 'rightbar'],
   );
   // A record that never moved one takes that surface's shipped blur, so an older record keeps the look it had. The
   // 0-initial surface is the LANE now: the defaults are one reading of the reader's own settings file, and they run a
@@ -92,7 +92,7 @@ test('the frost is a dial per surface, and a surface at 0 is left UNSET rather t
   assert.equal(properties['--glass-blur-user'], '3px');
   assert.equal(properties['--glass-blur-lane'], undefined);
   assert.equal(properties['--glass-blur-chip'], undefined);
-  assert.equal(glassBlurPropertyNames().length, 8);
+  assert.equal(glassBlurPropertyNames().length, 9);
   // …and the withdrawal REMOVES rather than re-resolves: `null` takes every name off, where an empty record would
   // write the shipped initials back on. The conversation gate depends on that difference when it is switched off.
   const style = {

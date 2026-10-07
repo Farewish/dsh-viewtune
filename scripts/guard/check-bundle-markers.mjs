@@ -1561,8 +1561,8 @@ const markers = [
     // The FROST family is excluded here and has its own marker below: these nine are the TINTS, while a frost
     // property is spelled `--glass-blur-<part>` — which this regex reads as the single name `--glass-blur`.
     const props = [...bundle.matchAll(/var\((--glass-(?!blur)[a-z]+)/g)].map(match => match[1]);
-    return new Set(props).size === 9
-      && ['--glass-lane', '--glass-user', '--glass-card', '--glass-code', '--glass-diff', '--glass-chip', '--glass-scrollbar', '--glass-pill', '--glass-input']
+    return new Set(props).size === 10
+      && ['--glass-lane', '--glass-user', '--glass-card', '--glass-code', '--glass-diff', '--glass-chip', '--glass-scrollbar', '--glass-pill', '--glass-input', '--glass-rightbar']
         .every(name => props.includes(name) && bundle.includes(`"${name}"`));
   }],
   // …and the same coupling for the FROST: one property per surface that can carry a `backdrop-filter`, read by a
@@ -1573,7 +1573,7 @@ const markers = [
   // wallpaper-scope.ts, so they are checked by name here instead of by the table.
   ['every surface that can be frosted has its own blur dial', () => {
     const props = [...bundle.matchAll(/var\((--glass-blur-[a-z]+)/g)].map(match => match[1]);
-    const frosted = ['lane', 'user', 'card', 'code', 'diff', 'chip', 'pill', 'input'];
+    const frosted = ['lane', 'user', 'card', 'code', 'diff', 'chip', 'pill', 'input', 'rightbar'];
     return new Set(props).size === frosted.length
       && frosted.every(id => props.includes(`--glass-blur-${id}`) && bundle.includes(`"--glass-blur-${id}"`))
       && !bundle.includes('--glass-blur-scrollbar')

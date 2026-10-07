@@ -96,6 +96,21 @@ export const GLASS_PARTS: readonly GlassPart[] = [
     hint: '阅读页与对话页都生效',
     blur: { property: '--glass-blur-input', initial: 10 },
   },
+  {
+    /**
+     * 「右侧栏面板」 — the dockkit pane the right-hand windows open into (files, the diff view, the terminal). The reader described
+     * that column as two surfaces and asked for them separately: its top STRIP is merged into the top bar's scrim
+     * (`wallpaper-scope.ts` paints `[data-rightbar-col] [data-dockkit-strip]` from the header's own variables, so the two read as
+     * one bar), and the page BELOW it is this dial.
+     *
+     * What covered the wallpaper was never the pane: measured on the live page, the pane and its `_paneBody_` are both
+     * transparent, and the only painted layer in the column is the rightbar FRAME's own gradient (`[data-rightbar-collapsed]`).
+     * `rightbar-glass.ts` withdraws that gradient and lays this wash and its frost on the pane.
+     */
+    id: 'rightbar', label: '右侧栏面板', property: '--glass-rightbar', initial: 30,
+    hint: '右侧栏打开的页面（文件、差异、终端）',
+    blur: { property: '--glass-blur-rightbar', initial: 8 },
+  },
 ];
 
 /** The frost's own ceiling, in px: past this the text behind a plate stops being legible as anything. */
