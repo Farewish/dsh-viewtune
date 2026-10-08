@@ -1,4 +1,4 @@
-import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
+import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
 
 export type DeliverableOpenMode = 'external' | 'sidebar';
 
@@ -90,7 +90,10 @@ export function workspaceImageUrl(
   if (isAbsoluteWorkspacePath(url) || url.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(url)) return undefined;
   try {
     const absolute = resolveWorkspacePath(cwd, decodeURIComponent(url));
-    return `${origin}/api/file?path=${encodeURIComponent(absolute)}`;
+    // The HOST's own builder, not a hand-rolled string: it also covers the desktop transport (`dsh-app://app/`) and any
+    // deployment prefix, and the upstream document preview uses it for exactly this job
+    // (`ui-sidebar-documentpreview/src/client/markdown/path-images.ts`). A base must end in a slash to resolve against.
+    return fileMediaUrl(origin.endsWith('/') ? origin : `${origin}/`, absolute);
   } catch {
     // A malformed escape sequence is not something this can serve; the renderer falls back to the alt text.
     return undefined;
