@@ -1,6 +1,6 @@
 # Changelog
 
-## 未发布（下一版）
+## 0.5.8 (the right column joins the top bar, its code band follows the scrim, and the terminal entry matches its file sibling)
 
 ### 右侧栏的**代码条**不再自己画一层实底，改由顶栏遮罩决定深浅（读者确认达成 ✓）
 

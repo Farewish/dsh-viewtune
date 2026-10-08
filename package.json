@@ -1,6 +1,6 @@
 {
   "name": "dsh-viewtune",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "A reading view for DeepSeek Harness: one turn per page with its process, reasoning and deliverables in place, a tunable frosted-glass skin and wallpaper, and handling for very long sessions. Started from aa2246740/dsh-better-display.",
   "type": "module",
   "license": "MIT",
