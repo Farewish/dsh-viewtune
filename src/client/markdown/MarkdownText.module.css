@@ -332,3 +332,26 @@
   cursor: pointer;
 }
 .fileLink:hover { text-decoration-color: currentColor; }
+/* The hover card over a file link. FIXED, not absolute: the card must not be clipped by the turn, the card or the column it
+   happens to sit in — the reading view nests several `overflow`/`contain` boxes above a paragraph. It never takes the pointer
+   (`pointer-events: none`), so it cannot steal a click from the link it describes. */
+.pathLinkHost { display: inline; }
+.pathPreview {
+  position: fixed;
+  z-index: 60;
+  transform: translateY(calc(-100% - 8px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 288px;
+  padding: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+.pathPreviewImage { display: block; max-width: 272px; max-height: 184px; object-fit: contain; border-radius: 6px; }
+.pathPreviewName { font-weight: 600; }
+.pathPreviewPath { color: var(--dsw-alias-label-tertiary); font-size: 12px; overflow-wrap: anywhere; }

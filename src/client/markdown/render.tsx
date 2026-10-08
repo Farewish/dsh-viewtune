@@ -33,6 +33,7 @@ import { McpAppCodeBlock, StreamingMcpAppPlaceholder } from '../McpAppFrame.js'
 import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../mcp-app.js'
 import type { PositionedBlock } from './incremental.js'
 import { parseFileLink } from './file-link.js'
+import { PathPreview } from '../PathPreview.js'
 import css from './MarkdownText.module.css'
 
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
@@ -529,7 +530,9 @@ function renderAnchor(url: string, children: ReactNode[], key: Key, context: Mar
     const file = parseFileLink(url)
     if (file !== undefined) {
       const open = context.openFileLink
+      const resolveImageUrl = context.resolveImageUrl
       return (
+        <PathPreview path={file.path} line={file.line} resolveImageUrl={resolveImageUrl}>
         <button
           key={key}
           type="button"
@@ -539,6 +542,7 @@ function renderAnchor(url: string, children: ReactNode[], key: Key, context: Mar
         >
           {children}
         </button>
+        </PathPreview>
       )
     }
   }
