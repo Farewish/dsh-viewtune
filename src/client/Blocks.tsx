@@ -81,7 +81,14 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
   return <figure className={css.imageFigure} data-reader-image data-image-state={error ? 'error' : decoded ? 'ready' : 'loading'}>
     <div className={css.imageFrame} style={{ aspectRatio: `${width} / ${height}` }}>
       {!error && url && <button ref={opener} type="button" className={css.imageOpen} aria-label={`放大图片${attachment.name ? `：${attachment.name}` : ''}`} onClick={() => dialog.current?.showModal()}>
-        <img src={url} alt={attachment.name ?? '会话图片'} width={width} height={height} onLoad={() => setDecoded(true)} onError={() => setError(true)} data-ready={decoded} />
+        {/* `onLoad` alone leaves a CACHED image invisible forever: the fetch and the decode can finish before React attaches the
+            handler, so the event never fires, `decoded` stays false, `data-ready` stays "false", and the stylesheet holds it at
+            `opacity: 0` — the reader's report exactly (「阅读页回答正文里的图片不会显示」). The ref callback closes that gap: by the
+            time the node is attached a cached image already reports `complete` with a real `naturalWidth`, so it is revealed on the
+            spot instead of waiting for an event that will not come. Re-setting the same value is a no-op in React, so no guard is
+            needed in the other direction. */}
+        <img src={url} alt={attachment.name ?? '会话图片'} width={width} height={height} onLoad={() => setDecoded(true)} onError={() => setError(true)} data-ready={decoded}
+          ref={node => { if (node && node.complete && node.naturalWidth > 0) setDecoded(true); }} />
       </button>}
       {(!decoded || error) && <div className={css.imagePlaceholder}>
         <span>{error ? '图片未能加载' : '正在加载图片'}</span>
