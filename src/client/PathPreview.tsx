@@ -1,18 +1,21 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo } from 'react';
 import type { ReactNode } from 'react';
+import { HoverCard } from '@deepseek-ai/dsh-client-ui-primitives';
 import { fileNameOf, previewKindOf } from './path-preview.js';
 import css from './markdown/MarkdownText.module.css';
 
 /**
- * The hover card the host shows over a file link, in the reading view's own shape.
+ * The hover card the host shows over a file link — the host's own component, not a lookalike.
  *
- * The host pairs its Markdown file links with an image preview supplied by the owner (`MarkdownDelegate.fileImages`), and its own
- * component is not importable here — these packages export `apply`/`inject`, not their internals. So this is a lookalike that
- * asks the ONE thing we can answer: the owner's workspace resolver, which renders an image. For every other file the card names
- * the file instead of pretending to know its contents — nothing here can read a file's bytes.
+ * The first version of this was hand-rolled with `position: fixed` and the reader saw it land far from the link
+ * (「预览框应该在路径链接旁边啊，现在怎么离的这么远」): the reading view's ancestors carry `transform` and `filter` (the per-word
+ * reveal is `filter: blur(…)`), and a fixed box resolves against the nearest such ancestor. The host's primitives already
+ * export `HoverCard`, which is PORTALED to the body and documents exactly the placement wanted — `variant: 'compact'`, "compact
+ * card beside the anchor" — and which also hides itself while a tooltip inside the anchor is showing. Using it removes the
+ * guesswork, the extra dependency (`react-dom` is not in this package's dependencies) and the second idea of what a card is.
  *
- * Deliberately small: it appears after a short delay, disappears immediately, never swallows a click, and is decorative
- * (`aria-hidden`) because the link it hangs from already carries the same information in its `title`.
+ * The content is still ours and still honest: an image renders through the owner's workspace resolver, everything else is named
+ * rather than previewed, because nothing here can read a file's bytes.
  */
 export const PathPreview = memo(function PathPreview({ path, line, resolveImageUrl, children }: {
   path: string;
@@ -20,44 +23,21 @@ export const PathPreview = memo(function PathPreview({ path, line, resolveImageU
   resolveImageUrl?: ((url: string) => string | undefined) | undefined;
   children: ReactNode;
 }) {
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (timer.current !== null) clearTimeout(timer.current); }, []);
-  const show = useCallback((host: HTMLElement) => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    // A short delay so a pointer crossing the text on its way somewhere else never flashes a card.
-    timer.current = setTimeout(() => {
-      const rect = host.getBoundingClientRect();
-      setAnchor({ top: rect.top, left: rect.left });
-    }, 260);
-  }, []);
-  const hide = useCallback(() => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    setAnchor(null);
-  }, []);
   const kind = previewKindOf(path);
   const source = kind === 'image' ? resolveImageUrl?.(path) : undefined;
   return (
-    <span
-      className={css.pathLinkHost}
-      onMouseEnter={event => { show(event.currentTarget); }}
-      onMouseLeave={hide}
-      onFocus={event => { show(event.currentTarget); }}
-      onBlur={hide}
-    >
-      {children}
-      {anchor !== null && (
-        <span
-          className={css.pathPreview}
-          style={{ top: `${String(anchor.top)}px`, left: `${String(anchor.left)}px` }}
-          data-path-preview={kind}
-          aria-hidden="true"
-        >
+    <HoverCard
+      anchor={children}
+      inline
+      variant="compact"
+      openDelayMs={260}
+      content={
+        <span className={css.pathPreviewBody}>
           {source !== undefined && <img className={css.pathPreviewImage} src={source} alt="" />}
           <span className={css.pathPreviewName}>{line === undefined ? fileNameOf(path) : `${fileNameOf(path)}:${String(line)}`}</span>
           <span className={css.pathPreviewPath}>{path}</span>
         </span>
-      )}
-    </span>
+      }
+    />
   );
 });
