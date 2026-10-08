@@ -533,11 +533,14 @@ function renderAnchor(url: string, children: ReactNode[], key: Key, context: Mar
       const resolveImageUrl = context.resolveImageUrl
       return (
         <PathPreview path={file.path} line={file.line} resolveImageUrl={resolveImageUrl}>
+        {/* NO `title`: the reader saw the native tooltip and the preview card at the same time (「预览时，会有一个地址说明……
+            又有一个预览，把前者删掉」) — two overlapping explanations of the same thing. The card is the one that stays, and it
+            carries the path and the line, so nothing is lost for a sighted reader. A screen reader keeps the link's own text as
+            its name, which is what a link should announce. */}
         <button
           key={key}
           type="button"
           className={css.fileLink}
-          title={file.line === undefined ? file.path : `${file.path}:${String(file.line)}`}
           onClick={() => { open(file.path, file.line) }}
         >
           {children}
