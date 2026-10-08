@@ -32,6 +32,7 @@ import { renderTexToReact } from './katex.js'
 import { McpAppCodeBlock, StreamingMcpAppPlaceholder } from '../McpAppFrame.js'
 import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../mcp-app.js'
 import type { PositionedBlock } from './incremental.js'
+import { parseFileLink } from './file-link.js'
 import css from './MarkdownText.module.css'
 
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
@@ -151,6 +152,14 @@ export interface MarkdownRenderContext {
    * same vocabulary as `fileMentions`: the renderer asks, it never guesses at paths. Undefined means "leave the URL alone".
    */
   readonly resolveImageUrl?: (url: string) => string | undefined
+  /**
+   * Reader addition: open a local file destination — the owner's navigation for a Markdown link whose destination is a path in
+   * the session workspace, exactly the capability the host's `MarkdownDelegate` provides. Absent leaves the destination as plain
+   * text, which is what the host documents and what this renderer did before.
+   * @param path - The decoded local path.
+   * @param line - The first line to reveal, when the destination carried a `#L12` or `#L12-L20` fragment.
+   */
+  readonly openFileLink?: ((path: string, line?: number) => void) | undefined
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
   readonly fileMentions: MarkdownFileMentions | undefined
   /** Inside an anchor's children: interactive mentions must not nest there. */
@@ -314,7 +323,7 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'table':
       return renderTable(node, key, context)
     case 'link':
-      return renderAnchor(node.url, renderChildren(node.children, { ...context, inLink: true }), key)
+      return renderAnchor(node.url, renderChildren(node.children, { ...context, inLink: true }), key, context)
     case 'linkReference':
       return renderLinkReference(node, key, context)
     case 'image':
@@ -511,7 +520,28 @@ function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNod
 }
 
 /** Anchor over a parsed markdown destination, which hast normalized before the allowlist saw it. */
-function renderAnchor(url: string, children: ReactNode[], key: Key): ReactNode {
+function renderAnchor(url: string, children: ReactNode[], key: Key, context: MarkdownRenderContext): ReactNode {
+  // A LOCAL destination is the owner's to open, and that is the host's rule too: `parseFileLink` decides what counts as one
+  // (`client/ui-primitives/src/markdown/file-link.ts`, ported here), and the host's own comment says the destination stays PLAIN
+  // TEXT when no handler is installed — which is exactly what the reading view used to do, and why the reader saw no link where
+  // the transcript showed one (「我们的相对路径能不能像对话页那样做成链接？」).
+  if (context.openFileLink !== undefined && context.inLink !== true) {
+    const file = parseFileLink(url)
+    if (file !== undefined) {
+      const open = context.openFileLink
+      return (
+        <button
+          key={key}
+          type="button"
+          className={css.fileLink}
+          title={file.line === undefined ? file.path : `${file.path}:${String(file.line)}`}
+          onClick={() => { open(file.path, file.line) }}
+        >
+          {children}
+        </button>
+      )
+    }
+  }
   return renderSafeLink(normalizeUri(url), children, key)
 }
 
@@ -531,9 +561,11 @@ function inlineCodeHttpUrl(value: string): string | undefined {
 }
 
 function renderImage(url: string, alt: string, key: Key, context: MarkdownRenderContext): ReactNode {
-  // The owner resolves first — a workspace-relative path is not fetchable as written, and the host's transcript shows the same
-  // image because it performs this step. Everything after it is the unchanged allowlist chain.
-  const authored = context.resolveImageUrl?.(url) ?? url
+  // The host's own reading of an image destination first (`parseFileLink`, ported verbatim): a local path is the owner's to
+  // resolve, and the host's transcript shows the same image because it performs this step. Anything it refuses — a URL, a query,
+  // a fragment-only link — goes down the unchanged allowlist chain instead.
+  const file = parseFileLink(url)
+  const authored = (file === undefined ? undefined : context.resolveImageUrl?.(file.path)) ?? url
   const imageSrc = remoteImageUrl(sanitizeUrl(normalizeUri(authored)))
   if (imageSrc === undefined) {
     return <span key={key} className={css.imageAlt}>{alt}</span>
@@ -571,7 +603,7 @@ function renderLinkReference(
     // not an anchor, so mentions inside it stay live.
     return <Fragment key={key}>{'['}{renderChildren(node.children, context)}{referenceSuffix(node)}</Fragment>
   }
-  return renderAnchor(definition.url, renderChildren(node.children, { ...context, inLink: true }), key)
+  return renderAnchor(definition.url, renderChildren(node.children, { ...context, inLink: true }), key, context)
 }
 
 function renderImageReference(

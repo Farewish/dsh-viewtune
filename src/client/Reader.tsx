@@ -1146,6 +1146,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // into its own file route, and the reading view showed only the alt text without this step. `workspaceImageUrl` owns the
     // rules and the tests; anything absolute or already a URL comes back undefined and is handed on untouched.
     resolveImageUrl: (url: string) => workspaceImageUrl(props.cwd, url),
+    // A Markdown link whose destination is a local path is the owner's to open — the host calls it a file link and its
+    // MarkdownDelegate documents that an absent handler leaves plain text, which is what this view used to do. Same opener
+    // as everything else here, so 「产物用侧边栏打开」 decides between the system app and the sidebar as usual.
+    openFileLink: (path: string) => { openFile(path); },
     metrics,
   };
   const terminal = terminalLabel(boundary.reason);

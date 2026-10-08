@@ -34,6 +34,7 @@ function renderSettled(
   renderText: MarkdownRenderContext['renderText'],
   renderAtom: MarkdownRenderContext['renderAtom'],
   resolveImageUrl: MarkdownRenderContext['resolveImageUrl'],
+  openFileLink: MarkdownRenderContext['openFileLink'],
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -44,6 +45,7 @@ function renderSettled(
     streaming: false,
     codeLabels,
     resolveImageUrl,
+    openFileLink,
     fileMentions,
     targets,
     footnoteOrder: [],
@@ -77,7 +79,7 @@ class StreamingRenderer {
   private lastRendered: ReactNode[] = []
 
   /** @param codeLabels - Fence copy labels baked into cached elements; the owner replaces the renderer when they change. */
-  constructor(private readonly codeLabels: MarkdownCodeLabels | undefined, private readonly renderText: MarkdownRenderContext['renderText'], private readonly renderAtom: MarkdownRenderContext['renderAtom'], private readonly resolveImageUrl: MarkdownRenderContext['resolveImageUrl'] = undefined) {}
+  constructor(private readonly codeLabels: MarkdownCodeLabels | undefined, private readonly renderText: MarkdownRenderContext['renderText'], private readonly renderAtom: MarkdownRenderContext['renderAtom'], private readonly resolveImageUrl: MarkdownRenderContext['resolveImageUrl'] = undefined, private readonly openFileLink: MarkdownRenderContext['openFileLink'] = undefined) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -113,6 +115,7 @@ class StreamingRenderer {
         streaming: true,
         codeLabels: this.codeLabels,
         resolveImageUrl: this.resolveImageUrl,
+        openFileLink: this.openFileLink,
         fileMentions: undefined,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
@@ -134,6 +137,7 @@ class StreamingRenderer {
       streaming: true,
       codeLabels: this.codeLabels,
       resolveImageUrl: this.resolveImageUrl,
+      openFileLink: this.openFileLink,
       fileMentions: undefined,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
@@ -168,7 +172,7 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl, openFileLink }: {
   text: string
   streaming?: boolean
   codeLabels?: MarkdownCodeLabels | undefined
@@ -177,19 +181,21 @@ export const MarkdownText = memo(function MarkdownText({ text, streaming = false
   renderAtom?: MarkdownRenderContext['renderAtom']
   /** Owner's workspace-path resolver for image destinations; undefined leaves every URL as authored. */
   resolveImageUrl?: MarkdownRenderContext['resolveImageUrl']
+  /** Owner's navigation for a local file link; undefined leaves the destination as plain text, as the host documents. */
+  openFileLink?: MarkdownRenderContext['openFileLink']
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl)
+      return renderSettled(text, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl, openFileLink)
     }
     if (streamRef.current === null || streamLabelsRef.current !== codeLabels) {
-      streamRef.current = new StreamingRenderer(codeLabels, renderText, renderAtom, resolveImageUrl)
+      streamRef.current = new StreamingRenderer(codeLabels, renderText, renderAtom, resolveImageUrl, openFileLink)
       streamLabelsRef.current = codeLabels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl])
+  }, [text, streaming, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl, openFileLink])
   return <div className={css.markdown}>{children}</div>
 })

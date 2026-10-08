@@ -85,6 +85,12 @@ export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'
    * rendered there and fell back to alt text here. Optional: an owner that cannot resolve leaves every URL as authored.
    */
   resolveImageUrl?: (url: string) => string | undefined;
+  /**
+   * Reader addition: open a local file destination from a Markdown link — the same capability the host's own
+   * MarkdownDelegate exposes, and the reason a workspace path in the transcript is a link while the reading view showed
+   * plain text. Absent leaves the destination as text. Optional: an owner with no opener simply omits it.
+   */
+  openFileLink?: (path: string, line?: number) => void;
   metrics?: {
     usage?: NonNullable<import('@deepseek-ai/dsh-client-ui-chat/client').TurnTailChatData['tokenUsage']>;
     runMs?: number;
