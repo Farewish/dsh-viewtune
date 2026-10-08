@@ -60,6 +60,12 @@ function sanitizeUrl(url: string): string {
 }
 
 function remoteImageUrl(url: string): string | undefined {
+  // SAME-ORIGIN ROOT-RELATIVE PATHS ARE ALLOWED, and this is the one line the reader's report needed: the host's own transcript
+  // renders an answer's images from app routes (`/open-in-app/…`, `/api/…`), which `new URL()` cannot parse without a base — so
+  // this function threw, `renderImage` fell back to the alt text, and the reading view showed 「图 1 一阶RC充电电路」 where the host
+  // page showed the diagram. Same-origin is the security property that matters here, and a single leading slash is exactly that.
+  // Only a SINGLE slash: `//host/…` is protocol-relative, i.e. cross-origin, and stays rejected with everything below it.
+  if (url.startsWith('/') && !url.startsWith('//')) return url
   try {
     const protocol = new URL(url).protocol
     return protocol === 'http:' || protocol === 'https:' ? url : undefined
