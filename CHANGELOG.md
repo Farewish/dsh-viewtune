@@ -2,6 +2,29 @@
 
 ## 未发布（下一版）
 
+### 右侧栏的**代码条**不再自己画一层实底，改由顶栏遮罩决定深浅（读者确认达成 ✓）
+
+- **目标** ✓（读者原话 ✓）：「我是想让它**跟着顶栏遮罩走，深浅一致**」✓。
+- **答案来自宿主自己的样式表** ✓（**不是**逐层试出来的 ✓）：读 `@deepseek-ai/dsh-client-ui-primitives/lib/markdown/CodeBlock.module.css` ✓：
+  ```
+  .bannerWrap { position: sticky; top: 0; z-index: 6; background-color: var(--dsw-alias-bg-base); … }   ← 实底在此层
+  .banner     { background: var(--dsl-code-block-banner-background-color); }                            ← 内层（未动）
+  .block pre  { background: var(--dsl-code-block-background); }                                         ← 代码正文（未动）
+  ```
+  ⇒ 那条带子之所以一直"没变" ✓，是因为实底画在**包装层 `.bannerWrap`** ✓，而早先几次都在清**内层 `.banner`** ✗。
+- **改动（只有一条 ✓）** ✓：
+  ```css
+  html[data-viewtune-wallpaper] [data-rightbar-col] [class*="_bannerWrap_"],
+  html[data-viewtune-wallpaper] [data-rightbar-collapsed] [class*="_bannerWrap_"] {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+  ```
+  ⇒ 实底消失后 ✓，这条带子**直接被顶栏遮罩的规则作用** ✓ ⇒ **深浅与顶栏一致** ✓、且**随挡位变化** ✓（读者确认 ✓「现在虽然没有透明，但达成了最初的想法：随顶栏遮罩变化」✓ 并认可 ✓）。
+- **安全边界** ✓：两条选择器都夹在 `[data-rightbar-col]` / `[data-rightbar-collapsed]` 内 ✓ ⇒ **阅读页零接触** ✓（这条硬约束本轮被反复强调 ✓，也验证过两次误伤 ✓）；未加任何**列外**规则 ✓。
+- **保留的克制** ✓：按读者"先只做 3"的要求 ✓，**没有**加 `:not([data-code-block-banner])` 排除 ✓、**没有**动横幅内层颜色 ✓、**没有**碰代码正文底板 ✓。
+- 全链 build ✓、`TYPES OK` ✓、**40/40** ✓、守卫 **25/25** ✓、反向自检 **OK** ✓。
+
 ### 补：右侧栏的**第二行**也并进顶栏遮罩（读者指出"貌似还差一行"）
 
 - **读者反馈** ✓（附截图 ✓）：变黑的那条是「文件 | SHARE… | ＋」+ 窗口按钮**那一条** ✓，而它**下面还有一行**（`…\SHARE.md` + 「Markdown」 + 刷新按钮 ✓）**没被并进去** ✓ ⇒「**貌似还差一行**」✓；并给出该行类名 **`k-1LKG_header`** ✓（本地名 `header` ✓、哈希来自**文档预览自己的** CSS 模块 ✓）。
