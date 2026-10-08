@@ -1,3 +1,5 @@
+import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
+
 export type DeliverableOpenMode = 'external' | 'sidebar';
 
 /**
@@ -62,6 +64,37 @@ export function resolveOpenWorkspacePath(
   resolveWorkspacePath: (cwd: string | undefined, path: string) => string,
 ): string {
   return isFolderOpenPath(path) ? (cwd ?? '.') : resolveWorkspacePath(cwd, path);
+}
+
+/**
+ * The URL that serves one workspace file, or `undefined` when a destination needs no resolution.
+ *
+ * An answer's image is often authored as a path INSIDE the session workspace, which the browser cannot fetch as written — the
+ * host's own transcript turns exactly those into its file route, and the reading view showed only the image's alt text because
+ * it did not perform that step. This is the step, kept out of the renderer so it can be tested without a DOM (the suite has none).
+ *
+ * Only workspace-relative destinations are touched. Anything absolute — `/…`, `//host/…`, or any `scheme:` — is left to the
+ * markdown renderer's own protocol allowlist, unchanged.
+ *
+ * @param cwd - The session's workdir as the host reports it; undefined leaves the destination alone.
+ * @param url - The destination exactly as authored.
+ * @param origin - The app's own origin; defaults to the page's.
+ * @returns The file route for a workspace path, else undefined.
+ */
+export function workspaceImageUrl(
+  cwd: string | undefined,
+  url: string,
+  origin: string | undefined = globalThis.location?.origin,
+): string | undefined {
+  if (cwd === undefined || url === '' || origin === undefined || origin === '') return undefined;
+  if (isAbsoluteWorkspacePath(url) || url.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(url)) return undefined;
+  try {
+    const absolute = resolveWorkspacePath(cwd, decodeURIComponent(url));
+    return `${origin}/api/file?path=${encodeURIComponent(absolute)}`;
+  } catch {
+    // A malformed escape sequence is not something this can serve; the renderer falls back to the alt text.
+    return undefined;
+  }
 }
 
 /**

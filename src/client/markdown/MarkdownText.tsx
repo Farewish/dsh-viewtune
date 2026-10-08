@@ -33,6 +33,7 @@ function renderSettled(
   fileMentions: MarkdownFileMentions | undefined,
   renderText: MarkdownRenderContext['renderText'],
   renderAtom: MarkdownRenderContext['renderAtom'],
+  resolveImageUrl: MarkdownRenderContext['resolveImageUrl'],
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -42,6 +43,7 @@ function renderSettled(
     renderAtom,
     streaming: false,
     codeLabels,
+    resolveImageUrl,
     fileMentions,
     targets,
     footnoteOrder: [],
@@ -75,7 +77,7 @@ class StreamingRenderer {
   private lastRendered: ReactNode[] = []
 
   /** @param codeLabels - Fence copy labels baked into cached elements; the owner replaces the renderer when they change. */
-  constructor(private readonly codeLabels: MarkdownCodeLabels | undefined, private readonly renderText: MarkdownRenderContext['renderText'], private readonly renderAtom: MarkdownRenderContext['renderAtom']) {}
+  constructor(private readonly codeLabels: MarkdownCodeLabels | undefined, private readonly renderText: MarkdownRenderContext['renderText'], private readonly renderAtom: MarkdownRenderContext['renderAtom'], private readonly resolveImageUrl: MarkdownRenderContext['resolveImageUrl'] = undefined) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -110,6 +112,7 @@ class StreamingRenderer {
         renderAtom: this.renderAtom,
         streaming: true,
         codeLabels: this.codeLabels,
+        resolveImageUrl: this.resolveImageUrl,
         fileMentions: undefined,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
@@ -130,6 +133,7 @@ class StreamingRenderer {
       renderAtom: this.renderAtom,
       streaming: true,
       codeLabels: this.codeLabels,
+      resolveImageUrl: this.resolveImageUrl,
       fileMentions: undefined,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
@@ -164,26 +168,28 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions, renderText, renderAtom }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl }: {
   text: string
   streaming?: boolean
   codeLabels?: MarkdownCodeLabels | undefined
   fileMentions?: MarkdownFileMentions | undefined
   renderText?: MarkdownRenderContext['renderText']
   renderAtom?: MarkdownRenderContext['renderAtom']
+  /** Owner's workspace-path resolver for image destinations; undefined leaves every URL as authored. */
+  resolveImageUrl?: MarkdownRenderContext['resolveImageUrl']
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, codeLabels, fileMentions, renderText, renderAtom)
+      return renderSettled(text, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl)
     }
     if (streamRef.current === null || streamLabelsRef.current !== codeLabels) {
-      streamRef.current = new StreamingRenderer(codeLabels, renderText, renderAtom)
+      streamRef.current = new StreamingRenderer(codeLabels, renderText, renderAtom, resolveImageUrl)
       streamLabelsRef.current = codeLabels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, codeLabels, fileMentions, renderText, renderAtom])
+  }, [text, streaming, codeLabels, fileMentions, renderText, renderAtom, resolveImageUrl])
   return <div className={css.markdown}>{children}</div>
 })

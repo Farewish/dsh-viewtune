@@ -113,7 +113,7 @@ export function contentBlocks(content: UserMessageNode['content']): AssistantBlo
 
 type TextPresentation = { startedAt?: number; interrupted?: boolean; liveText?: boolean };
 
-function ReadingMarkdown({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, kind = 'body', fileMentions }: { text: string; streaming: boolean; holdFormatting: boolean; kind?: 'body' | 'reasoning'; fileMentions?: BlockRenderProps['fileMentions'] } & TextPresentation) {
+function ReadingMarkdown({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, kind = 'body', fileMentions, resolveImageUrl }: { text: string; streaming: boolean; holdFormatting: boolean; kind?: 'body' | 'reasoning'; fileMentions?: BlockRenderProps['fileMentions']; resolveImageUrl?: BlockRenderProps['resolveImageUrl'] } & TextPresentation) {
   const root = useRef<HTMLDivElement>(null);
   const presentation = useStreamingText(text, streaming, { startedAt, interrupted: interrupted || !liveText, selected: holdFormatting });
   // Native Markdown changes block keys for its full final parse. Keep the last
@@ -124,7 +124,7 @@ function ReadingMarkdown({ text, streaming, holdFormatting, startedAt, interrupt
   useLayoutEffect(() => { committedMode.current = effectiveMode; }, [effectiveMode]);
   return <div ref={root} className={css.readingText} data-reader-text data-reader-text-kind={kind} data-received-length={text.length} data-shown-length={presentation.text.length}
     data-presentation-pending={presentation.pending || undefined} data-motion-style="opacity-blur" data-ud-motion="reader-text-arrival" data-ud-motion-type="reveal" data-ud-motion-no-flash="true">
-    <MotionMarkdown text={presentation.text} streaming={effectiveMode} enabled={liveText && presentation.reveal && effectiveMode} revision={presentation.revision} fileMentions={fileMentions} />
+    <MotionMarkdown text={presentation.text} streaming={effectiveMode} enabled={liveText && presentation.reveal && effectiveMode} revision={presentation.revision} fileMentions={fileMentions} resolveImageUrl={resolveImageUrl} />
   </div>;
 }
 
@@ -136,7 +136,7 @@ function ReadingReasoning({ text, streaming, holdFormatting, startedAt, interrup
   </div>;
 }
 
-function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], fillComposer: BlockRenderProps['fillComposer'], holdFormatting: boolean, presentation: TextPresentation, fileMentions?: BlockRenderProps['fileMentions']): ReactNode {
+function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], fillComposer: BlockRenderProps['fillComposer'], holdFormatting: boolean, presentation: TextPresentation, fileMentions?: BlockRenderProps['fileMentions'], resolveImageUrl?: BlockRenderProps['resolveImageUrl']): ReactNode {
   switch (block.kind) {
     // The reader's own message goes through THIS pipeline too, and that is a fix rather than a shortcut. The host's
     // `MarkdownText` separates block children with newline text nodes, which is invisible while whitespace collapses — but
@@ -144,7 +144,7 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
     // only a newline, sitting between two blocks, gets an anonymous line box of its own: the empty line the reader reported
     // between their opening paragraph and their numbered list. This renderer emits no such newlines between blocks, and
     // keeps the soft breaks inside a paragraph as text, which is exactly the split that bubble needs.
-    case 'text': return <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={fileMentions} />;
+    case 'text': return <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={fileMentions} resolveImageUrl={resolveImageUrl} />;
     case 'image': return <ImageBlock attachment={block.attachment} loadImage={loadImage} />;
     case 'reasoning': return <ReadingReasoning text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} />;
     case 'tool-call': return <JsonBlock label={`工具参数 · ${block.name}`} payload={block.argsRaw} truncatedLabel={truncatedJsonLabel} />;
@@ -164,13 +164,13 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
   }
 }
 
-export const Blocks = memo(function Blocks({ blocks, streaming = false, source = 'assistant', holdFormatting = false, startedAt, interrupted, liveText, renderSlotChain, loadImage, fillComposer, fileMentions }: BlockRenderProps & TextPresentation & {
+export const Blocks = memo(function Blocks({ blocks, streaming = false, source = 'assistant', holdFormatting = false, startedAt, interrupted, liveText, renderSlotChain, loadImage, fillComposer, fileMentions, resolveImageUrl }: BlockRenderProps & TextPresentation & {
   blocks: readonly AssistantBlock[]; streaming?: boolean; source?: ReaderBlockOwner['source']; holdFormatting?: boolean;
 }) {
   return <ComposerFillContext.Provider value={fillComposer}>
     <div className={css.blocks} data-streaming={streaming || undefined}>
       {blocks.map((block, index) => <BlockBoundary key={block.kind === 'image' ? `image:${block.attachment.attachmentId}:${index}` : `${index}:${block.kind}`}>
-        <Fragment>{renderSlotChain('dsh-better-display.block', { block, streaming, source }, { fallback: fallback(block, streaming, source, loadImage, fillComposer, holdFormatting, { startedAt, interrupted, liveText }, fileMentions) })}</Fragment>
+        <Fragment>{renderSlotChain('dsh-better-display.block', { block, streaming, source }, { fallback: fallback(block, streaming, source, loadImage, fillComposer, holdFormatting, { startedAt, interrupted, liveText }, fileMentions, resolveImageUrl) })}</Fragment>
       </BlockBoundary>)}
     </div>
   </ComposerFillContext.Provider>;

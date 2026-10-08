@@ -170,6 +170,9 @@ export function apply(ctx: Context): void {
       };
       return {
         loadOlder: async () => { await session().loadOlder(); },
+        // The reader needs the session's workdir for ONE thing: turning an image destination written as a workspace path into
+        // the app's own file route, exactly as the host's transcript does. Read here, where the session list is in scope.
+        cwd: ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd,
         loadImage: async attachment => {
           const receipt = await session().readAttachment(attachment.attachmentId);
           if (!receipt.ok) throw new Error(receipt.error.message);

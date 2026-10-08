@@ -85,8 +85,10 @@ function MotionGap({ children }: { children: string }) {
 }
 
 /** Native DSH Markdown semantics with a stable text-leaf animation hook. */
-export function MotionMarkdown({ text, streaming, enabled, revision, fileMentions }: {
+export function MotionMarkdown({ text, streaming, enabled, revision, fileMentions, resolveImageUrl }: {
   text: string; streaming: boolean; enabled: boolean; revision: number; fileMentions?: MarkdownFileMentions;
+  /** Owner's workspace-path resolver for image destinations, forwarded to `MarkdownText` untouched. */
+  resolveImageUrl?: (url: string) => string | undefined;
 }) {
   const { words: perWord } = useContext(StreamMotionContext);
   const timeline = useRef<WordTimeline>();
@@ -109,7 +111,7 @@ export function MotionMarkdown({ text, streaming, enabled, revision, fileMention
   }, []);
   return <WordScope.Provider value={scope}>
     {perWord
-      ? <MarkdownText text={text} streaming={streaming} codeLabels={CODE_LABELS} fileMentions={fileMentions} renderText={renderText} renderAtom={renderAtom} />
-      : <MarkdownText text={text} streaming={streaming} codeLabels={CODE_LABELS} fileMentions={fileMentions} />}
+      ? <MarkdownText text={text} streaming={streaming} codeLabels={CODE_LABELS} fileMentions={fileMentions} resolveImageUrl={resolveImageUrl} renderText={renderText} renderAtom={renderAtom} />
+      : <MarkdownText text={text} streaming={streaming} codeLabels={CODE_LABELS} fileMentions={fileMentions} resolveImageUrl={resolveImageUrl} />}
   </WordScope.Provider>;
 }

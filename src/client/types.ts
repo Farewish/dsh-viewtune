@@ -37,6 +37,12 @@ export interface ReaderInjected {
   loadOlder: () => Promise<void>;
   loadImage: (attachment: ImageAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
   /**
+   * The session this view is showing, its workdir as the host knows it. Read by the reader only to turn an image destination
+   * written as a workspace path into a URL the browser can fetch — the same resolution the host's transcript performs, which is
+   * why an answer's images showed there and fell back to alt text here. Absent leaves every destination as authored.
+   */
+  cwd?: string;
+  /**
    * Writes text into this session's composer draft via the sanctioned
    * conversation input face, with a DOM fallback. Returns true when the
    * composer accepted the text.
@@ -73,6 +79,12 @@ export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'
   /** Durable closing-message seq of this turn (turn-tail closing), used as the fork anchor. */
   forkSeq?: number;
   fileMentions?: MarkdownFileMentions;
+  /**
+   * Reader addition: resolve an image destination written as a path inside the session's WORKSPACE into a URL the browser can
+   * fetch (the host's own file route). The host's transcript does this and the reading view did not, so an answer's images
+   * rendered there and fell back to alt text here. Optional: an owner that cannot resolve leaves every URL as authored.
+   */
+  resolveImageUrl?: (url: string) => string | undefined;
   metrics?: {
     usage?: NonNullable<import('@deepseek-ai/dsh-client-ui-chat/client').TurnTailChatData['tokenUsage']>;
     runMs?: number;

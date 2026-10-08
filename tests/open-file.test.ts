@@ -1,8 +1,40 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+// The host's own resolver supplies the expected absolute path (platform separators included) rather than a guess at its rules.
+import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
 import {
-  deliverableOpenModeOf, fileAddressFor, isFolderOpenPath, openDeliverableFile,
+  deliverableOpenModeOf, fileAddressFor, isFolderOpenPath, openDeliverableFile, workspaceImageUrl,
 } from '../src/client/open-file.ts';
+
+// An answer's image is authored as a path inside the session workspace, which the browser cannot fetch as written. The host's
+// transcript resolves it to its own file route; the reading view showed only the alt text until this step existed. Every case
+// below is a decision rather than a detail.
+test('a workspace-relative image destination becomes the app file route, and nothing else is touched', () => {
+  const origin = 'http://127.0.0.1:62699';
+  // The resolved path comes from the host's own resolver, separators and all, so the expectation is derived from it rather than
+  // restating its platform rules here: what this asserts is that the resolved path is what reaches the route, encoded.
+  const relative = 'pics/circuit.png';
+  const built = workspaceImageUrl('D:\\DSH\\proj', relative, origin);
+  assert.ok(built?.startsWith(`${origin}/api/file?path=`), 'a relative path is served through the host file route');
+  assert.equal(
+    decodeURIComponent(built!.slice(built!.indexOf('path=') + 'path='.length)),
+    resolveWorkspacePath('D:\\DSH\\proj', relative),
+    'the host receives the path resolved against the session workdir',
+  );
+  assert.equal(
+    decodeURIComponent(workspaceImageUrl('/home/me/proj', 'a%20b.png', origin)!.slice(built!.indexOf('path=') + 'path='.length)),
+    resolveWorkspacePath('/home/me/proj', 'a b.png'),
+    'a percent-encoded path is decoded first, so the host receives the real name',
+  );
+  // Handed to the renderer's own allowlist, which already knows what to do with them.
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'http://x/y.png', origin), undefined, 'an absolute http(s) URL is untouched');
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', '/api/file?path=x', origin), undefined, 'a same-origin route is untouched');
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', '//evil/x.png', origin), undefined, 'a protocol-relative URL is cross-origin');
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'data:image/png;base64,AA', origin), undefined, 'a data URL is not a workspace path');
+  // Without a workdir there is nothing to resolve against, and a bad escape is not a path this can serve.
+  assert.equal(workspaceImageUrl(undefined, 'pics/a.png', origin), undefined, 'no cwd means no resolution');
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'a%ZZ.png', origin), undefined, 'a malformed escape falls back to the alt text');
+});
 
 // Fixture file names deliberately avoid a `.ts` extension: this repository's test runner rewrites
 // `.ts` specifiers to `.js` across the emitted tree, string literals included, so a fixture named

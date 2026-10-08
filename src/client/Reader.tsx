@@ -33,7 +33,7 @@ import { SettingsMenu } from './SettingsMenu.js';
 import { CollapseControl } from './CollapseControl.js';
 import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
-import { deliverableOpenModeOf } from './open-file.js';
+import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
 import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
 import { applyWindowScope, wallpaperChromeBlurOf, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
@@ -1142,6 +1142,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     forkAt: props.forkAt,
     forkSeq,
     fileMentions,
+    // An image destination the document wrote as a WORKSPACE PATH is not fetchable as authored — the host's transcript turns it
+    // into its own file route, and the reading view showed only the alt text without this step. `workspaceImageUrl` owns the
+    // rules and the tests; anything absolute or already a URL comes back undefined and is handed on untouched.
+    resolveImageUrl: (url: string) => workspaceImageUrl(props.cwd, url),
     metrics,
   };
   const terminal = terminalLabel(boundary.reason);

@@ -144,6 +144,13 @@ export interface MarkdownRenderContext {
   readonly codeLabels: MarkdownCodeLabels | undefined
   /** Inside a blockquote's children: tables there always fill the quote's width. */
   readonly inBlockquote?: boolean
+  /**
+   * Reader addition: resolve an image destination the document wrote in a form the browser cannot fetch by itself — a path
+   * relative to the SESSION WORKSPACE, which the host serves through its own file route. The host's transcript performs this
+   * resolution and the reading view did not, so an answer's images appeared there and fell back to alt text here. Owned by the
+   * same vocabulary as `fileMentions`: the renderer asks, it never guesses at paths. Undefined means "leave the URL alone".
+   */
+  readonly resolveImageUrl?: (url: string) => string | undefined
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
   readonly fileMentions: MarkdownFileMentions | undefined
   /** Inside an anchor's children: interactive mentions must not nest there. */
@@ -311,7 +318,7 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'linkReference':
       return renderLinkReference(node, key, context)
     case 'image':
-      return renderImage(node.url, node.alt ?? '', key)
+      return renderImage(node.url, node.alt ?? '', key, context)
     case 'imageReference':
       return renderImageReference(node, key, context)
     case 'footnoteReference':
@@ -523,8 +530,11 @@ function inlineCodeHttpUrl(value: string): string | undefined {
   }
 }
 
-function renderImage(url: string, alt: string, key: Key): ReactNode {
-  const imageSrc = remoteImageUrl(sanitizeUrl(normalizeUri(url)))
+function renderImage(url: string, alt: string, key: Key, context: MarkdownRenderContext): ReactNode {
+  // The owner resolves first — a workspace-relative path is not fetchable as written, and the host's transcript shows the same
+  // image because it performs this step. Everything after it is the unchanged allowlist chain.
+  const authored = context.resolveImageUrl?.(url) ?? url
+  const imageSrc = remoteImageUrl(sanitizeUrl(normalizeUri(authored)))
   if (imageSrc === undefined) {
     return <span key={key} className={css.imageAlt}>{alt}</span>
   }
@@ -571,7 +581,7 @@ function renderImageReference(
 ): ReactNode {
   const definition = context.targets.definitions.get(node.identifier.toUpperCase())
   if (definition === undefined) return `![${node.alt ?? ''}${referenceSuffix(node)}`
-  return renderImage(definition.url, node.alt ?? '', key)
+  return renderImage(definition.url, node.alt ?? '', key, context)
 }
 
 function renderFootnoteReference(
