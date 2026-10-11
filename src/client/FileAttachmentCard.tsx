@@ -49,7 +49,7 @@ export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment,
         <FileTypeIcon path={attachment.name} className={css.sentFileGlyph} />
       </span>
       <span className={css.sentFileText}>
-        <span className={css.sentFileName}>{attachment.name}</span>
+        <span className={css.sentFileName} title={attachment.name}>{attachment.name}</span>
         <span className={css.sentFileMeta}>
           {/* The host's meta line is 「TYPE 55KB」: the extension as written, then the size. Same here, with the error text taking
               the whole line when opening failed rather than a size that no longer matters. */}
