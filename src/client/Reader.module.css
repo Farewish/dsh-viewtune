@@ -1486,12 +1486,12 @@
    plate alone, the label (its sibling) would silently fall back to the default. */
 /* The spacer is the extra air above the first row of cards — it is what makes the plate's top taller. */
 .fileFrameHead { display: block; height: var(--frame-head, 18px); }
-/* The label is positioned in the PLATE's own geometry — the same right edge, the same width arithmetic, the same top — so the two keep a
+/* The label is a CHILD of the plate, so it needs no geometry of its own — the same right edge, the same width arithmetic, the same top — so the two keep a
    fixed relationship and the label is always inside the plate, whatever the reading column's width does. It used to be a plain block in the
    wrapper, which pinned it to the WRAPPER's left edge while the plate's left edge is counted backwards from the right; the gap between them
    therefore changed with every column resize (「阅读列宽度一变，'附件'的位置就跟着变」). `z-index: -1` puts the text on the plate's surface and
    the padding lines it up with the cards. */
-.fileFrameTitle { position: absolute; z-index: -1; right: calc(-1px - var(--frame-pad, 8px)); top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 18px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); height: var(--frame-head, 18px); line-height: var(--frame-head, 18px); padding-left: var(--frame-pad, 8px); box-sizing: border-box; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
+.fileFrameTitle { display: block; height: var(--frame-head, 18px); line-height: var(--frame-head, 18px); color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 .fileFrameWrap { --frame-pad: 8px; --frame-head: 18px; position: relative; z-index: 1; min-width: 0; margin: var(--frame-gap, 8px) 0; transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the
@@ -1501,6 +1501,6 @@
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL and enters only the geometry of this plate:
    it moves out by pad + 1px border on all four sides, and the width grows by the padding on both sides. The right side gets its padding
    back only because the wrapper shifts the whole block left by more than that (--frame-shift, 12px): grown at the column's right edge it was clipped, exactly as the 「展开」 control once was. The pad may not enter the `round()` basis: the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
-.fileFrame { position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 18px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+.fileFrame { position: absolute; z-index: -1; display: block; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 18px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

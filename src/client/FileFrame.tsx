@@ -53,15 +53,16 @@ export const FileFrame = memo(function FileFrame({ count, className, frameClassN
     return () => { observer.disconnect(); };
   }, [columns, needsFallback]);
   return <div ref={root} className={className} style={{ '--file-cols': String(columns) } as React.CSSProperties}>
-    {/* The spacer is the extra air above the first row; the label itself is positioned in the PLATE's geometry (same right edge, same width),
-        so the two keep a fixed relationship and the label stays inside the plate however wide the reading column becomes. */}
+    {/* The spacer is the extra air above the first row of cards. The label is a CHILD OF THE PLATE, so its place is decided by the plate's
+        own box and padding — no second copy of the width arithmetic, and no drift when the reading column changes width. */}
     <span className={css.fileFrameHead} aria-hidden="true" />
-    <span className={titleClassName}>{title}</span>
     {children}
     <span
       aria-hidden="true"
       className={frameClassName}
       {...(needsFallback && fallbackWidth !== null ? { style: { width: `${String(fallbackWidth)}px` } } : {})}
-    />
+    >
+      <span className={titleClassName}>{title}</span>
+    </span>
   </div>;
 });
