@@ -22,7 +22,9 @@ export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment,
   /** The session's attachment reader; typed for images upstream, but it is addressed by id alone. */
   loadFile: (attachment: FileAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
 }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  /** Set once the bytes are in hand, so a blocked popup can still be opened by a real click. */
+  const [ready, setReady] = useState(false);
   const url = useRef<string | null>(null);
   useEffect(() => () => { if (url.current !== null) URL.revokeObjectURL(url.current); }, []);
   const open = useCallback(async () => {
@@ -32,7 +34,11 @@ export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment,
       const result = await loadFile(attachment);
       if (url.current !== null) URL.revokeObjectURL(url.current);
       url.current = URL.createObjectURL(new Blob([result.data.slice().buffer], { type: result.mediaType }));
-      window.open(url.current, '_blank', 'noopener,noreferrer');
+      // A popup opened after an `await` is no longer tied to the click, so a blocker may refuse it and hand back null. When that
+      // happens the bytes are still in hand: the button turns into an ordinary link the reader can click themselves, which is a
+      // real gesture and never blocked. Either way nothing is lost and nothing is claimed.
+      const opened = window.open(url.current, '_blank', 'noopener,noreferrer');
+      setReady(opened === null || opened === undefined);
       setState('idle');
     } catch (error) {
       console.warn('[dsh-better-display] could not open a sent file:', error);
@@ -56,9 +62,12 @@ export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment,
           {state === 'error' ? '打开失败' : `${fileExtension(attachment.name).toUpperCase()} ${formatBytes(attachment.bytes)}`.trim()}
         </span>
       </span>
-      <button type="button" className={css.sentFileOpen} onClick={() => { void open(); }} disabled={state === 'loading'}>
-        {state === 'loading' ? '打开中…' : '打开'}
-      </button>
+      {ready && url.current !== null
+        // The popup was blocked, so the reader gets the real thing: an anchor they click themselves.
+        ? <a className={css.sentFileOpen} href={url.current} target="_blank" rel="noopener noreferrer" download={attachment.name}>打开</a>
+        : <button type="button" className={css.sentFileOpen} onClick={() => { void open(); }} disabled={state === 'loading'}>
+          {state === 'loading' ? '打开中…' : '打开'}
+        </button>}
     </div>
   );
 });

@@ -176,7 +176,11 @@ export function apply(ctx: Context): void {
         loadImage: async attachment => {
           const receipt = await session().readAttachment(attachment.attachmentId);
           if (!receipt.ok) throw new Error(receipt.error.message);
-          return { data: Uint8Array.from(receipt.value.data), mediaType: receipt.value.attachment.mediaType };
+          // The receipt carries the stored bytes plus the attachment it stored. Only an IMAGE ref has a `mediaType` of its own, and
+// reading it off a FILE receipt threw — which is why the card's 「打开」 button always reported 打开失败. Read it defensively:
+// an empty type is fine, the browser sniffs a PDF or an image from the bytes themselves.
+const stored = receipt.value as { data: Uint8Array; attachment?: { mediaType?: string } | undefined };
+return { data: Uint8Array.from(stored.data), mediaType: stored.attachment?.mediaType ?? '' };
         },
         openFile: async (path: string, options?: { mode?: DeliverableOpenMode }) => {          try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
