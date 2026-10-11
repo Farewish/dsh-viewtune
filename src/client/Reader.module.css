@@ -1457,9 +1457,12 @@
 /* The frame's width is layout's own arithmetic, so it tracks the cards in the SAME paint: `100%` is the width available to this
    absolutely positioned overlay (the row's parent), `round(down, …, 248px)` floors it to whole columns, and `--file-cols` — set by the
    component — caps it at the file count and at three. `- 6px` turns columns into the frame's width: N × 248 − 8 gap + 2 border. */
-/* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL: the column count is floored from the width
-   the ROW actually has (no padding subtracted — the row is what wraps the cards), and the pad is then added to the overlay's width and
-   to its three insets, so it draws around the cards without changing which column count the cards land on. N columns are N × 248 − 6px. */
+/* The frame's width is layout's own arithmetic, so it tracks the cards in the SAME paint: `100%` is the width available to this
+   absolutely positioned overlay (the row's parent), `round(down, …, 248px)` floors it to whole columns, and `--file-cols` — set by the
+   component — caps it at the file count and at three. N columns are N × 248 − 6px. It deliberately does NOT grow outward for a pad: an
+   overlay extended past the row it is anchored to gets clipped by the message column, which the reader saw twice. Space away from the
+   bubble and the images comes from the wrapper's vertical margin (`--frame-gap`) instead, which in a column layout cannot change the
+   row's width and so cannot change how the cards wrap. */
 /* The frame hugs the cards exactly: no outward growth, because a pad on the top, right or bottom edge would push the overlay past the
    row it is anchored to and the message column would clip it (the reader saw precisely that, twice). Spacing away from the bubble comes
    from the wrapper's own vertical margin instead — in the cluster's column layout a block margin cannot change the row's width, so the
