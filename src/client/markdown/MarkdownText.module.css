@@ -316,22 +316,40 @@
   text-underline-offset: 3px;
 }
 
-/* A Markdown link whose destination is a file in the session workspace: the owner opens it (the host calls the same
-   thing a "file link"). It is a BUTTON, not an anchor, because nothing navigates here — the click hands the path to the
-   app, which decides between the system opener and the sidebar. Styled as a link so it reads like the transcript s. */
+/* A Markdown link whose destination is a file in the session workspace. These declarations are COPIED from the host's own
+   sheet (`ui-primitives/src/markdown/MarkdownText.module.css`), including its reason for the colour: the platform's brand text
+   is near-black here, so links use the dedicated link alias instead. The transparent borders and negative margins are the host's
+   hit-area trick; the dotted underline on hover/focus matches its `.markdown a:hover` rule, since this element is a button and
+   would not inherit it. */
 .fileLink {
   display: inline;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  color: var(--dsw-alias-link);
+  font-weight: 500;
+  text-decoration: none;
   cursor: pointer;
+  transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
+  position: relative;
+  /* Transparent hit-area padding; literal zero-alpha only (no painted colour). */
+  border-left: 3px solid rgb(255 255 255 / 0);
+  border-right: 3px solid rgb(255 255 255 / 0);
+  border-top: 2px solid rgb(255 255 255 / 0);
+  border-bottom: 2px solid rgb(255 255 255 / 0);
+  margin-left: -3px;
+  margin-right: -3px;
 }
-.fileLink:hover { text-decoration-color: currentColor; }
+.fileLink:hover,
+.fileLink:focus {
+  outline: none;
+  text-decoration: underline dotted var(--dsw-alias-link);
+  text-underline-offset: 3px;
+}
+.fileLink:focus-visible {
+  box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+}
 /* The hover card over a file link is the HOST's `HoverCard` (ported use in `PathPreview.tsx`): it portals itself to the body and
    places a compact card beside its anchor, so nothing here has to position anything. Only the CONTENT is ours — the card box,
    its material and its placement all belong to the primitives. */
