@@ -1519,7 +1519,7 @@
 /* ONE geometry rule for BOTH overlays, so the arithmetic exists once: the plate draws the surface and the label row carries the label and
    the control, and they are the same box. Keeping them separate matters because the plate sits BEHIND the cards (`z-index: -1`) — a label
    inside it would be painted behind them and vanish, which is what happened. */
-.fileFrame, .fileFrameSurface { position: absolute; display: flex; align-items: center; gap: 8px; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 12px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); box-sizing: border-box; }
+.fileFrame, .fileFrameSurface { position: absolute; display: flex; align-items: flex-start; gap: 8px; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 12px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); box-sizing: border-box; }
 /* The plate only: the surface itself, painted behind the cards. The label row adds no background or border of its own. */
 .fileFrame { z-index: -1; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); }
 /* The label row only: on top of the cards' layer, in the head area where no card reaches. */
