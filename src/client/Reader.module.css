@@ -1421,7 +1421,7 @@
    percentage inside it is indefinite, and the card then resolves to its MAX-CONTENT width — which is the untruncated file name.
    That is what stretched the whole bubble and left a large empty area beside it (the reader reported both symptoms at once).
    `max-width: 100%` is the only escape hatch, for a window narrower than one card. */
-.sentFile { display: flex; align-items: center; gap: 10px; width: 225px; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-module-platform); }
+.sentFile { display: flex; align-items: center; gap: 10px; width: 250px; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-module-platform); }
 .sentFileIcon { display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--dsw-alias-label-secondary); }
 /* The host's file-type glyph is a 28px badge (its own documentation says so), and it carries its own category colour. */
 .sentFileGlyph { width: 28px; height: 28px; flex: none; }
