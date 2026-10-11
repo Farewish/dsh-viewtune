@@ -35,6 +35,7 @@ import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
 import { FileAttachmentCard } from './FileAttachmentCard.js';
+import { FileFrame } from './FileFrame.js';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
@@ -327,11 +328,14 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       </div>}
       {/* The file cards sit in the host's own row, and that row now sits inside one frame (the reader's request). The frame hugs the
           row and takes its ceiling from the host's chat content width, so it can never be wider than the message column. */}
-      {fileBlocks.length > 0 && <div className={css.fileFrame}>
+      {/* The frame measures the CLUSTER it lives in — the width actually available to it — and takes whole 248px columns from it, so its
+          border lands on the cards' outer edge without ever exceeding the message cluster. See FileFrame for why this needs a
+          measurement at all. */}
+      {fileBlocks.length > 0 && <FileFrame count={fileBlocks.length} className={css.fileFrame}>
         <div className={css.attachmentRow} data-message-attachments>
           {fileBlocks.map((block, index) => <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />)}
         </div>
-      </div>}
+      </FileFrame>}
       {otherBlocks.length > 0 && <div className={css.user}>
         <Blocks {...render} blocks={otherBlocks} source="user" />
       </div>}
