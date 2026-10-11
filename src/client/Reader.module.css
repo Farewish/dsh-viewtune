@@ -1450,6 +1450,10 @@
 /* ONE frame around the file cards, at the reader's request. It hugs its content and takes the host's chat content width as its
    ceiling — the same width the host caps its message column with — so the row inside keeps the host's own wrapping behaviour and the
    frame can never be wider than the column. Nothing else changes: the cards stay 240px, and there is no collapse. */
-.fileFrame { display: block; width: fit-content; max-width: var(--dsh-chat-content-width, 748px); padding: 0; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+/* The wrapper is layout-neutral: no width, no padding, no border, no background — it only positions the overlay. */
+.fileFrameWrap { position: relative; min-width: 0; }
+/* The frame: out of flow, anchored to the row's right/top/bottom (three edges the cards share with the row), width given from the file
+   count. `pointer-events: none` so it can never intercept a click; `max-width: 100%` so three columns never spill past the cluster. */
+.fileFrame { position: absolute; top: -1px; right: -1px; bottom: -1px; max-width: 100%; pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 94%, transparent); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
