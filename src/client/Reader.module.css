@@ -1457,9 +1457,9 @@
 /* The frame's width is layout's own arithmetic, so it tracks the cards in the SAME paint: `100%` is the width available to this
    absolutely positioned overlay (the row's parent), `round(down, …, 248px)` floors it to whole columns, and `--file-cols` — set by the
    component — caps it at the file count and at three. `- 6px` turns columns into the frame's width: N × 248 − 8 gap + 2 border. */
-/* `--frame-pad` is the breathing room between the border and the cards. It enters the arithmetic three times: the overlay is pushed
-   out by pad + 1px border on the top, right and bottom; the column count is floored from the width that REMAINS after the padding on
-   both sides; and the width itself grows by the padding on both sides. N columns are still N × 248 − 6px. */
-.fileFrame { --frame-pad: 8px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px - 2 * var(--frame-pad, 8px), 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+/* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL: the column count is floored from the width
+   the ROW actually has (no padding subtracted — the row is what wraps the cards), and the pad is then added to the overlay's width and
+   to its three insets, so it draws around the cards without changing which column count the cards land on. N columns are N × 248 − 6px. */
+.fileFrame { --frame-pad: 8px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
