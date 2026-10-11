@@ -55,23 +55,26 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
     data-open={open ? 'true' : 'false'}
     style={{ '--file-cols': String(columns) } as React.CSSProperties}
   >
+    {/* The clip box holds ONLY the spacer and the host's row: the plate is its SIBLING, because `overflow: hidden` on the box that
+        contained the plate clipped the plate on all four sides (it deliberately overhangs the row by its padding). The wrapper still hugs
+        the clip's height, so the plate — anchored to the wrapper — ends exactly where the visible row ends. */}
     <div className={clipClassName}>
       <span className={css.fileFrameHead} aria-hidden="true" />
       {children}
-      <span
-        className={frameClassName}
-        {...(needsFallback && fallbackWidth !== null ? { style: { width: `${String(fallbackWidth)}px` } } : {})}
-      >
-        <span className={titleClassName}>附件</span>
-        {count > 1 && <button
-          type="button"
-          className={css.fileFrameToggle}
-          aria-expanded={open}
-          onClick={() => { setOpen(value => !value); }}
-        >
-          {open ? '收起' : `展开全部 ${String(count)} 个`}
-        </button>}
-      </span>
     </div>
+    <span
+      className={frameClassName}
+      {...(needsFallback && fallbackWidth !== null ? { style: { width: `${String(fallbackWidth)}px` } } : {})}
+    >
+      <span className={titleClassName}>附件</span>
+      {count > 1 && <button
+        type="button"
+        className={css.fileFrameToggle}
+        aria-expanded={open}
+        onClick={() => { setOpen(value => !value); }}
+      >
+        {open ? '收起' : `展开全部 ${String(count)} 个`}
+      </button>}
+    </span>
   </div>;
 });

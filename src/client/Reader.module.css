@@ -1502,9 +1502,10 @@
 /* The clip box: it holds the spacer and the host's row, and the plate is anchored to IT, so the plate ends where the visible row ends. This
    element — not the wrapper — is the positioning context for that reason. Collapsed it shows one row of cards: the card's own 64px, plus
    the head above and the plate's padding below, which must be included or that padding would be clipped away. */
-.fileFrameClip { position: relative; }
+/* The clip box is NOT the positioning context: the plate must stay outside it, or `overflow: hidden` would clip the plate's overhang. */
+.fileFrameClip { min-width: 0; }
 .fileFrameWrap[data-open="false"] .fileFrameClip { max-height: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 64px + var(--frame-pad, 8px) + 1px); overflow: hidden; }
-.fileFrameWrap { --frame-pad: 8px; --frame-head: 12px; z-index: 1; min-width: 0; margin: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 2px) 0 var(--frame-gap, 8px); transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
+.fileFrameWrap { --frame-pad: 8px; --frame-head: 12px; position: relative; z-index: 1; min-width: 0; margin: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 2px) 0 var(--frame-gap, 8px); transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the
    frame being cut on the right (the same clipping that once caught the 「展开」 control). A TRANSFORM is used rather than a margin because
