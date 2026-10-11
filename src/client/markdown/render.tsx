@@ -298,6 +298,10 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
               aria-label={mention.label}
               onClick={mention.open}
             >
+              {/* The same leading glyph the host puts on its own file mention — and the same classifier (`classifyLinkPath`),
+                  which is what the reader was looking at when they said only the image icon had appeared here: a file link (the
+                  Markdown-destination path) had gained one, while an inline-code token the owner resolved to a file had not. */}
+              <LinkIconMedium kind={classifyLinkPath(value)} className={css.linkIcon} />
               {content}
             </button>
           </code>
