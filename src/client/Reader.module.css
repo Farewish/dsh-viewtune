@@ -1494,7 +1494,7 @@
 /* `margin-top` is measured from the plate's own content top (its padding box), and the plate's top edge is counted upward from the cards by
    `--frame-head` — so growing the head cancels a downward move one for one. This is therefore 20px of REAL downward travel with the head
    left at 12px, which is why the label now sits below the plate's top padding by 20. */
-.fileFrameTitle { display: block; height: var(--frame-head, 12px); line-height: var(--frame-head, 12px); margin: 2px 0 0 11px; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
+.fileFrameTitle { display: block; height: var(--frame-head, 12px); line-height: var(--frame-head, 12px); margin: 2px 0 0 9px; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 .fileFrameWrap { --frame-pad: 8px; --frame-head: 12px; position: relative; z-index: 1; min-width: 0; margin: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 2px) 0 var(--frame-gap, 8px); transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the
