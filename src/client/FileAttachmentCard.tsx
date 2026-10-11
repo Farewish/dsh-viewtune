@@ -1,44 +1,31 @@
 import { memo } from 'react';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
-import { FileTypeIcon, fileExtension } from '@deepseek-ai/dsh-client-ui-primitives';
-import { formatBytes } from './path-preview.js';
+import { FileTypeIcon, fileExtension, fileSizeText } from '@deepseek-ai/dsh-client-ui-primitives';
 import css from './Reader.module.css';
 
 /**
- * A file the reader SENT — a PDF, a spreadsheet, a zip — as one card, whatever its format.
+ * A file the reader SENT, drawn as the HOST draws it — a 1:1 copy of its `fileCard` from the conversation page.
  *
- * The reading view showed 「此内容类型尚未接入阅读页，原始内容已保留」 for these, and the reason is worth stating plainly because the
- * reader asked whether every format needs its own handling: it does not. The host models any non-image attachment as ONE
- * `ContentBlock` — `'file': FileBlock`, whose ref carries only `{ attachmentId, name, bytes }` — so a single branch covers every
- * format that exists and every format added later.
+ * The reader asked for exactly this: 「完完全全照搬宿主，包括图片，文件卡样式行为等等也照搬。1:1复刻」. So the markup is the host's
+ * (`MessageItem.tsx`: one `span.fileCard` holding `FileTypeIcon` + a column of `fileName` and `fileMeta`) and every style value below
+ * comes from its shipped stylesheet (`MessageItem.module.css`): a fixed 240px card, `min-height: 64px`, `padding: 8px 12px`, a 0.5px
+ * border, `--dsw-radius-xl`, `--dsw-specific-input-major` as the background, a 28px glyph, a 14px/500 name and a 12px tertiary meta
+ * line — and the meta text is built with the host's own `fileSizeText` rather than a helper of ours.
  *
- * THE CARD HAS NO OPEN ACTION, and that is the host's own design rather than an omission here. Its only client-side reader,
- * `readAttachment`, is typed `{ attachment: ImageAttachmentRef; data: Uint8Array }` and refuses anything else with
- * 「Image is not referenced by this session.」 — an id is *"never a filesystem path or bearer URL"*, so serving arbitrary stored
- * bytes to the page by id would turn one leaked id into a file read. A sent file's bytes went to the model, which is what sending
- * it was for; the page only reports that it was sent. An earlier version of this card had a 「打开」 button, it could only fail,
- * and the reader removed it (「算了，那就A吧」).
- *
- * Reading the file by NAME from the workspace was considered and rejected on the same grounds of honesty: a name is not a path, so
- * it would sometimes open a different file with the same name and look like success.
+ * The card carries NO action: a `FileAttachmentRef` holds `{ attachmentId, name, bytes }` and the host's only client-side reader
+ * refuses anything that is not an image ("Image is not referenced by this session."), which is why the host's own card has no button
+ * either. An earlier version added one here; it could only fail, and the reader removed it.
  */
 export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment }: { attachment: FileAttachmentRef }) {
   return (
-    <div className={css.sentFile} data-reader-file={attachment.name}>
-      <span className={css.sentFileIcon}>
-        {/* The host's own FILE-TYPE glyph, not the link glyph: it is a category-coloured badge (a red PDF, a green spreadsheet,
-            and so on), which is what the reader saw in the transcript and asked to match (「对话页里用户传的文件的图标有特殊规则」).
-            `classifyFileType` never sees a path here — a `FileAttachmentRef` carries only a display name — so the name alone picks
-            the category, exactly as it does for the host's own card. */}
-        <FileTypeIcon path={attachment.name} className={css.sentFileGlyph} />
-      </span>
-      <span className={css.sentFileText}>
-        <span className={css.sentFileName} title={attachment.name}>{attachment.name}</span>
-        <span className={css.sentFileMeta}>
-          {/* The host's meta line is 「TYPE 55KB」: the extension as written, then the size. */}
-          {`${fileExtension(attachment.name).toUpperCase()} ${formatBytes(attachment.bytes)}`.trim()}
+    <span className={css.fileCard} data-reader-file={attachment.name} title={attachment.name}>
+      <FileTypeIcon path={attachment.name} className={css.fileIcon} />
+      <span className={css.fileContent}>
+        <span className={css.fileName}>{attachment.name}</span>
+        <span className={css.fileMeta}>
+          {[fileExtension(attachment.name).toUpperCase().slice(0, 8), fileSizeText(attachment.bytes)].filter(Boolean).join(' ')}
         </span>
       </span>
-    </div>
+    </span>
   );
 });

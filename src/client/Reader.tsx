@@ -34,7 +34,8 @@ import { CollapseControl } from './CollapseControl.js';
 import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
-import { SentFiles } from './SentFiles.js';
+import { FileAttachmentCard } from './FileAttachmentCard.js';
+import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
 import { applyWindowScope, wallpaperChromeBlurOf, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
@@ -310,19 +311,21 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   if (!node || node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) {
     const blocks = contentBlocks(node.data.content);
-    const imageBlocks = blocks.filter(b => b.kind === 'image');
-    // A sent FILE leaves the bubble for its own framed card; the images keep the reading view's own path, and the reader's prose
-    // stays in the bubble (「单独提出图片，只留文件卡片，然后加一个大框框住所有文件卡片」).
-    const fileBlocks = blocks.filter(b => b.kind === 'other'
-      && b.block !== null && typeof b.block === 'object' && (b.block as { type?: unknown }).type === 'file');
-    const otherBlocks = blocks.filter(b => b.kind !== 'image' && !fileBlocks.includes(b));
+    // THE HOST'S OWN MODEL, 1:1: images and files the reader sent go into ONE row, in document order, and the reader's text stays in
+    // the bubble below it. That is what the conversation page does (`MessageItem.tsx`: `attachmentRow` + `fileCard`), and the reader
+    // asked for a faithful copy (「完完全全照搬宿主，包括图片，文件卡样式行为等等也照搬。1:1复刻」).
+    const isFile = (b: typeof blocks[number]): boolean => b.kind === 'other'
+      && b.block !== null && typeof b.block === 'object' && (b.block as { type?: unknown }).type === 'file';
+    const attachmentBlocks = blocks.filter(b => b.kind === 'image' || isFile(b));
+    const otherBlocks = blocks.filter(b => !attachmentBlocks.includes(b));
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
     return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
-      {fileBlocks.length > 0 && <SentFiles {...render} blocks={fileBlocks} />}
-      {imageBlocks.length > 0 && <div className={css.userImages}>
-        <Blocks {...render} blocks={imageBlocks} source="user" />
+      {attachmentBlocks.length > 0 && <div className={css.attachmentRow} data-message-attachments>
+        {attachmentBlocks.map((block, index) => isFile(block)
+          ? <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />
+          : <Fragment key={`image:${String(index)}`}><Blocks {...render} blocks={[block]} source="user" /></Fragment>)}
       </div>}
       {otherBlocks.length > 0 && <div className={css.user}>
         <Blocks {...render} blocks={otherBlocks} source="user" />
