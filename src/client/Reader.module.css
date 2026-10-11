@@ -1471,7 +1471,12 @@
    margin cannot change the row's width, so the cards keep wrapping exactly as the host wraps them. `z-index: 1` gives the frame a
    stacking context of its own — inside it the plate sits BEHIND the cards, while the whole wrapper sits ABOVE the siblings, so the
    frame's padding is not painted over by the bubble below (which is what made it look clipped before). */
-.fileFrameWrap { position: relative; z-index: 1; min-width: 0; margin: var(--frame-gap, 8px) 0; }
+.fileFrameWrap { position: relative; z-index: 1; min-width: 0; margin: var(--frame-gap, 8px) 0; transform: translateX(calc(-1 * var(--frame-shift, 12px))); }
+/* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
+   is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the
+   frame being cut on the right (the same clipping that once caught the 「展开」 control). A TRANSFORM is used rather than a margin because
+   a transform is not part of layout: the row keeps the width it had, so the cards wrap on exactly the same columns and the frame keeps
+   landing on the same step. A margin here would have narrowed the row instead and could have moved a card to another line. */
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL and enters only the geometry of this plate:
    it moves out by pad + 1px border on the top, left and bottom, and the width grows by the padding on both sides. NOT on the right: the
    reading column's right edge is exactly where the cards end, so anything grown there is outside the column and gets clipped — the same reason the 「展开」 control was clipped. The platemay not enter the `round()` basis either: the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
