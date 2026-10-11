@@ -27,7 +27,7 @@ import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
-import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CodeBlock, LinkIconMedium, classifyLinkPath } from '@deepseek-ai/dsh-client-ui-primitives'
 import { renderTexToReact } from './katex.js'
 import { McpAppCodeBlock, StreamingMcpAppPlaceholder } from '../McpAppFrame.js'
 import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../mcp-app.js'
@@ -543,6 +543,10 @@ function renderAnchor(url: string, children: ReactNode[], key: Key, context: Mar
           className={css.fileLink}
           onClick={() => { open(file.path, file.line) }}
         >
+          {/* The host's own leading glyph, chosen by the same classifier its transcript uses (`classifyLinkPath`): image, code,
+              document, folder or other. The reader asked for it after seeing the transcript (「对话页这种链接前面都有小标识，
+              我们也加上」), and borrowing the host's glyphs is what keeps the two views reading alike. */}
+          <LinkIconMedium kind={classifyLinkPath(file.path)} className={css.linkIcon} />
           {children}
         </button>
         </PathPreview>

@@ -339,3 +339,5 @@
 .pathPreviewImage { display: block; max-width: 272px; max-height: 184px; object-fit: contain; border-radius: 6px; }
 .pathPreviewName { font-weight: 600; }
 .pathPreviewPath { color: var(--dsw-alias-label-tertiary); font-size: 12px; overflow-wrap: anywhere; }
+/* The leading category glyph on a file link, sized and aligned exactly as the host's own sheet does it. */
+.linkIcon { flex: none; width: 1.1em; height: 1.1em; vertical-align: -0.25em; margin-right: 5px; }
