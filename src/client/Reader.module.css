@@ -1523,6 +1523,9 @@
 /* The plate only: the surface itself, painted behind the cards. The label row adds no background or border of its own. */
 .fileFrame { z-index: -1; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); }
 /* The label row only: on top of the cards' layer, in the head area where no card reaches. */
+/* TOP alignment, not centre: this overlay spans the plate's whole height (it shares top and bottom with it), so centring its contents put the
+   label and the control halfway down the frame and moved them whenever the frame grew or shrank. Pinned to the top they keep the place the
+   reader set, whatever the collapse does. */
 .fileFrameSurface { z-index: 0; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
