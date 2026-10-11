@@ -283,14 +283,22 @@
   font-style: italic;
 }
 
-.image {
-  display: block;
-  width: auto;
-  max-width: 100%;
-  height: auto;
-  margin: 0;
-  border-radius: 8px;
+/* The FRAME the host puts around a local image (`ImagePreview.module.css`): a fixed 180px box with the image contained, which
+   is what keeps an answer's images from growing with the container. Reproduced here because that component is not exported. */
+.imageFrame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  border-radius: var(--dsw-radius-sm, 6px);
   background: var(--dsw-alias-bg-base);
+}
+.image {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   object-fit: contain;
 }
 

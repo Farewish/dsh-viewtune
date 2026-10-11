@@ -590,15 +590,20 @@ function renderImage(url: string, alt: string, key: Key, context: MarkdownRender
     return <span key={key} className={css.imageAlt}>{alt}</span>
   }
   return (
-    <img
-      key={key}
-      className={css.image}
-      src={imageSrc}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-    />
+    // The host renders a local image through its own `ImagePreview`: a FRAME of fixed height with the image contained inside it
+    // (`object-fit: contain`). That frame is why the transcript's answer images never balloon — a bare `<img>` with
+    // `max-width: 100%` grows to whatever its container happens to be, which is what the reader saw (「有时候会显示的非常大」).
+    // The component is not exported, so the frame is reproduced here with the same declarations.
+    <span key={key} className={css.imageFrame}>
+      <img
+        className={css.image}
+        src={imageSrc}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+      />
+    </span>
   )
 }
 
