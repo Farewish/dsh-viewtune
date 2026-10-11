@@ -327,13 +327,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       </div>}
       {/* The file cards sit in the host's own row, and that row now sits inside one frame (the reader's request). The frame hugs the
           row and takes its ceiling from the host's chat content width, so it can never be wider than the message column. */}
-      {/* THE FRAME'S WIDTH IS A LENGTH, because nothing else can hug a WRAPPED row: `fit-content` on the frame resolves against the
-          row's max-content — every card in ONE line — so the frame stayed 748px wide while the cards packed to its right, and the
-          reader measured the gap (「这个灰色框的左端，到底有没有贴到那7个文件卡片的左端？」). A column count times the card width is
-          definite, so the border lands on the cards' outer edge: 1 column 242px, 2 columns 490px, 3 columns 738px — the host's 240px
-          card, the 8px gaps and the 1px borders, counted once each. The host's chat content width stays as the ceiling, so a narrow
-          message column still wins and the cards simply wrap inside. */}
-      {fileBlocks.length > 0 && <div className={css.fileFrame} style={{ width: `${String(Math.min(fileBlocks.length, 3) * 248 - 6)}px` }}>
+      {fileBlocks.length > 0 && <div className={css.fileFrame}>
         <div className={css.attachmentRow} data-message-attachments>
           {fileBlocks.map((block, index) => <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />)}
         </div>
