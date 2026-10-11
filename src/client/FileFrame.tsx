@@ -75,11 +75,11 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
       <span className={titleClassName}>附件</span>
       {count > 1 && <button
         type="button"
-        className={css.fileFrameToggle}
+        className={`${css.deliverablesToggle} ${css.fileFrameToggle}`}
         aria-expanded={open}
         onClick={() => { setOpen(value => !value); }}
       >
-        {open ? '收起' : `展开全部 ${String(count)} 个`}
+        {open ? '收起' : '展开'}
       </button>}
     </span>
   </div>;

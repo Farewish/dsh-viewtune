@@ -1496,8 +1496,8 @@
    left at 12px, which is why the label now sits below the plate's top padding by 20. */
 /* The collapse control, on the label's line at the plate's right edge. `margin-left: auto` is what puts it there, so it shares the label's row
    and its height without any second geometry; `pointer-events: auto` is needed because the plate itself is transparent to the pointer. */
-.fileFrameToggle { margin-left: auto; pointer-events: auto; border: 0; padding: 0; background: transparent; color: var(--dsw-alias-link); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.fileFrameToggle:hover { text-decoration: underline dotted var(--dsw-alias-link); text-underline-offset: 3px; }
+/* Placement only: the look is the deliverables lane's own toggle, reused verbatim (the reader asked for exactly that). `pointer-events: auto` is needed because the overlay it sits in is transparent to the pointer. */
+.fileFrameToggle { margin-left: auto; pointer-events: auto; white-space: nowrap; }
 .fileFrameTitle { display: block; height: var(--frame-head, 12px); line-height: var(--frame-head, 12px); margin: 2px 0 0 9px; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 /* The clip box: it holds the spacer and the host's row, and the plate is anchored to IT, so the plate ends where the visible row ends. This
    element — not the wrapper — is the positioning context for that reason. Collapsed it shows one row of cards: the card's own 64px, plus
