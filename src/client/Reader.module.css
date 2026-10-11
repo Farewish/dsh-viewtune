@@ -1447,5 +1447,9 @@
 .fileContent { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .fileName { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dsw-alias-label-primary); font-size: 14px; font-weight: 500; line-height: 22px; }
 .fileMeta { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dsw-alias-label-tertiary, rgba(0, 0, 0, .45)); font-size: 12px; line-height: 15px; }
+/* ONE frame around the file cards, at the reader's request. It hugs its content and takes the host's chat content width as its
+   ceiling — the same width the host caps its message column with — so the row inside keeps the host's own wrapping behaviour and the
+   frame can never be wider than the column. Nothing else changes: the cards stay 240px, and there is no collapse. */
+.fileFrame { display: block; width: fit-content; max-width: var(--dsh-chat-content-width, 748px); padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

@@ -325,8 +325,12 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
       </div>}
-      {fileBlocks.length > 0 && <div className={css.attachmentRow} data-message-attachments>
-        {fileBlocks.map((block, index) => <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />)}
+      {/* The file cards sit in the host's own row, and that row now sits inside one frame (the reader's request). The frame hugs the
+          row and takes its ceiling from the host's chat content width, so it can never be wider than the message column. */}
+      {fileBlocks.length > 0 && <div className={css.fileFrame}>
+        <div className={css.attachmentRow} data-message-attachments>
+          {fileBlocks.map((block, index) => <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />)}
+        </div>
       </div>}
       {otherBlocks.length > 0 && <div className={css.user}>
         <Blocks {...render} blocks={otherBlocks} source="user" />
