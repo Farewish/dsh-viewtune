@@ -1473,8 +1473,8 @@
    frame's padding is not painted over by the bubble below (which is what made it look clipped before). */
 .fileFrameWrap { position: relative; z-index: 1; min-width: 0; margin: var(--frame-gap, 8px) 0; }
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL and enters only the geometry of this plate:
-   the three insets move out by pad + 1px border, and the width grows by the padding on both sides. It deliberately does NOT enter the
-   `round()` basis — the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
-.fileFrame { --frame-pad: 8px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+   it moves out by pad + 1px border on the top, left and bottom, and the width grows by the padding on both sides. NOT on the right: the
+   reading column's right edge is exactly where the cards end, so anything grown there is outside the column and gets clipped — the same reason the 「展开」 control was clipped. The platemay not enter the `round()` basis either: the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
+.fileFrame { --frame-pad: 8px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px)); right: -1px; bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
