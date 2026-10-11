@@ -1454,6 +1454,9 @@
 .fileFrameWrap { position: relative; min-width: 0; }
 /* The frame: out of flow, anchored to the row's right/top/bottom (three edges the cards share with the row), width given from the file
    count. `pointer-events: none` so it can never intercept a click; `max-width: 100%` so three columns never spill past the cluster. */
-.fileFrame { position: absolute; z-index: -1; top: -1px; right: -1px; bottom: -1px; pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+/* The frame's width is layout's own arithmetic, so it tracks the cards in the SAME paint: `100%` is the width available to this
+   absolutely positioned overlay (the row's parent), `round(down, …, 248px)` floors it to whole columns, and `--file-cols` — set by the
+   component — caps it at the file count and at three. `- 6px` turns columns into the frame's width: N × 248 − 8 gap + 2 border. */
+.fileFrame { position: absolute; z-index: -1; top: -1px; right: -1px; bottom: -1px; width: min(calc(round(down, 100% + 8px, 248px) - 6px), calc(var(--file-cols, 3) * 248px - 6px)); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
