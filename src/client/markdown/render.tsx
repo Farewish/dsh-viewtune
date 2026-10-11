@@ -34,6 +34,7 @@ import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../m
 import type { PositionedBlock } from './incremental.js'
 import { parseFileLink } from './file-link.js'
 import { PathPreview } from '../PathPreview.js'
+import { LightboxImage } from '../LightboxImage.js'
 import css from './MarkdownText.module.css'
 
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
@@ -589,22 +590,9 @@ function renderImage(url: string, alt: string, key: Key, context: MarkdownRender
   if (imageSrc === undefined) {
     return <span key={key} className={css.imageAlt}>{alt}</span>
   }
-  return (
-    // The host renders a local image through its own `ImagePreview`: a FRAME of fixed height with the image contained inside it
-    // (`object-fit: contain`). That frame is why the transcript's answer images never balloon — a bare `<img>` with
-    // `max-width: 100%` grows to whatever its container happens to be, which is what the reader saw (「有时候会显示的非常大」).
-    // The component is not exported, so the frame is reproduced here with the same declarations.
-    <span key={key} className={css.imageFrame}>
-      <img
-        className={css.image}
-        src={imageSrc}
-        alt={alt}
-        loading="lazy"
-        decoding="async"
-        referrerPolicy="no-referrer"
-      />
-    </span>
-  )
+  // The reader's own suggestion: an answer's image opens in the SAME dialog a sent image already opens in this view
+  // (`LightboxImage`, which reuses `ImageBlock`'s dialog classes), so the two image kinds behave alike when enlarged.
+  return <LightboxImage key={key} src={imageSrc} alt={alt} />
 }
 
 /** The bracketed source text a reference reverts to when its definition is missing. */

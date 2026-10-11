@@ -370,3 +370,7 @@
 .pathPreviewPath { color: var(--dsw-alias-label-tertiary); font-size: 12px; overflow-wrap: anywhere; }
 /* The leading category glyph on a file link, sized and aligned exactly as the host's own sheet does it. */
 .linkIcon { flex: none; width: 1.1em; height: 1.1em; vertical-align: -0.25em; margin-right: 5px; }
+/* The thumbnail is a bare button: the frame around it is the card, so the button adds no chrome of its own — only the
+   affordance that a click opens the enlarged view (`zoom-in`), matching what a sent image does in this view. */
+.imageOpenButton { display: block; border: 0; padding: 0; background: none; cursor: zoom-in; }
+.imageOpenButton:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
