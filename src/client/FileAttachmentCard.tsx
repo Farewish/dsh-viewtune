@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
-import { LinkIconMedium, classifyLinkPath } from '@deepseek-ai/dsh-client-ui-primitives';
+import { FileTypeIcon, fileExtension } from '@deepseek-ai/dsh-client-ui-primitives';
 import { formatBytes } from './path-preview.js';
 import css from './Reader.module.css';
 
@@ -42,11 +42,19 @@ export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment,
   return (
     <div className={css.sentFile} data-reader-file={attachment.name}>
       <span className={css.sentFileIcon}>
-        <LinkIconMedium kind={classifyLinkPath(attachment.name)} />
+        {/* The host's own FILE-TYPE glyph, not the link glyph: it is a category-coloured badge (a red PDF, a green spreadsheet,
+            and so on), which is what the reader saw in the transcript and asked to match (「对话页里用户传的文件的图标有特殊规则」).
+            `classifyFileType` never sees a path here — a `FileAttachmentRef` carries only a display name — so the name alone picks
+            the category, exactly as it does for the host's own card. */}
+        <FileTypeIcon path={attachment.name} className={css.sentFileGlyph} />
       </span>
       <span className={css.sentFileText}>
         <span className={css.sentFileName}>{attachment.name}</span>
-        <span className={css.sentFileMeta}>{state === 'error' ? '打开失败' : formatBytes(attachment.bytes)}</span>
+        <span className={css.sentFileMeta}>
+          {/* The host's meta line is 「TYPE 55KB」: the extension as written, then the size. Same here, with the error text taking
+              the whole line when opening failed rather than a size that no longer matters. */}
+          {state === 'error' ? '打开失败' : `${fileExtension(attachment.name).toUpperCase()} ${formatBytes(attachment.bytes)}`.trim()}
+        </span>
       </span>
       <button type="button" className={css.sentFileOpen} onClick={() => { void open(); }} disabled={state === 'loading'}>
         {state === 'loading' ? '打开中…' : '打开'}
