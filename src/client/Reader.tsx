@@ -34,6 +34,7 @@ import { CollapseControl } from './CollapseControl.js';
 import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
+import { SentFiles } from './SentFiles.js';
 import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
 import { applyWindowScope, wallpaperChromeBlurOf, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
@@ -310,11 +311,16 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   if (isNode(node, 'user') || isNode(node, 'steering')) {
     const blocks = contentBlocks(node.data.content);
     const imageBlocks = blocks.filter(b => b.kind === 'image');
-    const otherBlocks = blocks.filter(b => b.kind !== 'image');
+    // A sent FILE leaves the bubble for its own framed card; the images keep the reading view's own path, and the reader's prose
+    // stays in the bubble (「单独提出图片，只留文件卡片，然后加一个大框框住所有文件卡片」).
+    const fileBlocks = blocks.filter(b => b.kind === 'other'
+      && b.block !== null && typeof b.block === 'object' && (b.block as { type?: unknown }).type === 'file');
+    const otherBlocks = blocks.filter(b => b.kind !== 'image' && !fileBlocks.includes(b));
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
     return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
+      {fileBlocks.length > 0 && <SentFiles {...render} blocks={fileBlocks} />}
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
       </div>}
