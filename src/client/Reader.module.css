@@ -1460,6 +1460,11 @@
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL: the column count is floored from the width
    the ROW actually has (no padding subtracted — the row is what wraps the cards), and the pad is then added to the overlay's width and
    to its three insets, so it draws around the cards without changing which column count the cards land on. N columns are N × 248 − 6px. */
-.fileFrame { --frame-pad: 8px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+/* The frame hugs the cards exactly: no outward growth, because a pad on the top, right or bottom edge would push the overlay past the
+   row it is anchored to and the message column would clip it (the reader saw precisely that, twice). Spacing away from the bubble comes
+   from the wrapper's own vertical margin instead — in the cluster's column layout a block margin cannot change the row's width, so the
+   cards keep wrapping exactly as the host wraps them. `--frame-gap` is that space. */
+.fileFrameWrap { position: relative; min-width: 0; margin: var(--frame-gap, 8px) 0; }
+.fileFrame { position: absolute; z-index: -1; top: -1px; right: -1px; bottom: -1px; width: min(calc(round(down, 100% + 8px, 248px) - 6px), calc(var(--file-cols, 3) * 248px - 6px)); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
