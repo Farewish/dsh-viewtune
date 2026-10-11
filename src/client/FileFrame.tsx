@@ -21,12 +21,14 @@ const columnWidth = (columns: number): number => columns * 248 - 6;
  * The JavaScript below is only a fallback for an engine without `round()`, and it writes the width inline only then, so it can never
  * override the stylesheet.
  */
-export const FileFrame = memo(function FileFrame({ count, className, clipClassName, frameClassName, titleClassName, children }: {
+export const FileFrame = memo(function FileFrame({ count, className, clipClassName, frameClassName, surfaceClassName, titleClassName, children }: {
   /** How many file cards are inside; the column count never exceeds it, and one row is shown until expanded. */
   count: number;
   className: string;
   clipClassName: string;
   frameClassName: string;
+  /** Shares the plate's geometry for the label row; kept separate so the label is not painted behind the cards with the plate. */
+  surfaceClassName: string;
   titleClassName: string;
   children: ReactNode;
 }) {
@@ -62,10 +64,14 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
       <span className={css.fileFrameHead} aria-hidden="true" />
       {children}
     </div>
+    {/* The plate draws the surface BEHIND the cards (`z-index: -1`), so the label and the control must not live inside it — they would be
+        painted behind the cards with it and disappear. They sit in a second overlay that shares the plate's geometry through one rule
+        (`frameClassName` and `surfaceClassName` are selected together), so there is still no second copy of the arithmetic. */}
     <span
       className={frameClassName}
       {...(needsFallback && fallbackWidth !== null ? { style: { width: `${String(fallbackWidth)}px` } } : {})}
-    >
+    />
+    <span className={surfaceClassName}>
       <span className={titleClassName}>附件</span>
       {count > 1 && <button
         type="button"

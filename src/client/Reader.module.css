@@ -1514,6 +1514,15 @@
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL and enters only the geometry of this plate:
    it moves out by pad + 1px border on all four sides, and the width grows by the padding on both sides. The right side gets its padding
    back only because the wrapper shifts the whole block left by more than that (--frame-shift, 12px): grown at the column's right edge it was clipped, exactly as the 「展开」 control once was. The pad may not enter the `round()` basis: the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
-.fileFrame { position: absolute; z-index: -1; display: flex; align-items: center; gap: 8px; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 12px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+/* The label row shares the plate's geometry (same rule above) but NOT its layer: the plate is behind the cards, this is above them, so the
+   label and the control are visible. It has no background or border of its own — the plate draws those. */
+/* ONE geometry rule for BOTH overlays, so the arithmetic exists once: the plate draws the surface and the label row carries the label and
+   the control, and they are the same box. Keeping them separate matters because the plate sits BEHIND the cards (`z-index: -1`) — a label
+   inside it would be painted behind them and vanish, which is what happened. */
+.fileFrame, .fileFrameSurface { position: absolute; display: flex; align-items: center; gap: 8px; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 12px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); box-sizing: border-box; }
+/* The plate only: the surface itself, painted behind the cards. The label row adds no background or border of its own. */
+.fileFrame { z-index: -1; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); }
+/* The label row only: on top of the cards' layer, in the head area where no card reaches. */
+.fileFrameSurface { z-index: 0; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
