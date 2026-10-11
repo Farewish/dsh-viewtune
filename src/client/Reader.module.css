@@ -1451,6 +1451,9 @@
    ceiling — the same width the host caps its message column with — so the row inside keeps the host's own wrapping behaviour and the
    frame can never be wider than the column. Nothing else changes: the cards stay 240px, and there is no collapse. */
 /* The wrapper is layout-neutral: no width, no padding, no border, no background — it only positions the overlay. */
+/* The label in the frame's top-left corner. It occupies real layout space — that is the "taller top" the reader asked for — and the plate
+   simply grows upward over it, so the cards are still where the host puts them horizontally. The left padding lines it up with the cards. */
+.fileFrameTitle { display: block; height: var(--frame-head, 26px); line-height: var(--frame-head, 26px); padding-left: var(--frame-pad, 8px); color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 .fileFrameWrap { position: relative; min-width: 0; }
 /* The frame: out of flow, anchored to the row's right/top/bottom (three edges the cards share with the row), width given from the file
    count. `pointer-events: none` so it can never intercept a click; `max-width: 100%` so three columns never spill past the cluster. */
@@ -1471,6 +1474,9 @@
    margin cannot change the row's width, so the cards keep wrapping exactly as the host wraps them. `z-index: 1` gives the frame a
    stacking context of its own — inside it the plate sits BEHIND the cards, while the whole wrapper sits ABOVE the siblings, so the
    frame's padding is not painted over by the bubble below (which is what made it look clipped before). */
+/* The label in the frame's top-left corner. It occupies real layout space — that is the "taller top" the reader asked for — and the plate
+   simply grows upward over it, so the cards are still where the host puts them horizontally. The left padding lines it up with the cards. */
+.fileFrameTitle { display: block; height: var(--frame-head, 26px); line-height: var(--frame-head, 26px); padding-left: var(--frame-pad, 8px); color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 .fileFrameWrap { position: relative; z-index: 1; min-width: 0; margin: var(--frame-gap, 8px) 0; transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the
@@ -1480,6 +1486,6 @@
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL and enters only the geometry of this plate:
    it moves out by pad + 1px border on all four sides, and the width grows by the padding on both sides. The right side gets its padding
    back only because the wrapper shifts the whole block left by more than that (--frame-shift, 12px): grown at the column's right edge it was clipped, exactly as the 「展开」 control once was. The pad may not enter the `round()` basis: the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
-.fileFrame { --frame-pad: 8px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+.fileFrame { --frame-pad: 8px; --frame-head: 26px; position: absolute; z-index: -1; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 26px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

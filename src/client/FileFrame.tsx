@@ -23,11 +23,14 @@ const columnWidth = (columns: number): number => columns * 248 - 6;
  * The JavaScript below is only a fallback for an engine without `round()`, and it writes the width inline only in that case, so it can
  * never override the stylesheet. `z-index: -1` paints the plate behind the cards and `pointer-events: none` keeps it out of the way.
  */
-export const FileFrame = memo(function FileFrame({ count, className, frameClassName, children }: {
+export const FileFrame = memo(function FileFrame({ count, className, frameClassName, title, titleClassName, children }: {
   /** How many file cards are inside; the column count never exceeds it. */
   count: number;
   className: string;
   frameClassName: string;
+  /** The label in the frame's top-left corner. */
+  title: string;
+  titleClassName: string;
   children: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -49,6 +52,8 @@ export const FileFrame = memo(function FileFrame({ count, className, frameClassN
     return () => { observer.disconnect(); };
   }, [columns, needsFallback]);
   return <div ref={root} className={className} style={{ '--file-cols': String(columns) } as React.CSSProperties}>
+    {/* The title takes LAYOUT space, which is what makes the frame's top taller; the plate below simply grows upward over it. */}
+    <span className={titleClassName}>{title}</span>
     {children}
     <span
       aria-hidden="true"
