@@ -1,6 +1,7 @@
 import { Component, Fragment, memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
+import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock, UserMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { JsonBlock, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
@@ -9,6 +10,7 @@ import { truncatedJsonLabel } from './primitive-labels.js';
 import type { BlockRenderProps, ReaderBlockOwner } from './types.js';
 import { useStreamingText } from './streaming.js';
 import { MotionMarkdown, MotionPlainText } from './word-motion.js';
+import { FileAttachmentCard } from './FileAttachmentCard.js';
 import css from './Reader.module.css';
 
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
@@ -152,7 +154,16 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
       const raw = block.block;
       if (raw && typeof raw === 'object') {
         const item = raw as Record<string, unknown>;
-        if ((item.type === 'mcp-app' || item.type === 'mcpapp' || item.type === 'ui') && typeof item.html === 'string') {
+        // A SENT FILE — a PDF, a spreadsheet, anything that is not an image — is ONE host block (FileBlock), so this one
+        // branch covers every format now and later. It used to fall through to the message below, which is meant for content
+        // this view genuinely does not know.
+        if (item.type === 'file' && item.attachment !== null && typeof item.attachment === 'object') {
+          // loadImage is typed for an image ref, but the reader behind it is addressed by ttachmentId alone and returns the
+          // bytes with the attachment's own media type, which is all this needs.
+          const loadFile = loadImage as unknown as (attachment: FileAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
+          return <FileAttachmentCard attachment={item.attachment as FileAttachmentRef} loadFile={loadFile} />;
+        }
+                if ((item.type === 'mcp-app' || item.type === 'mcpapp' || item.type === 'ui') && typeof item.html === 'string') {
           return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} fillComposer={fillComposer} />;
         }
       }

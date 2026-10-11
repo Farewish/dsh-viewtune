@@ -1415,4 +1415,15 @@
 
 /* Kept last on purpose: the CSS-literal guard uses the final rule as its "the literal was not cut
    short" sentinel, so new rules belong above this one rather than after it. */
+/* One card for any file the reader SENT: type glyph, name, size, and a button that hands the bytes to the browser. It is not
+   per-format by design — the host models every non-image attachment as a single FileBlock. */
+.sentFile { display: flex; align-items: center; gap: 10px; max-width: 420px; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-module-platform); }
+.sentFileIcon { display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--dsw-alias-label-secondary); }
+.sentFileText { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sentFileName { overflow-wrap: anywhere; }
+.sentFileMeta { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+.sentFileOpen { flex: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; padding: 4px 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.sentFileOpen:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); }
+.sentFileOpen:disabled { opacity: 0.6; cursor: default; }
+
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
