@@ -291,7 +291,7 @@
 .imageFrame {
   display: inline-flex;
   width: fit-content;
-  max-width: 60%;
+  max-width: 100%;
   overflow: hidden;
   border-radius: var(--dsw-radius-sm, 6px);
   background: var(--dsw-alias-bg-base);
