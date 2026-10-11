@@ -519,6 +519,10 @@ function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNod
       href={safeHref}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
     >
+      {/* The host's own anchor glyph — `kind="url"` with the href, so a known host renders its site mark, exactly as its
+          `MarkdownAnchor` does. The reader noticed its absence here (「网页前面没有」) after the other two link shapes gained
+          theirs. */}
+      <LinkIconMedium kind="url" href={safeHref} className={css.linkIcon} />
       {children}
     </a>
   )
