@@ -1484,7 +1484,14 @@
    exactly on the plate's inner edge, which is what the reader asked for (「这个'附件'的位置要跟框走啊」). `--frame-head` is the extra air above
    the first row, and it lives on the WRAPPER with `--frame-pad`, so both the label and the plate read the same value — declared on the
    plate alone, the label (its sibling) would silently fall back to the default. */
-.fileFrameTitle { display: block; height: var(--frame-head, 18px); line-height: var(--frame-head, 18px); color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
+/* The spacer is the extra air above the first row of cards — it is what makes the plate's top taller. */
+.fileFrameHead { display: block; height: var(--frame-head, 18px); }
+/* The label is positioned in the PLATE's own geometry — the same right edge, the same width arithmetic, the same top — so the two keep a
+   fixed relationship and the label is always inside the plate, whatever the reading column's width does. It used to be a plain block in the
+   wrapper, which pinned it to the WRAPPER's left edge while the plate's left edge is counted backwards from the right; the gap between them
+   therefore changed with every column resize (「阅读列宽度一变，'附件'的位置就跟着变」). `z-index: -1` puts the text on the plate's surface and
+   the padding lines it up with the cards. */
+.fileFrameTitle { position: absolute; z-index: -1; right: calc(-1px - var(--frame-pad, 8px)); top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 18px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); height: var(--frame-head, 18px); line-height: var(--frame-head, 18px); padding-left: var(--frame-pad, 8px); box-sizing: border-box; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 .fileFrameWrap { --frame-pad: 8px; --frame-head: 18px; position: relative; z-index: 1; min-width: 0; margin: var(--frame-gap, 8px) 0; transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the

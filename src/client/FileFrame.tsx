@@ -1,4 +1,5 @@
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import css from './Reader.module.css';
 
 /** One column: a 240px host card, the 8px gap that follows it, and the 1px border of each end — so N columns are N × 248 − 6. */
 const columnWidth = (columns: number): number => columns * 248 - 6;
@@ -52,7 +53,9 @@ export const FileFrame = memo(function FileFrame({ count, className, frameClassN
     return () => { observer.disconnect(); };
   }, [columns, needsFallback]);
   return <div ref={root} className={className} style={{ '--file-cols': String(columns) } as React.CSSProperties}>
-    {/* The title takes LAYOUT space, which is what makes the frame's top taller; the plate below simply grows upward over it. */}
+    {/* The spacer is the extra air above the first row; the label itself is positioned in the PLATE's geometry (same right edge, same width),
+        so the two keep a fixed relationship and the label stays inside the plate however wide the reading column becomes. */}
+    <span className={css.fileFrameHead} aria-hidden="true" />
     <span className={titleClassName}>{title}</span>
     {children}
     <span
