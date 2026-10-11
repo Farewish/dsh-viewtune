@@ -311,21 +311,22 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   if (!node || node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) {
     const blocks = contentBlocks(node.data.content);
-    // THE HOST'S OWN MODEL, 1:1: images and files the reader sent go into ONE row, in document order, and the reader's text stays in
-    // the bubble below it. That is what the conversation page does (`MessageItem.tsx`: `attachmentRow` + `fileCard`), and the reader
-    // asked for a faithful copy (「完完全全照搬宿主，包括图片，文件卡样式行为等等也照搬。1:1复刻」).
+    // THE FILES take the host's own layout — one `attachmentRow` of 240px `fileCard`s, copied from its shipped stylesheet — while the
+    // IMAGES are moved OUT of that row (the reader's latest ruling) and keep the reading view's own container and renderer above it.
     const isFile = (b: typeof blocks[number]): boolean => b.kind === 'other'
       && b.block !== null && typeof b.block === 'object' && (b.block as { type?: unknown }).type === 'file';
-    const attachmentBlocks = blocks.filter(b => b.kind === 'image' || isFile(b));
-    const otherBlocks = blocks.filter(b => !attachmentBlocks.includes(b));
+    const fileBlocks = blocks.filter(b => isFile(b));
+    const imageBlocks = blocks.filter(b => b.kind === 'image');
+    const otherBlocks = blocks.filter(b => b.kind !== 'image' && !fileBlocks.includes(b));
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
     return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
-      {attachmentBlocks.length > 0 && <div className={css.attachmentRow} data-message-attachments>
-        {attachmentBlocks.map((block, index) => isFile(block)
-          ? <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />
-          : <Fragment key={`image:${String(index)}`}><Blocks {...render} blocks={[block]} source="user" /></Fragment>)}
+      {imageBlocks.length > 0 && <div className={css.userImages}>
+        <Blocks {...render} blocks={imageBlocks} source="user" />
+      </div>}
+      {fileBlocks.length > 0 && <div className={css.attachmentRow} data-message-attachments>
+        {fileBlocks.map((block, index) => <FileAttachmentCard key={`file:${String(index)}`} attachment={(block as unknown as { block: { attachment: FileAttachmentRef } }).block.attachment} />)}
       </div>}
       {otherBlocks.length > 0 && <div className={css.user}>
         <Blocks {...render} blocks={otherBlocks} source="user" />
