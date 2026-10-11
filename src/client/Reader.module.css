@@ -1431,8 +1431,5 @@
    reachable through the title. */
 .sentFileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sentFileMeta { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
-.sentFileOpen { flex: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; padding: 4px 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-.sentFileOpen:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); }
-.sentFileOpen:disabled { opacity: 0.6; cursor: default; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

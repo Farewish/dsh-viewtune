@@ -158,10 +158,7 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
         // branch covers every format now and later. It used to fall through to the message below, which is meant for content
         // this view genuinely does not know.
         if (item.type === 'file' && item.attachment !== null && typeof item.attachment === 'object') {
-          // loadImage is typed for an image ref, but the reader behind it is addressed by ttachmentId alone and returns the
-          // bytes with the attachment's own media type, which is all this needs.
-          const loadFile = loadImage as unknown as (attachment: FileAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
-          return <FileAttachmentCard attachment={item.attachment as FileAttachmentRef} loadFile={loadFile} />;
+          return <FileAttachmentCard attachment={item.attachment as FileAttachmentRef} />;
         }
                 if ((item.type === 'mcp-app' || item.type === 'mcpapp' || item.type === 'ui') && typeof item.html === 'string') {
           return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} fillComposer={fillComposer} />;

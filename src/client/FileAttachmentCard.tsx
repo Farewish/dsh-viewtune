@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo } from 'react';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { FileTypeIcon, fileExtension } from '@deepseek-ai/dsh-client-ui-primitives';
 import { formatBytes } from './path-preview.js';
@@ -10,41 +10,19 @@ import css from './Reader.module.css';
  * The reading view showed 「此内容类型尚未接入阅读页，原始内容已保留」 for these, and the reason is worth stating plainly because the
  * reader asked whether every format needs its own handling: it does not. The host models any non-image attachment as ONE
  * `ContentBlock` — `'file': FileBlock`, whose ref carries only `{ attachmentId, name, bytes }` — so a single branch covers every
- * format that exists and every format added later. Our converter knew `text` and `image` and dropped the rest into its
- * "unknown" bucket, which is what that message really meant.
+ * format that exists and every format added later.
  *
- * Opening is deliberately generic too: the bytes go through the same session reader that images use, become a blob URL, and are
- * handed to the browser, which then does what it does best with a PDF (shows it), an image (shows it) or a zip (downloads it).
- * Nothing here needs to know which of those will happen.
+ * THE CARD HAS NO OPEN ACTION, and that is the host's own design rather than an omission here. Its only client-side reader,
+ * `readAttachment`, is typed `{ attachment: ImageAttachmentRef; data: Uint8Array }` and refuses anything else with
+ * 「Image is not referenced by this session.」 — an id is *"never a filesystem path or bearer URL"*, so serving arbitrary stored
+ * bytes to the page by id would turn one leaked id into a file read. A sent file's bytes went to the model, which is what sending
+ * it was for; the page only reports that it was sent. An earlier version of this card had a 「打开」 button, it could only fail,
+ * and the reader removed it (「算了，那就A吧」).
+ *
+ * Reading the file by NAME from the workspace was considered and rejected on the same grounds of honesty: a name is not a path, so
+ * it would sometimes open a different file with the same name and look like success.
  */
-export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment, loadFile }: {
-  attachment: FileAttachmentRef;
-  /** The session's attachment reader; typed for images upstream, but it is addressed by id alone. */
-  loadFile: (attachment: FileAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
-}) {
-  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  /** Set once the bytes are in hand, so a blocked popup can still be opened by a real click. */
-  const [ready, setReady] = useState(false);
-  const url = useRef<string | null>(null);
-  useEffect(() => () => { if (url.current !== null) URL.revokeObjectURL(url.current); }, []);
-  const open = useCallback(async () => {
-    if (state === 'loading') return;
-    setState('loading');
-    try {
-      const result = await loadFile(attachment);
-      if (url.current !== null) URL.revokeObjectURL(url.current);
-      url.current = URL.createObjectURL(new Blob([result.data.slice().buffer], { type: result.mediaType }));
-      // A popup opened after an `await` is no longer tied to the click, so a blocker may refuse it and hand back null. When that
-      // happens the bytes are still in hand: the button turns into an ordinary link the reader can click themselves, which is a
-      // real gesture and never blocked. Either way nothing is lost and nothing is claimed.
-      const opened = window.open(url.current, '_blank', 'noopener,noreferrer');
-      setReady(opened === null || opened === undefined);
-      setState('idle');
-    } catch (error) {
-      console.warn('[dsh-better-display] could not open a sent file:', error);
-      setState('error');
-    }
-  }, [attachment, loadFile, state]);
+export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment }: { attachment: FileAttachmentRef }) {
   return (
     <div className={css.sentFile} data-reader-file={attachment.name}>
       <span className={css.sentFileIcon}>
@@ -57,17 +35,10 @@ export const FileAttachmentCard = memo(function FileAttachmentCard({ attachment,
       <span className={css.sentFileText}>
         <span className={css.sentFileName} title={attachment.name}>{attachment.name}</span>
         <span className={css.sentFileMeta}>
-          {/* The host's meta line is 「TYPE 55KB」: the extension as written, then the size. Same here, with the error text taking
-              the whole line when opening failed rather than a size that no longer matters. */}
-          {state === 'error' ? '打开失败' : `${fileExtension(attachment.name).toUpperCase()} ${formatBytes(attachment.bytes)}`.trim()}
+          {/* The host's meta line is 「TYPE 55KB」: the extension as written, then the size. */}
+          {`${fileExtension(attachment.name).toUpperCase()} ${formatBytes(attachment.bytes)}`.trim()}
         </span>
       </span>
-      {ready && url.current !== null
-        // The popup was blocked, so the reader gets the real thing: an anchor they click themselves.
-        ? <a className={css.sentFileOpen} href={url.current} target="_blank" rel="noopener noreferrer" download={attachment.name}>打开</a>
-        : <button type="button" className={css.sentFileOpen} onClick={() => { void open(); }} disabled={state === 'loading'}>
-          {state === 'loading' ? '打开中…' : '打开'}
-        </button>}
     </div>
   );
 });
