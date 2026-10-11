@@ -177,11 +177,45 @@ export const Blocks = memo(function Blocks({ blocks, streaming = false, source =
 }) {
   return <ComposerFillContext.Provider value={fillComposer}>
     <div className={css.blocks} data-streaming={streaming || undefined}>
-      {blocks.map((block, index) => <BlockBoundary key={block.kind === 'image' ? `image:${block.attachment.attachmentId}:${index}` : `${index}:${block.kind}`}>
-        <Fragment>{renderSlotChain('dsh-better-display.block', { block, streaming, source }, { fallback: fallback(block, streaming, source, loadImage, fillComposer, holdFormatting, { startedAt, interrupted, liveText }, fileMentions, resolveImageUrl, openFileLink) })}</Fragment>
-      </BlockBoundary>)}
+      {/* CONSECUTIVE SENT FILES GO IN ONE ROW, and this has to be done HERE rather than in CSS: `.blocks` is a COLUMN flex
+          container, so every block is its own flex item and a flex item's `display` is blockified — `inline-flex` on the card
+          changed nothing, which is why the reader still saw one file per line (「还是不行」). Grouping them makes the row a single
+          item that wraps inside itself, which is what "several on a line" actually means. Kept to `file` blocks: an image
+          already has its own container, and prose must stay prose. */}
+      {sentFileRows(blocks).map(row => row.kind === 'row'
+        ? <div key={`files:${String(row.start)}`} className={css.sentFileRow}>
+          {row.blocks.map((block, offset) => renderBlock(block, row.start + offset))}
+        </div>
+        : renderBlock(row.block, row.index))}
     </div>
   </ComposerFillContext.Provider>;
+
+  /** A sent file is the one block kind that reads as a LIST of things rather than as a paragraph. */
+  function isSentFile(block: AssistantBlock): boolean {
+    if (block.kind !== 'other') return false;
+    const raw = block.block;
+    return raw !== null && typeof raw === 'object' && (raw as { type?: unknown }).type === 'file';
+  }
+
+  /** One item per block, except runs of two or more sent files, which become one wrapping row. */
+  function sentFileRows(blocks: readonly AssistantBlock[]): ({ kind: 'row'; start: number; blocks: AssistantBlock[] } | { kind: 'one'; index: number; block: AssistantBlock })[] {
+    const rows: ({ kind: 'row'; start: number; blocks: AssistantBlock[] } | { kind: 'one'; index: number; block: AssistantBlock })[] = [];
+    for (let index = 0; index < blocks.length; index += 1) {
+      const block = blocks[index];
+      if (block === undefined) continue;
+      if (!isSentFile(block)) { rows.push({ kind: 'one', index, block }); continue; }
+      const run: AssistantBlock[] = [block];
+      while (index + 1 < blocks.length && isSentFile(blocks[index + 1]!)) { index += 1; run.push(blocks[index]!); }
+      rows.push(run.length > 1 ? { kind: 'row', start: index - run.length + 1, blocks: run } : { kind: 'one', index, block });
+    }
+    return rows;
+  }
+
+  function renderBlock(block: AssistantBlock, index: number): ReactNode {
+    return <BlockBoundary key={block.kind === 'image' ? `image:${block.attachment.attachmentId}:${index}` : `${String(index)}:${block.kind}`}>
+      <Fragment>{renderSlotChain('dsh-better-display.block', { block, streaming, source }, { fallback: fallback(block, streaming, source, loadImage, fillComposer, holdFormatting, { startedAt, interrupted, liveText }, fileMentions, resolveImageUrl, openFileLink) })}</Fragment>
+    </BlockBoundary>;
+  }
 });
 
 import { TurnMetrics } from './TurnMetrics.js';
