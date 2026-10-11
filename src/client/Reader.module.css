@@ -1494,8 +1494,17 @@
 /* `margin-top` is measured from the plate's own content top (its padding box), and the plate's top edge is counted upward from the cards by
    `--frame-head` — so growing the head cancels a downward move one for one. This is therefore 20px of REAL downward travel with the head
    left at 12px, which is why the label now sits below the plate's top padding by 20. */
+/* The collapse control, on the label's line at the plate's right edge. `margin-left: auto` is what puts it there, so it shares the label's row
+   and its height without any second geometry; `pointer-events: auto` is needed because the plate itself is transparent to the pointer. */
+.fileFrameToggle { margin-left: auto; pointer-events: auto; border: 0; padding: 0; background: transparent; color: var(--dsw-alias-link); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.fileFrameToggle:hover { text-decoration: underline dotted var(--dsw-alias-link); text-underline-offset: 3px; }
 .fileFrameTitle { display: block; height: var(--frame-head, 12px); line-height: var(--frame-head, 12px); margin: 2px 0 0 9px; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
-.fileFrameWrap { --frame-pad: 8px; --frame-head: 12px; position: relative; z-index: 1; min-width: 0; margin: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 2px) 0 var(--frame-gap, 8px); transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
+/* The clip box: it holds the spacer and the host's row, and the plate is anchored to IT, so the plate ends where the visible row ends. This
+   element — not the wrapper — is the positioning context for that reason. Collapsed it shows one row of cards: the card's own 64px, plus
+   the head above and the plate's padding below, which must be included or that padding would be clipped away. */
+.fileFrameClip { position: relative; }
+.fileFrameWrap[data-open="false"] .fileFrameClip { max-height: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 64px + var(--frame-pad, 8px) + 1px); overflow: hidden; }
+.fileFrameWrap { --frame-pad: 8px; --frame-head: 12px; z-index: 1; min-width: 0; margin: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 2px) 0 var(--frame-gap, 8px); transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the
    frame being cut on the right (the same clipping that once caught the 「展开」 control). A TRANSFORM is used rather than a margin because
@@ -1504,6 +1513,6 @@
 /* `--frame-pad` is the breathing room between the border and the cards. It is PURELY VISUAL and enters only the geometry of this plate:
    it moves out by pad + 1px border on all four sides, and the width grows by the padding on both sides. The right side gets its padding
    back only because the wrapper shifts the whole block left by more than that (--frame-shift, 12px): grown at the column's right edge it was clipped, exactly as the 「展开」 control once was. The pad may not enter the `round()` basis: the column count must come from the width the ROW has, or the plate would land on a different step than the cards. */
-.fileFrame { position: absolute; z-index: -1; display: block; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 12px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
+.fileFrame { position: absolute; z-index: -1; display: flex; align-items: center; gap: 8px; padding: var(--frame-pad, 8px) var(--frame-pad, 8px) 0; top: calc(-1px - var(--frame-pad, 8px) - var(--frame-head, 12px)); right: calc(-1px - var(--frame-pad, 8px)); bottom: calc(-1px - var(--frame-pad, 8px)); width: min(calc(round(down, 100% + 8px, 248px) - 6px + 2 * var(--frame-pad, 8px)), calc(var(--file-cols, 3) * 248px - 6px + 2 * var(--frame-pad, 8px))); pointer-events: none; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); box-sizing: border-box; }
 
 @keyframes settingsIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
