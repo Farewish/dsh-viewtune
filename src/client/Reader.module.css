@@ -616,7 +616,14 @@
 /* 纯文字的框头（提交框 ✓）：和按钮同样的排版，但**不是**可点外观 —— 没有手型、没有聚焦环 ✓。 */
 .deliverablesBoxPlain { grid-column: 1; grid-row: 1; padding: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: default; }
 .deliverablesBox[data-region=added] .deliverablesBoxLabel { color: var(--dsw-alias-state-business-primary); }
-.deliverablesBoxLane { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-width: 0; max-height: 62px; overflow: hidden; }
+/* The fold is a cap of two chip rows (62px), and it ANIMATES to the lane's own content height — published as `--box-full` by the box, since
+   only the element itself knows how tall its chips turned out. `overflow: hidden` stays on in both states so the animation has something to
+   clip (the trade is that a chip's hover shadow is cut at the lane's edge). Motion is the reading view's switch's business, spelled
+   `[data-motion=off]` as everywhere else in this file, with the system preference on top. */
+.deliverablesBoxLane { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-width: 0; max-height: 62px; overflow: hidden; transition: max-height 200ms ease; }
+.deliverablesBox[data-open] .deliverablesBoxLane { max-height: var(--box-full, 2000px); }
+[data-motion=off] .deliverablesBoxLane { transition: none; }
+@media (prefers-reduced-motion: reduce) { .deliverablesBoxLane { transition: none; } }
 .deliverablesBox[data-open] .deliverablesBoxLane { max-height: none; overflow: visible; }
 .deliverablesBox .deliverableChip { height: 28px; }
 /* 开关与标题同一行、贴右、与标题上下居中（读者先指出贴底、再要求挪到标题行）。 */
