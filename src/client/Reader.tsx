@@ -558,7 +558,8 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
           </span>
         )}
         <span className={css.deliverableName}>
-          {status === 'opened' ? '已在外部打开' : name}
+          {/* 文件名单独一层 ✓：卡片档的 `.deliverableName` 是**纵向 flex** ✓ ⇒ 裸文本会变成匿名 flex 项 ✗ ⇒ `ellipsis` 对它无效 ✓ */}
+          <span className={css.deliverableLabel}>{status === 'opened' ? '已在外部打开' : name}</span>
           {/* 卡片档的第二行：宿主是「描述，没有就是类型名」（`cardDescription(file.description, metadata)` ✓）⇒ 这里照做 ✓。 */}
           {display === 'cards' && status !== 'opened' && (description ?? kind) !== '' && (
             <span className={css.deliverableDescription}>{description ?? kind}</span>

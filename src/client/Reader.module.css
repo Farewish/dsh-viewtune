@@ -638,6 +638,11 @@
 /* 交付卡（详细卡片档）用**类名**判断 ✓ —— 这一轮学到的正是它 ✓：属性选择器在这条链上三次都没生效 ✓，而类名一贯可靠 ✓
    （本插件别处也一直用类名 ✓）。宽度另有内联样式兜底 ✓，不依赖任何选择器 ✓。 */
 .deliverableChip.deliveredCard { width: 100%; height: 60px; }
+/* The FILENAME, in a box of its own. It needs one because the card style turns `.deliverableName` into a COLUMN FLEX container to stack the
+   name over the description, and `text-overflow: ellipsis` cannot act on an anonymous flex item — which is why a long name ran past the card
+   in the detailed-card mode (the reader's report). `min-width: 0` and `max-width: 100%` let it shrink inside that column instead of forcing
+   the card wider. */
+.deliverableLabel { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .deliverableChip.deliveredCard .deliverableName { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
 .deliverableDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 /* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。
