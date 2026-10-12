@@ -646,7 +646,7 @@
 /* 交付栏那枚折叠开关：几何照**对话页实测值**（内容宽药丸 ✓），定位则由这里给出 —— 它在 `.deliverablesRegion` 这个两列网格里，
    所以跨满两列再 `justify-self: center` 才是"整栏居中" ✓（读者要的是居中 ✓）。逐属性照**对话页实测值**（读者给的计算样式）：内容宽的药丸 ✓、浅色底 ✓、无边框 ✓、12/18 字 ✓、
    gap 4px ✓。它与编辑卡的 `.changedCardToggle`（整行 + .5px 上边线）是两回事，所以是单独的类，两边互不影响 ✓。 */
-.deliveredGate { grid-column: 1 / -1; justify-self: center; margin-top: 8px; display: flex; align-items: center; gap: 4px; box-sizing: border-box; width: fit-content; height: 20px; padding: 1px 11px; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .08); color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; cursor: pointer; }
+.deliveredGate { grid-column: 1 / -1; justify-self: center; margin-top: 16px; display: flex; align-items: center; gap: 4px; box-sizing: border-box; width: fit-content; height: 20px; padding: 1px 11px; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .08); color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; cursor: pointer; }
 .deliveredGate:hover { color: var(--dsw-alias-label-secondary); }
 .changedCard { box-sizing: border-box; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-lg, 12px); background: var(--dsw-alias-bg-layer-1, var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover))); overflow: hidden; }
 /* 框头**故意**与卡身不同色 ✓（读者要求 ✓），而且是照宿主分的 ✓：它那张卡的**卡身**是主题的层色 `--dsw-alias-bg-layer-1` ✓，
