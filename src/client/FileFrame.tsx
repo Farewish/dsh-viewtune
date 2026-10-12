@@ -1,6 +1,9 @@
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import css from './Reader.module.css';
 
+/** One row of the clip: the head spacer plus a single 64px card. More content than this means the cards wrap. */
+const ONE_ROW_PX = 76;
+
 /** One column: a 240px host card, the 8px gap after it, and the 1px border of each end — so N columns are N × 248 − 6. */
 const columnWidth = (columns: number): number => columns * 248 - 6;
 
@@ -36,6 +39,8 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
   const clip = useRef<HTMLDivElement>(null);
   /** The clip's unclipped content height, so the expand/collapse can animate to a real value. */
   const [full, setFull] = useState<number | null>(null);
+  /** Whether the cards need more than the one row the collapse shows — the only case that needs a control. */
+  const [wraps, setWraps] = useState(false);
   const [open, setOpen] = useState(false);
   const [fallbackWidth, setFallbackWidth] = useState<number | null>(null);
   const columns = Math.min(count, 3);
@@ -45,7 +50,12 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
     // a huge `max-height` instead would make the animation reach the content almost immediately and look instant.
     const el = clip.current;
     if (!el) return;
-    const measure = (): void => { setFull(el.scrollHeight); };
+    const measure = (): void => {
+      setFull(el.scrollHeight);
+      // The clip holds the head spacer plus the cards, so anything taller than one row has wrapped. That is exactly when a control is
+      // worth showing, and it costs no extra measurement: this box is already observed.
+      setWraps(el.scrollHeight > ONE_ROW_PX);
+    };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => { measure(); });
@@ -89,7 +99,7 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
     />
     <span className={surfaceClassName}>
       <span className={titleClassName}>附件</span>
-      {count > 1 && <button
+      {wraps && <button
         type="button"
         className={`${css.deliverablesToggle} ${css.fileFrameToggle}`}
         aria-expanded={open}
