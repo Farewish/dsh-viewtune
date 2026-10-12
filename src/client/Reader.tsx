@@ -1000,7 +1000,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                     aria-label={deliveredOpen ? '收起交付文件列表' : `展开全部 ${String(groups.delivered.length)} 个交付文件`}
                     onClick={() => { setDeliveredOpen(value => !value); }}>
                     <span>{deliveredOpen ? '收起' : `全部 ${String(groups.delivered.length)} 个文件`}</span>
-                    <IconChevronDownOutlineRegular size={12} className={deliveredOpen ? css.changedCardChevronOpen : css.changedCardChevron} />
+                    <IconChevronDownOutlineRegular size={14} className={deliveredOpen ? css.changedCardChevronOpen : css.changedCardChevron} />
                   </button>}
                 </div>
               );
