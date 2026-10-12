@@ -1517,6 +1517,10 @@
    travels between one row (76px) and the content's own height, which the component publishes as `--frame-full`; a huge `max-height` would
    make the transition cover mostly empty space and look instant. */
 .fileFrameClip { min-width: 0; overflow: hidden; max-height: var(--frame-full, 2000px); transition: max-height 200ms ease; }
+/* The 动效 switch gets the last word, spelled as this file spells it everywhere else (`[data-motion=off]`): with motion off the clip simply
+   jumps between one row and the whole list, which is what the reader asked for (「之前加的那个附件的展开动画应该只在动效开关为开时才有」). The
+   system's own preference is honoured on top of that. */
+[data-motion=off] .fileFrameClip { transition: none; }
 @media (prefers-reduced-motion: reduce) { .fileFrameClip { transition: none; } }
 /* Collapsed height, stated as the clip box's own height so it can be tuned directly. The FRAME the reader measures is taller than this box by
    design: it reaches 21px above it (head 12 + pad 8 + 1px border) and 9px below it (pad 8 + 1px border), so a 76px box shows a 106px frame.
