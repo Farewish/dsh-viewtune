@@ -855,6 +855,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   // 详细卡片档里的「提交」要**复用平衡档那个框** ✓（读者要求 ✓），所以这里把它的区域描述取出来一份 ✓ —— 只在这个
   // 开关打开且真有提交时存在 ✓，其余情况为 undefined ✓（框也就不渲染 ✓）。
   const commitsRegion = regions.find(region => region.kind === 'commits');
+  // …and the same for 「交付」, which the card view used to draw as a bare row: it had no heading, no cap and no collapse control, where
+  // 编辑 and 提交 both had one (the reader asked for the control under the detailed card).
+  const deliveredRegion = regions.find(region => region.kind === 'delivered');
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
   // 「共 x 项编辑」点击展开的总差异面板 ✓（读者要的：悬停或点击都能看 ✓），以及面板里哪些文件的差异被展开了 ✓。
@@ -977,15 +980,14 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
             {changes.length > 0 && (
               <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
             )}
-            {/* 交付：宿主那张卡的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single` ✓）。
-                栅格用**内联样式**给出 ✓（不再依赖属性选择器 ✓ —— 那三次失败的正是不生效的选择器 ✓）。 */}
-            {groups.delivered.length > 0 && (
-              <div className={css.deliverablesRegion} data-region="delivered" title="这一轮交给你的文件">
-                <div className={css.deliverablesRow}
-                  style={{ display: 'grid', gridTemplateColumns: groups.delivered.length === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }}>
-                  {chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)}
-                </div>
-              </div>
+            {/* 交付：**直接复用平衡档那个框** ✓ —— 与「提交」同一份实现 ✓，因此框头（「共 N 项交付」✓）、两行封顶 ✓、
+                展开/收起开关 ✓、气泡样式 ✓ 全都一致；读者要的正是详细卡片下这个开关 ✓。此前这里是一个裸行：没有框头、
+                没有上限、也没有开关 ✗ —— 编辑与提交都有，只有它没有 ✓。 */}
+            {deliveredRegion !== undefined && (
+              <DeliverablesBox region={deliveredRegion} open={boxOpen[deliveredRegion.id] === true}
+                onToggle={() => { setBoxOpen(current => ({ ...current, [deliveredRegion.id]: current[deliveredRegion.id] !== true })); }}>
+                {chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)}
+              </DeliverablesBox>
             )}
             {/* 提交：**直接复用平衡档那个框** ✓（读者要求「样式换成平衡档那样的，直接复用」✓）—— 框头、展开开关、
                 气泡、底色与档位全都与平衡档同一份实现 ✓，所以两边不会各自漂移 ✓。 */}
