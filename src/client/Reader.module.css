@@ -642,7 +642,7 @@
    name over the description, and `text-overflow: ellipsis` cannot act on an anonymous flex item — which is why a long name ran past the card
    in the detailed-card mode (the reader's report). `min-width: 0` and `max-width: 100%` let it shrink inside that column instead of forcing
    the card wider. */
-.deliverableLabel { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deliverableLabel { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .deliverableChip.deliveredCard .deliverableName { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
 .deliverableDescription { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 /* 宿主那张「已编辑 N 个文件」列表卡（详细卡片档的**编辑**框）：一整张圆角卡 + 头部按钮 + 若干**行** + 折叠开关 ✓。
@@ -709,9 +709,12 @@
 @container (width <= 620px) { .deliverablesRow[data-delivered-count] { grid-template-columns: minmax(0, 1fr); } }
 .deliverableChip[data-style=card] { height: 60px; border-radius: var(--dsw-radius-lg); border-color: var(--dsw-alias-border-l1); padding: 8px 10px; background: var(--deliverable-fill, var(--dsw-alias-interactive-bg-hover)); }
 .deliverableChip[data-style=card]:hover { background: var(--deliverable-hover, var(--dsw-alias-bg-module-platform)); box-shadow: none; }
-.deliverableChip[data-style=card] .chipMain { max-width: none; flex: 1; gap: 10px; }
+/* `min-width: 0` is the whole fix for a long name in a card: a flex item's automatic minimum size is its CONTENT, so without it the main
+   column refuses to shrink and pushes the name out of the card no matter how the text itself is styled (the reader's screenshot showed
+   exactly that, after the ellipsis was put on the label but the chain above it could not shrink). */
+.deliverableChip[data-style=card] .chipMain { max-width: none; flex: 1; gap: 10px; min-width: 0; }
 .deliverableChip[data-style=card] .deliverableTypeIcon { width: 40px; height: 40px; border: .5px solid var(--dsw-alias-border-l1); border-radius: 10px; background: color-mix(in srgb, var(--dsw-static-neutral-00) 50%, transparent); color: var(--dsw-alias-link); }
-.deliverableChip[data-style=card] .deliverableName { display: inline-flex; align-items: baseline; min-width: 0; }
+.deliverableChip[data-style=card] .deliverableName { display: inline-flex; align-items: baseline; min-width: 0; overflow: hidden; }
 @container (width <= 620px) { .deliverablesRow[data-delivered-count] { grid-template-columns: minmax(0, 1fr); } }
 /* 提交气泡：不是文件，没有可点开的路径，所以只是一枚带短哈希的泡泡，标题（完整首行）放在 title 里。 */
 /* 气泡用**正文字体**，不是等宽 ✓ —— 读者报的「省略号在中间」正是等宽字体的 `…`（画在中间高度 ✗）：
