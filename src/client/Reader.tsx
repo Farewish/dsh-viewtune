@@ -858,8 +858,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
   // 「共 x 项编辑」点击展开的总差异面板 ✓（读者要的：悬停或点击都能看 ✓），以及面板里哪些文件的差异被展开了 ✓。
-  /** One row of the delivered grid, which is what the folded lane shows (the grid is two columns when there are two or more). */
-  const DELIVERED_COLLAPSED = 2;
+  /** TWO rows of the delivered grid — four cards, since that grid is two columns when there are two or more deliveries — which is both what
+   *  the folded lane shows and what decides whether a control is needed at all (「超过两行才开始折叠，折叠时显示两行」). */
+  const DELIVERED_COLLAPSED = 4;
   const [deliveredOpen, setDeliveredOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set());
