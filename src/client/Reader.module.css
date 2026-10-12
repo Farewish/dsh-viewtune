@@ -1500,7 +1500,7 @@
 .fileFrameToggle { margin: -7px 0 0 auto; pointer-events: auto; white-space: nowrap; }
 /* Hover styles the TEXT, not a plate behind it: the shared `.deliverablesToggle:hover` paints a hover background, and the reader asked for
    the highlight to be on the words instead. Overridden here, in our own class, so the deliverables lane keeps its own behaviour. */
-.fileFrameToggle:hover { background: 0 0; color: var(--dsw-alias-label-primary); text-decoration: underline; text-underline-offset: 3px; }
+.fileFrameToggle:hover { background: 0 0; color: var(--dsw-alias-label-primary); }
 .fileFrameTitle { display: block; height: var(--frame-head, 12px); line-height: var(--frame-head, 12px); margin: 3px 0 0 9px; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 /* The clip box: it holds the spacer and the host's row, and the plate is anchored to IT, so the plate ends where the visible row ends. This
    element — not the wrapper — is the positioning context for that reason. Collapsed it shows one row of cards: the card's own 64px, plus
