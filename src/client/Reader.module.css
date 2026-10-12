@@ -1506,11 +1506,15 @@
    element — not the wrapper — is the positioning context for that reason. Collapsed it shows one row of cards: the card's own 64px, plus
    the head above and the plate's padding below, which must be included or that padding would be clipped away. */
 /* The clip box is NOT the positioning context: the plate must stay outside it, or `overflow: hidden` would clip the plate's overhang. */
-.fileFrameClip { min-width: 0; }
+/* The clip box holds only the spacer and the host's row, so hiding its overflow is always safe — and necessary while it animates. Its height
+   travels between one row (76px) and the content's own height, which the component publishes as `--frame-full`; a huge `max-height` would
+   make the transition cover mostly empty space and look instant. */
+.fileFrameClip { min-width: 0; overflow: hidden; max-height: var(--frame-full, 2000px); transition: max-height 200ms ease; }
+@media (prefers-reduced-motion: reduce) { .fileFrameClip { transition: none; } }
 /* Collapsed height, stated as the clip box's own height so it can be tuned directly. The FRAME the reader measures is taller than this box by
    design: it reaches 21px above it (head 12 + pad 8 + 1px border) and 9px below it (pad 8 + 1px border), so a 76px box shows a 106px frame.
    The row itself stays the host's 64px card, which is why the box is 76 and not less. */
-.fileFrameWrap[data-open="false"] .fileFrameClip { max-height: 76px; overflow: hidden; }
+.fileFrameWrap[data-open="false"] .fileFrameClip { max-height: 76px; }
 .fileFrameWrap { --frame-pad: 8px; --frame-head: 12px; position: relative; z-index: 1; min-width: 0; margin: calc(var(--frame-head, 12px) + var(--frame-pad, 8px) + 2px) 0 var(--frame-gap, 8px); transform: translateX(calc(-1 * var(--frame-shift, 9px))); }
 /* `--frame-shift` moves the whole file block — cards and frame together — a little to the LEFT, because the reading column's right edge
    is exactly where the cards end: anything at that edge loses its last pixel or two to the column's clip, which the reader saw as the

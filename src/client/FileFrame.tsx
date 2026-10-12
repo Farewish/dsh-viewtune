@@ -33,10 +33,26 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
   children: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
+  const clip = useRef<HTMLDivElement>(null);
+  /** The clip's unclipped content height, so the expand/collapse can animate to a real value. */
+  const [full, setFull] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [fallbackWidth, setFallbackWidth] = useState<number | null>(null);
   const columns = Math.min(count, 3);
   const needsFallback = typeof CSS === 'undefined' || !CSS.supports('width', 'round(down, 100%, 248px)');
+  useLayoutEffect(() => {
+    // `scrollHeight` is the content height even while the box is clipped, which is exactly the value the transition needs to travel to;
+    // a huge `max-height` instead would make the animation reach the content almost immediately and look instant.
+    const el = clip.current;
+    if (!el) return;
+    const measure = (): void => { setFull(el.scrollHeight); };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => { measure(); });
+    observer.observe(el);
+    return () => { observer.disconnect(); };
+  }, [count, open]);
+
   useLayoutEffect(() => {
     if (!needsFallback) return;
     const el = root.current;
@@ -55,12 +71,12 @@ export const FileFrame = memo(function FileFrame({ count, className, clipClassNa
     ref={root}
     className={className}
     data-open={open ? 'true' : 'false'}
-    style={{ '--file-cols': String(columns) } as React.CSSProperties}
+    style={{ '--file-cols': String(columns), ...(full === null ? {} : { '--frame-full': `${String(full)}px` }) } as React.CSSProperties}
   >
     {/* The clip box holds ONLY the spacer and the host's row: the plate is its SIBLING, because `overflow: hidden` on the box that
         contained the plate clipped the plate on all four sides (it deliberately overhangs the row by its padding). The wrapper still hugs
         the clip's height, so the plate — anchored to the wrapper — ends exactly where the visible row ends. */}
-    <div className={clipClassName}>
+    <div ref={clip} className={clipClassName}>
       <span className={css.fileFrameHead} aria-hidden="true" />
       {children}
     </div>
