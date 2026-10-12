@@ -1127,13 +1127,16 @@ const markers = [
     // over when the list is open (the reader asked for the same arrow on 全部 N 个文件 and on 收起).
     && bundle.includes('IconChevronDownOutlineRegular')
     && bundle.includes('changedCardChevronOpen')
-    // …and the DELIVERED card keeps the host's shape too: one card per delivery, the assistant's own description as the
+    // …and each DELIVERED file keeps the host's own card shape: one card per delivery, the assistant's own description as the
     // second line (the host's `cardDescription(file.description, metadata)` falls back to the type caption, which the same
-    // element does), and the layout driven WITHOUT selector matching — three rounds of attribute selectors silently did
-    // nothing here, so the column count is an inline style and the card's own shape is a CLASS, which never fails.
+    // element does). The LANE's layout is no longer an inline grid: the reader asked for a collapse control on 交付 under the
+    // detailed card (「给产物展示为详细卡片下的交付文件做一个折叠开关」), so that lane now reuses the balanced mode's box — the
+    // same heading, two-row cap and 展开/收起 control that 编辑 and 提交 already had — and its chips wrap inside that box's
+    // lane instead of sitting in a two-column grid. The inline `gridTemplateColumns` this pinned before is therefore gone on
+    // purpose; the two assertions that still describe the delivered CARD are kept.
     && bundle.includes('deliveredCard')
-    && bundle.includes('gridTemplateColumns')
-    && bundle.includes('deliverableDescription')],
+    && bundle.includes('deliverableDescription')
+    && bundle.includes('deliverablesBoxLane')],
   // The HOST'S changes review, opened by resource: the one route a View has to the card the conversation page shows. The
   // card itself cannot be imported (the packages export only `apply`/`inject`, and its slot occupant needs that package's
   // own stores), but its address can be handed to `ctx.sidebarRight.openResource` and then the host draws it, unmodified.

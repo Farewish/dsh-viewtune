@@ -858,6 +858,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   // 平衡档的每个框各有一个展开开关（读者给的规格：一般只显示两行，展开后显示全部），所以状态是「按区域」的。
   const [boxOpen, setBoxOpen] = useState<Record<string, boolean>>({});
   // 「共 x 项编辑」点击展开的总差异面板 ✓（读者要的：悬停或点击都能看 ✓），以及面板里哪些文件的差异被展开了 ✓。
+  /** One row of the delivered grid, which is what the folded lane shows (the grid is two columns when there are two or more). */
+  const DELIVERED_COLLAPSED = 2;
+  const [deliveredOpen, setDeliveredOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set());
   const toggleDiff = (path: string) => {
@@ -978,15 +981,26 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
             )}
             {/* 交付：宿主那张卡的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single` ✓）。
-                栅格用**内联样式**给出 ✓（不再依赖属性选择器 ✓ —— 那三次失败的正是不生效的选择器 ✓）。 */}
-            {groups.delivered.length > 0 && (
-              <div className={css.deliverablesRegion} data-region="delivered" title="这一轮交给你的文件">
-                <div className={css.deliverablesRow}
-                  style={{ display: 'grid', gridTemplateColumns: groups.delivered.length === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }}>
-                  {chips(groups.delivered.map(entry => entry.path), undefined, groups.delivered)}
+                栅格用**内联样式**给出 ✓（不再依赖属性选择器 ✓ —— 那三次失败的正是不生效的选择器 ✓）。
+                折叠照**详细卡片自己的**做法 ✓（读者要求「按照对话页的加一个折叠开关」✓）：只渲染第一行（两列 ⇒ 两张 ✓），
+                开关用编辑卡同款的 `.changedCardToggle` + `IconChevronDownOutlineRegular` 箭头 ✓，文案也同款 ✓ —— 外观一点没动 ✓。 */}
+            {groups.delivered.length > 0 && (() => {
+              const foldable = groups.delivered.length > DELIVERED_COLLAPSED;
+              const shown = foldable && !deliveredOpen ? groups.delivered.slice(0, DELIVERED_COLLAPSED) : groups.delivered;
+              return (
+                <div className={css.deliverablesRegion} data-region="delivered" title="这一轮交给你的文件">
+                  <div className={css.deliverablesRow}
+                    style={{ display: 'grid', gridTemplateColumns: groups.delivered.length === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }}>
+                    {chips(shown.map(entry => entry.path), undefined, groups.delivered)}
+                  </div>
+                  {foldable && <button type="button" className={css.changedCardToggle} aria-expanded={deliveredOpen}
+                    onClick={() => { setDeliveredOpen(value => !value); }}>
+                    <span>{deliveredOpen ? '收起' : `全部 ${String(groups.delivered.length)} 个文件`}</span>
+                    <IconChevronDownOutlineRegular size={12} className={deliveredOpen ? css.changedCardChevronOpen : css.changedCardChevron} />
+                  </button>}
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {/* 提交：**直接复用平衡档那个框** ✓（读者要求「样式换成平衡档那样的，直接复用」✓）—— 框头、展开开关、
                 气泡、底色与档位全都与平衡档同一份实现 ✓，所以两边不会各自漂移 ✓。 */}
             {commitsRegion !== undefined && (
