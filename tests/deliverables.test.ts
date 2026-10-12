@@ -48,9 +48,9 @@ test('getTurnDeliverables reads the host’s two published lists: 交付 and 编
   // entirely from the tool-flow fallback without anyone noticing. The real shape is `{ changes, presented }`: `presented`
   // is what was DELIVERED (the reader's share package — 交付), `changes` is what was edited (编辑).
   //
-  // The two OVERLAP, which the reader corrected: 编辑 answers "what did this turn change" and 交付 answers "what did it
-  // hand over", so a file that was edited and then delivered belongs in both. Only the older 新增/编辑 shape made them
-  // mutually exclusive.
+  // The two boxes answer different questions, and the reader ruled on how they may overlap: 编辑 answers "what did this turn
+  // CHANGE" and 交付 answers "what did it hand over", so a file that was changed AND delivered belongs in both — but a file that
+  // was only handed over is NOT an edit and must not appear under 编辑 (「编辑栏里面不应该有未编辑仅交付的文件」).
   const turn = turnWith({
     changes: {
       added: 12,
@@ -67,8 +67,8 @@ test('getTurnDeliverables reads the host’s two published lists: 交付 and 编
     changesSeq: undefined,
     // Delivered files carry the assistant's own description, which is the second line of the host's card.
     delivered: [{ path: 'src/client/Reader.tsx' }, { description: '分享包', path: 'dist/pkg.tgz' }],
-    // …the delivered files lead (first-seen), and the one that was only changed follows; each path appears once per list.
-    edited: ['src/client/Reader.tsx', 'dist/pkg.tgz', 'src/client/Reader.module.css'],
+    // Only what the turn CHANGED: the delivered-only package is absent, and each path appears once.
+    edited: ['src/client/Reader.tsx', 'src/client/Reader.module.css'],
   });
   // The flat list — inline mentions, and the row's gate — is the union, deliveries first.
   assert.deepEqual(getTurnDeliverables(turn), ['src/client/Reader.tsx', 'dist/pkg.tgz', 'src/client/Reader.module.css']);

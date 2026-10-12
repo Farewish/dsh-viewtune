@@ -299,13 +299,17 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
   //     cannot be told apart, so they are one list under 「编辑」.
   //   · 交付 — what was DELIVERED: the host's `presented` list, the assistant's own hand-over (the share package).
   // The two OVERLAP on purpose, which the reader corrected: the boxes answer different questions — what did this turn
-  // change, and what did it hand over — so a file that was edited and then delivered answers both. Only the older shape
-  // (新增 vs 编辑) made them mutually exclusive, and that shape is gone. A delivered-only file is in 编辑 as well, for
-  // the same reason the client cannot tell a created file from an edited one.
-  const deliveredPaths = delivered.map(entry => entry.path);
+  // change, and what did it hand over — so a file that was edited and then delivered answers both. What the reader ruled
+  // OUT is the reverse: a file that was only handed over is not an edit, so `delivered` no longer feeds the 编辑 list
+  // (「编辑栏里面不应该有未编辑仅交付的文件」).
   const editedList: string[] = [];
   const seen = new Set<string>();
-  for (const path of [...deliveredPaths, ...changed, ...touched]) {
+  // A DELIVERED-ONLY FILE IS NOT AN EDIT. The reader ruled on this after seeing one in 编辑 as well: 「编辑栏里面不应该有未编辑仅交付的文件」.
+  // The two boxes still overlap where they should — a file that was changed AND handed over answers both questions — but being handed over
+  // is not itself a change, so `delivered` no longer feeds this union. What remains is every file the turn is known to have TOUCHED: the
+  // host's change announcement and the fallback's reading of the write/edit calls. Whether such a file was NEW or EDITED still cannot be
+  // told apart, so they stay one list under 「编辑」.
+  for (const path of [...changed, ...touched]) {
     if (path === '' || seen.has(path)) continue;
     seen.add(path);
     editedList.push(path);
