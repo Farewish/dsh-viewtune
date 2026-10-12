@@ -646,11 +646,6 @@
 /* 交付栏那枚折叠开关：几何照**对话页实测值**（内容宽药丸 ✓），定位则由这里给出 —— 它在 `.deliverablesRegion` 这个两列网格里，
    所以跨满两列再 `justify-self: center` 才是"整栏居中" ✓（读者要的是居中 ✓）。逐属性照**对话页实测值**（读者给的计算样式）：内容宽的药丸 ✓、浅色底 ✓、无边框 ✓、12/18 字 ✓、
    gap 4px ✓。它与编辑卡的 `.changedCardToggle`（整行 + .5px 上边线）是两回事，所以是单独的类，两边互不影响 ✓。 */
-/* The fold is "render fewer cards", so there is no height to transition — the cards that were hidden animate IN instead: a short fade with
-   a two-pixel rise, long enough to read as motion and short enough not to delay the click. The system's own preference gets the last word. */
-.deliveredOpened > * { animation: deliveredCardIn 160ms ease both; }
-@keyframes deliveredCardIn { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .deliveredOpened > * { animation: none; } }
 .deliveredGate { grid-column: 1 / -1; justify-self: center; margin-top: 16px; display: flex; align-items: center; gap: 4px; box-sizing: border-box; width: fit-content; height: 20px; padding: 1px 11px; border: 0; border-radius: 6px; background: 0 0; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; line-height: 18px; font-weight: 400; cursor: pointer; }
 /* 静息透明，悬停只亮**底板**、文字不变 ✓（读者给的实测值就是悬停那一刻取的 ✓：rgba(255,255,255,.08) 是 hover 的底色 ✓，
    我先前当成静息底色 ✗ ⇒ 于是它"永远亮着" ✓）。 */

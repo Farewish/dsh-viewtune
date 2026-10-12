@@ -990,7 +990,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               const shown = foldable && !deliveredOpen ? groups.delivered.slice(0, DELIVERED_COLLAPSED) : groups.delivered;
               return (
                 <div className={css.deliverablesRegion} data-region="delivered" title="这一轮交给你的文件">
-                  <div className={`${css.deliverablesRow}${deliveredOpen && foldable ? ` ${css.deliveredOpened}` : ''}`}
+                  <div className={css.deliverablesRow}
                     style={{ display: 'grid', gridTemplateColumns: groups.delivered.length === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }}>
                     {chips(shown.map(entry => entry.path), undefined, groups.delivered)}
                   </div>
