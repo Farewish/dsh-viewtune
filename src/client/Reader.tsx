@@ -993,7 +993,11 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                     style={{ display: 'grid', gridTemplateColumns: groups.delivered.length === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '10px', alignItems: 'stretch' }}>
                     {chips(shown.map(entry => entry.path), undefined, groups.delivered)}
                   </div>
-                  {foldable && <button type="button" className={css.changedCardToggle} aria-expanded={deliveredOpen}
+                  {/* 开关照**对话页那枚**的实测值 ✓（读者给的计算样式 ✓）：`display:flex; align-items:center; gap:4px;
+                      padding:1px 11px; height:20px; font-size:12px; line-height:18px; font-weight:400; color: tertiary;
+                      background: rgba(255,255,255,.08); border:0; width:内容宽` ✓ —— 不是编辑卡那种整行 + 上边线 ✗。 */}
+                  {foldable && <button type="button" className={css.deliveredGate} aria-expanded={deliveredOpen}
+                    aria-label={deliveredOpen ? '收起交付文件列表' : `展开全部 ${String(groups.delivered.length)} 个交付文件`}
                     onClick={() => { setDeliveredOpen(value => !value); }}>
                     <span>{deliveredOpen ? '收起' : `全部 ${String(groups.delivered.length)} 个文件`}</span>
                     <IconChevronDownOutlineRegular size={12} className={deliveredOpen ? css.changedCardChevronOpen : css.changedCardChevron} />
