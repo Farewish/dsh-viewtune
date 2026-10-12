@@ -654,13 +654,7 @@ function DeliverablesBox({ region, open, onToggle, onHeadingClick, panel, childr
   useEffect(() => {
     const node = lane.current;
     if (node === null) return;
-    const measure = () => {
-      setOverflowing(needsExpand(node.scrollHeight));
-      // The full height travels to the stylesheet as `--box-full`, so the expand can be a real transition rather than a jump: the cap is
-      // 62px and the target is the content's own height. `scrollHeight` is the content height even while the lane is clipped, which is
-      // exactly what the transition needs.
-      node.style.setProperty('--box-full', `${String(node.scrollHeight)}px`);
-    };
+    const measure = () => { setOverflowing(needsExpand(node.scrollHeight)); };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
