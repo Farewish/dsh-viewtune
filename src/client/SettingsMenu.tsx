@@ -517,7 +517,6 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>自动收起更早流程</span>
               </span>
               <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
-                  <Switch checked={segmentProcessByNarration} onChange={onSegmentProcessByNarration} label="按旁白分段" title={SEGMENT_HINT} />
             </div>
             {/* The COUNT-based folding, right next to the boolean one because the two answer the same question at
                 different times: that one acts while a turn streams, this one at rest as well — and since a folded
@@ -588,6 +587,13 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
               </select>
             </div>
             <Group caption="流程展示设置" />
+            {/* The host's own conversation-page shape: one collapsible stretch per narration, each labelled with what happened inside it. */}
+            <div className={css.settingsRow} title={SEGMENT_HINT} data-ud-check="reader-settings-segment-by-narration">
+              <span className={css.settingsCopy}>
+                <span className={css.settingsLabel}>按旁白分段</span>
+              </span>
+              <Switch checked={segmentProcessByNarration} onChange={onSegmentProcessByNarration} label="按旁白分段" />
+            </div>
             <div className={css.settingsRow} title={FOLLOW_MODE_HINT} data-ud-check="reader-settings-follow-mode">
               <span className={css.settingsCopy}>
                 <span className={css.settingsLabel}>跟随到最新</span>
