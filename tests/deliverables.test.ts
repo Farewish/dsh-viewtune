@@ -294,3 +294,21 @@ test('the turn’s changed files carry their hunks and the call that changed the
   assert.deepEqual(turnChanges([]), []);
   assert.deepEqual(turnChanges(undefined), []);
 });
+
+test('a commit inside a subshell or with captured output is still a commit', () => {
+  // The reader's own commit was written as `$out = (git commit -m "…" 2>&1 | Out-String)`, and the rule that required `git commit` at the start
+  // of a command missed it — so the whole 提交 lane never appeared for that turn. A subshell or a captured output is still a commit.
+  const shapes = [
+    'git commit -m "x"',
+    'cd repo && git commit -m "x"',
+    '$out = (git commit -m "x" 2>&1 | Out-String)',
+    'hash=$(git commit -m "x")',
+    'git -C /tmp/repo commit -m "x"',
+  ];
+  for (const command of shapes) {
+    const flow = [tool('run', { command })];
+    assert.equal(turnCommits(flow).length, 1, command);
+  }
+  // …and prose that merely MENTIONS a commit is not one: only a command-shaped field is read at all.
+  assert.deepEqual(turnCommits([tool('write', { file_path: 'notes.md', content: 'run git commit -m "x" here' })]), []);
+});

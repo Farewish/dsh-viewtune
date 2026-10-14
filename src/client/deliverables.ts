@@ -118,7 +118,9 @@ export interface CommitRecord {
  * `git -C <dir> commit -m …` — exactly how this project's own commits are made — and a pattern demanding `git` be
  * followed immediately by `commit` never matched one, so 「提交」 stayed empty forever.
  */
-const GIT_COMMIT = /(?:^|[;&|]|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/;
+// A commit is a commit wherever it is spelled: at a line's start, after a separator, inside a subshell (`(git commit …)`) or with the output
+// captured (`x=$(git commit …)`, `$out = (git commit …)`) — the reader's own commit went undetected for exactly that last reason.
+const GIT_COMMIT = /(?:^|[;&|(]|\$\(|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/;
 
 /** The message of a `git commit`, from the first `-m`/`--message` argument the command carries. */
 function commitSubject(command: string): string {
