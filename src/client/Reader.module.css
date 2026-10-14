@@ -723,6 +723,9 @@
 .deliverableCommit { box-sizing: border-box; position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 12px; font-family: inherit; cursor: pointer; }
 /* 提交气泡：**一行封顶** ✓（读者选的方案 B ✓）—— 主题可以很长，没有上限就会把整行撑开 ✓。
    省略号落在**这一行文字的末尾** ✓（`line-height` 与胶囊高度无关 ✓，文字始终垂直居中 ✓）。 */
+/* The recovered short hash, in front of the message it belongs to. The reader asked for both halves visible: the message is what identifies the
+   commit to a human, the hash is what can be pasted into `git show`, and until now only one of them could be seen at a time. */
+.deliverableCommitHash { margin-right: 6px; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
 .deliverableCommitText { display: block; line-height: 20px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 「已复制」**盖在标签上** ✓，不参与布局 ⇒ 气泡尺寸不变 ✓，后面的气泡不会跟着挪位 ✓（读者第 2 条 ✓）。 */
 .deliverableCommitCopied { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: inherit; background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover)); color: var(--dsw-alias-state-success-primary, var(--dsw-alias-label-primary)); }

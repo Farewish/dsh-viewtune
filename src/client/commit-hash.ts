@@ -78,3 +78,37 @@ export async function commitHashOf(cwd: string | undefined, subject: string): Pr
   }
   return undefined;
 }
+
+export interface RecentCommit { readonly hash: string; readonly subject: string }
+
+/**
+ * The newest `count` commits in `cwd`, newest first.
+ *
+ * The answer for a call the host TRUNCATED: when a tool call's arguments arrive as `…` — long `-m` messages are the ones that get cut — there
+ * is no subject to look a hash up BY, and the call's result is cut the same way. The repository still has the order, and the commits of the
+ * turn being read are the newest ones, so the caller pairs them positionally. Cached per directory and count for the life of the page, because
+ * a lane re-renders often and the newest N only change when someone commits again.
+ */
+const recentCache = new Map<string, readonly RecentCommit[]>();
+
+export async function recentCommitsOf(cwd: string | undefined, count: number): Promise<readonly RecentCommit[]> {
+  if (cwd === undefined || cwd === '' || count <= 0) return [];
+  const key = `${cwd}|${String(count)}`;
+  const cached = recentCache.get(key);
+  if (cached !== undefined) return cached;
+  try {
+    const response = await fetch(COMMIT_HASHES_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cwd, subjects: [], recent: count }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json() as { recent?: readonly RecentCommit[] };
+    const list = Array.isArray(data.recent) ? data.recent : [];
+    recentCache.set(key, list);
+    return list;
+  } catch {
+    // Nothing cached: a later mount may ask again, which is the right trade for a server that is briefly away.
+    return [];
+  }
+}

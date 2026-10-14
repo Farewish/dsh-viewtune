@@ -35,7 +35,7 @@ import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
 import { FileAttachmentCard } from './FileAttachmentCard.js';
-import { commitHashOf } from './commit-hash.js';
+import { commitHashOf, recentCommitsOf } from './commit-hash.js';
 import { FileFrame } from './FileFrame.js';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { textCadenceOf } from './text-cadence.js';
@@ -797,21 +797,30 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
  *
  * One component rather than three copies: the row appears in all three display modes and they must not drift.
  */
-const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitRecord }) {
+const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commit: CommitRecord; newestIndex: number }) {
   const [copied, setCopied] = useState(false);
   const cwd = useContext(ReaderCwdContext);
   /**
    * A hash recovered from the repository, for a commit whose call never showed git's own output line. `undefined` means "nothing recovered
    * yet"; the module's cache remembers a subject the host could not find, so the same lookup is never sent twice.
    */
-  const [recovered, setRecovered] = useState<string | undefined>(commit.hash);
+  const [recovered, setRecovered] = useState<CommitRecord | undefined>(commit.hash === undefined ? undefined : commit);
   useEffect(() => {
-    if (commit.hash !== undefined) { setRecovered(commit.hash); return; }
+    if (commit.hash !== undefined) { setRecovered(commit); return; }
     let live = true;
-    void commitHashOf(cwd, commit.subject).then(found => { if (live && found !== undefined) setRecovered(found); });
+    // A subject the host TRUNCATED (long `-m` messages arrive as `…`) cannot be looked up by, and neither can a missing one; for those the
+    // repository answers by POSITION instead — the turn's commits are the newest ones, so this bubble takes its own place from the end.
+    const usable = commit.subject !== '' && commit.subject !== UNKNOWN_COMMIT && !commit.subject.includes('…');
+    const answer = usable
+      ? commitHashOf(cwd, commit.subject).then(hash => (hash === undefined ? undefined : { ...commit, hash }))
+      : recentCommitsOf(cwd, newestIndex + 1).then(list => {
+        const found = list[newestIndex];
+        return found === undefined ? undefined : { hash: found.hash, subject: found.subject === '' ? commit.subject : found.subject };
+      });
+    void answer.then(value => { if (live && value !== undefined) setRecovered(value); });
     return () => { live = false; };
-  }, [cwd, commit.hash, commit.subject]);
-  const shown: CommitRecord = recovered === undefined ? commit : { ...commit, hash: recovered };
+  }, [cwd, commit, newestIndex]);
+  const shown: CommitRecord = recovered ?? commit;
   const copy = () => {
     try {
       void navigator.clipboard?.writeText(commitClipboard(shown));
@@ -827,7 +836,7 @@ const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitReco
       aria-label={`复制提交 ${commitClipboard(shown)}`} onClick={copy}>
       {/* 标签**始终是提交信息** ✓：宽度因此不会变 ✓（读者第 2 条：「已复制」一出现，后面的气泡全都跟着挪位 ✗）。
           确认提示**盖在上面** ✓（绝对定位、不吃布局 ✓），淡去之后气泡还是原来那个尺寸 ✓。 */}
-      <span className={css.deliverableCommitText}>{commitLabel(shown)}</span>
+      <span className={css.deliverableCommitText}>{shown.hash !== undefined && <span className={css.deliverableCommitHash}>{shown.hash}</span>}{commitLabel(shown)}</span>
       {copied && <span className={css.deliverableCommitCopied} aria-hidden>已复制</span>}
     </button>
   );
@@ -987,7 +996,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble — the message as the
                     // label, the short hash in the tooltip (see `CommitBubble`).
                     : groups.commits.map((commit, index) => (
-                      <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
+                      <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} newestIndex={groups.commits.length - 1 - index} />
                     ))}
                 </DeliverablesBox>
               );
@@ -1034,7 +1043,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               <DeliverablesBox region={commitsRegion} open={boxOpen[commitsRegion.id] === true}
                 onToggle={() => { setBoxOpen(current => ({ ...current, [commitsRegion.id]: current[commitsRegion.id] !== true })); }}>
                 {groups.commits.map((commit, index) => (
-                  <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
+                  <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} newestIndex={groups.commits.length - 1 - index} />
                 ))}
               </DeliverablesBox>
             )}
@@ -1049,7 +1058,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
           <span className={css.commitsLabel}>提交</span>
           <div className={css.commitsList}>
             {groups.commits.map((commit, index) => (
-              <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
+              <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} newestIndex={groups.commits.length - 1 - index} />
             ))}
           </div>
         </div>
