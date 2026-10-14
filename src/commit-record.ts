@@ -34,6 +34,14 @@ export interface RecordedEvent {
 interface SessionRecord {
   readonly events: RecordedEvent[];
   readonly bySeq: Map<number, RecordedEvent>;
+  /**
+   * The session's own working directory, taken off the event callback's session.
+   *
+   * The routes need a directory to read `git log` in, and the caller's copy is not trustworthy: the reading view gets it from a store lookup that
+   * can answer nothing, and when it does answer nothing BOTH lookups (by call id and by subject) fail silently while the old read-git's-output
+   * path keeps working — exactly the shape of the reader's report.
+   */
+  cwd?: string;
 }
 
 const sessions = new Map<string, SessionRecord>();
@@ -69,9 +77,10 @@ function serialize(data: unknown): string {
 /**
  * Record one appended event. Called for EVERY `session/event`, never throwing: a record that breaks must not take the host down with it.
  */
-export function recordSessionEvent(sessionId: string, seq: number, time: number, type: string, data: unknown): void {
+export function recordSessionEvent(sessionId: string, seq: number, time: number, type: string, data: unknown, cwd?: string): void {
   try {
     const session = recordOf(sessionId);
+    if (cwd !== undefined && cwd !== '') session.cwd = cwd;
     const event: RecordedEvent = { seq, time, type, text: serialize(data) };
     session.events.push(event);
     session.bySeq.set(seq, event);
@@ -103,4 +112,25 @@ export const RECORD_SEARCH_LIMIT = SEARCH_LIMIT;
 /** The recorded events of one session, oldest first, or empty when nothing was recorded. */
 export function recordedEvents(sessionId: string): readonly RecordedEvent[] {
   return sessions.get(sessionId)?.events ?? [];
+}
+
+/**
+ * The working directory recorded for a session, or undefined when nothing was recorded for it.
+ *
+ * The routes need a directory to read `git log` in, and the client's own copy of it is not to be trusted: it comes from a store lookup that can
+ * answer nothing, and when it does, BOTH lookups (by call id and by subject) silently find no hash while the old read-git's-output path keeps
+ * working — which is exactly the shape of the reader's report. The session knows its own `cwd`, and the event callback hands the session over.
+ */
+export function recordedCwd(sessionId: string): string | undefined {
+  return sessions.get(sessionId)?.cwd;
+}
+
+/** How many events are recorded for one session. The route reports it: it separates "nothing was recorded" from "recorded but not matched". */
+export function recordedEventCount(sessionId: string): number {
+  return sessions.get(sessionId)?.events.length ?? 0;
+}
+
+/** The session ids the recorder knows, for a diagnostic that has to tell "wrong id" from "nothing recorded". */
+export function sessionsSeen(): readonly string[] {
+  return [...sessions.keys()];
 }

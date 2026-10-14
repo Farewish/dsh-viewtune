@@ -5,7 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { commitHashes } from './commit-hash.js';
-import { recordSessionEvent } from './commit-record.js';
+import { recordSessionEvent, recordedCwd, recordedEventCount, sessionsSeen } from './commit-record.js';
 import { recordedCommitsByCall } from './commit-calls.js';
 import type { Context } from '@deepseek-ai/cordis';
 import { contentTypeOf, listWallpapers, resolveWallpaperFile, seedDefaultWallpaper, wallpaperDirOf } from './wallpaper-files.js';
@@ -168,10 +168,10 @@ export function apply(ctx: Context): void {
     // TYPED BY HAND, and deliberately NOT by importing `@deepseek-ai/dsh-session`: that package augments `Context.sessions` with its own store,
     // and this plugin's CLIENT half resolves `ctx.sessions.list` through a different (client) facade — importing it broke those four call sites.
     // The event name and the four fields read here are all this needs, and the record module's test pins them.
-    type Listener = (session: { id: unknown }, event: { seq: unknown; time: unknown; type: unknown; data: unknown }) => void;
+    type Listener = (session: { id: unknown; cwd?: unknown }, event: { seq: unknown; time: unknown; type: unknown; data: unknown }) => void;
     const on = ctx.on as unknown as (name: string, listener: Listener) => () => void;
     const off = on('session/event', (session, event) => {
-      recordSessionEvent(String(session.id), Number(event.seq), Number(event.time), String(event.type), event.data);
+      recordSessionEvent(String(session.id), Number(event.seq), Number(event.time), String(event.type), event.data, typeof session.cwd === 'string' ? session.cwd : undefined);
     });
     return () => { off(); };
   }, 'dsh-viewtune: session event recorder');
@@ -253,6 +253,9 @@ export function apply(ctx: Context): void {
           try {
             const data = JSON.parse(body);
             const sessionId = typeof data.sessionId === 'string' ? data.sessionId.trim() : '';
+            // The RECORDED directory, not the caller's: the reading view's own copy can be empty, and when it is, every lookup silently finds
+            // nothing while the old read-git''s-output path keeps working — the exact shape of the reader''s report.
+            const recordedDir = sessionId === '' ? undefined : recordedCwd(sessionId);
             const callIds = Array.isArray(data.callIds)
               ? data.callIds.filter((id: unknown): id is string => typeof id === 'string' && id !== '')
               : [];
@@ -260,7 +263,12 @@ export function apply(ctx: Context): void {
               json(res, 400, { ok: false, error: 'Empty sessionId' });
               return;
             }
-            json(res, 200, { ok: true, commits: recordedCommitsByCall(sessionId, callIds) });
+            json(res, 200, {
+              ok: true,
+              recorded: recordedEventCount(sessionId),
+              known: sessionsSeen().slice(0, 8),
+              commits: recordedCommitsByCall(sessionId, callIds),
+            });
           } catch (err) {
             json(res, 400, { ok: false, error: String(err) });
           }
