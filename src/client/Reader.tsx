@@ -1259,7 +1259,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // GOVERNED BY THE 总流程折叠开关, which is the reader's own convention: the outer disclosure (「用时 N 秒」/「执行过程」) owns the whole process, and
     // a 次级 header may only exist while it is OPEN. The steps below are already hidden by their own `open={expanded}` wrappers, but a header sits
     // outside those wrappers — so without this it would have stayed on screen inside a collapsed process.
-    if (!segmentByNarration || !expanded) return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
+    // ONLY A FINISHED TURN IS SEGMENTED, which is the host's own rule (its segment state is guarded by `turn.status !== "closed"`) and the reader's
+    // convention: while a turn is running the whole process is shown directly and no 次级 header exists at all, so there is nothing to fold and
+    // nothing that could hide work in progress.
+    if (!segmentByNarration || !expanded || boundary.status !== 'closed') return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
     const isNarration = (item: ReaderFlowEntry): boolean => {
       if (item.kind !== 'node') return false;
       const node = nodes.get(item.nodeKey);
@@ -1291,7 +1294,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       index += 1;
     }
     return augmented;
-  }, [segmentByNarration, expanded, flow, nodes, group.key, openSegments]);
+  }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
   const toggleSegment = useCallback((id: string) => {
     setOpenSegments(current => {
       const next = new Set(current);
