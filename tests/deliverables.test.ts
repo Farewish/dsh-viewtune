@@ -164,22 +164,22 @@ test('the commits a turn made are read from its calls: hash and subject', () => 
   ];
   // …and git's own summary line in the result supplies the short hash.
   (flow[0].block as unknown as { content: unknown }).content = [{ type: 'text', text: '[adapt-0.2.0 1a2b3c4] Fix the box heading\n 1 file changed' }];
-  assert.deepEqual(turnCommits(flow), [{ hash: '1a2b3c4', subject: 'Fix the box heading' }]);
+  assert.deepEqual(turnCommits(flow), [{ callId: 'call:bash', hash: '1a2b3c4', subject: 'Fix the box heading' }]);
 });
 
 test('a commit made with a global option is still a commit — the reader’s own case', () => {
   // Every commit in the reader's instance is made as `git -C <dir> commit …` (it is how this project's are made), and a
   // pattern demanding `git` be followed immediately by `commit` matched none of them: 「提交」 never appeared.
   const flow = [tool('pwsh', { command: 'git -C D:\\DSH\\dsh-better-display-tools\\worktree\\dsh-viewtune commit -m "A real one"' })];
-  assert.deepEqual(turnCommits(flow), [{ subject: 'A real one' }]);
-  assert.deepEqual(turnCommits([tool('pwsh', { command: 'git -c core.pager=cat commit --message "And another"' })]), [{ subject: 'And another' }]);
+  assert.deepEqual(turnCommits(flow), [{ callId: 'call:pwsh', subject: 'A real one' }]);
+  assert.deepEqual(turnCommits([tool('pwsh', { command: 'git -c core.pager=cat commit --message "And another"' })]), [{ callId: 'call:pwsh', subject: 'And another' }]);
 });
 
 test('a commit with no -m takes its subject from git’s own summary line', () => {
   // …which is the `-F <file>` case: this project's own commits are made that way.
   const flow = [tool('pwsh', { command: 'git -C repo commit -F msg.txt' })];
   (flow[0].block as unknown as { content: unknown }).content = [{ type: 'text', text: '[adapt-0.2.0 e49eaa9] Merge the file lists into 编辑' }];
-  assert.deepEqual(turnCommits(flow), [{ hash: 'e49eaa9', subject: 'Merge the file lists into 编辑' }]);
+  assert.deepEqual(turnCommits(flow), [{ callId: 'call:pwsh', hash: 'e49eaa9', subject: 'Merge the file lists into 编辑' }]);
 });
 
 test('a command that merely MENTIONS a commit is not one, and neither is a document about commits', () => {
@@ -194,7 +194,7 @@ test('a command that merely MENTIONS a commit is not one, and neither is a docum
 });
 
 test('a commit keeps its subject even when the result carries no readable hash', () => {
-  assert.deepEqual(turnCommits([tool('bash', { command: 'git commit --message "Only a subject"' })]), [{ subject: 'Only a subject' }]);
+  assert.deepEqual(turnCommits([tool('bash', { command: 'git commit --message "Only a subject"' })]), [{ callId: 'call:bash', subject: 'Only a subject' }]);
 });
 
 test('a commit bubble is labelled with its message, and a click copies its hash — the reader’s choice', () => {
@@ -217,14 +217,14 @@ test('a result that is only a `git log --oneline -1` line still names the commit
   // 「一次提交」 instead of their message. Measured from their own command, and pinned here.
   const flow = [tool('pwsh', { command: 'git -C repo commit -F msg.txt; git -C repo log --oneline -1' })];
   (flow[0].block as unknown as { content: unknown }).content = [{ type: 'text', text: ' b2302ee Brief mode only: commits get their own row\n' }];
-  assert.deepEqual(turnCommits(flow), [{ hash: 'b2302ee', subject: 'Brief mode only: commits get their own row' }]);
+  assert.deepEqual(turnCommits(flow), [{ callId: 'call:pwsh', hash: 'b2302ee', subject: 'Brief mode only: commits get their own row' }]);
 });
 
 test('when nothing readable names the commit, the bubble says so instead of inventing a name', () => {
   // A `-F <file>` commit whose result holds neither the summary line nor a log line: the message is simply not readable
   // from a client, and saying that is the honest outcome — the reader read the old placeholder 「一次提交」 as the commit's
   // own message, which is exactly what a placeholder must not look like.
-  assert.deepEqual(turnCommits([tool('bash', { command: 'git commit -F msg.txt' })]), [{ subject: UNKNOWN_COMMIT }]);
+  assert.deepEqual(turnCommits([tool('bash', { command: 'git commit -F msg.txt' })]), [{ callId: 'call:bash', subject: UNKNOWN_COMMIT }]);
 });
 
 test('createProducedFileMentions resolves exact paths and unique basenames, leaving ambiguous basenames inert', () => {

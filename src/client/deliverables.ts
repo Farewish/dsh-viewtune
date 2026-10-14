@@ -2,6 +2,10 @@ import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/clien
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { ReaderFlowEntry } from './tool-activity.js';
 import { callDiffHunks, inputFields, stringValue, toolIdentity } from './tool-activity.js';
+// The two pure parsing pieces live in src/commit-parse.ts because the HOST needs the very same ones (it answers commits by call id from the
+// untruncated events). One source, so the two halves cannot drift.
+import { commitSubject, commitSummary, GIT_COMMIT, unquoted, UNKNOWN_COMMIT } from '../commit-parse.js';
+export { UNKNOWN_COMMIT } from '../commit-parse.js';
 // Type-only, so this module stays free of the primitives at RUNTIME and can still be unit-tested outside a browser.
 import type { DiffHunk } from '@deepseek-ai/dsh-client-ui-primitives';
 
@@ -79,7 +83,6 @@ export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths
  * Deliberately NOT a word that could pass for a name: the reader saw 「一次提交」 in a bubble and read it as the commit's
  * own message — a placeholder that looks like a name is worse than an admission that the message was not readable.
  */
-export const UNKNOWN_COMMIT = '未读到提交信息';
 
 /**
  * What a commit's bubble is LABELLED with — the reader's answer to "which shows better?".
@@ -109,6 +112,11 @@ export interface CommitRecord {
   readonly hash?: string;
   /** The message's first line, from the command's own `-m` or from git's output, or `UNKNOWN_COMMIT`. */
   readonly subject: string;
+  /**
+   * The tool call this commit came from, when the flow named one. The host answers a commit BY this id from the untruncated session events,
+   * which is what makes the hash exact: no pairing by order, no time window, and a concurrent commit to the same repository cannot move it.
+   */
+  readonly callId?: string;
 }
 
 /**
@@ -120,42 +128,11 @@ export interface CommitRecord {
  */
 // A commit is a commit wherever it is spelled: at a line's start, after a separator, inside a subshell (`(git commit …)`) or with the output
 // captured (`x=$(git commit …)`, `$out = (git commit …)`) — the reader's own commit went undetected for exactly that last reason.
-const GIT_COMMIT = /(?:^|[;&|(]|\$\(|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/;
 
-/**
- * The command with its QUOTED SPANS removed, which is what the rule above is tested against.
- *
- * A command that merely WRITES the words `git commit -m "x"` into a file — the test fixture for this very rule, for instance — is not a commit,
- * and counting it produced a phantom entry in the lane showing the fixture's own `x` as its subject (the reader saw four commits where three
- * had been made). Quoted spans are where prose hides, so they are removed first; `\\'` keeps a literal backslash from swallowing the quote
- * that follows it.
- */
-function unquoted(command: string): string {
-  return command.replace(/\\\\.|"(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'/g, ' ');
-}
 
 /** The message of a `git commit`, from the first `-m`/`--message` argument the command carries. */
-function commitSubject(command: string): string {
-  const quoted = /(?:^|\s)-{1,2}m(?:essage)?[= ](?:"([^"]+)"|'([^']+)'|([^\s"'&|;]+))/m.exec(command);
-  const subject = (quoted?.[1] ?? quoted?.[2] ?? quoted?.[3] ?? '').split('\n')[0]?.trim() ?? '';
-  return subject === '' ? UNKNOWN_COMMIT : subject;
-}
 
 /** Git's own summary line in a result: `[branch 1a2b3c4] the subject`, both halves at once. */
-function commitSummary(text: string): { hash?: string; subject?: string } {
-  const match = /^\s*\[[^\]\s]+ ([0-9a-f]{7,40})\]\s*(.*)$/m.exec(text);
-  if (match !== null) return { hash: match[1], subject: match[2]?.trim() };
-  // …and the ONE-LINE LOG shape, which is the one the reader's own commits arrive in and the reason 「提交」 showed a
-  // placeholder rather than a name: their command ends with `git log --oneline -1`, so the only line the tool result keeps
-  // is `<short hash> <subject>` — no brackets, so the bracketed pattern above never matched it. Measured from their own
-  // command, not guessed.
-  //
-  // The bare form is accepted only line-anchored, with a 7..40 hex run and a space before a non-space: the shapes that
-  // could otherwise look like this are file content, and a `git commit` result is git's own output.
-  const bare = /^[^\S\n]*([0-9a-f]{7,40})[^\S\n]+(\S.*)$/m.exec(text);
-  if (bare === null) return {};
-  return { hash: bare[1], subject: bare[2]?.trim() };
-}
 
 /**
  * The commits a turn made: every tool call whose ARGUMENTS carry a `git commit` command.
@@ -194,7 +171,10 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
     const key = `${summary.hash ?? ''}\u0000${finalSubject}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    commits.push(summary.hash === undefined ? { subject: finalSubject } : { hash: summary.hash, subject: finalSubject });
+    // The call's own id travels with the record, so the host can answer THIS commit rather than one that merely looks like it.
+    const callId = typeof item.callId === 'string' && item.callId !== '' ? item.callId : undefined;
+    const base = callId === undefined ? {} : { callId };
+    commits.push(summary.hash === undefined ? { ...base, subject: finalSubject } : { ...base, hash: summary.hash, subject: finalSubject });
   }
   return commits;
 }

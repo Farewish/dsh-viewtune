@@ -35,7 +35,7 @@ import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
 import { FileAttachmentCard } from './FileAttachmentCard.js';
-import { commitHashOf, recentCommitsOf } from './commit-hash.js';
+import { commitHashOf, commitsByCall, type CallCommit } from './commit-hash.js';
 import { FileFrame } from './FileFrame.js';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { textCadenceOf } from './text-cadence.js';
@@ -646,7 +646,7 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
  * repository by subject (see `commit-hash.ts`). A context rather than a prop because the bubbles sit several layers down in two different
  * layouts, and threading it through both would touch every component between.
  */
-const ReaderCwdContext = createContext<string | undefined>(undefined);
+const ReaderCwdContext = createContext<{ cwd?: string; sessionId?: string }>({});
 
 function DeliverablesBox({ region, open, onToggle, onHeadingClick, panel, children }: {
   region: { id: string; label: string; hint: string; count: number };
@@ -799,7 +799,7 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
  */
 const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commit: CommitRecord; newestIndex: number }) {
   const [copied, setCopied] = useState(false);
-  const cwd = useContext(ReaderCwdContext);
+  const { cwd, sessionId } = useContext(ReaderCwdContext);
   /**
    * A hash recovered from the repository, for a commit whose call never showed git's own output line. `undefined` means "nothing recovered
    * yet"; the module's cache remembers a subject the host could not find, so the same lookup is never sent twice.
@@ -808,18 +808,28 @@ const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commi
   useEffect(() => {
     if (commit.hash !== undefined) { setRecovered(commit); return; }
     let live = true;
-    // A subject the host TRUNCATED (long `-m` messages arrive as `…`) cannot be looked up by, and neither can a missing one; for those the
-    // repository answers by POSITION instead — the turn's commits are the newest ones, so this bubble takes its own place from the end.
+    /**
+     * THREE ways to a hash, in the order that is most exact first:
+     *
+     *  1. THE CALL ID. The host recorded this session's untruncated events and can answer "what did THIS call commit?" — exact, and immune to
+     *     the host truncating a long `-m` message down to `…`, which is what the reader's own commits arrive as.
+     *  2. THE SUBJECT, through a `git log` by title, for a commit the recorder never saw (it only records from plugin activation onward).
+     *  3. Nothing. A commit whose hash cannot be proven keeps its message alone: a wrong hash looks right and pastes into `git show`, which is
+     *     worse than an absent one.
+     */
     const usable = commit.subject !== '' && commit.subject !== UNKNOWN_COMMIT && !commit.subject.includes('…');
-    const answer = usable
-      ? commitHashOf(cwd, commit.subject).then(hash => (hash === undefined ? undefined : { ...commit, hash }))
-      : recentCommitsOf(cwd, newestIndex + 1).then(list => {
-        const found = list[newestIndex];
-        return found === undefined ? undefined : { hash: found.hash, subject: found.subject === '' ? commit.subject : found.subject };
-      });
+    const byCall = commit.callId === undefined
+      ? Promise.resolve<CallCommit | undefined>(undefined)
+      : commitsByCall(sessionId, [commit.callId]).then(map => map[commit.callId as string]);
+    const answer = byCall.then(found => {
+      if (found !== undefined) return { ...commit, ...(found.hash === undefined ? {} : { hash: found.hash }), subject: found.subject === '' ? commit.subject : found.subject };
+      if (!usable) return undefined;
+      return commitHashOf(cwd, commit.subject).then(hash => (hash === undefined ? undefined : { ...commit, hash }));
+    });
     void answer.then(value => { if (live && value !== undefined) setRecovered(value); });
     return () => { live = false; };
-  }, [cwd, commit, newestIndex]);
+  }, [cwd, sessionId, commit]);
+  /** What the bubble renders: the committed record once a hash has been recovered, otherwise what the flow carried. */
   const shown: CommitRecord = recovered ?? commit;
   const copy = () => {
     try {
@@ -2076,7 +2086,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><ReaderCwdContext.Provider value={props.cwd}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.9" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><ReaderCwdContext.Provider value={{ cwd: props.cwd, sessionId: props.sessionId }}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.9" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
