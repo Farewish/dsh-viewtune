@@ -800,10 +800,7 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
 const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commit: CommitRecord; newestIndex: number }) {
   const [copied, setCopied] = useState(false);
   const { cwd, sessionId } = useContext(ReaderCwdContext);
-  // TEMPORARY DIAGNOSTIC: the four values the hash path actually uses. Remove once the lane is confirmed on the reader's instance.
   useEffect(() => {
-    console.info('[viewtune] commit bubble', { subject: commit.subject, callId: commit.callId, cwd, sessionId });
-  }, [commit.subject, commit.callId, cwd, sessionId]);
   /**
    * A hash recovered from the repository, for a commit whose call never showed git's own output line. `undefined` means "nothing recovered
    * yet"; the module's cache remembers a subject the host could not find, so the same lookup is never sent twice.
