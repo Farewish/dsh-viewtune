@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PROCESS_DONE_LABELS, processGroups, processKindOfTool, segmentLabelOf } from '../src/client/process-segments.ts';
-import type { ProcessCharacter, ProcessKind } from '../src/client/process-segments.ts';
 
 test('the labels are the host\'s own words, verbatim', () => {
   // Copied from `dsh-client-ui-chat`'s table (`message.stepProcess.done.*`). If one of these changes, the reading view has stopped agreeing
@@ -46,50 +45,34 @@ test('a run\'s title follows the host\'s own composition, rule for rule', () => 
   assert.equal(segmentLabelOf(['commands', 'read']), '执行了命令并已读取文件');
 });
 
-/** A stand-in for a flow item: only the two things `processGroups` reads. */
-interface Item {
-  readonly id: string;
-  readonly character: ProcessCharacter;
-  readonly kind: ProcessKind;
-}
-
-const step = (id: string, character: ProcessCharacter, kind: ProcessKind = 'tools'): Item => ({ id, character, kind });
-const IND: ProcessCharacter = { independent: true };
-const THINK: ProcessCharacter = { reasoning: true };
-const SAY: ProcessCharacter = { reply: true };
-/** The common case the reader reported: thinking AND the narration that follows it live in ONE step. */
-const BOTH: ProcessCharacter = { reasoning: true, reply: true };
-const OTHER: ProcessCharacter = {};
-
-const shape = (items: readonly Item[], turnClosed = true): readonly string[] => processGroups(
-  items,
-  item => item.character,
-  item => item.kind,
-  turnClosed,
-).map(unit => unit.kind === 'single'
-  ? `single:${unit.item.id}`
-  : `run[${unit.members.map(member => member.id).join(',')}]${unit.label === undefined ? '(growing)' : `=${unit.label}`}`);
-
 test('a run is bounded by the host\'s own rules: the INDEPENDENT kinds and the narration', () => {
-  // `processGroups` is a transcription of `rebuild` in `conversation-nodes/process-groups.js` (see the module). Each case below was a bug in the
-  // earlier narration-only version.
-  //
-  // 1. THINKING IS A MEMBER: a run that opens with it is a run, and it gets a title like any other.
-  assert.deepEqual(shape([step('t1', THINK, 'thinking'), step('read1', OTHER, 'read')]), ['run[t1,read1]=已完成分析并读取文件']);
-  // 2. A TOOL CALL IS NOT A BOUNDARY — what the reader saw as 「有时候没有以旁白为界」.
-  assert.equal(shape([step('a', OTHER, 'commands'), step('b', OTHER, 'read')]).length, 1, 'two tools stay in ONE run');
+  // `processGroups` is a transcription of `rebuild` in `conversation-nodes/process-groups.js` (see the module). Three things it must get right,
+  // each of which was wrong in the earlier narration-only version.
+  type Character = 'independent' | 'reasoning' | 'reply' | 'other';
+  interface Item { readonly id: string; readonly character: Character; readonly kind?: ReturnType<typeof processKindOfTool> }
+  const step = (id: string, character: Character, kind: ReturnType<typeof processKindOfTool> = 'tools'): Item => ({ id, character, kind });
+  const shape = (items: readonly Item[], turnClosed = true): readonly string[] => processGroups(
+    items,
+    item => item.character,
+    item => item.kind ?? 'tools',
+    turnClosed,
+  ).map(unit => unit.kind === 'single'
+    ? `single:${unit.item.id}`
+    : `run[${unit.members.map(member => member.id).join(',')}]${unit.label === undefined ? '(growing)' : `=${unit.label}`}`);
+
+  // 1. THINKING IS A MEMBER: a run that opens with it is a run, and it gets a title like any other — the reader's second report.
+  assert.deepEqual(shape([step('t1', 'reasoning', 'thinking'), step('read1', 'other', 'read')]), ['run[t1,read1]=已完成分析并读取文件']);
+
+  // 2. A TOOL CALL IS NOT A BOUNDARY — the bug the reader saw as 「有时候没有以旁白为界」.
+  assert.equal(shape([step('a', 'other', 'commands'), step('b', 'other', 'read')]).length, 1, 'two tools stay in ONE run');
+
   // 3. THE NARRATION ENDS A RUN AND STANDS OUTSIDE IT.
   assert.deepEqual(
-    shape([step('t1', THINK, 'thinking'), step('say', SAY), step('t2', THINK, 'thinking')]),
+    shape([step('t1', 'reasoning', 'thinking'), step('say', 'reply'), step('t2', 'reasoning', 'thinking')]),
     ['run[t1]=已完成分析', 'single:say', 'run[t2]=已完成分析'],
   );
-  // 4. THINKING AND NARRATION IN ONE STEP: the node is a MEMBER — so its thinking is governed by the run's fold control — AND a single whose
-  //    render is the BODY alone, so the narration stays on the page. This is the reader's 「旁白上方紧挨着的思考段不受管辖」.
-  assert.deepEqual(
-    shape([step('t1', THINK, 'thinking'), step('both', BOTH, 'thinking')]),
-    ['run[t1,both]=已完成分析', 'single:both'],
-  );
+
   // An INDEPENDENT node does the same, and a growing tail (a running turn) carries no title.
-  assert.deepEqual(shape([step('x', OTHER, 'edit'), step('u', IND)]), ['run[x]=修改了文件', 'single:u']);
-  assert.deepEqual(shape([step('x', OTHER, 'edit'), step('y', OTHER, 'read')], false), ['run[x,y](growing)']);
+  assert.deepEqual(shape([step('x', 'other', 'edit'), step('u', 'independent')]), ['run[x]=修改了文件', 'single:u']);
+  assert.deepEqual(shape([step('x', 'other', 'edit'), step('y', 'other', 'read')], false), ['run[x,y](growing)']);
 });

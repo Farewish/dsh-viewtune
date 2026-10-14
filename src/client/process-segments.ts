@@ -131,22 +131,11 @@ export function segmentLabelOf(kinds: readonly ProcessKind[]): string {
 /**
  * What one flow item is, in the host's own terms.
  *
- * NOT a single value, and that is the whole point: the host runs `if (reasoning(node)) pending.push(...)` and then
- * `if (reply(node)) { flush(true); emit(key, { groupPart: "response" }) }` over the SAME node, so one step can be a member of a run AND stand
- * outside it at once. Treating it as one-or-the-other is exactly the bug the reader reported — a step whose thinking sits immediately above its
- * own narration never got a fold control, because the node was classified as a reply and its thinking was therefore never added to any run.
- *
- * `independent` is the host's `INDEPENDENT` set — user, steering, turn-trigger, model-retry, turn-error, turn-max-tokens, turn-tail — which is the
- * WHOLE of its boundary list, so anything else is a member of the run it sits in.
+ * `independent` is its `INDEPENDENT` set — user, steering, turn-trigger, model-retry, turn-error, turn-max-tokens, turn-tail — which is the WHOLE
+ * of its boundary list, so anything else is a member of the run it sits in. `reasoning` is an assistant step that says something in its thinking
+ * block; `reply` is one that carries the answer body, i.e. the turn's narration.
  */
-export interface ProcessCharacter {
-  /** In the host's `INDEPENDENT` set: stands outside every run and is never a member. */
-  readonly independent?: boolean;
-  /** Carries thinking: a MEMBER of the run it sits in. */
-  readonly reasoning?: boolean;
-  /** Carries the answer body, i.e. the turn's narration: ends the run before it and stands outside it. */
-  readonly reply?: boolean;
-}
+export type ProcessCharacter = 'independent' | 'reasoning' | 'reply' | 'other';
 
 /** A run of members — the host's `ProcessGroup`. */
 export interface ProcessGroupRun<T> {
@@ -164,18 +153,11 @@ export interface ProcessGroupRun<T> {
   readonly label?: string;
 }
 
-/**
- * A node that sits OUTSIDE every run: an `INDEPENDENT` node, or the narration (the host's `groupPart: "response"`).
- *
- * `part` says how the caller must render it, and it matters when the SAME node was also a member of the run before it: then the single is the
- * step's ANSWER BODY only (`'body'`), because the caller has already rendered its thinking inside the run.
- */
+/** A node that sits OUTSIDE every run: an `INDEPENDENT` node, or the narration (the host's `groupPart: "response"`). */
 export interface ProcessSingle<T> {
   readonly kind: 'single';
   readonly item: T;
   readonly character: 'independent' | 'reply';
-  /** Which of the item's parts this single stands for: everything (`whole`), or the answer body alone (`body`). */
-  readonly part: 'whole' | 'body';
 }
 
 export type ProcessUnit<T> = ProcessGroupRun<T> | ProcessSingle<T>;
@@ -224,30 +206,14 @@ export function processGroups<T>(
   let followed = false;
   for (const item of items) {
     const character = characterOf(item);
-    // An INDEPENDENT node is only ever a single: it is never a member of a run.
-    if (character.independent === true) {
+    if (character === 'independent' || character === 'reply') {
       flush(true);
-      units.push({ kind: 'single', item, character: 'independent', part: 'whole' });
-      followed = true;
-      continue;
-    }
-    // A node with thinking is a MEMBER, and its kind counts towards the run's title. This is the half that was missing: a step whose thinking
-    // sits immediately above its own narration used to be classified as a reply and never entered a run at all.
-    if (character.reasoning === true) {
+      units.push({ kind: 'single', item, character });
+    } else {
+      // `reasoning` and `other` are both members; only the label composition tells them apart.
       pending.push(item);
       const kind = kindOf(item);
       if (!kinds.includes(kind)) kinds.push(kind);
-    } else if (character.reply !== true) {
-      // Anything else — a tool call, a command, a question reply — is a member too.
-      pending.push(item);
-      const kind = kindOf(item);
-      if (!kinds.includes(kind)) kinds.push(kind);
-    }
-    // …and a node carrying the answer body ends the run and stands outside it. When it was ALSO a member (thinking and body in one step) the
-    // single stands for the BODY alone, because the caller has already rendered its thinking inside the run.
-    if (character.reply === true) {
-      flush(true);
-      units.push({ kind: 'single', item, character: 'reply', part: character.reasoning === true ? 'body' : 'whole' });
     }
     followed = true;
   }
