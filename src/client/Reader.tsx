@@ -18,6 +18,9 @@ import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } 
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
+import { toolName } from './projection.js';
+import type { ReaderFlowEntry } from './tool-activity.js';
+import { processKindOfTool, splitByNarration, type ProcessKind } from './process-segments.js';
 import { stepReading, tokensPerSecondOf } from './turn-reading.js';
 import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
@@ -1074,7 +1077,15 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
+/** A synthetic render item: the header of one narration-separated stretch of the process (see 「按旁白分段」). */
+interface SegmentHeaderItem {
+  readonly kind: 'segmentHeader';
+  readonly key: string;
+  readonly segmentId: string;
+  readonly label: string;
+}
+
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, segmentByNarration, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; segmentByNarration: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -1226,6 +1237,59 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   };
   const terminal = terminalLabel(boundary.reason);
   const hasTurnError = flow.some(item => item.kind === 'node' && nodes.get(item.nodeKey)?.kind === 'turn-error');
+  /**
+   * 「按旁白分段」, the render half: a synthetic HEADER item in front of each stretch, and the members of a closed stretch left out.
+   *
+   * Built as an augmented list rather than by restructuring the flow's own JSX, so the existing branches stay exactly as they were and this
+   * feature cannot change how a single step renders. The boundaries are the turn's NARRATION (an assistant node that says something) and every
+   * other thing the reader sees in the flow that is not process — a user message, a turn trigger — because those separate steps just as a
+   * narration does. Membership and label come from `process-segments.ts`, which is the host's own rule and wording.
+   */
+  const [closedSegments, setClosedSegments] = useState<ReadonlySet<string>>(() => new Set<string>());
+  // One ref for every stretch header: it exists so a focus return has somewhere to land, and the headers share the flow's own button.
+  const segmentButton = useRef<HTMLButtonElement>(null);
+  const renderFlow = useMemo(() => {
+    if (!segmentByNarration) return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
+    const isNarration = (item: ReaderFlowEntry): boolean => {
+      if (item.kind !== 'node') return false;
+      const node = nodes.get(item.nodeKey);
+      if (node === undefined) return true;
+      if (node.kind !== 'assistant-step') return true;
+      const blocks = (node.data as { blocks?: readonly { kind?: string; text?: string }[] }).blocks ?? [];
+      return blocks.some(block => block.kind === 'text' && (block.text ?? '').trim() !== '');
+    };
+    const kindOf = (item: ReaderFlowEntry): ProcessKind => {
+      if (item.kind !== 'node') return processKindOfTool(item.block === undefined ? '' : toolName(item.block));
+      const node = nodes.get(item.nodeKey);
+      const blocks = (node?.data as { blocks?: readonly { kind?: string }[] } | undefined)?.blocks ?? [];
+      return blocks.some(block => block.kind === 'reasoning') ? 'thinking' : 'tools';
+    };
+    const items = flow.filter(item => !isNarration(item) || false);
+    const segments = splitByNarration(items, () => false, kindOf);
+    const closedKeys = new Set<string>();
+    const augmented: (ReaderFlowEntry | SegmentHeaderItem)[] = [];
+    let index = 0;
+    for (const item of flow) {
+      if (isNarration(item)) { augmented.push(item); continue; }
+      const segment = segments.find((candidate: { items: readonly ReaderFlowEntry[] }) => candidate.items.includes(item));
+      if (segment === undefined) { augmented.push(item); continue; }
+      const position = segments.indexOf(segment);
+      const id = `${group.key}:${String(position)}`;
+      if (segment.items[0] === item) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: segment.label });
+      if (closedSegments.has(id)) continue;
+      augmented.push(item);
+      index += 1;
+    }
+    return augmented;
+  }, [segmentByNarration, flow, nodes, group.key, closedSegments]);
+  const toggleSegment = useCallback((id: string) => {
+    setClosedSegments(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const showTerminalNotice = terminal && !hasTurnError && boundary.reason !== 'interrupted' && boundary.reason !== 'aborted';
   // The duration stays on the process disclosure rather than becoming its own
   // row: the disclosure label is what expands and folds the process.
@@ -1237,7 +1301,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
-      {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
+      {renderFlow.map(item => item.kind === 'segmentHeader' ? <Fragment key={item.key}>
+        <Disclosure open={!closedSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} label={<span className={css.segmentLabel}>{item.label}</span>} />
+      </Fragment> : item.kind === 'node' ? <Fragment key={item.key}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
         <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
@@ -2200,7 +2266,7 @@ export function Reader(props: ReaderProps) {
         }}>一次性加载到最早（较慢）</button>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} onLeaveTail={scroll.release} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} live={group.turn !== null && group.turn === liveTurn} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} segmentByNarration={segmentByNarration} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} onLeaveTail={scroll.release} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} live={group.turn !== null && group.turn === liveTurn} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (
