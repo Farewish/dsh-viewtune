@@ -828,7 +828,11 @@ const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commi
     });
     void answer.then(value => { if (live && value !== undefined) setRecovered(value); });
     return () => { live = false; };
-  }, [cwd, sessionId, commit]);
+    // DEPEND ON THE FIELDS, never on `commit`. The record object is rebuilt by every render, so `[commit]` re-ran this effect constantly and each
+    // run's cleanup cancelled the previous run's promise — every hash found asynchronously was discarded, while the synchronous case (a hash the
+    // flow already carried) worked. That is exactly what the reader saw: only the commits whose git output was NOT swallowed ever showed a hash,
+    // and the route, given the same subject and directory, answered correctly from the page.
+  }, [cwd, sessionId, commit.subject, commit.callId, commit.hash]);
   /** What the bubble renders: the committed record once a hash has been recovered, otherwise what the flow carried. */
   const shown: CommitRecord = recovered ?? commit;
   const copy = () => {
