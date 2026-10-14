@@ -9,8 +9,14 @@
 /** What a session's commit bubble shows when no message could be read at all. */
 export const UNKNOWN_COMMIT = '未读到提交信息';
 
-/** `git commit` in COMMAND position, allowing the global options between the program and its subcommand, in a subshell, or with output captured. */
-export const GIT_COMMIT = /(?:^|[;&|(]|\$\(|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/;
+/**
+ * `git commit` in COMMAND position: the start of a LINE, after a separator, inside a subshell, or with its output captured.
+ *
+ * The `m` flag is load-bearing, and its absence was a real miss: a commit written on its OWN LINE of a multi-line script — which is how every
+ * commit in this project's own turns is written, `git add -A` on one line and `git commit -m "…"` on the next — never matched, because `^`
+ * without `m` means the start of the WHOLE string. The reader hit it as a turn whose commit produced no 提交 lane at all.
+ */
+export const GIT_COMMIT = /(?:^|[;&|(]|\$\(|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/m;
 
 /**
  * The command with its QUOTED SPANS removed, which is what the rule above is tested against.

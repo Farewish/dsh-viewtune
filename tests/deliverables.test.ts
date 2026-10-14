@@ -326,3 +326,15 @@ test('a command that merely WRITES a commit command is not a commit', () => {
   // …while the real thing, quoted or not, still counts.
   assert.equal(turnCommits([tool('run', { command: '$out = (git commit -m "x" 2>&1)' })]).length, 1);
 });
+
+test('a commit on its own LINE of a multi-line script is found — the whole reason the m flag exists', () => {
+  // The reader saw a turn whose commit produced NO 提交 lane at all: their command is a script, with `git add -A` on one line and
+  // `git commit -m "…"` on the next, and `^` without the `m` flag only matches the start of the whole string.
+  const script = [
+    '$enc = New-Object System.Text.UTF8Encoding($false)',
+    'Set-Location $wt',
+    'git add -A',
+    'git commit -m "Drop the superseded lookup" | Out-String',
+  ].join('\n');
+  assert.deepEqual(turnCommits([tool('pwsh', { command: script })]), [{ callId: 'call:pwsh', subject: 'Drop the superseded lookup' }]);
+});
