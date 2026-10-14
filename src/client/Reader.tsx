@@ -1567,6 +1567,8 @@ export function Reader(props: ReaderProps) {
   // `undefined` — into OFF, which is not what the default says. The guard that pairs every default with its reader
   // caught exactly this when the default was flipped (see check-settings-fallbacks).
   const autoCollapseEarlier = props.useStore(state => state.autoCollapseEarlier) !== false;
+  // 「按旁白分段」: group a turn's process into collapsible stretches separated by its narration (see `process-segments.ts`).
+  const segmentByNarration = props.useStore(state => state.segmentProcessByNarration) === true;
   // A `useMemo` on `timeline`, NOT a selector: `useChat` runs its selector on every store notification, and text arrives
   // as one notification per delta, so scanning the turn map inside the selector meant walking every turn in the
   // conversation once per streamed chunk — work that grows with the history and can only ever change at a turn or step
@@ -2108,6 +2110,7 @@ export function Reader(props: ReaderProps) {
           revealWords={revealWords} onRevealWords={props.actions.setRevealWords}
           followMode={followMode} onFollowMode={props.actions.setFollowMode}
           autoCollapseEarlier={autoCollapseEarlier} onAutoCollapseEarlier={props.actions.setAutoCollapseEarlier}
+        segmentProcessByNarration={segmentByNarration} onSegmentProcessByNarration={props.actions.setSegmentProcessByNarration}
           reasoningFollow={reasoningFollow} onReasoningFollow={props.actions.setReasoningFollow}
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}

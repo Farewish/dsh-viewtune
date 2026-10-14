@@ -180,6 +180,14 @@ export interface ReaderState {
    */
   reasoningFold: boolean;
   /**
+   * Split a turn's process by its NARRATION, one collapsible stretch per gap, the way the host's conversation page does.
+   *
+   * Each stretch is labelled with the host's own wording for what happened inside it (`process-segments.ts`), and the label is a JOIN of
+   * the kinds in first-appearance order, so a turn that ran a command, edited a file and read one reads
+   * 「执行了命令，修改了文件，已读取文件」. OFF by default: the segments are a change to a page the reader already reads.
+   */
+  segmentProcessByNarration: boolean;
+  /**
    * Whether opening a reasoning card also brings its BOTTOM to the top of the composer — 「展开后底端对齐输入栏顶」.
    *
    * ON by default: the reader asked for the behaviour itself, not for a switch to discover. Read defensively (`!== false`),
@@ -261,6 +269,7 @@ type ReaderActions = {
   setReasoningRate: (draft: ReaderState, value: number) => void;
   setFocusExpand: (draft: ReaderState, value: boolean) => void;
   setReasoningFold: (draft: ReaderState, value: boolean) => void;
+  setSegmentProcessByNarration: (draft: ReaderState, value: boolean) => void;
   setExpandBottomAlign: (draft: ReaderState, value: boolean) => void;
   /** Drop every stored expansion choice, so each turn falls back to its default. */
   clearExpanded: (draft: ReaderState) => void;
@@ -337,6 +346,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // …and a card is NOT folded to one line unless the reader asks for it: the fold changes the SHAPE of every reasoning
       // card, so it ships off and every record written before it keeps the cards it had.
       reasoningFold: false,
+  segmentProcessByNarration: false,
       // …and opening a card DOES bring its bottom to the composer by default: the reader asked for the behaviour, so a fresh
       // install (and every record written before the switch) opens with it.
       expandBottomAlign: true,
@@ -388,6 +398,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
       setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },
       setReasoningFold: (draft, value: boolean) => { draft.reasoningFold = value; },
+  setSegmentProcessByNarration: (draft, value: boolean) => { draft.segmentProcessByNarration = value; },
       setExpandBottomAlign: (draft, value: boolean) => { draft.expandBottomAlign = value; },
       clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },

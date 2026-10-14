@@ -83,6 +83,8 @@ const REASONING_FOLD_HINT = '每张思考卡折成一行，点展开可看全文
 const EXPAND_BOTTOM_HINT = '展开后卡片底端贴到输入栏顶上';
 /** What the turn window buys, as that row's `title` box: behaviour only, and short (the copy check caps it at 28). */
 const FOLD_BEFORE_HINT = '只留最近这几轮，更早的用按钮取；0 是全部保留';
+/** What splitting a turn's process by its narration does, as that row's 	itle box (the host's own conversation-page shape). */
+const SEGMENT_HINT = '以旁白为界分段，每段一个可展开的标题，同对话页';
 /** How the three ways of showing a turn's files differ, in the reader's own terms. */
 const DELIVERABLE_DISPLAY_HINT = '简略更紧凑，详细更像原生卡片';
 /** What the entry row changes, in the reader's own terms. */
@@ -143,7 +145,7 @@ function Group({ caption }: { caption?: string }) {
  * tabs. A settings panel with more than one page should not be the one place in this view where a
  * keyboard reader has to guess.
  */
-export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, entryView, onEntryView, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, reasoningFold, onReasoningFold, expandBottomAlign, onExpandBottomAlign, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
+export function SettingsMenu({ motion, preference, onChange, glass, onGlass, glassConversation, onGlassConversation, conversationSolid, onConversationSolid, collapseMode, onCollapseMode, glassParts, onGlassPart, glassBlur, onGlassBlur, openInSidebar, onOpenInSidebar, deliverableDisplay, onDeliverableDisplay, entryView, onEntryView, recordCommits, onRecordCommits, reviewInSidebar, onReviewInSidebar, stripWheel, onStripWheel, textCadence, onTextCadence, revealBlur, onRevealBlur, revealWords, onRevealWords, followMode, onFollowMode, autoCollapseEarlier, onAutoCollapseEarlier, collapseBefore, onCollapseBefore, reasoningFollow, onReasoningFollow, reasoningRate, onReasoningRate, focusExpand, onFocusExpand, reasoningFold, onReasoningFold, segmentProcessByNarration, onSegmentProcessByNarration, expandBottomAlign, onExpandBottomAlign, wallpaper, wallpaperDim, onWallpaper, onWallpaperDim, wallpaperScope, wallpaperChromeSidebar, wallpaperChromeHeader, wallpaperChromeSidebarBlur, wallpaperChromeHeaderBlur, onWallpaperScope, onWallpaperChromeSidebar, onWallpaperChromeHeader, onWallpaperChromeSidebarBlur, onWallpaperChromeHeaderBlur, shortcuts, onShortcut, buttonRef }: {
   /** Whether animation actually runs: the preference with the system's request folded in. */
   motion: boolean;
   /** The stored motion preference, which is what the switch shows. */
@@ -207,6 +209,9 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
   onFocusExpand: (next: boolean) => void;
   reasoningFold: boolean;
   onReasoningFold: (next: boolean) => void;
+  /** Whether a turn's process is grouped into collapsible stretches separated by its narration (the host's conversation-page shape). */
+  segmentProcessByNarration: boolean;
+  onSegmentProcessByNarration: (next: boolean) => void;
   expandBottomAlign: boolean;
   onExpandBottomAlign: (next: boolean) => void;
   /** The chosen wallpaper's file name in the plugin's folder, or `''` for none. */
@@ -512,6 +517,7 @@ export function SettingsMenu({ motion, preference, onChange, glass, onGlass, gla
                 <span className={css.settingsLabel}>自动收起更早流程</span>
               </span>
               <Switch checked={autoCollapseEarlier} onChange={onAutoCollapseEarlier} label="自动收起更早流程" />
+                  <Switch checked={segmentProcessByNarration} onChange={onSegmentProcessByNarration} label="按旁白分段" title={SEGMENT_HINT} />
             </div>
             {/* The COUNT-based folding, right next to the boolean one because the two answer the same question at
                 different times: that one acts while a turn streams, this one at rest as well — and since a folded
