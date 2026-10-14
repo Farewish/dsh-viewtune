@@ -372,10 +372,6 @@
    focus (both are decided in `ReasoningCard.tsx`, which is also where 「不记忆」 is satisfied — the open state is the card's
    own component state, never part of the record). */
 .reasonFoldIcon { flex: none; align-self: center; color: var(--dsw-alias-label-secondary); }
-/* A finished turn's folded process row, labelled with the turn's NARRATION — the host's own treatment (`dsh-client-ui-chat`: `.lcKema_summary`
-   is `nowrap` with `overflow: hidden`, and `.lcKema_summaryText` adds the ellipsis, at the secondary content size). Only rendered when the
-   reader turns 「旁白作为折叠标签」 on; otherwise the row keeps its 「执行过程」/「用时 N 秒」 label. */
-.processNarration { min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dsw-alias-label-secondary); font-size: var(--dsh-content-font-size-secondary, 13px); line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px)); }
 .reasonCard[data-folded] { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; }
 .reasonCard[data-folded] .reasonHeading { flex: none; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
 /* One line EXACTLY: `.reasonText` has `line-height: 24px`, so a shorter ceiling cuts into the glyphs (the reader saw the
