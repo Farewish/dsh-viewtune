@@ -1245,7 +1245,14 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
    * other thing the reader sees in the flow that is not process — a user message, a turn trigger — because those separate steps just as a
    * narration does. Membership and label come from `process-segments.ts`, which is the host's own rule and wording.
    */
-  const [closedSegments, setClosedSegments] = useState<ReadonlySet<string>>(() => new Set<string>());
+  /**
+   * The stretches the reader has OPENED, by segment id.
+   *
+   * Stored the OPEN way round on purpose, because the reader's convention is that a 次级流程折叠开关 starts COLLAPSED: opening the 总流程折叠开关
+   * shows the stretch headers and the narrations and nothing else, and a stretch shows its steps only after its own header is clicked. An empty
+   * set is therefore exactly the initial state.
+   */
+  const [openSegments, setOpenSegments] = useState<ReadonlySet<string>>(() => new Set<string>());
   // One ref for every stretch header: it exists so a focus return has somewhere to land, and the headers share the flow's own button.
   const segmentButton = useRef<HTMLButtonElement>(null);
   const renderFlow = useMemo(() => {
@@ -1279,14 +1286,14 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       const position = segments.indexOf(segment);
       const id = `${group.key}:${String(position)}`;
       if (segment.items[0] === item) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: segment.label });
-      if (closedSegments.has(id)) continue;
+      if (!openSegments.has(id)) continue;
       augmented.push(item);
       index += 1;
     }
     return augmented;
-  }, [segmentByNarration, expanded, flow, nodes, group.key, closedSegments]);
+  }, [segmentByNarration, expanded, flow, nodes, group.key, openSegments]);
   const toggleSegment = useCallback((id: string) => {
-    setClosedSegments(current => {
+    setOpenSegments(current => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -1305,7 +1312,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {renderFlow.map(item => item.kind === 'segmentHeader' ? <Fragment key={item.key}>
-        <Disclosure open={!closedSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} label={<span className={css.segmentLabel}>{item.label}</span>} />
+        <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} label={<span className={css.segmentLabel}>{item.label}</span>} />
       </Fragment> : item.kind === 'node' ? <Fragment key={item.key}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
         <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
