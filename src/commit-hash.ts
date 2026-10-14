@@ -78,39 +78,3 @@ export async function commitHashes(cwd: string, subjects: readonly string[]): Pr
   }
   return wanted;
 }
-
-/**
- * The newest `count` commits in `cwd`, newest first, as `{ hash, subject }`.
- *
- * This is the answer for a call the host TRUNCATED: when a tool call's arguments arrive as `…` (long `-m` messages are the ones that get cut)
- * there is no subject to look a hash up BY, and the call's result is cut the same way. The repository still knows the order, and a turn's
- * commits are the newest ones at the moment the turn is read — so the caller pairs them positionally, newest first, and gets both halves back.
- * Same failure discipline as `commitHashes`: anything unprovable answers empty rather than throwing.
- */
-export async function recentCommits(cwd: string, count: number): Promise<readonly { hash: string; subject: string }[]> {
-  if (!Number.isFinite(count) || count <= 0) return [];
-  try {
-    const info = await stat(cwd);
-    if (!info.isDirectory()) return [];
-  } catch {
-    return [];
-  }
-  try {
-    const result = await run('git', ['-C', cwd, 'log', '--no-merges', `-n${String(Math.min(count, 50))}`, '--format=%h%x1f%s'], {
-      timeout: 5000,
-      maxBuffer: 4 * 1024 * 1024,
-      windowsHide: true,
-    });
-    const out: { hash: string; subject: string }[] = [];
-    for (const line of result.stdout.split('\n')) {
-      const separator = line.indexOf(FIELD_SEPARATOR);
-      if (separator <= 0) continue;
-      const hash = line.slice(0, separator).trim();
-      const subject = line.slice(separator + 1).trim();
-      if (hash !== '' && subject !== '') out.push({ hash, subject });
-    }
-    return out;
-  } catch {
-    return [];
-  }
-}
