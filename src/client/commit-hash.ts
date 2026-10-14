@@ -94,38 +94,3 @@ export function commitHashOf(cwd: string | undefined, subject: string): Promise<
   schedule(cwd, cache);
   return answer;
 }
-
-/**
- * The commits of a session, keyed by the tool call that made each one.
- *
- * This is the exact path: the host answers from the UNTRUNCATED session events it recorded, so a long `-m` message or a cut result cannot hide
- * the hash, and — unlike pairing by position or by time window — a second session committing to the same repository cannot move anyone's hash.
- * An empty answer is cached for the life of the page: the host looked, and a lane re-render must not ask again.
- */
-export const COMMIT_CALLS_PATH = '/better-display/commit-calls';
-
-export interface CallCommit { readonly hash?: string; readonly subject: string }
-
-const callsCache = new Map<string, Record<string, CallCommit>>();
-
-export async function commitsByCall(sessionId: string | undefined, callIds: readonly string[]): Promise<Record<string, CallCommit>> {
-  if (sessionId === undefined || sessionId === '' || callIds.length === 0) return {};
-  const key = `${sessionId}|${[...callIds].sort().join(',')}`;
-  const cached = callsCache.get(key);
-  if (cached !== undefined) return cached;
-  try {
-    const response = await fetch(COMMIT_CALLS_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, callIds }),
-    });
-    if (!response.ok) return {};
-    const data = await response.json() as { commits?: Record<string, CallCommit> };
-    const commits = data.commits ?? {};
-    callsCache.set(key, commits);
-    return commits;
-  } catch {
-    // Nothing cached: a later mount may ask again, which is the right trade for a server that is briefly away.
-    return {};
-  }
-}

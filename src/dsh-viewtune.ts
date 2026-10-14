@@ -5,8 +5,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { commitHashes } from './commit-hash.js';
-import { recordSessionEvent, recordedCwd, recordedEventCount, sessionsSeen } from './commit-record.js';
-import { recordedCommitsByCall } from './commit-calls.js';
 import type { Context } from '@deepseek-ai/cordis';
 import { contentTypeOf, listWallpapers, resolveWallpaperFile, seedDefaultWallpaper, wallpaperDirOf } from './wallpaper-files.js';
 import { SETTINGS_MAX_BYTES, readSettings, settingsFileOf, writeSettings } from './viewtune-settings.js';
@@ -156,26 +154,6 @@ export function apply(ctx: Context): void {
     return () => undefined;
   }, 'dsh-viewtune: shipped wallpaper');
 
-  /**
-   * Record every appended session event, so a commit can later be answered by CALL ID.
-   *
-   * `session/event` is the supported append hook (the synchronous `snapshotEvents` reads are deprecated for new callers), and it carries the
-   * UNTRUNCATED event — which is the whole point: the UI projection cuts a long `-m` message down to `…` and can drop git's own output line,
-   * so the reading view alone cannot always name the commit it is showing. The recorder keeps a bounded window per session; see its module for
-   * the bounds and why it is deliberately shape-agnostic about event types.
-   */
-  ctx.effect(() => {
-    // TYPED BY HAND, and deliberately NOT by importing `@deepseek-ai/dsh-session`: that package augments `Context.sessions` with its own store,
-    // and this plugin's CLIENT half resolves `ctx.sessions.list` through a different (client) facade — importing it broke those four call sites.
-    // The event name and the four fields read here are all this needs, and the record module's test pins them.
-    type Listener = (session: { id: unknown; cwd?: unknown }, event: { seq: unknown; time: unknown; type: unknown; data: unknown }) => void;
-    const on = ctx.on as unknown as (name: string, listener: Listener) => () => void;
-    const off = on('session/event', (session, event) => {
-      recordSessionEvent(String(session.id), Number(event.seq), Number(event.time), String(event.type), event.data, typeof session.cwd === 'string' ? session.cwd : undefined);
-    });
-    return () => { off(); };
-  }, 'dsh-viewtune: session event recorder');
-
   if (ctx.webServer) {
     /**
      * Commit subjects → short hashes, for the reading view's 提交 lane.
@@ -221,60 +199,6 @@ export function apply(ctx: Context): void {
       });
     }, 'dsh-viewtune: /better-display/commit-hashes route');
 
-    ctx.effect(() => {
-
-
-      return ctx.webServer!.register({
-        /**
-         * Commits, keyed by the tool call that made them, from the recorded (untruncated) events.
-         *
-         * `POST { sessionId, callIds }` → `{ ok, commits: { [callId]: { hash?, subject } } }`. Answering by call id is what removes every
-         * guess: the reading view knows which call its bubble belongs to, so no pairing by order and no time window is involved, and a
-         * second session committing to the same repository cannot move anyone's hash. Same shell as the other POSTs here: method,
-         * same-origin, capped body, and an empty answer rather than an error when nothing can be read.
-         */
-        kind: 'exact',
-        path: '/better-display/commit-calls',
-        handler: async (req, res) => {
-          if (req.method !== 'POST') {
-            res.statusCode = 405;
-            res.end();
-            return;
-          }
-          if (!sameOrigin(req)) {
-            json(res, 403, { ok: false, error: 'cross-origin' });
-            return;
-          }
-          const body = await readBody(req, REVEAL_MAX_BYTES);
-          if (body === undefined) {
-            json(res, 413, { ok: false, error: 'payload too large' });
-            return;
-          }
-          try {
-            const data = JSON.parse(body);
-            const sessionId = typeof data.sessionId === 'string' ? data.sessionId.trim() : '';
-            // The RECORDED directory, not the caller's: the reading view's own copy can be empty, and when it is, every lookup silently finds
-            // nothing while the old read-git''s-output path keeps working — the exact shape of the reader''s report.
-            const recordedDir = sessionId === '' ? undefined : recordedCwd(sessionId);
-            const callIds = Array.isArray(data.callIds)
-              ? data.callIds.filter((id: unknown): id is string => typeof id === 'string' && id !== '')
-              : [];
-            if (sessionId === '') {
-              json(res, 400, { ok: false, error: 'Empty sessionId' });
-              return;
-            }
-            json(res, 200, {
-              ok: true,
-              recorded: recordedEventCount(sessionId),
-              known: sessionsSeen().slice(0, 8),
-              commits: recordedCommitsByCall(sessionId, callIds),
-            });
-          } catch (err) {
-            json(res, 400, { ok: false, error: String(err) });
-          }
-        },
-      });
-    }, 'dsh-viewtune: /better-display/commit-calls route');
 
     ctx.effect(() => {
       return ctx.webServer!.register({
