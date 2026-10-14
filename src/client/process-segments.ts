@@ -128,49 +128,96 @@ export function segmentLabelOf(kinds: readonly ProcessKind[]): string {
   return kinds.length > HOST_LABEL_LIMIT ? `${title}${HOST_MORE}` : title;
 }
 
-/** A stretch of process items between two narrations. */
-export interface ProcessSegment<T> {
-  /** The items, in order. Never empty: an empty stretch is not a segment. */
-  readonly items: readonly T[];
-  /** The kinds present, in first-appearance order. */
+/**
+ * What one flow item is, in the host's own terms.
+ *
+ * `independent` is its `INDEPENDENT` set — user, steering, turn-trigger, model-retry, turn-error, turn-max-tokens, turn-tail — which is the WHOLE
+ * of its boundary list, so anything else is a member of the run it sits in. `reasoning` is an assistant step that says something in its thinking
+ * block; `reply` is one that carries the answer body, i.e. the turn's narration.
+ */
+export type ProcessCharacter = 'independent' | 'reasoning' | 'reply' | 'other';
+
+/** A run of members — the host's `ProcessGroup`. */
+export interface ProcessGroupRun<T> {
+  readonly kind: 'group';
+  /** The members, in order. Never empty. */
+  readonly members: readonly T[];
+  /** The kinds present, in first-appearance order (see `segmentLabelOf`). */
   readonly kinds: readonly ProcessKind[];
-  /** The host's wording for those kinds. */
-  readonly label: string;
+  /** The host's `closed`: true once a later node ended the run, false only for a run still growing. */
+  readonly closed: boolean;
+  /**
+   * The host's title, and ONLY for a closed run — its `refresh` keeps just `counts` once closed and leaves a growing run with live detail instead,
+   * so the title is a finished fact. `undefined` means "still growing: show it, do not label it".
+   */
+  readonly label?: string;
 }
 
+/** A node that sits OUTSIDE every run: an `INDEPENDENT` node, or the narration (the host's `groupPart: "response"`). */
+export interface ProcessSingle<T> {
+  readonly kind: 'single';
+  readonly item: T;
+  readonly character: 'independent' | 'reply';
+}
+
+export type ProcessUnit<T> = ProcessGroupRun<T> | ProcessSingle<T>;
+
 /**
- * Split items into the stretches between narrations.
+ * The host's segmentation, transcribed from `rebuild` in `lib/types/client/conversation-nodes/process-groups.js`:
  *
- * The readers' own report of what the host does, in their words: 「以旁白为分界线，折叠之间的（包括开头到第一段旁白和最后一段旁白到回答正文）各种步骤」.
- * So a narration is a SEPARATOR, not a member: the run of items before the first narration is a segment (its label says what the turn did
- * before saying anything), every run between two narrations is a segment, and the run after the last narration is a segment too — while the
- * narrations themselves stay outside, in flow order, so the page keeps reading as a narrative.
+ *   if (INDEPENDENT.has(node.kind))  { flush(true); emit(key, { kind: "node", key }) }
+ *   else if (node.kind === "assistant-step") {
+ *     if (reasoning(node)) pending.push({ key, groupPart: "reasoning" })
+ *     if (reply(node))     { flush(true); emit(key, { kind: "node", key, groupPart: "response" }) }
+ *   } else pending.push({ kind: "node", key })
+ *   …flush(followed)   // the tail is closed only if something followed it
  *
- * `isNarration` decides membership and `kindOf` names an item; both are injected so this stays pure and testable.
+ * Three consequences matter, and each of them was a bug in the earlier narration-only version:
+ *
+ *  1. THINKING IS A MEMBER. A run usually opens with the thinking that preceded any narration, which is why a run starting at a 思考 has its own
+ *     fold control — the reader reported it missing.
+ *  2. THE BOUNDARIES ARE THE `INDEPENDENT` SET, not "anything that is not an assistant step". A tool call, a command, a question reply — all
+ *     MEMBERS. Treating them as boundaries split runs that the host keeps whole ("有时候没有以旁白为界").
+ *  3. THE NARRATION BOTH ENDS A RUN AND STANDS OUTSIDE IT. It is emitted as its own node, so the page still reads as a narrative, and the run
+ *     before it closes.
+ *
+ * `turnClosed` is the host's `input.timeline.turns.get(turn)?.status === "closed"`, which closes the trailing run as well: a finished turn has
+ * no growing tail. The host's `position.previous !== previous` rule (a break in NODE ORDER) has no counterpart here — the flow this view renders
+ * is already one ordered list — so it is deliberately absent rather than forgotten.
  */
-export function splitByNarration<T>(
+export function processGroups<T>(
   items: readonly T[],
-  isNarration: (item: T) => boolean,
+  characterOf: (item: T) => ProcessCharacter,
   kindOf: (item: T) => ProcessKind,
-): readonly ProcessSegment<T>[] {
-  const segments: ProcessSegment<T>[] = [];
-  let run: T[] = [];
+  turnClosed: boolean,
+): readonly ProcessUnit<T>[] {
+  const units: ProcessUnit<T>[] = [];
+  let pending: T[] = [];
   let kinds: ProcessKind[] = [];
-  const flush = (): void => {
-    if (run.length === 0) return;
-    segments.push({ items: run, kinds, label: segmentLabelOf(kinds) });
-    run = [];
+  const flush = (closed: boolean): void => {
+    if (pending.length === 0) return;
+    units.push({
+      kind: 'group', members: pending, kinds, closed,
+      ...(closed ? { label: segmentLabelOf(kinds) } : {}),
+    });
+    pending = [];
     kinds = [];
   };
+  let followed = false;
   for (const item of items) {
-    if (isNarration(item)) {
-      flush();
-      continue;
+    const character = characterOf(item);
+    if (character === 'independent' || character === 'reply') {
+      flush(true);
+      units.push({ kind: 'single', item, character });
+    } else {
+      // `reasoning` and `other` are both members; only the label composition tells them apart.
+      pending.push(item);
+      const kind = kindOf(item);
+      if (!kinds.includes(kind)) kinds.push(kind);
     }
-    const kind = kindOf(item);
-    run.push(item);
-    if (!kinds.includes(kind)) kinds.push(kind);
+    followed = true;
   }
-  flush();
-  return segments;
+  // The trailing run: closed when the turn is over, still growing otherwise — the host's `flush(followed)` plus its turn-status check.
+  flush(turnClosed);
+  return units;
 }

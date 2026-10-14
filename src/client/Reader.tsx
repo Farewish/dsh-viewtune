@@ -20,7 +20,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { toolName } from './projection.js';
 import type { ReaderFlowEntry } from './tool-activity.js';
-import { processKindOfTool, splitByNarration, type ProcessKind } from './process-segments.js';
+import { processGroups, processKindOfTool, type ProcessCharacter, type ProcessKind } from './process-segments.js';
 import { stepReading, tokensPerSecondOf } from './turn-reading.js';
 import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
@@ -1078,6 +1078,9 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
 }
 
 /** A synthetic render item: the header of one narration-separated stretch of the process (see 「按旁白分段」). */
+/** The host's INDEPENDENT set: a node kind that stands outside every run (process-groups.js). */
+const INDEPENDENT_NODE_KINDS: ReadonlySet<string> = new Set(['user', 'steering', 'turn-trigger', 'model-retry', 'turn-error', 'turn-max-tokens', 'turn-tail']);
+
 interface SegmentHeaderItem {
   readonly kind: 'segmentHeader';
   readonly key: string;
@@ -1263,13 +1266,22 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // convention: while a turn is running the whole process is shown directly and no 次级 header exists at all, so there is nothing to fold and
     // nothing that could hide work in progress.
     if (!segmentByNarration || !expanded || boundary.status !== 'closed') return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
-    const isNarration = (item: ReaderFlowEntry): boolean => {
-      if (item.kind !== 'node') return false;
+    // THE HOST'S OWN BOUNDARIES, from `process-groups.js`: only these node kinds stand outside a run. Everything else — a tool call, a command, a
+    // question reply, a reasoning step — is a MEMBER of the run it sits in. The earlier version treated anything that was not an assistant step as
+    // a boundary, which split runs the host keeps whole and left a run that opens with 思考 without a fold control of its own.
+    const characterOf = (item: ReaderFlowEntry): ProcessCharacter => {
+      if (item.kind !== 'node') return 'other';
       const node = nodes.get(item.nodeKey);
-      if (node === undefined) return true;
-      if (node.kind !== 'assistant-step') return true;
-      const blocks = (node.data as { blocks?: readonly { kind?: string; text?: string }[] }).blocks ?? [];
-      return blocks.some(block => block.kind === 'text' && (block.text ?? '').trim() !== '');
+      if (node === undefined) return 'other';
+      if (node.kind === 'assistant-step') {
+        const blocks = (node.data as { blocks?: readonly { kind?: string; text?: string }[] }).blocks ?? [];
+        // The narration (the host's `reply`) both ends the run before it and stands outside every run.
+        if (blocks.some(block => block.kind === 'text' && (block.text ?? '').trim() !== '')) return 'reply';
+        // Thinking is a MEMBER: a run usually opens with it, which is why a run that starts at a 思考 gets its own fold control.
+        if (blocks.some(block => block.kind === 'reasoning' && (block.text ?? '').trim() !== '')) return 'reasoning';
+        return 'other';
+      }
+      return INDEPENDENT_NODE_KINDS.has(node.kind) ? 'independent' : 'other';
     };
     const kindOf = (item: ReaderFlowEntry): ProcessKind => {
       if (item.kind !== 'node') return processKindOfTool(item.block === undefined ? '' : toolName(item.block));
@@ -1277,21 +1289,21 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       const blocks = (node?.data as { blocks?: readonly { kind?: string }[] } | undefined)?.blocks ?? [];
       return blocks.some(block => block.kind === 'reasoning') ? 'thinking' : 'tools';
     };
-    const items = flow.filter(item => !isNarration(item) || false);
-    const segments = splitByNarration(items, () => false, kindOf);
-    const closedKeys = new Set<string>();
+    // A finished turn has no growing tail, so every run is closed and every run therefore carries a title (see `processGroups`).
+    const units = processGroups(flow, characterOf, kindOf, true);
     const augmented: (ReaderFlowEntry | SegmentHeaderItem)[] = [];
-    let index = 0;
-    for (const item of flow) {
-      if (isNarration(item)) { augmented.push(item); continue; }
-      const segment = segments.find((candidate: { items: readonly ReaderFlowEntry[] }) => candidate.items.includes(item));
-      if (segment === undefined) { augmented.push(item); continue; }
-      const position = segments.indexOf(segment);
-      const id = `${group.key}:${String(position)}`;
-      if (segment.items[0] === item) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: segment.label });
-      if (!openSegments.has(id)) continue;
-      augmented.push(item);
-      index += 1;
+    let runIndex = 0;
+    for (const unit of units) {
+      // An independent node or a narration: rendered where it is, with no fold control of its own.
+      if (unit.kind === 'single') { augmented.push(unit.item); continue; }
+      const id = `${group.key}:run:${String(runIndex)}`;
+      runIndex += 1;
+      // The host labels a run only once it is closed; a run with no title is a growing tail and is simply shown.
+      if (unit.label !== undefined) {
+        augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: unit.label });
+        if (!openSegments.has(id)) continue;
+      }
+      for (const member of unit.members) augmented.push(member);
     }
     return augmented;
   }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
