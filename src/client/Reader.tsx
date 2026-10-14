@@ -1080,6 +1080,27 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
   const expansionChoice = props.useStore(state => state.expanded?.[choiceKey]);
+  /**
+   * 「旁白作为折叠标签」: the host's own treatment of a completed turn, copied from its source.
+   *
+   * `dsh-client-ui-chat` folds a finished turn to ONE 24px row whose label is the turn's last text — its `.lcKema_summary` is `nowrap` with
+   * `overflow: hidden` and `.lcKema_summaryText` adds the ellipsis, at the secondary content size, and when there is no text at all neither the
+   * summary nor its separator is rendered. This is that label: the last assistant text of the turn, flattened to one line by CSS. OFF by
+   * default, so a reader who does not ask for it keeps 「执行过程」/「用时 N 秒」 exactly as before.
+   */
+  const foldByNarration = props.useStore(state => state.foldProcessByNarration) === true;
+  const narration = useMemo(() => {
+    let text = '';
+    for (const key of group.keys) {
+      const node = nodes.get(key);
+      if (node === undefined || node.kind !== 'assistant-step') continue;
+      const blocks = (node.data as { blocks?: readonly { kind?: string; text?: string }[] }).blocks ?? [];
+      const joined = blocks.filter(block => block.kind === 'text' && typeof block.text === 'string').map(block => block.text).join(' ').trim();
+      // The LAST step that says something wins: a turn narrates its way through several steps and the closing one is the summary.
+      if (joined !== '') text = joined;
+    }
+    return text.replace(/\s+/g, ' ');
+  }, [group.keys, nodes]);
   const flowId = useId();
   const processButton = useRef<HTMLButtonElement>(null);
   const setExpanded = useCallback((value: boolean) => props.actions.setExpanded(choiceKey, value), [props.actions, choiceKey]);
@@ -1232,7 +1253,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined} data-live={live === true ? '' : undefined}>
     {turnUserKeys.map(userKey => <BlockBoundary key={userKey}><MainNode {...shared} boundary={boundary} nodeKey={userKey} /></BlockBoundary>)}
     {hasProcess && <Disclosure open={expanded} onToggle={() => setExpanded(!wantsProcess)} controls={flowId} buttonRef={processButton}
-      label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
+      label={foldByNarration && boundary.status === 'closed' && narration !== ''
+        ? <span className={css.processNarration}>{narration}</span>
+        : <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
     {!hasProcess && boundary.status === 'open' && <div className={css.disclosure} data-reader-status-only>
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />
     </div>}
@@ -1567,6 +1590,8 @@ export function Reader(props: ReaderProps) {
   // `undefined` — into OFF, which is not what the default says. The guard that pairs every default with its reader
   // caught exactly this when the default was flipped (see check-settings-fallbacks).
   const autoCollapseEarlier = props.useStore(state => state.autoCollapseEarlier) !== false;
+  // 「旁白作为折叠标签」: a finished turn's folded row shows the turn's last text instead of 「执行过程」/「用时 N 秒」 (see `TurnGroup`).
+  const foldProcessByNarration = props.useStore(state => state.foldProcessByNarration) === true;
   // A `useMemo` on `timeline`, NOT a selector: `useChat` runs its selector on every store notification, and text arrives
   // as one notification per delta, so scanning the turn map inside the selector meant walking every turn in the
   // conversation once per streamed chunk — work that grows with the history and can only ever change at a turn or step
@@ -2108,6 +2133,7 @@ export function Reader(props: ReaderProps) {
           revealWords={revealWords} onRevealWords={props.actions.setRevealWords}
           followMode={followMode} onFollowMode={props.actions.setFollowMode}
           autoCollapseEarlier={autoCollapseEarlier} onAutoCollapseEarlier={props.actions.setAutoCollapseEarlier}
+        foldProcessByNarration={foldProcessByNarration} onFoldProcessByNarration={props.actions.setFoldProcessByNarration}
           reasoningFollow={reasoningFollow} onReasoningFollow={props.actions.setReasoningFollow}
           reasoningRate={reasoningRate} onReasoningRate={props.actions.setReasoningRate}
           focusExpand={focusExpand} onFocusExpand={props.actions.setFocusExpand}

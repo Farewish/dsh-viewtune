@@ -180,6 +180,14 @@ export interface ReaderState {
    */
   reasoningFold: boolean;
   /**
+   * Show the turn's NARRATION on a finished turn's folded process row, instead of 「执行过程」/「用时 N 秒」.
+   *
+   * This is the host's own treatment of a completed turn (`dsh-client-ui-chat`: `.lcKema_summary` carries the last text of the turn, single
+   * line with an ellipsis, and it is not rendered at all when there is nothing to say). OFF by default, because it changes a row the reader
+   * already reads.
+   */
+  foldProcessByNarration: boolean;
+  /**
    * Whether opening a reasoning card also brings its BOTTOM to the top of the composer — 「展开后底端对齐输入栏顶」.
    *
    * ON by default: the reader asked for the behaviour itself, not for a switch to discover. Read defensively (`!== false`),
@@ -261,6 +269,7 @@ type ReaderActions = {
   setReasoningRate: (draft: ReaderState, value: number) => void;
   setFocusExpand: (draft: ReaderState, value: boolean) => void;
   setReasoningFold: (draft: ReaderState, value: boolean) => void;
+  setFoldProcessByNarration: (draft: ReaderState, value: boolean) => void;
   setExpandBottomAlign: (draft: ReaderState, value: boolean) => void;
   /** Drop every stored expansion choice, so each turn falls back to its default. */
   clearExpanded: (draft: ReaderState) => void;
@@ -337,6 +346,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       // …and a card is NOT folded to one line unless the reader asks for it: the fold changes the SHAPE of every reasoning
       // card, so it ships off and every record written before it keeps the cards it had.
       reasoningFold: false,
+  foldProcessByNarration: false,
       // …and opening a card DOES bring its bottom to the composer by default: the reader asked for the behaviour, so a fresh
       // install (and every record written before the switch) opens with it.
       expandBottomAlign: true,
@@ -388,6 +398,7 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
       setReasoningRate: (draft, value: number) => { draft.reasoningRate = value; },
       setFocusExpand: (draft, value: boolean) => { draft.focusExpand = value; },
       setReasoningFold: (draft, value: boolean) => { draft.reasoningFold = value; },
+  setFoldProcessByNarration: (draft, value: boolean) => { draft.foldProcessByNarration = value; },
       setExpandBottomAlign: (draft, value: boolean) => { draft.expandBottomAlign = value; },
       clearExpanded: (draft) => { draft.expanded = {}; },
       setStripWheel: (draft, value: boolean) => { draft.stripWheel = value; },
