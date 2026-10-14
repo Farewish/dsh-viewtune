@@ -146,7 +146,13 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, ...render }: SeatProps & {
+const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, segments = 'both', ...render }: SeatProps & {
+  /**
+   * Which of the step's parts to render (the host's `groupPart`). A step commonly carries its thinking AND the narration that follows it in the same
+   * node; the host renders those as two entries — the thinking INSIDE the run, the narration OUTSIDE it — and 「按旁白分段」 splits the same way, so
+   * the thinking is governed by the run's fold control while the narration stays on the page. `both` is the ordinary, unsplit case.
+   */
+  segments?: 'both' | 'reasoning' | 'body';
   motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
   reasoningFollow: ReasoningFollowMode; reasoningRate: number;
   focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
@@ -165,7 +171,15 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const hasToolCalls = data.blocks.some(block => block.kind === 'tool-call');
   const isProcessStep = earlier || hasToolCalls || (boundary.latestStep > 0 && data.step < boundary.latestStep);
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
-  return <>{parts.map((part, index) => part.kind === 'reasoning'
+  // WHICH PARTS TO RENDER. A step commonly carries its thinking AND the narration that follows it in the same node — the host renders those as two
+  // entries (`groupPart: "reasoning"` inside the run and `groupPart: "response"` outside it), and 「按旁白分段」 needs the same split: the thinking
+  // is governed by the run's own fold control while the narration stays on the page. `both` is the ordinary, unsplit case.
+  const shown = segments === 'reasoning'
+    ? parts.filter(part => part.kind === 'reasoning')
+    : segments === 'body'
+      ? parts.filter(part => part.kind !== 'reasoning')
+      : parts;
+  return <>{shown.map((part, index) => part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
       {/* `step` is the HOST's number for this assistant step (`turn.steps`), never a count of anything this view renders.
           A reasoning block is content INSIDE a step, so an empty one can neither add a step nor shift a number: dropping its
@@ -1265,23 +1279,26 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // ONLY A FINISHED TURN IS SEGMENTED, which is the host's own rule (its segment state is guarded by `turn.status !== "closed"`) and the reader's
     // convention: while a turn is running the whole process is shown directly and no 次级 header exists at all, so there is nothing to fold and
     // nothing that could hide work in progress.
-    if (!segmentByNarration || !expanded || boundary.status !== 'closed') return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
+    if (!segmentByNarration || !expanded || boundary.status !== 'closed') {
+      return { list: flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[], partOf: new Map<string, 'both' | 'reasoning' | 'body'>() };
+    }
     // THE HOST'S OWN BOUNDARIES, from `process-groups.js`: only these node kinds stand outside a run. Everything else — a tool call, a command, a
     // question reply, a reasoning step — is a MEMBER of the run it sits in. The earlier version treated anything that was not an assistant step as
     // a boundary, which split runs the host keeps whole and left a run that opens with 思考 without a fold control of its own.
     const characterOf = (item: ReaderFlowEntry): ProcessCharacter => {
-      if (item.kind !== 'node') return 'other';
+      if (item.kind !== 'node') return {};
       const node = nodes.get(item.nodeKey);
-      if (node === undefined) return 'other';
+      if (node === undefined) return {};
       if (node.kind === 'assistant-step') {
         const blocks = (node.data as { blocks?: readonly { kind?: string; text?: string }[] }).blocks ?? [];
-        // The narration (the host's `reply`) both ends the run before it and stands outside every run.
-        if (blocks.some(block => block.kind === 'text' && (block.text ?? '').trim() !== '')) return 'reply';
-        // Thinking is a MEMBER: a run usually opens with it, which is why a run that starts at a 思考 gets its own fold control.
-        if (blocks.some(block => block.kind === 'reasoning' && (block.text ?? '').trim() !== '')) return 'reasoning';
-        return 'other';
+        // BOTH may be true, and that is the common case: a step carries its thinking and the narration that follows it in one node. The host
+        // pushes such a node into the run (its `reasoning` half) and emits it as a single (its `response` half) — see `processGroups`.
+        return {
+          reasoning: blocks.some(block => block.kind === 'reasoning' && (block.text ?? '').trim() !== ''),
+          reply: blocks.some(block => block.kind === 'text' && (block.text ?? '').trim() !== ''),
+        };
       }
-      return INDEPENDENT_NODE_KINDS.has(node.kind) ? 'independent' : 'other';
+      return INDEPENDENT_NODE_KINDS.has(node.kind) ? { independent: true } : {};
     };
     const kindOf = (item: ReaderFlowEntry): ProcessKind => {
       if (item.kind !== 'node') return processKindOfTool(item.block === undefined ? '' : toolName(item.block));
@@ -1292,20 +1309,29 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // A finished turn has no growing tail, so every run is closed and every run therefore carries a title (see `processGroups`).
     const units = processGroups(flow, characterOf, kindOf, true);
     const augmented: (ReaderFlowEntry | SegmentHeaderItem)[] = [];
+    // HOW EACH RENDER OF A SPLIT STEP SHOWS ITSELF, keyed by node: a member shows its THINKING (the run's fold control governs it) and the single
+    // outside the run shows the ANSWER BODY (so the narration stays on the page, exactly as the host's two `groupPart` entries do).
+    const partOf = new Map<string, 'both' | 'reasoning' | 'body'>();
     let runIndex = 0;
     for (const unit of units) {
       // An independent node or a narration: rendered where it is, with no fold control of its own.
-      if (unit.kind === 'single') { augmented.push(unit.item); continue; }
+      if (unit.kind === 'single') {
+        if (unit.item.kind === 'node' && unit.part === 'body') partOf.set(unit.item.nodeKey, 'body');
+        augmented.push(unit.item);
+        continue;
+      }
       const id = `${group.key}:run:${String(runIndex)}`;
       runIndex += 1;
       // The host labels a run only once it is closed; a run with no title is a growing tail and is simply shown.
-      if (unit.label !== undefined) {
-        augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: unit.label });
-        if (!openSegments.has(id)) continue;
+      const labelled = unit.label !== undefined;
+      if (labelled) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: unit.label });
+      if (labelled && !openSegments.has(id)) continue;
+      for (const member of unit.members) {
+        if (member.kind === 'node') partOf.set(member.nodeKey, labelled ? 'reasoning' : 'both');
+        augmented.push(member);
       }
-      for (const member of unit.members) augmented.push(member);
     }
-    return augmented;
+    return { list: augmented, partOf };
   }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
   const toggleSegment = useCallback((id: string) => {
     setOpenSegments(current => {
@@ -1326,11 +1352,11 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
-      {renderFlow.map(item => item.kind === 'segmentHeader' ? <Fragment key={item.key}>
+      {renderFlow.list.map(item => item.kind === 'segmentHeader' ? <Fragment key={item.key}>
         <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} label={<span className={css.segmentLabel}>{item.label}</span>} />
       </Fragment> : item.kind === 'node' ? <Fragment key={item.key}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
+        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={renderFlow.partOf.get(item.nodeKey) ?? 'both'} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
       </Fragment> : <Fragment key={item.key}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
