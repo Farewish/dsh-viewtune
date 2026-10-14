@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
-import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, createContext, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -35,6 +35,7 @@ import { collapseModeOf } from './collapse-mode.js';
 import { applyGlassBlur, glassBlurProperties, glassBlurValues, glassProperties, glassValues } from './glass.js';
 import { deliverableOpenModeOf, workspaceImageUrl } from './open-file.js';
 import { FileAttachmentCard } from './FileAttachmentCard.js';
+import { commitHashOf } from './commit-hash.js';
 import { FileFrame } from './FileFrame.js';
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { textCadenceOf } from './text-cadence.js';
@@ -640,6 +641,13 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
  *
  * The switch appears only when there IS something behind the cap — the reader's 「无需展开的时候展开不用出现」.
  */
+/**
+ * The session's working directory, for the one thing below that needs it: a commit whose hash never reached the plugin is looked up in the
+ * repository by subject (see `commit-hash.ts`). A context rather than a prop because the bubbles sit several layers down in two different
+ * layouts, and threading it through both would touch every component between.
+ */
+const ReaderCwdContext = createContext<string | undefined>(undefined);
+
 function DeliverablesBox({ region, open, onToggle, onHeadingClick, panel, children }: {
   region: { id: string; label: string; hint: string; count: number };
   open: boolean;
@@ -791,9 +799,22 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
  */
 const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitRecord }) {
   const [copied, setCopied] = useState(false);
+  const cwd = useContext(ReaderCwdContext);
+  /**
+   * A hash recovered from the repository, for a commit whose call never showed git's own output line. `undefined` means "nothing recovered
+   * yet"; the module's cache remembers a subject the host could not find, so the same lookup is never sent twice.
+   */
+  const [recovered, setRecovered] = useState<string | undefined>(commit.hash);
+  useEffect(() => {
+    if (commit.hash !== undefined) { setRecovered(commit.hash); return; }
+    let live = true;
+    void commitHashOf(cwd, commit.subject).then(found => { if (live && found !== undefined) setRecovered(found); });
+    return () => { live = false; };
+  }, [cwd, commit.hash, commit.subject]);
+  const shown: CommitRecord = recovered === undefined ? commit : { ...commit, hash: recovered };
   const copy = () => {
     try {
-      void navigator.clipboard?.writeText(commitClipboard(commit));
+      void navigator.clipboard?.writeText(commitClipboard(shown));
     } catch {
       // No clipboard permission: stay silent rather than claim a copy that did not happen.
       return;
@@ -802,8 +823,8 @@ const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitReco
     window.setTimeout(() => { setCopied(false); }, 1200);
   };
   return (
-    <button type="button" className={css.deliverableCommit} title={commitTitle(commit)}
-      aria-label={`复制提交 ${commitClipboard(commit)}`} onClick={copy}>
+    <button type="button" className={css.deliverableCommit} title={commitTitle(shown)}
+      aria-label={`复制提交 ${commitClipboard(shown)}`} onClick={copy}>
       {/* 标签**始终是提交信息** ✓：宽度因此不会变 ✓（读者第 2 条：「已复制」一出现，后面的气泡全都跟着挪位 ✗）。
           确认提示**盖在上面** ✓（绝对定位、不吃布局 ✓），淡去之后气泡还是原来那个尺寸 ✓。 */}
       <span className={css.deliverableCommitText}>{commitLabel(commit)}</span>
@@ -2046,7 +2067,7 @@ export function Reader(props: ReaderProps) {
     return pendingSubmissions.filter(sub => sub.placement !== 'queued');
   }, [pendingSubmissions]);
 
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.9" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
+  return <StreamMotionContext.Provider value={streamMotion}><ReaderCwdContext.Provider value={props.cwd}><div ref={root} className={css.root} style={{ ...glassVars, ...wallpaperVars } as CSSProperties} data-dsh-better-display="0.5.9" data-motion={motion ? 'on' : 'off'} data-reader-follow-mode={followMode} data-reader-strip-wheel={stripWheel ? 'on' : 'off'} data-reader-glass={glassPreference ? '' : undefined} data-reader-wallpaper={wallpaperName === '' || windowScope ? undefined : ''}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} runningTurn={liveTurn} onNavigate={onNavigateTurn} />
     {/* ChatView publishes data-chat-flow="" on its column. Skins treat a
         scrollport without that hook as inspect-only and hide [data-composer-seat]. */}
@@ -2193,5 +2214,5 @@ export function Reader(props: ReaderProps) {
         <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m3 6.5 5 5 5-5" /></svg>
       </button></div>}
     </div>
-  </div></StreamMotionContext.Provider>;
+  </div></ReaderCwdContext.Provider></StreamMotionContext.Provider>;
 }

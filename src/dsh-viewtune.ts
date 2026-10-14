@@ -4,6 +4,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { commitHashes } from './commit-hash.js';
 import type { Context } from '@deepseek-ai/cordis';
 import { contentTypeOf, listWallpapers, resolveWallpaperFile, seedDefaultWallpaper, wallpaperDirOf } from './wallpaper-files.js';
 import { SETTINGS_MAX_BYTES, readSettings, settingsFileOf, writeSettings } from './viewtune-settings.js';
@@ -154,9 +155,58 @@ export function apply(ctx: Context): void {
   }, 'dsh-viewtune: shipped wallpaper');
 
   if (ctx.webServer) {
+    /**
+     * Commit subjects → short hashes, for the reading view's 提交 lane.
+     *
+     * The lane's hash can only come from git's own output line at the moment of the commit, so a commit made with `-F <file>` (this project's
+     * own habit) or one whose output was piped away arrives with a subject and no hash. The repository still knows it; this answers it. Body is
+     * capped like every other POST here, same-origin is required, and the work is one `git log` in the directory the reader's session already
+     * works in. Failures answer an empty record: a missing hash is a cosmetic loss, and the lane must never break over one.
+     */
     ctx.effect(() => {
       return ctx.webServer!.register({
         kind: 'exact',
+        path: '/better-display/commit-hashes',
+        handler: async (req, res) => {
+          if (req.method !== 'POST') {
+            res.statusCode = 405;
+            res.end();
+            return;
+          }
+          if (!sameOrigin(req)) {
+            json(res, 403, { ok: false, error: 'cross-origin' });
+            return;
+          }
+          const body = await readBody(req, REVEAL_MAX_BYTES);
+          if (body === undefined) {
+            json(res, 413, { ok: false, error: 'payload too large' });
+            return;
+          }
+          try {
+            const data = JSON.parse(body);
+            const cwd = typeof data.cwd === 'string' ? data.cwd.trim() : '';
+            const subjects = Array.isArray(data.subjects) ? data.subjects.filter((s: unknown): s is string => typeof s === 'string') : [];
+            if (cwd === '') {
+              json(res, 400, { ok: false, error: 'Empty cwd' });
+              return;
+            }
+            json(res, 200, { ok: true, hashes: await commitHashes(cwd, subjects) });
+          } catch (err) {
+            json(res, 400, { ok: false, error: String(err) });
+          }
+        },
+      });
+    }, 'dsh-viewtune: /better-display/commit-hashes route');
+
+    ctx.effect(() => {
+
+
+      return ctx.webServer!.register({
+
+
+        kind: 'exact',
+
+
         path: '/better-display/reveal',
         handler: async (req, res) => {
           if (req.method !== 'POST') {
