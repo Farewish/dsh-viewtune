@@ -69,13 +69,63 @@ export function processKindOfTool(name: string): ProcessKind {
   return 'tools';
 }
 
-/** One stretch's label: the kinds it holds, deduplicated, in first-appearance order, joined the way the host joins them. */
+/** How many kinds a title names before it starts saying 「等」. The host's own `slice(0, 3)`. */
+const HOST_LABEL_LIMIT = 3;
+/** `message.stepProcess.sharedPrefix` — the 「已」 that two labels may share, and that the second then drops. */
+const HOST_SHARED_PREFIX = '已';
+/** `message.stepProcess.comma`. */
+const HOST_COMMA = '，';
+/** `message.stepProcess.more`. */
+const HOST_MORE = '等';
+
+/** The host's `continuation`: a later label loses its first letter's case so the phrase reads as one (`已搜索代码` → `搜索代码`). */
+function continuation(label: string): string {
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+/**
+ * One stretch's title, composed exactly as the host composes it.
+ *
+ * The host's own function, taken verbatim from `lib/types/client/chat/step-process.js` in the shipped `dsh-client-ui-chat` bundle (which keeps its
+ * source comments):
+ *
+ *   function processTitle(summary, t) {
+ *     const labels = summary.counts.slice(0, 3).map(({ kind }) => t(`message.stepProcess.done.${kind}`));
+ *     const first = labels[0];
+ *     if (first === void 0) return t("message.stepProcess.done.thinking");
+ *     const continuation = (label) => label.charAt(0).toLowerCase() + label.slice(1);
+ *     const second = labels[1];
+ *     if (second === void 0) return first;
+ *     if (labels.length === 2) {
+ *       const prefix = t("message.stepProcess.sharedPrefix");
+ *       return t("message.stepProcess.joinTwo", { first, second: continuation(prefix !== "" && first.startsWith(prefix) && second.startsWith(prefix) ? second.slice(prefix.length) : second) });
+ *     }
+ *     const title = [first, ...labels.slice(1).map(continuation)].join(t("message.stepProcess.comma"));
+ *     return summary.counts.length > 3 ? t("message.stepProcess.more", { title }) : title;
+ *   }
+ *
+ * …with its own Chinese strings: `sharedPrefix` is 「已」, `joinTwo` is 「{first}并{second}」, `comma` is 「，」 and `more` is 「{title}等」. So:
+ *
+ *   none 已完成分析 · one 执行了命令 · two 已读取文件并搜索代码 · three 执行了命令，修改了文件，已读取文件 · four 执行了命令，修改了文件，已读取文件等
+ *
+ * The ordering it consumes is the host's RANKED `summary.counts`; this takes the kinds in the order the caller supplies, which is the order the
+ * turn did them in (see the caller). The shape of the title is identical either way; only the sequence can differ.
+ */
 export function segmentLabelOf(kinds: readonly ProcessKind[]): string {
-  const seen: ProcessKind[] = [];
-  for (const kind of kinds) {
-    if (!seen.includes(kind)) seen.push(kind);
+  const labels = kinds.slice(0, HOST_LABEL_LIMIT).map(kind => PROCESS_DONE_LABELS[kind]);
+  const first = labels[0];
+  if (first === undefined) return PROCESS_DONE_LABELS.thinking;
+  if (labels.length === 1) return first;
+  const second = labels[1] ?? '';
+  // Two kinds read as one phrase, and the shared 「已」 of the second is dropped so the pair does not say it twice.
+  if (labels.length === 2) {
+    const trimmed = first.startsWith(HOST_SHARED_PREFIX) && second.startsWith(HOST_SHARED_PREFIX)
+      ? second.slice(HOST_SHARED_PREFIX.length)
+      : second;
+    return `${first}并${continuation(trimmed)}`;
   }
-  return seen.map(kind => PROCESS_DONE_LABELS[kind]).join('，');
+  const title = [first, ...labels.slice(1).map(continuation)].join(HOST_COMMA);
+  return kinds.length > HOST_LABEL_LIMIT ? `${title}${HOST_MORE}` : title;
 }
 
 /** A stretch of process items between two narrations. */
