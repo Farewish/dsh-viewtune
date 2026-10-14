@@ -1131,14 +1131,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
-  /**
-   * 「旁白作为折叠标签」 also decides WHEN a turn folds: with it on, a turn that has just FINISHED folds at once, even while
-   * 「自动收起更早流程」 is off. The reader's own click still wins — a stored choice is used exactly as it is, which is what keeps the disclosure
-   * control answering a click instead of looking dead.
-   */
-  const narrationFolds = foldByNarration && boundary.status === 'closed' && boundary.reason === 'completed';
-  const effectiveChoice = expansionChoice !== undefined || !narrationFolds ? expansionChoice : false;
-  const wantsProcess = holdingSelection || processExpanded(effectiveChoice, boundary, foldEarlier);
+  const wantsProcess = holdingSelection || processExpanded(expansionChoice, boundary, foldEarlier);
   /**
    * The process the reader is actually shown: the decision above, held one short beat behind when it CLOSES.
    *
