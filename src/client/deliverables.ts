@@ -122,6 +122,18 @@ export interface CommitRecord {
 // captured (`x=$(git commit …)`, `$out = (git commit …)`) — the reader's own commit went undetected for exactly that last reason.
 const GIT_COMMIT = /(?:^|[;&|(]|\$\(|\bthen\b)\s*git\s+(?:(?:-C|-c|--git-dir|--work-tree)\s+\S+\s+)*commit\b/;
 
+/**
+ * The command with its QUOTED SPANS removed, which is what the rule above is tested against.
+ *
+ * A command that merely WRITES the words `git commit -m "x"` into a file — the test fixture for this very rule, for instance — is not a commit,
+ * and counting it produced a phantom entry in the lane showing the fixture's own `x` as its subject (the reader saw four commits where three
+ * had been made). Quoted spans are where prose hides, so they are removed first; `\\'` keeps a literal backslash from swallowing the quote
+ * that follows it.
+ */
+function unquoted(command: string): string {
+  return command.replace(/\\\\.|"(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'/g, ' ');
+}
+
 /** The message of a `git commit`, from the first `-m`/`--message` argument the command carries. */
 function commitSubject(command: string): string {
   const quoted = /(?:^|\s)-{1,2}m(?:essage)?[= ](?:"([^"]+)"|'([^']+)'|([^\s"'&|;]+))/m.exec(command);
@@ -172,7 +184,7 @@ export function turnCommits(flow?: readonly ReaderFlowEntry[]): readonly CommitR
     // ONLY a command-shaped field counts. Searching the whole argument text would count a `write` whose CONTENT happens to
     // mention `git commit` — this very plugin's CHANGELOG does — and a false commit is worse than a missed one.
     const command = stringValue(args, 'command', 'cmd', 'script', 'input');
-    if (command === undefined || !GIT_COMMIT.test(command)) continue;
+    if (command === undefined || !GIT_COMMIT.test(unquoted(command))) continue;
     const result = (block.content ?? []).map(part => typeof part?.text === 'string' ? part.text : '').join('\n');
     const summary = commitSummary(result);
     // The command's own `-m` names the commit first; git's summary line is the fallback, and it also carries the hash —

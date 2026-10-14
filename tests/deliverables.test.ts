@@ -312,3 +312,17 @@ test('a commit inside a subshell or with captured output is still a commit', () 
   // …and prose that merely MENTIONS a commit is not one: only a command-shaped field is read at all.
   assert.deepEqual(turnCommits([tool('write', { file_path: 'notes.md', content: 'run git commit -m "x" here' })]), []);
 });
+
+test('a command that merely WRITES a commit command is not a commit', () => {
+  // The reader saw four commits where three had been made: the fourth was the fixture for the test above, whose command text contains
+  // `git commit -m "x"`. Quoted spans are prose, so they are stripped before the rule is tested.
+  const writing = [
+    'Set-Content -Path t.ts -Value "git commit -m \\"x\\""',
+    "Add-Path -Filter 'git commit -m y'",
+  ];
+  for (const command of writing) {
+    assert.deepEqual(turnCommits([tool('run', { command })]), [], command);
+  }
+  // …while the real thing, quoted or not, still counts.
+  assert.equal(turnCommits([tool('run', { command: '$out = (git commit -m "x" 2>&1)' })]).length, 1);
+});
