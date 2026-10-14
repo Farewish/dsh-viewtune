@@ -1249,7 +1249,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // One ref for every stretch header: it exists so a focus return has somewhere to land, and the headers share the flow's own button.
   const segmentButton = useRef<HTMLButtonElement>(null);
   const renderFlow = useMemo(() => {
-    if (!segmentByNarration) return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
+    // GOVERNED BY THE 总流程折叠开关, which is the reader's own convention: the outer disclosure (「用时 N 秒」/「执行过程」) owns the whole process, and
+    // a 次级 header may only exist while it is OPEN. The steps below are already hidden by their own `open={expanded}` wrappers, but a header sits
+    // outside those wrappers — so without this it would have stayed on screen inside a collapsed process.
+    if (!segmentByNarration || !expanded) return flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[];
     const isNarration = (item: ReaderFlowEntry): boolean => {
       if (item.kind !== 'node') return false;
       const node = nodes.get(item.nodeKey);
@@ -1281,7 +1284,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       index += 1;
     }
     return augmented;
-  }, [segmentByNarration, flow, nodes, group.key, closedSegments]);
+  }, [segmentByNarration, expanded, flow, nodes, group.key, closedSegments]);
   const toggleSegment = useCallback((id: string) => {
     setClosedSegments(current => {
       const next = new Set(current);
