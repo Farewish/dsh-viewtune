@@ -800,7 +800,6 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
 const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commit: CommitRecord; newestIndex: number }) {
   const [copied, setCopied] = useState(false);
   const { cwd, sessionId } = useContext(ReaderCwdContext);
-  useEffect(() => {
   /**
    * A hash recovered from the repository, for a commit whose call never showed git's own output line. `undefined` means "nothing recovered
    * yet"; the module's cache remembers a subject the host could not find, so the same lookup is never sent twice.
