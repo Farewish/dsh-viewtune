@@ -1102,6 +1102,18 @@ interface SegmentHeaderItem {
   readonly label: string;
 }
 
+/**
+ * A synthetic render item: the BODY of one stretch — all of its member rows, in one animated container.
+ *
+ * One item rather than one item per row, because the container has to be the flow's own child for its height animation to also pull the flex
+ * column's `row-gap` out of the layout while it is closed (see `ProcessFragment`). The rows themselves are rendered by `renderMember`.
+ */
+interface RunBodyItem {
+  readonly kind: 'runBody';
+  readonly key: string;
+  readonly rows: readonly ReaderFlowEntry[];
+}
+
 const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, segmentByNarration, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; segmentByNarration: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
@@ -1280,7 +1292,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // convention: while a turn is running the whole process is shown directly and no 次级 header exists at all, so there is nothing to fold and
     // nothing that could hide work in progress.
     if (!segmentByNarration || !expanded || boundary.status !== 'closed') {
-      return { list: flow as readonly (ReaderFlowEntry | SegmentHeaderItem)[], partOf: new Map<number, 'both' | 'reasoning' | 'body'>(), openOf: new Map<number, boolean>() };
+      return { list: flow as readonly (ReaderFlowEntry | SegmentHeaderItem | RunBodyItem)[], partOf: new Map<number, 'both' | 'reasoning' | 'body'>(), openOf: new Map<number, boolean>() };
     }
     // THE HOST'S OWN BOUNDARIES, from `process-groups.js`: only these node kinds stand outside a run. Everything else — a tool call, a command, a
     // question reply, a reasoning step — is a MEMBER of the run it sits in. The earlier version treated anything that was not an assistant step as
@@ -1317,7 +1329,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     };
     // A finished turn has no growing tail, so every run is closed and every run therefore carries a title (see `processGroups`).
     const units = processGroups(flow, characterOf, kindOf, true);
-    const augmented: (ReaderFlowEntry | SegmentHeaderItem)[] = [];
+    const augmented: (ReaderFlowEntry | SegmentHeaderItem | RunBodyItem)[] = [];
     /**
      * HOW EACH RENDER ROW SHOWS ITSELF, keyed by the row's POSITION in `augmented`.
      *
@@ -1369,14 +1381,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
        * page read as a jumble. The motion now comes from a short enter transition on the content that appears, which cannot fight the layout.
        */
       if (!runOpen) continue;
-      for (const member of rest) {
-        // A member is drawn INSIDE its run, so it shows its THINKING alone: its narration is drawn once, outside, by the single above. The first
-        // version of this wrote `labelled ? 'reasoning' : 'both'` here, so a run without a header drew the body inside AND outside — the reader
-        // saw the page stutter, the narration duplicated, and the narration's own fade fight itself.
-        if (member.kind === 'node') partOf.set(augmented.length, 'reasoning');
-        openOf.set(augmented.length, runOpen);
-        augmented.push(member);
-      }
+      // ONE item for the whole body: the rows live inside that item's `ProcessFragment`, which is what animates their height and cancels the gap
+      // while they are closed. A closed stretch contributes no such item at all, so it costs nothing and leaves no blank space.
+      augmented.push({ kind: 'runBody', key: `${id}:body`, rows: rest });
     }
     return { list: augmented, partOf, openOf };
   }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
@@ -1388,6 +1395,27 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       return next;
     });
   }, []);
+  /**
+   * ONE member of a 次级 stretch — a node row or a tool row — rendered on its own.
+   *
+   * Extracted so a stretch's rows can live inside ONE `ProcessFragment`, which is the only structure that both ANIMATES the collapse and leaves no
+   * blank space: that component measures its content and animates the height, and — as its own comment explains — it also pulls the flex column's
+   * `row-gap` out of the layout with a negative margin while it is closed, because a box shrunk to nothing still owns the gap beside it. A per-row
+   * animation (the earlier attempts) could not do that: the animated element sat INSIDE a `BlockBoundary`, so its compensation targeted the wrong
+   * parent and every closed row left its 16px behind.
+   */
+  const renderMember = (item: ReaderFlowEntry, segments: 'both' | 'reasoning' | 'body' = 'both'): ReactNode => item.kind === 'node'
+    ? <Fragment>
+      <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
+      <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={segments} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
+      <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
+    </Fragment>
+    : <Fragment>
+      <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
+        <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
+        {item.block && <ToolMedia {...shared} block={item.block} />}
+      </ProcessFragment></BlockBoundary>
+    </Fragment>;
   const showTerminalNotice = terminal && !hasTurnError && boundary.reason !== 'interrupted' && boundary.reason !== 'aborted';
   // The duration stays on the process disclosure rather than becoming its own
   // row: the disclosure label is what expands and folds the process.
@@ -1405,15 +1433,15 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
           appeared one more time. */}
       {renderFlow.list.map((item, index) => item.kind === 'segmentHeader' ? <Fragment key={`${item.key}#${String(index)}`}>
         <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} meta={false} ariaLabel={`${openSegments.has(item.segmentId) ? '收起' : '展开'}${item.label}`} label={<span className={css.segmentLabel}>{item.label}</span>} />
-      </Fragment> : item.kind === 'node' ? <Fragment key={`${item.key}#${String(index)}`}>
-        <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={renderFlow.partOf.get(index) ?? 'both'} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
-        <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
+      </Fragment> : item.kind === 'runBody' ? <Fragment key={`${item.key}#${String(index)}`}>
+        {/* ONE animated container per stretch, and it is the flow's own child — which is what lets `ProcessFragment` measure the rows and pull their
+            `row-gap` out of the layout while it is closed. It mounts when the stretch is opened (a closed stretch contributes no rows at all), so the
+            collapse costs nothing and the expansion still animates. */}
+        <ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key}>
+          {item.rows.map(row => <Fragment key={row.key}>{renderMember(row, 'reasoning')}</Fragment>)}
+        </ProcessFragment>
       </Fragment> : <Fragment key={`${item.key}#${String(index)}`}>
-        <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
-          <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
-          {item.block && <ToolMedia {...shared} block={item.block} />}
-        </ProcessFragment></BlockBoundary>
+        {renderMember(item, item.kind === 'node' && renderFlow.partOf.get(index) !== undefined ? renderFlow.partOf.get(index)! : 'both')}
       </Fragment>)}
     </div>
     {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} reviewInSidebar={reviewInSidebar} turnNumber={turnNumber} sessionId={props.sessionId} openChangesReview={props.openChangesReview} openFile={openFile} revealFile={props.revealFile} />}
