@@ -1327,7 +1327,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       if (labelled) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: unit.label });
       if (labelled && !openSegments.has(id)) continue;
       for (const member of unit.members) {
-        if (member.kind === 'node') partOf.set(member.nodeKey, labelled ? 'reasoning' : 'both');
+        // A member is drawn INSIDE its run, so it shows its THINKING alone: its narration is drawn once, outside, by the single above. The first
+        // version of this wrote `labeled ? 'reasoning' : 'both'` here, so a run without a header drew the body inside AND outside — the reader
+        // saw the page stutter, the narration duplicated, and the narration's own fade fight itself. Every part is drawn exactly ONCE now.
+        if (member.kind === 'node') partOf.set(member.nodeKey, 'reasoning');
         augmented.push(member);
       }
     }
