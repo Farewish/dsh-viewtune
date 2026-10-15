@@ -1355,13 +1355,17 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSession={props.useSession} useSessionStatus={props.useSessionStatus} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
-      {renderFlow.list.map(item => item.kind === 'segmentHeader' ? <Fragment key={item.key}>
+      {/* THE KEY CARRIES THE POSITION, and it has to: 「按旁白分段」 can put the SAME node in this list twice — once inside its run (showing its
+          thinking) and once outside it (showing the narration) — so `item.key` alone is no longer unique. React treats duplicate keys as an error
+          and renders duplicate, unstable rows for them, which is exactly what the reader saw: every time a 次级 run was opened, the narration
+          appeared one more time. */}
+      {renderFlow.list.map((item, index) => item.kind === 'segmentHeader' ? <Fragment key={`${item.key}#${String(index)}`}>
         <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} label={<span className={css.segmentLabel}>{item.label}</span>} />
-      </Fragment> : item.kind === 'node' ? <Fragment key={item.key}>
+      </Fragment> : item.kind === 'node' ? <Fragment key={`${item.key}#${String(index)}`}>
         <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
         <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={renderFlow.partOf.get(item.nodeKey) ?? 'both'} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
-      </Fragment> : <Fragment key={item.key}>
+      </Fragment> : <Fragment key={`${item.key}#${String(index)}`}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
           <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
           {item.block && <ToolMedia {...shared} block={item.block} />}
