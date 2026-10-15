@@ -1362,6 +1362,13 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       const labelled = unit.label !== undefined;
       if (labelled) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: unit.label });
       const runOpen = !labelled || openSegments.has(id);
+      /**
+       * A CLOSED STRETCH TAKES NO ROOM AT ALL — only its header row is left — which is what 「仅向下展开内容」 means: opening one inserts its content
+       * underneath and moves nothing else, and closing it takes that room back. Leaving the members mounted instead (an earlier attempt, made to keep
+       * a height transition) left every one of them folded to its own one-line summary, so a "closed" stretch was still several rows tall and the
+       * page read as a jumble. The motion now comes from a short enter transition on the content that appears, which cannot fight the layout.
+       */
+      if (!runOpen) continue;
       for (const member of rest) {
         // A member is drawn INSIDE its run, so it shows its THINKING alone: its narration is drawn once, outside, by the single above. The first
         // version of this wrote `labelled ? 'reasoning' : 'both'` here, so a run without a header drew the body inside AND outside — the reader
@@ -1399,11 +1406,11 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       {renderFlow.list.map((item, index) => item.kind === 'segmentHeader' ? <Fragment key={`${item.key}#${String(index)}`}>
         <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} meta={false} ariaLabel={`${openSegments.has(item.segmentId) ? '收起' : '展开'}${item.label}`} label={<span className={css.segmentLabel}>{item.label}</span>} />
       </Fragment> : item.kind === 'node' ? <Fragment key={`${item.key}#${String(index)}`}>
-        <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded && (renderFlow.openOf.get(index) ?? true)} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={renderFlow.partOf.get(index) ?? 'both'} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded && (renderFlow.openOf.get(index) ?? true)} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
+        <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
+        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={renderFlow.partOf.get(index) ?? 'both'} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
       </Fragment> : <Fragment key={`${item.key}#${String(index)}`}>
-        <BlockBoundary><ProcessFragment open={expanded && (renderFlow.openOf.get(index) ?? true)} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
+        <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
           <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
           {item.block && <ToolMedia {...shared} block={item.block} />}
         </ProcessFragment></BlockBoundary>
