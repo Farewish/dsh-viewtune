@@ -92,4 +92,7 @@ test('a run is bounded by the host\'s own rules: the INDEPENDENT kinds and the n
   // An INDEPENDENT node does the same, and a growing tail (a running turn) carries no title.
   assert.deepEqual(shape([step('x', OTHER, 'edit'), step('u', IND)]), ['run[x]=修改了文件', 'single:u']);
   assert.deepEqual(shape([step('x', OTHER, 'edit'), step('y', OTHER, 'read')], false), ['run[x,y](growing)']);
+  // 5. AN ITEM THAT IS NO KIND OF WORK adds no word to the title. `undefined` is exactly that; the first version fell back to 'tools', so a stretch
+  //    claimed 「已调用工具」 on a turn that had called nothing (the reader's report).
+  assert.deepEqual(shape([{ id: 'a', character: OTHER, kind: undefined as unknown as ProcessKind }]), ['run[a]=已完成分析']);
 });

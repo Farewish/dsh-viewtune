@@ -1300,11 +1300,20 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       }
       return INDEPENDENT_NODE_KINDS.has(node.kind) ? { independent: true } : {};
     };
-    const kindOf = (item: ReaderFlowEntry): ProcessKind => {
+    /**
+     * What KIND of work an item is, or `undefined` when it is no work at all.
+     *
+     * `undefined` matters: the first version fell through to `'tools'` for anything that was not thinking, so a step that merely carried text — or
+     * nothing — was counted as 「已调用工具」 and the reader saw a stretch claiming tool calls that never happened. A kind is only reported when
+     * the item really does that work.
+     */
+    const kindOf = (item: ReaderFlowEntry): ProcessKind | undefined => {
       if (item.kind !== 'node') return processKindOfTool(item.block === undefined ? '' : toolName(item.block));
       const node = nodes.get(item.nodeKey);
       const blocks = (node?.data as { blocks?: readonly { kind?: string }[] } | undefined)?.blocks ?? [];
-      return blocks.some(block => block.kind === 'reasoning') ? 'thinking' : 'tools';
+      if (blocks.some(block => block.kind === 'reasoning')) return 'thinking';
+      if (blocks.some(block => block.kind === 'tool-call')) return 'tools';
+      return undefined;
     };
     // A finished turn has no growing tail, so every run is closed and every run therefore carries a title (see `processGroups`).
     const units = processGroups(flow, characterOf, kindOf, true);

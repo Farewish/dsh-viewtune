@@ -206,7 +206,8 @@ export type ProcessUnit<T> = ProcessGroupRun<T> | ProcessSingle<T>;
 export function processGroups<T>(
   items: readonly T[],
   characterOf: (item: T) => ProcessCharacter,
-  kindOf: (item: T) => ProcessKind,
+  /** What kind of work the item is, or undefined when it is no work at all — an unnamed kind would invent activity the turn never had. */
+  kindOf: (item: T) => ProcessKind | undefined,
   turnClosed: boolean,
 ): readonly ProcessUnit<T>[] {
   const units: ProcessUnit<T>[] = [];
@@ -236,12 +237,14 @@ export function processGroups<T>(
     if (character.reasoning === true) {
       pending.push(item);
       const kind = kindOf(item);
-      if (!kinds.includes(kind)) kinds.push(kind);
+      // An item may be NO kind of work (a step that merely carries text). It is still a member — the host keeps it in the run — but it must not put
+      // a word in the title, or a stretch would claim activity the turn never had (the reader saw 「已调用工具」 on a stretch that called nothing).
+      if (kind !== undefined && !kinds.includes(kind)) kinds.push(kind);
     } else if (character.reply !== true) {
       // Anything else — a tool call, a command, a question reply — is a member too.
       pending.push(item);
       const kind = kindOf(item);
-      if (!kinds.includes(kind)) kinds.push(kind);
+      if (kind !== undefined && !kinds.includes(kind)) kinds.push(kind);
     }
     // …and a node carrying the answer body ends the run and stands outside it. When it was ALSO a member (thinking and body in one step) the
     // single stands for the BODY alone, because the caller has already rendered its thinking inside the run.
