@@ -1335,11 +1335,25 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       }
       const id = `${group.key}:run:${String(runIndex)}`;
       runIndex += 1;
+      /**
+       * THE TURN'S OWN RECORD GOES ABOVE THE HEADER, not inside the run.
+       *
+       * The host has a rule for this node kind — `else if (node.kind === "turn-process") emit(pending[0]?.key ?? key, …)`, which re-homes the record
+       * onto the run's first member instead of leaving it where it sits in the flow. The reader's expectation matches: 「轮次过程记录」 belongs
+       * directly under the turn's 总开关 and ABOVE the first 次级 header, because it is the TURN's record and not a member of one stretch. Without
+       * this it stayed wherever the flow put it, which left it below the first run the moment that run had any members.
+       */
+      const records = unit.members.filter(member => member.kind === 'node' && nodes.get(member.nodeKey)?.kind === 'turn-process');
+      const rest = unit.members.filter(member => !records.includes(member));
+      for (const record of records) {
+        openOf.set(augmented.length, true);
+        augmented.push(record);
+      }
       // The host labels a run only once it is closed; a run with no title is a growing tail and is simply shown.
       const labelled = unit.label !== undefined;
       if (labelled) augmented.push({ kind: 'segmentHeader', key: `${id}:header`, segmentId: id, label: unit.label });
       const runOpen = !labelled || openSegments.has(id);
-      for (const member of unit.members) {
+      for (const member of rest) {
         // A member is drawn INSIDE its run, so it shows its THINKING alone: its narration is drawn once, outside, by the single above. The first
         // version of this wrote `labelled ? 'reasoning' : 'both'` here, so a run without a header drew the body inside AND outside — the reader
         // saw the page stutter, the narration duplicated, and the narration's own fade fight itself.
