@@ -116,20 +116,31 @@ export function StatusText({ text, motion, shimmer = false }: { text: string; mo
   </span>;
 }
 
-export function Disclosure({ open, onToggle, label, status, controls, buttonRef }: {
+/**
+ * A fold control: a labelled button with a chevron, and — for the turn's own 总流程折叠开关 — the 「思考与过程 N 个步骤」 line beneath it.
+ *
+ * `meta` exists because 「按旁白分段」 reuses this control for its 次级 stretch headers, and that line belongs to the TURN's process, not to a
+ * stretch of it: without the switch every stretch header drew a second 「思考与过程」 (the reader's report). The aria label follows, since a
+ * stretch is not 「思考与过程」 either.
+ */
+export function Disclosure({ open, onToggle, label, status, controls, buttonRef, meta = true, ariaLabel }: {
   open: boolean; onToggle: () => void; label: ReactNode;
   status?: string; controls: string; buttonRef: RefObject<HTMLButtonElement>;
+  /** Whether to draw the 「思考与过程」 meta line under the button. The turn's own control does; a 次级 stretch header does not. */
+  meta?: boolean;
+  /** The accessible name, for a control that is not the turn's process itself. */
+  ariaLabel?: string;
 }) {
   return <div className={css.disclosure} data-reader-disclosure data-expanded={open}>
-    <button ref={buttonRef} type="button" className={css.disclosureButton} aria-label={`${open ? '收起' : '展开'}思考与过程`} aria-expanded={open} aria-controls={controls} onClick={onToggle}>
+    <button ref={buttonRef} type="button" className={css.disclosureButton} aria-label={ariaLabel ?? `${open ? '收起' : '展开'}思考与过程`} aria-expanded={open} aria-controls={controls} onClick={onToggle}>
       {label}
       <svg className={css.chevron} data-open={open} viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
     </button>
-    <div className={css.processMeta} data-reader-process-meta data-open={open} aria-hidden={!open}>
+    {meta && <div className={css.processMeta} data-reader-process-meta data-open={open} aria-hidden={!open}>
       <div className={css.processMetaInner}><div className={css.processMetaLine}>
         <span>思考与过程</span>{status && <span className={css.meta}>{status}</span>}
       </div></div>
-    </div>
+    </div>}
   </div>;
 }
 
