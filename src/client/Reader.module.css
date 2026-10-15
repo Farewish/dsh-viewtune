@@ -177,6 +177,10 @@
 .disclosureButton svg { position: relative; top: 2px; }
 /* One stretch header of 「按旁白分段」: the host's own wording for what happened between two narrations, on a row of its own. Sized and coloured
    like the host's summary line (`.lcKema_summary`: secondary size, nowrap, ellipsis) so a long label cannot wrap the row. */
+/* The rows of one 次级 stretch. They live inside a `ProcessFragment` — which is what animates them and cancels the flow's gap while they are
+   closed — so the flow's own `gap` no longer reaches them and the rhythm has to be given here, at the same 16px. Without it the rows sat tight
+   against each other (the reader's report). */
+.runBodyInner { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .segmentLabel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dsw-alias-label-secondary); font-size: var(--dsh-content-font-size-secondary, 13px); line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px)); }
 .disclosure { min-width: 0; }
 /* `margin-left: -6px` STAYS: it pulls the label's text edge back into line with the body beneath it, once the button's own

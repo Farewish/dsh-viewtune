@@ -1112,6 +1112,8 @@ interface RunBodyItem {
   readonly kind: 'runBody';
   readonly key: string;
   readonly rows: readonly ReaderFlowEntry[];
+  /** The stretch's own open state, which is what `ProcessFragment` animates between. */
+  readonly open: boolean;
 }
 
 const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, segmentByNarration, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; segmentByNarration: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
@@ -1380,10 +1382,15 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
        * a height transition) left every one of them folded to its own one-line summary, so a "closed" stretch was still several rows tall and the
        * page read as a jumble. The motion now comes from a short enter transition on the content that appears, which cannot fight the layout.
        */
-      if (!runOpen) continue;
-      // ONE item for the whole body: the rows live inside that item's `ProcessFragment`, which is what animates their height and cancels the gap
-      // while they are closed. A closed stretch contributes no such item at all, so it costs nothing and leaves no blank space.
-      augmented.push({ kind: 'runBody', key: `${id}:body`, rows: rest });
+      /**
+       * THE BODY IS ALWAYS IN THE LIST — open or closed — and `ProcessFragment` does the rest: it measures the rows, animates the height when `open`
+       * changes, and pulls the flow's `row-gap` out of the layout with a negative margin while it is closed.
+       *
+       * Mounting it only when open (the previous attempt) gave it nothing to animate: a component that is BORN open never sees a change, so its
+       * transition never runs and the reader saw no animation at all. A closed body costs the component's own margin compensation instead of the
+       * blank space an unwrapped row used to leave.
+       */
+      augmented.push({ kind: 'runBody', key: `${id}:body`, rows: rest, open: runOpen });
     }
     return { list: augmented, partOf, openOf };
   }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
@@ -1434,11 +1441,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       {renderFlow.list.map((item, index) => item.kind === 'segmentHeader' ? <Fragment key={`${item.key}#${String(index)}`}>
         <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} meta={false} ariaLabel={`${openSegments.has(item.segmentId) ? '收起' : '展开'}${item.label}`} label={<span className={css.segmentLabel}>{item.label}</span>} />
       </Fragment> : item.kind === 'runBody' ? <Fragment key={`${item.key}#${String(index)}`}>
-        {/* ONE animated container per stretch, and it is the flow's own child — which is what lets `ProcessFragment` measure the rows and pull their
-            `row-gap` out of the layout while it is closed. It mounts when the stretch is opened (a closed stretch contributes no rows at all), so the
-            collapse costs nothing and the expansion still animates. */}
-        <ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key}>
-          {item.rows.map(row => <Fragment key={row.key}>{renderMember(row, 'reasoning')}</Fragment>)}
+        {/* ONE animated container per stretch, and it is the flow's own child — which is what lets `ProcessFragment` measure the rows, animate the
+            height between `open` values, and pull their `row-gap` out of the layout while it is closed (see the note in its own source). */}
+        <ProcessFragment open={item.open && expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key}>
+          <div className={css.runBodyInner}>{item.rows.map(row => <Fragment key={row.key}>{renderMember(row, 'reasoning')}</Fragment>)}</div>
         </ProcessFragment>
       </Fragment> : <Fragment key={`${item.key}#${String(index)}`}>
         {renderMember(item, item.kind === 'node' && renderFlow.partOf.get(index) !== undefined ? renderFlow.partOf.get(index)! : 'both')}
