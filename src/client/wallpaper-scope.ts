@@ -22,6 +22,7 @@
  * returns a handle, and the live snapshot belongs to the framework's instance.
  */
 import { wallpaperDimOf } from './wallpaper.js';
+import { stylesheetElement } from './stylesheet.js';
 
 export const WINDOW_SCOPE_ATTRIBUTE = 'data-viewtune-wallpaper';
 export const WINDOW_SCOPE_STYLE_ID = 'dsh-viewtune-wallpaper-scope';
@@ -520,10 +521,7 @@ export function windowScopeCss(): string {
  * `doc` is a parameter so the behaviour can be tested without a browser.
  */
 export function installWindowScope(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', WINDOW_SCOPE_STYLE_ID);
-  style.textContent = windowScopeCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, WINDOW_SCOPE_STYLE_ID, windowScopeCss());
   return () => {
     style.remove();
     applyWindowScope(doc, null);

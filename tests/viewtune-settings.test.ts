@@ -4,7 +4,7 @@
  * exercised here without starting a server.
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -52,6 +52,16 @@ test('a missing file is distinct from one that exists but cannot be trusted', as
   const directory = join(dir, 'not-a-file');
   mkdirSync(directory);
   assert.deepEqual(await readSettings(directory), { kind: 'invalid' });
+});
+
+test('concurrent writes are serialized and leave one whole record', async () => {
+  const file = join(dir, 'concurrent.json');
+  const results = await Promise.all([writeSettings(file, { n: 1 }), writeSettings(file, { n: 2 })]);
+  assert.deepEqual(results, [true, true]);
+  // The queue preserves call order, so the second record is the one on disk; the point is that the
+  // result is one complete record and not an interleaving of the two.
+  assert.deepEqual(await readSettings(file), { kind: 'ok', record: { n: 2 } });
+  assert.deepEqual(readdirSync(dir).filter(name => name.includes('.tmp')), []);
 });
 
 test('a record round-trips, and a refusal leaves the previous one in place', async () => {

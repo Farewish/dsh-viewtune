@@ -59,9 +59,11 @@ const MODIFIER_KEYS = new Set(['Alt', 'AltGraph', 'CapsLock', 'Control', 'Dead',
  * which is a far worse trade than a shortcut that has to pick another letter.
  */
 const RESERVED = new Set([
-  'Alt+F4', 'Alt+Tab',
-  'Control+A', 'Control+C', 'Control+F', 'Control+N', 'Control+P', 'Control+S', 'Control+T', 'Control+V', 'Control+W', 'Control+X', 'Control+Z',
-  'Meta+A', 'Meta+C', 'Meta+F', 'Meta+N', 'Meta+P', 'Meta+Q', 'Meta+S', 'Meta+T', 'Meta+V', 'Meta+W', 'Meta+X', 'Meta+Z',
+  'Alt+F4', 'Alt+Tab', 'Alt+ArrowLeft', 'Alt+ArrowRight',
+  'Control+A', 'Control+C', 'Control+F', 'Control+L', 'Control+N', 'Control+P', 'Control+R', 'Control+S', 'Control+T', 'Control+V', 'Control+W', 'Control+X', 'Control+Z',
+  'Control+Shift+T',
+  'Meta+A', 'Meta+C', 'Meta+F', 'Meta+L', 'Meta+N', 'Meta+P', 'Meta+Q', 'Meta+R', 'Meta+S', 'Meta+T', 'Meta+V', 'Meta+W', 'Meta+X', 'Meta+Z',
+  'Meta+Shift+T', 'Meta+ArrowLeft', 'Meta+ArrowRight',
 ]);
 
 /** Normalise one event key into the spelling a binding stores; null when it cannot be a binding. */

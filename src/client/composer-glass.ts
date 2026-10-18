@@ -20,6 +20,7 @@
  * host's band stays and the fade survives; that combination used to lose it.
  */
 import { GLASS_ATTRIBUTE } from './app-backdrop.js';
+import { stylesheetElement } from './stylesheet.js';
 import { WINDOW_SCOPE_ATTRIBUTE as WALLPAPER_ATTRIBUTE } from './wallpaper-scope.js';
 
 export const COMPOSER_GLASS_STYLE_ID = 'dsh-viewtune-composer-glass';
@@ -105,9 +106,6 @@ export function composerGlassCss(): string {
 
 /** Install it once per document and hand back the disposer `ctx.effect` requires. */
 export function installComposerGlass(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', COMPOSER_GLASS_STYLE_ID);
-  style.textContent = composerGlassCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, COMPOSER_GLASS_STYLE_ID, composerGlassCss());
   return () => { style.remove(); };
 }

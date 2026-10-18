@@ -21,6 +21,7 @@
  * switch off nothing here applies at all, and the page keeps exactly the look it always had.
  */
 import { CONVERSATION_GLASS_ATTRIBUTE } from './app-backdrop.js';
+import { stylesheetElement } from './stylesheet.js';
 
 export const CONVERSATION_GLASS_STYLE_ID = 'dsh-viewtune-conversation-glass';
 
@@ -65,7 +66,9 @@ export function conversationGlassCss(): string {
     `   of the same token, so a fence with no language stayed a solid slab over the dialled plate. The body`,
     `   is cleared instead of dialled twice — and this is the one rule that has to reach a component's own`,
     `   selector, because the second plate is a `+"`pre`"+` the theme styles directly. */`,
-    `${COLUMN} pre {`,
+    `/* Only the fenced block's inner pre carries a code child; a plain preformatted block or a tool's`,
+    `   raw output keeps the theme's plate. The earlier selector cleared every pre in the column. */`,
+    `${COLUMN} pre:has(> code) {`,
     `  background: transparent !important;`,
     `}`,
     `/* The banner row is TWO plates as well, and this is the last opaque layer on the page: a sticky wrap`,
@@ -126,7 +129,7 @@ export function conversationGlassCss(): string {
     // the word, anywhere in the document, and the reading view is only spared because its own bubble happens to be named
     // `…_user` today. `COLUMN` states the real rule for this module — the conversation switch must not reach into the
     // reading view — so this rule carries the same exclusion the column rules do, rather than depending on a rename.
-    `${GATE} [class*="_bubble"]:not([data-dsh-better-display], [data-dsh-better-display] *) {`,
+    `${COLUMN} [class*="_bubble"]:not([data-dsh-better-display], [data-dsh-better-display] *) {`,
     `  background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0, 0, 0, .08)) var(--glass-user, 25%), transparent);`,
     `  backdrop-filter: blur(var(--glass-blur-user));`,
     `  -webkit-backdrop-filter: blur(var(--glass-blur-user));`,
@@ -227,10 +230,7 @@ export function conversationGlassCss(): string {
 
 /** Install the stylesheet once; the disposer takes it away with the gate it is switched on by. */
 export function installConversationGlass(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', CONVERSATION_GLASS_STYLE_ID);
-  style.textContent = conversationGlassCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, CONVERSATION_GLASS_STYLE_ID, conversationGlassCss());
   return () => {
     style.remove();
   };

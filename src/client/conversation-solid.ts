@@ -19,6 +19,7 @@
  * and this switch has nothing to do with whether one does.
  */
 import { CONVERSATION_SOLID_ATTRIBUTE } from './app-backdrop.js';
+import { stylesheetElement } from './stylesheet.js';
 
 export const CONVERSATION_SOLID_STYLE_ID = 'dsh-viewtune-conversation-solid';
 
@@ -79,10 +80,7 @@ export function conversationSolidCss(): string {
 
 /** Install the stylesheet once; the disposer takes it away with the gate it is switched on by. */
 export function installConversationSolid(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', CONVERSATION_SOLID_STYLE_ID);
-  style.textContent = conversationSolidCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, CONVERSATION_SOLID_STYLE_ID, conversationSolidCss());
   return () => {
     style.remove();
   };

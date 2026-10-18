@@ -17,6 +17,8 @@
  * The scrim's fallback is 0% and the image's is `none`, so with no wallpaper the last two layers paint
  * nothing and the groove is all there is.
  */
+import { stylesheetElement } from './stylesheet.js';
+
 export const SCROLLBAR_STYLE_ID = 'dsh-viewtune-scrollbar';
 
 /**
@@ -100,16 +102,14 @@ export function scrollbarStyleCss(): string {
     `   一个正三角形和倒三角形 … 折叠成一行之后，滑动条和滑动槽看不见了，但两个三角形还在」. Hidden here rather than styled,`,
     `   because a groove this plugin paints has no use for arrow buttons: the wheel, the keyboard and the rail all still scroll`,
     `   every one of these containers. */`,
-    `::-webkit-scrollbar-button { display: none !important; }`,
+    `[class*="_scrollBody"]::-webkit-scrollbar-button,`,
+    `[class*="composer" i] [class*="_scroll"]::-webkit-scrollbar-button { display: none !important; }`,
   ].join('\n');
 }
 
 /** Install the stylesheet once; the disposer also clears the value it left on the document. */
 export function installScrollbarStyle(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', SCROLLBAR_STYLE_ID);
-  style.textContent = scrollbarStyleCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, SCROLLBAR_STYLE_ID, scrollbarStyleCss());
   return () => {
     style.remove();
     applyScrollbarFill(doc, '');

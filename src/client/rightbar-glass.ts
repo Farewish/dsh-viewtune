@@ -15,6 +15,7 @@
  * pseudo needs, without being a backdrop root itself.
  */
 import { GLASS_ATTRIBUTE } from './app-backdrop.js';
+import { stylesheetElement } from './stylesheet.js';
 import { WINDOW_SCOPE_ATTRIBUTE as WALLPAPER_ATTRIBUTE } from './wallpaper-scope.js';
 
 export const RIGHTBAR_GLASS_STYLE_ID = 'dsh-viewtune-rightbar-glass';
@@ -59,9 +60,6 @@ export function rightbarGlassCss(): string {
 
 /** Install the stylesheet once; the disposer removes the element it appended. */
 export function installRightbarGlass(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', RIGHTBAR_GLASS_STYLE_ID);
-  style.textContent = rightbarGlassCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, RIGHTBAR_GLASS_STYLE_ID, rightbarGlassCss());
   return () => { style.remove(); };
 }

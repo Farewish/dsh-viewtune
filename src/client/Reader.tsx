@@ -535,12 +535,16 @@ const DeliverableChip = memo(function DeliverableChip({ path, display, descripti
 
   const onCopy = (event: React.MouseEvent) => {
     event.stopPropagation();
+    let writing: Promise<void> | undefined;
     try {
-      void navigator.clipboard?.writeText(path);
-      flash('copied');
+      writing = navigator.clipboard?.writeText(path);
     } catch {
-      // fallback
+      return;
     }
+    if (writing === undefined) return;
+    // Only a resolved write may claim a copy. The old synchronous `try` could not see a rejected
+    // promise, so a denied clipboard still flashed 「已复制」.
+    void writing.then(() => { flash('copied'); }, () => undefined);
   };
 
   const name = basename(path);
@@ -816,6 +820,9 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
  */
 const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commit: CommitRecord; newestIndex: number }) {
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
+  // The flash is a timer owned by this bubble; unmounting without clearing it calls back into a gone component.
+  useEffect(() => () => { clearTimeout(copiedTimer.current); }, []);
   const { cwd } = useContext(ReaderCwdContext);
   /**
    * A hash recovered from the repository, for a commit whose call never showed git's own output line. `undefined` means "nothing recovered
@@ -846,14 +853,19 @@ const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commi
   /** What the bubble renders: the committed record once a hash has been recovered, otherwise what the flow carried. */
   const shown: CommitRecord = recovered ?? commit;
   const copy = () => {
+    let writing: Promise<void> | undefined;
     try {
-      void navigator.clipboard?.writeText(commitClipboard(shown));
+      writing = navigator.clipboard?.writeText(commitClipboard(shown));
     } catch {
       // No clipboard permission: stay silent rather than claim a copy that did not happen.
       return;
     }
-    setCopied(true);
-    window.setTimeout(() => { setCopied(false); }, 1200);
+    if (writing === undefined) return;
+    void writing.then(() => {
+      setCopied(true);
+      clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => { setCopied(false); }, 1200);
+    }, () => undefined);
   };
   return (
     <button type="button" className={css.deliverableCommit} title={commitTitle(shown)}

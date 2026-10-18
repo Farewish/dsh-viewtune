@@ -13,7 +13,8 @@
  * over these, which is what makes the refusals ("is this a record we are willing to keep?") testable
  * without starting a server.
  */
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 /**
@@ -101,16 +102,31 @@ export async function readSettings(file: string): Promise<SettingsRead> {
 /**
  * Store a record, answering whether it was one.
  *
- * Written to a sibling and renamed over the target, so a crash or a full disk mid-write leaves the
- * previous record in place rather than a half-written one. The reader's settings are exactly the kind
- * of thing that must not become unreadable because the write was interrupted.
+ * Written to a unique sibling and renamed over the target, so a crash or a full disk mid-write leaves
+ * the previous record in place rather than a half-written one. Writes are serialized: concurrent PUTs
+ * from two tabs used to share one `<file>.tmp`, and a later rename could fail (or an older body could
+ * land last) while both requests reported their own outcome.
  */
-export async function writeSettings(file: string, value: unknown): Promise<boolean> {
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+export function writeSettings(file: string, value: unknown): Promise<boolean> {
   const record = settingsRecordOf(value);
-  if (record === undefined) return false;
-  await mkdir(dirname(file), { recursive: true });
-  const temporary = `${file}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
-  await rename(temporary, file);
-  return true;
+  if (record === undefined) return Promise.resolve(false);
+  const write = async (): Promise<boolean> => {
+    await mkdir(dirname(file), { recursive: true });
+    const temporary = `${file}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+      await rename(temporary, file);
+      return true;
+    } catch (error) {
+      await rm(temporary, { force: true }).catch(() => undefined);
+      throw error;
+    }
+  };
+  // Serialize every write to this record. A previous failure must not poison the queue: the next
+  // caller still gets to try.
+  const queued = writeQueue.then(write, write);
+  writeQueue = queued.then(() => undefined, () => undefined);
+  return queued;
 }

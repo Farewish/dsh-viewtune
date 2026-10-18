@@ -26,6 +26,8 @@
  * The state is a MODE, not a preference: it lives for the session and resets on reload, which is what fits a control
  * that says "show me this now". It is inert when there is no goal bar on the page at all.
  */
+import { stylesheetElement } from './stylesheet.js';
+
 export const GOAL_EXPANDED_ATTRIBUTE = 'data-viewtune-goal-expanded';
 
 /** The hook the goal package publishes on its bar (`@deepseek-ai/dsh-client-ui-goal`). */
@@ -180,13 +182,12 @@ export function goalBarCss(): string {
  * control dead.
  */
 export function installGoalBar(doc: Document): () => void {
-  const style = doc.createElement('style');
-  style.setAttribute('data-viewtune-style', GOAL_BAR_STYLE_ID);
-  style.textContent = goalBarCss();
-  doc.head.append(style);
+  const style = stylesheetElement(doc, GOAL_BAR_STYLE_ID, goalBarCss());
   const view = doc.defaultView;
   if (view === null) return () => { style.remove(); };
   const onClick = (event: MouseEvent): void => {
+    // Only the primary button is a click on the bar; a right/middle press must not fold it either.
+    if (event.button !== 0) return;
     const selection = view.getSelection();
     // A drag that selects text ends in a click too, and the reader was copying the goal rather than folding it away.
     const collapsed = selection === null || selection.isCollapsed;

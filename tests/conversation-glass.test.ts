@@ -92,6 +92,8 @@ test('the page claims code paper and the user bubble, and no other dial', () => 
   assert.ok(css.includes('--dsw-alias-markdown-code-block-banner:'));
   assert.ok(css.includes('--dsw-alias-markdown-inline-code:'));
   assert.ok(css.includes('[class*="_bubble"]'));
+  // Only the fenced block's inner pre is cleared; a plain preformatted block keeps the theme's plate.
+  assert.ok(css.includes('pre:has(> code)'));
   // …and the bubble rule carries the exclusion too. Matching by a class-name SUBSTRING reaches every element on the
   // page whose class contains it, so "this plugin's own bubble is named `…_user`" was a statement about today's name
   // rather than a boundary: renaming that local would have let the conversation switch into the reading view.
@@ -100,6 +102,9 @@ test('the page claims code paper and the user bubble, and no other dial', () => 
     bubbleRule !== undefined && bubbleRule.includes(':not([data-dsh-better-display], [data-dsh-better-display] *)'),
     `the bubble rule is not excluded from the reading view: ${String(bubbleRule)}`,
   );
+  // …and it is scoped to the conversation column, so the goal bar's and user-question bubbles are
+  // not repainted by the conversation switch.
+  assert.ok(bubbleRule?.includes('[data-chat-flow]'), `the bubble rule is not scoped to the column: ${String(bubbleRule)}`);
   assert.ok(css.includes('--glass-code'));
   assert.ok(css.includes('--glass-user'));
   assert.ok(css.includes('--glass-diff'));

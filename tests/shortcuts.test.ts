@@ -53,6 +53,11 @@ test('the problems a recording can hit are named, not guessed', () => {
   assert.equal(shortcutProblem('Alt', null), 'modifier');
   assert.equal(shortcutProblem('Control+C', null), 'reserved', 'binding copy would take copy away');
   assert.equal(shortcutProblem('Meta+V', null), 'reserved');
+  // Browser navigation/history combinations are not free either: a document-level listener that
+  // preventDefaults them takes reload, the address bar, or back/forward away from the page.
+  for (const binding of ['Control+R', 'Control+Shift+T', 'Control+L', 'Alt+ArrowLeft', 'Meta+R', 'Meta+Shift+T']) {
+    assert.equal(shortcutProblem(binding, null), 'reserved', binding);
+  }
   assert.equal(shortcutProblem('Alt+C', 'Alt+C'), 'taken');
   assert.equal(shortcutProblem('alt+c', 'Alt+C'), 'taken', 'the comparison is on the canonical form');
   assert.equal(shortcutProblem('Alt+C', 'Alt+Shift+C'), null);

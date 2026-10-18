@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { mkdir, stat } from 'node:fs/promises';
+import { lstat, mkdir } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { pipeline } from 'node:stream/promises';
 import { homedir } from 'node:os';
@@ -353,8 +353,11 @@ export function apply(ctx: Context): void {
             return;
           }
           try {
-            const info = await stat(file);
-            if (!info.isFile()) {
+            // `lstat`, not `stat`: a symlink inside the wallpaper folder must not become a way to serve any
+            // local image through this route. The listing already ignores symlinks (`Dirent.isFile` does not
+            // follow them), so the route has to agree with it rather than offer a file the list never showed.
+            const info = await lstat(file);
+            if (!info.isFile() || info.isSymbolicLink()) {
               json(res, 404, { ok: false, error: 'not a file' });
               return;
             }
@@ -387,7 +390,7 @@ export function apply(ctx: Context): void {
             }
             /**
              * `pipeline` owns both ends: an `'error'` on the read stream (the file vanished or became
-             * unreadable between `stat` and `open`) is caught here instead of surfacing as an
+             * unreadable between `lstat` and `open`) is caught here instead of surfacing as an
              * uncaughtException that would end the whole Host. The headers are already out at this
              * point, so the only honest answer left is to close this one response.
              */

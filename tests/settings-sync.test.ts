@@ -94,6 +94,26 @@ test('a failed write is swallowed, and the next change still goes out', async ()
   assert.deepEqual(saved, [{ dim: 2 }]);
 });
 
+test('writes are serialized, so an older state cannot land after a newer one', async () => {
+  const saved: unknown[] = [];
+  let releaseFirst = (): void => {};
+  const firstGate = new Promise<void>(resolve => { releaseFirst = resolve; });
+  const writer = createSettingsWriter(async state => {
+    saved.push(state);
+    if (saved.length === 1) await firstGate;
+    return true;
+  }, 1);
+  writer.push({ n: 1 });
+  await new Promise(resolve => { setTimeout(resolve, 5); });
+  // The first save is now held open. The second state must queue behind it, not race it.
+  writer.push({ n: 2 });
+  await new Promise(resolve => { setTimeout(resolve, 5); });
+  assert.deepEqual(saved, [{ n: 1 }]);
+  releaseFirst();
+  await new Promise(resolve => { setTimeout(resolve, 15); });
+  assert.deepEqual(saved, [{ n: 1 }, { n: 2 }]);
+});
+
 test('a record the host already stored is not sent again, so an unrelated change costs no write', async () => {
   const saved: unknown[] = [];
   const writer = createSettingsWriter(async state => { saved.push(state); return true; }, 1);

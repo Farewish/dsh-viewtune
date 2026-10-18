@@ -179,6 +179,11 @@ export function createSettingsWriter(
   let pending: unknown;
   let waiting = false;
   let lastStored: string | undefined;
+  /**
+   * The write chain. The first save starts SYNCHRONOUSLY (the pagehide flush has no microtask to
+   * spare); later saves queue behind it so an older PUT cannot land after a newer one.
+   */
+  let chain: Promise<void> | null = null;
   const send = (): void => {
     timer = undefined;
     if (!waiting) return;
@@ -192,9 +197,25 @@ export function createSettingsWriter(
       body = undefined;
     }
     if (body !== undefined && body === lastStored) return;
-    void save(state).then(stored => {
-      if (stored === true) lastStored = body;
-    }, () => undefined);
+    const run = (): Promise<void> => {
+      try {
+        return Promise.resolve(save(state)).then(
+          stored => { if (stored === true) lastStored = body; },
+          () => undefined,
+        );
+      } catch {
+        return Promise.resolve();
+      }
+    };
+    if (chain === null) {
+      const started = run();
+      chain = started;
+      void started.finally(() => { if (chain === started) chain = null; });
+    } else {
+      const next = chain.then(run, run);
+      chain = next;
+      void next.finally(() => { if (chain === next) chain = null; });
+    }
   };
   return {
     push(state: unknown): void {
