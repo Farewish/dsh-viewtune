@@ -282,7 +282,7 @@ type ReaderActions = {
   setWallpaperChromeSidebarBlur: (draft: ReaderState, value: number) => void;
   setWallpaperChromeHeaderBlur: (draft: ReaderState, value: number) => void;
   setShortcut: (draft: ReaderState, action: ShortcutAction, value: string) => void;
-  hydrate: (draft: ReaderState, value: Record<string, unknown>) => void;
+  hydrate: (draft: ReaderState, value: Record<string, unknown>, skipKeys?: ReadonlySet<string>) => void;
 };
 
 export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderActions> {
@@ -431,9 +431,10 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
        * not a path anyone is on. Preserving them would mean carrying a pass-through bag of unknown keys through the
        * store and re-sending it, which is machinery to protect a reader from a build they do not run.
        */
-      hydrate: (draft, value) => {
+      hydrate: (draft, value, skipKeys) => {
         const target = draft as unknown as Record<string, unknown>;
         for (const key of Object.keys(value)) {
+          if (skipKeys?.has(key)) continue;
           // The per-turn expansion choices are never taken from the shared record. They are this session's memory of
           // what the reader opened, keyed by bare turn numbers that another session is free to mean something else by,
           // and the host record is one file for every session at once. `hostRecordOf` keeps them out on the way back.
@@ -449,8 +450,8 @@ export function createReaderStore(): EngineStoreHandle<ReaderState, ReaderAction
         const legacy = Object.prototype.hasOwnProperty.call(value, CHROME_LEGACY_KEY) ? value[CHROME_LEGACY_KEY] : undefined;
         if (legacy !== undefined) {
           const scrims = chromeScrimsOf(value);
-          if (!Object.prototype.hasOwnProperty.call(value, CHROME_SIDEBAR_KEY)) draft.wallpaperChromeSidebar = scrims.sidebar;
-          if (!Object.prototype.hasOwnProperty.call(value, CHROME_HEADER_KEY)) draft.wallpaperChromeHeader = scrims.header;
+          if (!skipKeys?.has(CHROME_SIDEBAR_KEY) && !Object.prototype.hasOwnProperty.call(value, CHROME_SIDEBAR_KEY)) draft.wallpaperChromeSidebar = scrims.sidebar;
+          if (!skipKeys?.has(CHROME_HEADER_KEY) && !Object.prototype.hasOwnProperty.call(value, CHROME_HEADER_KEY)) draft.wallpaperChromeHeader = scrims.header;
         }
       },
     },

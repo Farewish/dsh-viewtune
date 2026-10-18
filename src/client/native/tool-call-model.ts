@@ -202,6 +202,37 @@ function pickString(args: Record<string, unknown>, keys: readonly string[]): str
   return undefined
 }
 
+/**
+ * Materialize the fields a `ToolArgs` view has received so far.
+ *
+ * 0.2.1 publishes the lazy view on preparing, started and result rows; its `text` reader returns a
+ * streaming string prefix, and `value` returns a non-string only once it closed. A preparing row used
+ * to have no arguments at all here, so its expanded body stayed empty until dispatch. The view is
+ * read structurally because this build still type-checks against 0.2.0, where it does not exist.
+ */
+interface ToolArgsView {
+  keys(): readonly string[];
+  text(key: string): string | undefined;
+  value(key: string): unknown;
+}
+
+function argsObjectOf(args: unknown): Record<string, unknown> | undefined {
+  const view = args as Partial<ToolArgsView> | undefined;
+  if (view === undefined || typeof view.keys !== 'function' || typeof view.text !== 'function' || typeof view.value !== 'function') {
+    return undefined;
+  }
+  const keys = view.keys();
+  if (keys.length === 0) return undefined;
+  const object: Record<string, unknown> = {};
+  for (const key of keys) {
+    const text = view.text(key);
+    if (text !== undefined) { object[key] = text; continue }
+    const value = view.value(key);
+    if (value !== undefined) object[key] = value;
+  }
+  return object;
+}
+
 /** Summary key preference per variant (args-derived; result-derived summaries are a ledger item). */
 const SUMMARY_KEYS: Record<ToolRowVariant, readonly string[]> = {
   bash: ['description', 'command'],
@@ -226,8 +257,8 @@ export function relativizeToCwd(text: string, cwd: string | undefined): string {
   return text
 }
 
-function deriveSummary(toolName: string, variant: ToolRowVariant, argsRaw: string): string {
-  const parsed = parseArgs(argsRaw)
+function deriveSummary(toolName: string, variant: ToolRowVariant, argsRaw: string, argsObject?: Record<string, unknown>): string {
+  const parsed = argsObject ?? parseArgs(argsRaw)
   if (typeof parsed !== 'object' || parsed === null) return firstLine(argsRaw)
   const args = parsed as Record<string, unknown>
   const owned = TOOL_SUMMARIES[toolName]?.(args)
@@ -250,15 +281,19 @@ const FILE_PATH_KEYS = ['path', 'file_path'] as const
 /** File-tool variants whose summary may be an openable workspace path. */
 const FILE_PATH_VARIANTS: ReadonlySet<ToolRowVariant> = new Set(['read', 'write', 'edit'])
 
-function deriveFilePath(variant: ToolRowVariant, argsRaw: string): string | undefined {
+function deriveFilePath(variant: ToolRowVariant, argsRaw: string, argsObject?: Record<string, unknown>): string | undefined {
   if (!FILE_PATH_VARIANTS.has(variant)) return undefined
-  const parsed = parseArgs(argsRaw)
+  const parsed = argsObject ?? parseArgs(argsRaw)
   if (typeof parsed !== 'object' || parsed === null) return undefined
   const picked = pickString(parsed as Record<string, unknown>, FILE_PATH_KEYS)
   return picked === undefined ? undefined : firstLine(picked)
 }
 
-function deriveBody(variant: ToolRowVariant, argsRaw: string): string | null {
+function deriveBody(variant: ToolRowVariant, argsRaw: string, argsObject?: Record<string, unknown>): string | null {
+  if (argsObject !== undefined) {
+    if (variant === 'code' && typeof argsObject.code === 'string' && argsObject.code !== '') return argsObject.code
+    return JSON.stringify(argsObject, null, 2)
+  }
   if (argsRaw === '') return null
   const parsed = parseArgs(argsRaw)
   if (parsed === undefined) return argsRaw
@@ -280,23 +315,29 @@ function deriveBody(variant: ToolRowVariant, argsRaw: string): string | null {
  * @returns the row model.
  */
 export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: string, home?: string): ToolRowModel {
-  const variant = classifyTool(toolName)
   const done = 'kind' in block
   // `block.argsRaw` off the running union stops compiling in 0.2.0: a `phase: 'preparing'` call carries no arguments yet,
-  // and only `phase: 'start'` does — which is the same thing this row has always shown (a preparing row has no summary
-  // text to derive, so it fell back to the call id either way).
+  // and only `phase: 'start'` does. 0.2.1 adds the lazy `args` view on every phase, which is what lets a preparing row
+  // show the fields received so far and a window-truncated result keep its tool name.
   const argsRaw = (done ? block.call?.argsRaw : block.phase === 'start' ? block.argsRaw : undefined) ?? ''
+  const argsObject = argsObjectOf((block as unknown as { args?: unknown }).args)
+  const resultName = done ? (block as unknown as { name?: string }).name : undefined
+  const effectiveName = toolName !== '' ? toolName : resultName ?? ''
+  const variant = classifyTool(effectiveName)
   const state: ToolRowState = !done ? 'running'
     : block.error?.code === 'interrupted' ? 'stopped'
       : block.isError ? 'error' : 'ok'
-  const base = argsRaw === ''
+  const derived = argsRaw === '' && argsObject === undefined
+    ? ''
+    : deriveSummary(effectiveName, variant, argsRaw, argsObject)
+  const base = derived === ''
     ? block.callId
-    : abbreviateHomePath(relativizeToCwd(deriveSummary(toolName, variant, argsRaw), cwd), home)
-  const toolTitle = TOOL_TITLES[toolName]
+    : abbreviateHomePath(relativizeToCwd(derived, cwd), home)
+  const toolTitle = TOOL_TITLES[effectiveName]
   // Others keeps the static "Tool call" title (figma literal); the real tool
   // name rides the mutable summary slot unless the tool owns a specific title.
-  const summary = variant === 'others' && toolName !== '' && toolTitle === undefined
-    ? `${toolName} · ${base}`
+  const summary = variant === 'others' && effectiveName !== '' && toolTitle === undefined
+    ? `${effectiveName} · ${base}`
     : base
   // The empty string is "no text" for both derived result fields: a settled
   // call with blank content has nothing to expand, and a blank first line
@@ -307,8 +348,8 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     variant,
     title: toolTitle ?? VARIANT_TITLES[variant],
     summary,
-    filePath: deriveFilePath(variant, argsRaw),
-    body: deriveBody(variant, argsRaw),
+    filePath: deriveFilePath(variant, argsRaw, argsObject),
+    body: deriveBody(variant, argsRaw, argsObject),
     output,
     errorSummary,
     state,

@@ -45,7 +45,7 @@ import { textCadenceOf } from './text-cadence.js';
 import { wallpaperDimOf, wallpaperGeometry, wallpaperNameOf, wallpaperProperties, wallpaperUrl } from './wallpaper.js';
 import { applyWindowScope, wallpaperChromeBlurOf, wallpaperChromeOf, wallpaperScopeOf } from './wallpaper-scope.js';
 import { applyScrollbarFill, scrollbarFillOf } from './scrollbar.js';
-import { createSettingsWriter, hostRecordOf, loadHostSettings } from './settings-sync.js';
+import { changedSettingsKeys, createSettingsWriter, hostRecordOf, loadHostSettings } from './settings-sync.js';
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
@@ -1206,6 +1206,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // …and where the 编辑 heading's click leads: the host's own changes review, or this view's panel (the default). Read here
   // rather than passed down, like the mode above — this component already subscribes to the store for its own needs.
   const reviewInSidebar = props.useStore(state => state.reviewInSidebar) === true;
+  // 0.2.1 publishes the Session-scope access answer; the host's own branch button reads it before
+  // offering fork. Without it the click reached a refused RPC and only a console line said so.
+  const forkAllowed = props.useAccess?.('session/fork') !== false;
   // The review address needs the 1-based turn number the host validates; the group's key is that number.
   const turnNumber = Number(group.turn);
   const openFile = useCallback(
@@ -1273,7 +1276,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     fillComposer: props.fillComposer,
     openFile,
     revealFile: props.revealFile,
-    forkAt: props.forkAt,
+    forkAt: forkAllowed ? props.forkAt : undefined,
     forkSeq,
     fileMentions,
     // An image destination the document wrote as a WORKSPACE PATH is not fetchable as authored — the host's transcript turns it
@@ -1592,6 +1595,8 @@ export function Reader(props: ReaderProps) {
   // The host keeps the copy that survives (see settings-sync.ts): read once here, written back whenever
   // anything settles.
   const readerState = props.useStore(state => state);
+  const readerStateRef = useRef(readerState);
+  readerStateRef.current = readerState;
   const settingsWriter = useMemo(() => createSettingsWriter(), []);
   // Nothing is sent before that read has ANSWERED. Pushing on mount would write this browser's (possibly
   // empty) state over the record that outlived the last launch — the read has to win that race, and the
@@ -1599,6 +1604,9 @@ export function Reader(props: ReaderProps) {
   const settingsLoaded = useRef(false);
   useEffect(() => {
     let cancelled = false;
+    // The state as it was when the read started. A key that differs when the answer arrives was
+    // changed by the reader while the request was in flight, and the stored value must not win.
+    const before = hostRecordOf(readerStateRef.current);
     void loadHostSettings().then(read => {
       if (cancelled) return;
       /**
@@ -1616,7 +1624,21 @@ export function Reader(props: ReaderProps) {
         return;
       }
       settingsLoaded.current = true;
-      if (read.kind === 'stored') { props.actions.hydrate(read.record); return; }
+      if (read.kind === 'stored') {
+        const current = hostRecordOf(readerStateRef.current);
+        const dirty = changedSettingsKeys(before, current);
+        if (dirty.length === 0) { props.actions.hydrate(read.record); return; }
+        // Hydrate the keys the reader did NOT touch, keep the dirty ones, and write the merged record
+        // once: otherwise the stored value overwrites the reader's change, and the write that follows
+        // puts that stale value back on disk.
+        props.actions.hydrate(read.record, new Set(dirty));
+        const merged = { ...read.record };
+        for (const key of dirty) {
+          if (Object.prototype.hasOwnProperty.call(current, key)) merged[key] = current[key];
+        }
+        settingsWriter.push(merged);
+        return;
+      }
       // The host answered, and answered that nothing is stored: THIS browser's copy becomes the record. That is also
       // the migration for settings a reader made before the host kept any.
       settingsWriter.push(hostRecordOf(readerState));

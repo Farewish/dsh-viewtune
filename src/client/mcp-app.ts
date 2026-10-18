@@ -183,9 +183,8 @@ export function isMcpAppCodeBlock(lang: string | null | undefined, meta: string 
   if (m.includes('mcp-app') || m.includes('mcpapp') || m.includes('sep-1865') || m.includes('mcp-ui')) {
     return true;
   }
-  if (l === 'html' && (value.includes('ui/submit') || value.includes('ui/initialize') || value.includes('SEP-1865') || value.includes('mcp-app'))) {
-    return true;
-  }
+  // No content sniffing: an `html` block that merely TALKS about SEP-1865 or `ui/submit` is a code
+  // sample, not executable content. Only the explicit language or metadata above opts in.
   return false;
 }
 

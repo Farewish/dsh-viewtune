@@ -39,6 +39,21 @@ export function hostRecordOf<T extends object>(state: T): Record<string, unknown
 }
 
 /**
+ * The keys whose value changed between two host records.
+ *
+ * The record is read once on mount, but the reader can change a setting while that read is in flight.
+ * Hydrating the stored record over those keys would lose the change, and the write that follows would
+ * put the old value back. Comparing each key lets the caller keep exactly the keys the reader touched.
+ */
+export function changedSettingsKeys(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): string[] {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  return [...keys].filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
+}
+
+/**
  * How long a settled state waits before it is sent.
  *
  * Long enough to swallow a drag, short enough that a reader who changes something and immediately quits
@@ -68,9 +83,19 @@ export type HostSettingsRead =
  * hands off the record. A reader whose settings cannot be fetched still gets a working app; what they must not get is
  * a working app that quietly overwrote the settings it failed to fetch.
  */
-export async function loadHostSettings(): Promise<HostSettingsRead> {
+/** How long the initial read may take before the caller gives up and keeps its hands off the record. */
+export const SETTINGS_READ_TIMEOUT_MS = 8_000;
+
+export async function loadHostSettings(
+  timeoutMs: number = SETTINGS_READ_TIMEOUT_MS,
+): Promise<HostSettingsRead> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => { controller.abort(); }, timeoutMs);
   try {
-    const res = await fetch(READER_SETTINGS_PATH, { headers: { accept: 'application/json' } });
+    const res = await fetch(READER_SETTINGS_PATH, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
+    });
     if (!res.ok) return { kind: 'unavailable' };
     const body = await res.json() as { settings?: unknown };
     const settings = body.settings;
@@ -78,6 +103,8 @@ export async function loadHostSettings(): Promise<HostSettingsRead> {
     return Object.keys(settings).length > 0 ? { kind: 'stored', record: settings as Record<string, unknown> } : { kind: 'empty' };
   } catch {
     return { kind: 'unavailable' };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

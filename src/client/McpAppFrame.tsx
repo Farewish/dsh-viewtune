@@ -173,6 +173,10 @@ export const McpAppFrame = memo(function McpAppFrame({
     const handleMessage = (event: MessageEvent) => {
       const iframe = iframeRef.current;
       if (!iframe || event.source !== iframe.contentWindow) return;
+      // The frame is sandboxed WITHOUT allow-same-origin, so its own document has the opaque origin
+      // `'null'`. A self-navigation to a remote page keeps the same WindowProxy but reports that
+      // page's origin, which is exactly the case this refuses.
+      if (event.origin !== 'null') return;
 
       const data = event.data;
       if (!data || typeof data !== 'object') return;

@@ -25,7 +25,7 @@ test('isMcpAppCodeBlock detects all valid MCP App code block formats', () => {
   assert.equal(isMcpAppCodeBlock('html', 'mcp-app title="测试"', '<div>test</div>'), true);
   assert.equal(isMcpAppCodeBlock(null, 'sep-1865', '<div>test</div>'), true);
 
-  // Content heuristic for SEP-1865 JSON-RPC
+  // A code sample that merely talks about SEP-1865 is not executable content.
   const quizSnippet = `
     window.parent.postMessage({
       jsonrpc: "2.0",
@@ -33,7 +33,7 @@ test('isMcpAppCodeBlock detects all valid MCP App code block formats', () => {
       params: { choice: "A" }
     }, "*");
   `;
-  assert.equal(isMcpAppCodeBlock('html', null, quizSnippet), true);
+  assert.equal(isMcpAppCodeBlock('html', null, quizSnippet), false);
 
   // Negative cases
   assert.equal(isMcpAppCodeBlock('typescript', null, 'const x = 1;'), false);

@@ -65,6 +65,11 @@ export interface ReaderInjected {
   openChangesReview?: (coordinates: { sessionId: string; seq: number; turn: number }) => void;
   /** Fork the conversation at a specific message sequence into a new branch session. */
   forkAt?: (seq: number) => void;
+  /**
+   * 0.2.1's Session-scope access answer, injected as a standard prop. Optional because 0.2.0 has no
+   * such prop; absent means the host makes the decision, not this view.
+   */
+  useAccess?: (action: string) => boolean | undefined;
   /** Load session history through a target sequence number. */
   loadThrough?: (seq: unknown) => Promise<void>;
 }

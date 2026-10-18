@@ -20,6 +20,13 @@ const preparing = (name: string) => ({
   phase: 'preparing', callId: 'call-2', name, turn: 1, step: 1, time: 0, subCalls: [],
 }) as unknown as ToolCallBlock;
 
+/** The 0.2.1 lazy view, reduced to the readers this row uses. */
+const argsView = (args: Record<string, unknown>) => ({
+  keys: () => Object.keys(args),
+  text: (key: string) => typeof args[key] === 'string' ? args[key] as string : undefined,
+  value: (key: string) => typeof args[key] === 'string' ? undefined : args[key],
+});
+
 test('the calls the product renders with its own cards are named here, not called "Tool call"', () => {
   const question = toolRowModel('ask_user_question', call('ask_user_question', {
     questions: [{ id: 'a', question: '要改动吗？' }, { id: 'b', question: '范围？' }],
@@ -68,6 +75,25 @@ test('a call whose arguments have not arrived yet is named by its id, not filled
   assert.equal(row.title, 'Todo');
   assert.equal(row.summary, 'call-2');
   assert.equal(row.body, null);
+});
+
+test('a preparing call reads the fields already received through ToolArgs', () => {
+  const row = toolRowModel('read', {
+    phase: 'preparing', callId: 'call-3', name: 'read', args: argsView({ path: '/w/a.md' }), turn: 1, step: 1, time: 0, subCalls: [],
+  } as unknown as ToolCallBlock);
+  assert.equal(row.summary, '/w/a.md');
+  assert.equal(row.filePath, '/w/a.md');
+  assert.match(row.body ?? '', /a\.md/);
+});
+
+test('a result whose call left the window keeps the name the result carries', () => {
+  const row = toolRowModel('', {
+    kind: 'tool-result', seq: 1, time: 0, callId: 'call-4', name: 'read', args: argsView({}),
+    call: null, callTime: null, content: [], isError: false, subCalls: [],
+  } as unknown as ToolCallBlock);
+  assert.equal(row.variant, 'read');
+  assert.notEqual(row.title, 'Tool call');
+  assert.equal(row.summary, 'call-4');
 });
 
 test('each of those calls is its own kind of row, which is what the icon table keys off', () => {

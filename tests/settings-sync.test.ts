@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { READER_SETTINGS_PATH as HOST_PATH } from '../src/dsh-viewtune.ts';
 import {
-  READER_SETTINGS_PATH, createSettingsWriter, hostRecordOf, loadHostSettings, saveHostSettings,
+  READER_SETTINGS_PATH, changedSettingsKeys, createSettingsWriter, hostRecordOf, loadHostSettings, saveHostSettings,
 } from '../src/client/settings-sync.ts';
 
 test('the client reads and writes the route the host actually registers', () => {
@@ -141,6 +141,27 @@ test('a write that did NOT land is not deduplicated away', async () => {
   writer.push({ motion: true });
   await new Promise(resolve => { setTimeout(resolve, 20); });
   assert.deepEqual(attempted, [{ motion: true }, { motion: true }]);
+});
+
+test('only the keys the reader changed while the read was in flight are kept', () => {
+  const before = { motion: true, wallpaperDim: 20, wallpaper: 'a.jpg' };
+  const after = { motion: false, wallpaperDim: 20, wallpaper: 'a.jpg' };
+  assert.deepEqual(changedSettingsKeys(before, after), ['motion']);
+  assert.deepEqual(changedSettingsKeys(before, before), []);
+  // A key that appeared/disappeared counts too: the merge must not resurrect a stale value.
+  assert.deepEqual(changedSettingsKeys({ motion: true }, { motion: true, wallpaper: 'b.jpg' }), ['wallpaper']);
+});
+
+test('a read that never answers times out as unavailable', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = ((_input: unknown, init?: { signal?: AbortSignal }) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+  })) as unknown as typeof fetch;
+  try {
+    assert.deepEqual(await loadHostSettings(5), { kind: 'unavailable' });
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test('a read answers three ways, and a failed one is not an empty one', async () => {
