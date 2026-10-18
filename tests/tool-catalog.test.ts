@@ -52,14 +52,14 @@ test('every 0.2.1 tool has a process-row title and variant', () => {
 
 test('job and inspect rows carry the id or target in the collapsed summary', () => {
   const job = toolRowModel('job_output', callWith('job_output', { job_id: 'job-7', wait: true }));
-  assert.equal(job.title, '任务输出');
+  assert.equal(job.title, 'Read job output');
   assert.match(job.summary, /job-7/);
-  assert.match(job.summary, /等待中/);
+  assert.match(job.summary, /waiting/);
 
   const inspect = toolRowModel('cordis_inspect_query', callWith('cordis_inspect_query', {
     platform: 'host', provider: 'cordis', method: 'services',
   }));
-  assert.equal(inspect.title, '检查提供方');
+  assert.equal(inspect.title, 'Query runtime');
   assert.match(inspect.summary, /host/);
   assert.match(inspect.summary, /cordis/);
 });
