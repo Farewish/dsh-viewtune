@@ -29,11 +29,15 @@ export const readBlockLabels: ReadBlockLabels = {
   expandAria: hidden => `展开其余 ${hidden} 行`, collapse: '收起', expand: hidden => `展开其余 ${hidden} 行`,
 };
 
-export const terminalBlockLabels: TerminalBlockLabels = {
+// 0.2.1's TerminalBlock added a required `commandLine(line)` label for the horizontally
+// scrollable command rows. This build still type-checks against 0.2.0, where the field does not
+// exist, so it is added as an intersection rather than left out at runtime.
+export const terminalBlockLabels: TerminalBlockLabels & { commandLine: (line: number) => string } = {
   signal: signal => `信号 ${signal}`, exitCode: code => `退出码 ${code}`,
   // 0.2.0 added this one: the pill for a command that settled without an exit code (killed by a signal the view does
   // not know, or never started). The wording is the host's own Chinese for the same state.
   noExitCode: '未正常退出',
+  commandLine: line => `命令第 ${line} 行`,
   running: '执行中', failed: '失败', done: '已完成', copy: '复制', copied: '已复制',
   noOutput: '没有输出', collapseAria: '收起命令输出', collapse: '收起',
   expandAria: hidden => `展开其余 ${hidden} 行`, expand: hidden => `展开其余 ${hidden} 行`,

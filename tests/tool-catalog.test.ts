@@ -11,6 +11,7 @@ import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/clie
 import { activitySummary } from '../src/client/tool-activity.ts';
 import { classifyTool, toolRowModel } from '../src/client/native/tool-call-model.ts';
 import { isStructuredTool } from '../src/client/tool-result-model.ts';
+import { terminalBlockLabels } from '../src/client/primitive-labels.ts';
 
 /**
  * 0.2.1 catalog names, plus the aliases and plugin-owned verbs this view also renders.
@@ -71,6 +72,13 @@ test('the registry and job tools use their own categories', () => {
   assert.equal(activitySummary({ block: call('cordis_inspect_query') }).category, 'read');
   assert.equal(activitySummary({ block: call('session_search') }).category, 'search');
   assert.equal(activitySummary({ block: call('working_directory') }).category, 'read');
+});
+
+test('the terminal card carries 0.2.1’s commandLine label', () => {
+  // 0.2.1's TerminalBlock calls `labels.commandLine(index)` for every command row. 0.2.0's type
+  // does not declare it, so a missing runtime field throws only when the card is expanded.
+  assert.equal(typeof terminalBlockLabels.commandLine, 'function');
+  assert.equal(terminalBlockLabels.commandLine(2), '命令第 2 行');
 });
 
 test('the structured result cards cover the new receipt/registry tools', () => {
