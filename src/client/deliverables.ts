@@ -287,6 +287,9 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
       const args = inputFields(toolRaw);
       // One entry can name SEVERAL paths — a patch names its files in its own text — so each call yields a list.
       const found: { path: string; created: boolean }[] = [];
+      // Compatibility with third-party plugins that still register `apply_patch` / `str_replace_editor`.
+      // 0.2.1's official tool set does not, so these branches are dormant on a stock install and are
+      // not evidence of how an official write/edit call behaves.
       if (toolName === 'apply_patch') {
         const patch = stringValue(args, 'patch', 'input', 'diff') ?? toolRaw;
         for (const match of patch.matchAll(/^\*\*\* (Add|Update|Delete|add|update|delete) File:\s*(.+)$/gm)) {

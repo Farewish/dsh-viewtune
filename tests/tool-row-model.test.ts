@@ -96,6 +96,14 @@ test('a result whose call left the window keeps the name the result carries', ()
   assert.equal(row.summary, 'call-4');
 });
 
+test('web_fetch is a read row in both tables', () => {
+  const block = call('web_fetch', { url: 'https://example.com' });
+  const summary = activitySummary({ block });
+  assert.equal(summary.category, 'read');
+  assert.equal(summary.title, '读取网页');
+  assert.equal(toolRowModel('web_fetch', block).variant, 'read');
+});
+
 test('each of those calls is its own kind of row, which is what the icon table keys off', () => {
   const summary = (name: string, args: unknown) => activitySummary({ block: call(name, args) });
   assert.equal(summary('ask_user_question', { questions: [] }).category, 'question');

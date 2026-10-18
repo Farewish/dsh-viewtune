@@ -146,10 +146,12 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
   const description = stringValue(args, 'description');
   const file = target?.split(/[/\\]/).at(-1);
   const category: ToolCategory = /^(write|edit|apply_patch|patch|str_replace_editor)$/.test(name) ? 'write'
-    : /^(read|read_file|read_image)$/.test(name) ? 'read'
+    // `web_fetch` is a READ row in the product's own tool table (`tool-call-model.ts` classifies it
+    // the same way); keeping it in `web` here made the two tables disagree about one call.
+    : /^(read|read_file|read_image|web_fetch)$/.test(name) ? 'read'
     : /^(bash|shell|terminal|terminal_send|exec_command|pwsh)$/.test(name) ? 'terminal'
     : /^(grep|glob|find|search)$/.test(name) ? 'search'
-    : /^(web_search|web_fetch|web_open)$/.test(name) ? 'web'
+    : /^(web_search|web_open)$/.test(name) ? 'web'
     // Three calls the product renders with its own keyed card, each its own kind of thing rather
     // than a machine step: they take their product counterpart's glyph and title instead of the
     // generic sparkle. The product's read_image row is a read row, so it is one here too.
@@ -158,7 +160,7 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
     : name === 'present' ? 'delivery'
     : 'other';
   const title = category === 'write' ? `${name === 'write' ? '写入' : '修改'}${file ? ` ${file}` : name === 'apply_patch' ? '代码补丁' : '文件'}`
-    : category === 'read' ? `读取${file ? ` ${file}` : '文件'}`
+    : category === 'read' ? name === 'web_fetch' ? '读取网页' : `读取${file ? ` ${file}` : '文件'}`
     : category === 'terminal' ? description || '运行命令'
     : category === 'search' ? name === 'glob' ? '查找文件' : '搜索内容'
     : category === 'web' ? name === 'web_search' ? '搜索网页' : '读取网页'
@@ -194,6 +196,9 @@ const DIFF_NEW_FIELDS = ['content', 'new_string', 'new_str', 'newText', 'file_te
  * reading that as a file body invents additions for calls that changed no file at all.
  */
 export const DIFF_FALLBACK_TOOLS = ['write', 'edit', 'str_replace_editor'] as const;
+// `str_replace_editor` / `apply_patch` are NOT registered by 0.2.1's official tool set. They stay in
+// this table only for third-party plugins that still expose those names; a stock install has no
+// call that reaches these branches.
 const DIFF_MUTATION_TOOLS = new Set<string>(DIFF_FALLBACK_TOOLS);
 
 function firstString(source: Record<string, unknown> | undefined, fields: readonly string[]): string | null {
