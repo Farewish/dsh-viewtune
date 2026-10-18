@@ -18,6 +18,8 @@ declare module '@deepseek-ai/cordis' {
         path: string;
         handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
       }) => () => void;
+      /** The bound listener's local origin, when the installed webserver exposes it. */
+      getOrigin?: () => string;
     };
   }
 }
@@ -43,13 +45,13 @@ const WALLPAPER_REVEAL_PATH = '/better-display/wallpapers/reveal';
 export const READER_SETTINGS_PATH = '/better-display/settings';
 const READER_SETTINGS_FILE = settingsFileOf(process.env, homedir());
 /**
- * The most a reveal request may carry.
+ * The most a POST body may carry.
  *
- * The payload is one path — a few hundred bytes at the outside — and the route is unauthenticated on localhost, which
- * is the same reason the settings route has a cap. That route had one and this one did not: it accumulated whatever
- * arrived and parsed it at the end, so the body could be made as large as the process's memory.
+ * The commit-hash lookup sends one working directory and a handful of subjects; the settings route
+ * has its own bound. This one exists for the same reason: these routes are unauthenticated on
+ * localhost, so a body nobody bounded is a body that can be made as large as the process's memory.
  */
-const REVEAL_MAX_BYTES = 4 * 1024;
+const POST_MAX_BYTES = 4 * 1024;
 /**
  * The wallpaper file this build ships, beside the manifest.
  *
@@ -106,20 +108,41 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /**
- * Refuse a request that came from another page.
+ * Refuse a request that did not come from this listener's own page.
  *
- * These routes are unauthenticated on localhost, so without this a page the reader happens to have
- * open could list their wallpaper folder, read the files out of it, or ask the OS to reveal it. A
- * browser always sends `Origin` (cross-origin fetch) or `Referer` (image load) on such a request;
- * anything carrying neither is a local client rather than a page, and is left alone.
+ * These routes are unauthenticated on localhost. The old check compared Origin to the request's own
+ * Host header, which a DNS-rebinding page passes trivially: the browser sends the attacker's hostname
+ * in BOTH headers while the connection lands on 127.0.0.1. The Host is therefore checked against the
+ * listener's own origin (or a loopback authority) first; Origin/Referer must still agree with it, and
+ * a browser-declared cross-site request is refused outright.
+ *
+ * A missing Host is refused: every HTTP/1.1 browser request carries one, so only a malformed client
+ * loses here.
  */
-function sameOrigin(req: IncomingMessage): boolean {
+function hostnameOf(authority: string): string | undefined {
+  try {
+    return new URL(`http://${authority}`).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+function isLoopbackName(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '[::1]' || hostname === '::1' || /^127\./.test(hostname);
+}
+
+export function isTrustedRequest(req: IncomingMessage, originHost: string | undefined): boolean {
   const host = req.headers.host;
-  if (host === undefined) return true;
+  if (host === undefined || host === '') return false;
+  const hostname = hostnameOf(host);
+  if (hostname === undefined) return false;
+  const expected = originHost === undefined ? undefined : hostnameOf(originHost);
+  if (!isLoopbackName(hostname) && (expected === undefined || hostname !== expected)) return false;
+  if (req.headers['sec-fetch-site'] === 'cross-site') return false;
   for (const header of [req.headers.origin, req.headers.referer]) {
     if (header === undefined) continue;
     try {
-      if (new URL(header).host !== host) return false;
+      if (new URL(header).host.toLowerCase() !== host.toLowerCase()) return false;
     } catch {
       return false;
     }
@@ -140,13 +163,6 @@ function launchDetached(command: string, args: readonly string[]): Promise<void>
     child.once('error', reject);
     child.once('spawn', () => { child.unref(); resolve(); });
   });
-}
-
-/** Reveal one file (selected in its folder) in the platform's file manager. */
-async function revealFile(path: string): Promise<void> {
-  if (process.platform === 'darwin') await launchDetached('open', ['-R', path]);
-  else if (process.platform === 'win32') await launchDetached('explorer.exe', [`/select,${path}`]);
-  else await launchDetached('xdg-open', [path]);
 }
 
 /** Reveal one folder in the platform's file manager, so the reader can drop images into it. */
@@ -175,6 +191,19 @@ export function apply(ctx: Context): void {
 
   if (ctx.webServer) {
     /**
+     * This listener's own authority, used by every route's request fence. `getOrigin()` throws before
+     * the listener binds or when the bind address has no URL form; in that case only loopback
+     * authorities are trusted, which is the local-desktop case this plugin is installed for.
+     */
+    const webOriginHost = (() => {
+      try {
+        const origin = ctx.webServer!.getOrigin?.();
+        return origin === undefined ? undefined : new URL(origin).host;
+      } catch {
+        return undefined;
+      }
+    })();
+    /**
      * Commit subjects → short hashes, for the reading view's 提交 lane.
      *
      * The lane's hash can only come from git's own output line at the moment of the commit, so a commit made with `-F <file>` (this project's
@@ -192,11 +221,11 @@ export function apply(ctx: Context): void {
             res.end();
             return;
           }
-          if (!sameOrigin(req)) {
+          if (!isTrustedRequest(req, webOriginHost)) {
             json(res, 403, { ok: false, error: 'cross-origin' });
             return;
           }
-          const body = await readBody(req, REVEAL_MAX_BYTES);
+          const body = await readBody(req, POST_MAX_BYTES);
           if (body === undefined) {
             json(res, 413, { ok: false, error: 'payload too large' });
             return;
@@ -219,55 +248,6 @@ export function apply(ctx: Context): void {
     }, 'dsh-viewtune: /better-display/commit-hashes route');
 
 
-    ctx.effect(() => {
-      return ctx.webServer!.register({
-
-
-        kind: 'exact',
-
-
-        path: '/better-display/reveal',
-        handler: async (req, res) => {
-          if (req.method !== 'POST') {
-            res.statusCode = 405;
-            res.end();
-            return;
-          }
-          if (!sameOrigin(req)) {
-            json(res, 403, { ok: false, error: 'cross-origin' });
-            return;
-          }
-          const body = await readBody(req, REVEAL_MAX_BYTES);
-          if (body === undefined) {
-            json(res, 413, { ok: false, error: 'payload too large' });
-            return;
-          }
-          let targetPath: string;
-          try {
-            const data = JSON.parse(body);
-            targetPath = typeof data.path === 'string' ? data.path.trim() : '';
-          } catch (err) {
-            json(res, 400, { ok: false, error: String(err) });
-            return;
-          }
-          if (!targetPath) {
-            json(res, 400, { ok: false, error: 'Empty path' });
-            return;
-          }
-          try {
-            await revealFile(targetPath);
-          } catch (error) {
-            // The opener missing (or unable to start) is a failure the reader can be told about; it must never
-            // surface as an uncaughtException and take the Host with it.
-            console.warn(`[viewtune] could not reveal the path: ${String(error)}`);
-            json(res, 500, { ok: false, error: 'reveal failed' });
-            return;
-          }
-          json(res, 200, { ok: true });
-        },
-      });
-    }, 'dsh-viewtune: /better-display/reveal route');
-
     // The reader's settings, kept HERE rather than only in the browser. The client store persists to
     // localStorage, which is keyed by ORIGIN — and this server's port is ephemeral, so every launch is a
     // new origin with an empty store: "every time I quit DSH, all of viewtune's settings are reset".
@@ -278,12 +258,20 @@ export function apply(ctx: Context): void {
         kind: 'exact',
         path: READER_SETTINGS_PATH,
         handler: async (req, res) => {
-          if (!sameOrigin(req)) {
+          if (!isTrustedRequest(req, webOriginHost)) {
             json(res, 403, { ok: false, error: 'cross-origin' });
             return;
           }
           if (req.method === 'GET') {
-            json(res, 200, { ok: true, settings: (await readSettings(READER_SETTINGS_FILE)) ?? {} });
+            const read = await readSettings(READER_SETTINGS_FILE);
+            if (read.kind === 'invalid') {
+              // A file that exists but cannot be read or parsed is not "no record": answering `{}` would
+              // let the client seed its defaults over the record it failed to read. The client's
+              // `unavailable` branch already keeps its hands off the host record.
+              json(res, 500, { ok: false, error: 'settings unreadable' });
+              return;
+            }
+            json(res, 200, { ok: true, settings: read.kind === 'ok' ? read.record : {} });
             return;
           }
           if (req.method !== 'PUT') {
@@ -334,7 +322,7 @@ export function apply(ctx: Context): void {
             json(res, 405, { ok: false, error: 'GET only' });
             return;
           }
-          if (!sameOrigin(req)) {
+          if (!isTrustedRequest(req, webOriginHost)) {
             json(res, 403, { ok: false, error: 'cross-origin' });
             return;
           }
@@ -354,7 +342,7 @@ export function apply(ctx: Context): void {
             json(res, 405, { ok: false, error: 'GET only' });
             return;
           }
-          if (!sameOrigin(req)) {
+          if (!isTrustedRequest(req, webOriginHost)) {
             json(res, 403, { ok: false, error: 'cross-origin' });
             return;
           }
@@ -425,7 +413,7 @@ export function apply(ctx: Context): void {
             json(res, 405, { ok: false, error: 'POST only' });
             return;
           }
-          if (!sameOrigin(req)) {
+          if (!isTrustedRequest(req, webOriginHost)) {
             json(res, 403, { ok: false, error: 'cross-origin' });
             return;
           }

@@ -4,7 +4,7 @@
  * exercised here without starting a server.
  */
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -37,22 +37,29 @@ test('only a plain, bounded, serializable object is a record', () => {
   assert.equal(settingsRecordOf(cycle), undefined);
 });
 
-test('a missing, unreadable or non-record file reads as nothing at all', async () => {
-  assert.equal(await readSettings(join(dir, 'never-written.json')), undefined);
+test('a missing file is distinct from one that exists but cannot be trusted', async () => {
+  assert.deepEqual(await readSettings(join(dir, 'never-written.json')), { kind: 'missing' });
   const broken = join(dir, 'broken.json');
   writeFileSync(broken, '{ not json at all', 'utf8');
-  assert.equal(await readSettings(broken), undefined);
+  assert.deepEqual(await readSettings(broken), { kind: 'invalid' });
   const array = join(dir, 'array.json');
   writeFileSync(array, '[1,2]', 'utf8');
-  assert.equal(await readSettings(array), undefined);
+  assert.deepEqual(await readSettings(array), { kind: 'invalid' });
+  // The read path enforces the same bound as the write path, before parsing the file.
+  const oversized = join(dir, 'oversized.json');
+  writeFileSync(oversized, `{"pad":"${'x'.repeat(SETTINGS_MAX_BYTES)}"}`, 'utf8');
+  assert.deepEqual(await readSettings(oversized), { kind: 'invalid' });
+  const directory = join(dir, 'not-a-file');
+  mkdirSync(directory);
+  assert.deepEqual(await readSettings(directory), { kind: 'invalid' });
 });
 
 test('a record round-trips, and a refusal leaves the previous one in place', async () => {
   const file = join(dir, 'nested', 'settings.json');
   assert.equal(await writeSettings(file, { wallpaper: 'x.jpg', wallpaperDim: 51 }), true);
-  assert.deepEqual(await readSettings(file), { wallpaper: 'x.jpg', wallpaperDim: 51 });
+  assert.deepEqual(await readSettings(file), { kind: 'ok', record: { wallpaper: 'x.jpg', wallpaperDim: 51 } });
   // A body that is not a record is refused BEFORE anything is written: a shape this half does not
   // recognise must not be allowed to overwrite a good record with rubbish.
   assert.equal(await writeSettings(file, 42), false);
-  assert.deepEqual(await readSettings(file), { wallpaper: 'x.jpg', wallpaperDim: 51 });
+  assert.deepEqual(await readSettings(file), { kind: 'ok', record: { wallpaper: 'x.jpg', wallpaperDim: 51 } });
 });

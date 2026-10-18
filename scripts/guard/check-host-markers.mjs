@@ -30,10 +30,10 @@ const BUNDLE = join(ROOT, 'lib', 'dsh-viewtune.js');
  * fail is a checker nobody can trust, and that is asserted rather than promised.
  */
 export const INVARIANTS = [
-  ["the reveal route's body is capped while it arrives", (bundle) =>
-    bundle.includes('readBody(req, REVEAL_MAX_BYTES)')],
+  ["the commit-hash route's body is capped while it arrives", (bundle) =>
+    bundle.includes('readBody(req, POST_MAX_BYTES)')],
   ['that cap is a real number, not a symbol the reader has to trust', (bundle) =>
-    /const REVEAL_MAX_BYTES = \d+;/.test(bundle)],
+    /const POST_MAX_BYTES = \d+;/.test(bundle)],
   ["the settings route's body is capped the same way", (bundle) =>
     bundle.includes('readBody(req, SETTINGS_MAX_BYTES)')],
   ["a body reader settles on the request's close, not only on end", (bundle) =>
@@ -54,10 +54,10 @@ export const INVARIANTS = [
     // `pathname === prefix || pathname.startsWith(prefix + '/')`, so a registered trailing slash never matches and every
     // thumbnail silently 404s against the server's bare answer.
     bundle.includes('const WALLPAPER_ROUTE = "/better-display/wallpaper";')],
-  ['the reveal route answers POST only, and only from this origin', (bundle) =>
-    // Both are one-line refusals that a rewrite could drop without any test noticing. Matched as shapes rather than as
-    // single lines: the formatter decides where the object literal's properties land.
-    /error: "POST only"/.test(bundle) && /if \(!sameOrigin\(req\)\)/.test(bundle)],
+  ['no custom reveal route remains: reveal is the host session action’s job', (bundle) =>
+    !bundle.includes('/better-display/reveal') && bundle.includes('isTrustedRequest(req, webOriginHost)')],
+  ['the host routes trust the listener’s authority, not the request’s own Host', (bundle) =>
+    bundle.includes('isTrustedRequest(req, webOriginHost)') && bundle.includes('sec-fetch-site')],
 ];
 // What this guard deliberately does NOT cover: the wallpaper FOLDER never reaching the browser. That is asserted on the
 // client half, where it belongs (`check-bundle-markers.mjs`, the `no wallpaper folder in the client bundle` marker) —
@@ -77,13 +77,13 @@ function selfTest() {
   }
   // …and once the shapes are there, nothing is reported: a checker that always fails is as useless as one that never does.
   const satisfied = violationsOf(
-    'readBody(req, REVEAL_MAX_BYTES)\nconst REVEAL_MAX_BYTES = 4096;\nreadBody(req, SETTINGS_MAX_BYTES)'
+    'readBody(req, POST_MAX_BYTES)\nconst POST_MAX_BYTES = 4096;\nreadBody(req, SETTINGS_MAX_BYTES)'
     + '\nreq.on("aborted", () => {\nreq.on("close", () => {'
     + '\nwritten = await writeSettings(F, V);\njson(res, 500, {'
     + '\n"Cache-Control": "private, no-cache",\nETag: etag,\nif (req.headers["if-none-match"] === etag) {\nres.writeHead(304, headers);'
     + '\nconst etag = `W/"${String(info.size)}-${String(Math.round(info.mtimeMs))}"`;'
     + '\nconst WALLPAPER_ROUTE = "/better-display/wallpaper";'
-    + '\nif (!sameOrigin(req)) {\nres.statusCode = 405;\nerror: "POST only"',
+    + '\nisTrustedRequest(req, webOriginHost);\nsec-fetch-site',
   );
   if (satisfied.length !== 0) {
     console.error(`SELFTEST FAILED — a conforming bundle was reported: ${JSON.stringify(satisfied)}`);

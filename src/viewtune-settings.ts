@@ -13,7 +13,7 @@
  * over these, which is what makes the refusals ("is this a record we are willing to keep?") testable
  * without starting a server.
  */
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 /**
@@ -59,23 +59,42 @@ export function settingsRecordOf(value: unknown): Record<string, unknown> | unde
 }
 
 /**
- * Read the stored record, or `undefined` when there is nothing usable to read.
+ * What a read of the stored record established.
  *
- * A missing file, a truncated one and a hand-edited one all answer the same way: the caller falls back
- * to the reader's defaults. That is deliberate — a settings file is allowed to be absent on a first
- * run, and a reader is not supposed to be locked out of their own app by one.
+ * A missing file is safe to treat as "nothing stored yet" — the client may seed it. A file that exists
+ * but cannot be read, parsed or bounded is NOT the same fact: reporting it as empty would let the client
+ * overwrite a record it never managed to read, so the route answers 5xx for this case instead.
  */
-export async function readSettings(file: string): Promise<Record<string, unknown> | undefined> {
+export type SettingsRead =
+  | { readonly kind: 'ok'; readonly record: Record<string, unknown> }
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'invalid' };
+
+/**
+ * Read the stored record, distinguishing an absent file from one that cannot be trusted.
+ *
+ * A file is checked against the same bound the write path enforces BEFORE it is read, so a hand-edited
+ * or oversized file is refused without first allocating it in memory.
+ */
+export async function readSettings(file: string): Promise<SettingsRead> {
+  let info;
+  try {
+    info = await stat(file);
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? { kind: 'missing' } : { kind: 'invalid' };
+  }
+  if (!info.isFile() || info.size > SETTINGS_MAX_BYTES) return { kind: 'invalid' };
   let text: string;
   try {
     text = await readFile(file, 'utf8');
-  } catch {
-    return undefined;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? { kind: 'missing' } : { kind: 'invalid' };
   }
   try {
-    return settingsRecordOf(JSON.parse(text));
+    const record = settingsRecordOf(JSON.parse(text));
+    return record === undefined ? { kind: 'invalid' } : { kind: 'ok', record };
   } catch {
-    return undefined;
+    return { kind: 'invalid' };
   }
 }
 

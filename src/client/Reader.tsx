@@ -26,7 +26,7 @@ import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, isProcessStepOf, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
 import { entryViewOf } from './entry-policy.js';
 import type { CommitRecord, DeliveredFile, DeliverableDisplay, TurnChange } from './deliverables.js';
@@ -169,7 +169,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const parts = assistantSegments(data.blocks);
   const earlier = isEarlierNarration(data, boundary);
   const hasToolCalls = data.blocks.some(block => block.kind === 'tool-call');
-  const isProcessStep = earlier || hasToolCalls || (boundary.latestStep > 0 && data.step < boundary.latestStep);
+  const isProcessStep = isProcessStepOf(data, boundary, hasToolCalls);
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
   // WHICH PARTS TO RENDER. A step commonly carries its thinking AND the narration that follows it in the same node — the host renders those as two
   // entries (`groupPart: "reasoning"` inside the run and `groupPart: "response"` outside it), and 「按旁白分段」 needs the same split: the thinking

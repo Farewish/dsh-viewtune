@@ -46,6 +46,19 @@ export function isEarlierNarration(data: AssistantChatData, boundary: TurnBounda
 }
 
 /**
+ * Whether a settled Assistant step belongs to the turn's process instead of its answer.
+ *
+ * A completed turn can keep later steps after the closing answer (the host records them and the
+ * process window still renders them). Those later steps must not make the closing step itself look
+ * like process: `latestStep` is a position, not the answer boundary, so the closing step is excluded
+ * from the "older step" arm. A step that carries a tool call stays process wherever it sits.
+ */
+export function isProcessStepOf(data: AssistantChatData, boundary: TurnBoundary, hasToolCalls: boolean): boolean {
+  if (hasToolCalls || isEarlierNarration(data, boundary)) return true;
+  return boundary.latestStep > 0 && data.step < boundary.latestStep && data.step !== boundary.closingStep;
+}
+
+/**
  * Is this turn's process open?
  *
  * `foldEarlier` is the reader's 「自动收起更早流程」: while a turn is running, ANY turn that is not the running one starts

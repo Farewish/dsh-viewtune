@@ -48,7 +48,7 @@ interface SidebarRightFace {
   tabsIn?: (sessionId: string) => readonly SidebarTabLike[];
 }
 interface RemoteSessionFace {
-  openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>;
+  openWorkspacePath: (arg: { path: string; action?: 'reveal' }) => Promise<{ ok: boolean; error?: { message: string } }>;
 }
 
 export type { ReaderBlockOwner } from './types.js';
@@ -241,27 +241,21 @@ return { data: Uint8Array.from(stored.data), mediaType: stored.attachment?.media
             console.warn('[dsh-better-display] openChangesReview error:', error);
           }
         },
-        revealFile: async (path: string) => {          try {
+        revealFile: async (path: string) => {
+          try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
             const targetPath = resolveWorkspacePath(cwd, path);
-            // 1. Try dedicated host endpoint for native file highlighting (open -R / explorer /select)
-            try {
-              const res = await fetch('/better-display/reveal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: targetPath }),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                if (data.ok) return;
-              }
-            } catch {
-              // Server endpoint not yet available, fallback to directory open
-            }
-
-            // 2. Fallback to official opener with parent directory
-            const parentDir = dirname(targetPath);
             const remote = ctx.get?.('remote.session') as unknown as RemoteSessionFace | undefined;
+            // 0.2.1's own reveal action validates the target against the Session workspace before it
+            // launches the desktop opener. The old plugin endpoint accepted any path from its body,
+            // which made this route a general "open this local path" primitive for any same-origin page.
+            if (remote?.openWorkspacePath) {
+              const result = await remote.openWorkspacePath({ path: targetPath, action: 'reveal' });
+              if (result?.ok) return;
+              console.warn('[dsh-better-display] reveal refused:', result?.error?.message);
+            }
+            // Fallback for a host without the reveal action: open the containing folder instead.
+            const parentDir = dirname(targetPath);
             if (remote?.openWorkspacePath) {
               await remote.openWorkspacePath({ path: parentDir });
             }

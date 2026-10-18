@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, isProcessStepOf, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
 import type { TurnBoundary } from '../src/client/projection.ts';
 import { activityPhase, activitySummary, inputFields, readerFlow } from '../src/client/tool-activity.ts';
 
@@ -63,6 +63,19 @@ test('a settled step alone never means final or disposable', () => {
   assert.equal(isEarlierNarration(assistant(), { ...active, status: 'unknown' }), false);
   assert.equal(isEarlierNarration(assistant({ status: 'running' }), active), false);
   assert.equal(isEarlierNarration(assistant(), active), false);
+});
+
+test('the closing answer step is not folded as process just because later steps exist', () => {
+  // A completed turn may keep later steps after its closing answer. `latestStep` then points past the
+  // answer, and the old `data.step < latestStep` arm turned the answer into a closed process row.
+  const boundary: TurnBoundary = { ...completed, latestStep: 4, closingStep: 3 };
+  const closing = assistant({ step: 3 });
+  assert.equal(isEarlierNarration(closing, boundary), false);
+  assert.equal(isProcessStepOf(closing, boundary, false), false);
+  assert.equal(isProcessStepOf(assistant({ step: 2 }), boundary, false), true);
+  // A tool call is process wherever it sits, including the closing step.
+  const tool = { kind: 'tool-call', callId: 'c1', name: 'read', argsRaw: '{}' } as AssistantBlock;
+  assert.equal(isProcessStepOf(assistant({ step: 3, blocks: [tool] }), boundary, true), true);
 });
 
 test('process stays open through body output and later steps until successful turn completion', () => {
