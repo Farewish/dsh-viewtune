@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode, RefObject } from 'react';
+import type { ReactNode, Ref, RefObject } from 'react';
 import css from './Reader.module.css';
 import { StreamMotionContext } from './streaming.js';
 
@@ -125,7 +125,7 @@ export function StatusText({ text, motion, shimmer = false }: { text: string; mo
  */
 export function Disclosure({ open, onToggle, label, status, controls, buttonRef, meta = true, ariaLabel }: {
   open: boolean; onToggle: () => void; label: ReactNode;
-  status?: string; controls: string; buttonRef: RefObject<HTMLButtonElement>;
+  status?: string; controls?: string; buttonRef: Ref<HTMLButtonElement>;
   /** Whether to draw the 「思考与过程」 meta line under the button. The turn's own control does; a 次级 stretch header does not. */
   meta?: boolean;
   /** The accessible name, for a control that is not the turn's process itself. */
@@ -145,8 +145,8 @@ export function Disclosure({ open, onToggle, label, status, controls, buttonRef,
 }
 
 /** Supplemental details stay in source order beside their own narration. */
-export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, children, framed = false }: {
-  open: boolean; motion: boolean; onRead: () => void; nodeKey: string;
+export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, id, children, framed = false }: {
+  open: boolean; motion: boolean; onRead: () => void; nodeKey: string; id?: string;
   returnFocusTo: RefObject<HTMLElement>; children: ReactNode; framed?: boolean;
 }) {
   const body = useRef<HTMLDivElement>(null);
@@ -256,7 +256,7 @@ export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, 
     running.current?.cancel();
   }, []);
   if (!open && !present) return null;
-  return <div ref={body} className={css.disclosureBody} data-reader-process data-reader-process-key={nodeKey} data-ud-motion="reader-process-size"
+  return <div ref={body} id={id} className={css.disclosureBody} data-reader-process data-reader-process-key={nodeKey} data-ud-motion="reader-process-size"
     aria-hidden={!open} onPointerDown={() => { if (open) onRead(); }} onFocusCapture={() => { if (open) onRead(); }} {...(!open ? { inert: '' } : {})}>
     <div className={framed ? css.processFrame : css.processContents}>{children}</div>
   </div>;

@@ -78,6 +78,15 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const [edges, setEdges] = useState('none');
   const lastHeight = useRef(0);
   const resize = useRef<Animation | null>(null);
+  /** Every delayed write this card owns, cleared on unmount instead of reaching back into a detached node. */
+  const timers = useRef(new Set<number>());
+  const later = useCallback((run: () => void, delay: number) => {
+    const id = window.setTimeout(() => {
+      timers.current.delete(id);
+      run();
+    }, delay);
+    timers.current.add(id);
+  }, []);
   /**
    * 「思考卡折叠成一行」: folded unless the reader opened THIS card or it is the one holding the focus. The two states that win
    * over the fold are the two the reader is looking at on purpose — the card they opened, and the card being written into —
@@ -250,13 +259,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         let settled = false;
         const settle = () => {
           if (settled || resize.current !== animation) return;
+          if (!port.isConnected) return;
           settled = true;
           resize.current = null; animation.cancel();
           port.style.maxHeight = ''; port.style.height = '';
           lastHeight.current = port.clientHeight;
         };
         animation.onfinish = settle;
-        window.setTimeout(settle, 300 + 240);
+        later(settle, 300 + 240);
       }
       return;
     }
@@ -774,6 +784,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     let settled = false;
     const settle = () => {
       if (settled || resize.current !== animation) return;
+      if (!port.isConnected) return;
       settled = true;
       resize.current = null; animation.cancel();
       port.style.maxHeight = ''; port.style.height = '';
@@ -790,6 +801,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     return () => { window.clearTimeout(deadline); };
   }, [expanded, folded, motion, selected]);
   useEffect(() => () => { window.cancelAnimationFrame(alignFrame.current); resize.current?.cancel(); }, []);
+  useEffect(() => () => {
+    for (const id of timers.current) window.clearTimeout(id);
+    timers.current.clear();
+  }, []);
 
   /**
    * Bring this card's BOTTOM to the top of the composer — 「展开后底端对齐输入栏顶」.
@@ -870,7 +885,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const root = cardRoot();
     if (root !== null) {
       root.setAttribute('data-reader-resizing', '');
-      window.setTimeout(() => root.removeAttribute('data-reader-resizing'), 600);
+      later(() => { if (root.isConnected) root.removeAttribute('data-reader-resizing'); }, 600);
     }
     setExpanded(value => !value);
     /**
@@ -880,7 +895,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      */
     if (alignBottom && !expanded) {
       pendingAlign.current = true;
-      window.setTimeout(() => { if (pendingAlign.current) { pendingAlign.current = false; alignCardBottom(); } }, 600);
+      later(() => { if (pendingAlign.current) { pendingAlign.current = false; alignCardBottom(); } }, 600);
     }
   };
   const pendingAlign = useRef(false);

@@ -6,6 +6,8 @@ test('the reader’s setting decides which page a brand new session opens on', (
   // 阅读页 is the shipped default and keeps the behaviour this plugin always had; 对话页 leaves the host's own view alone.
   assert.equal(new ReaderEntryPolicy(false).select(null, 'reader'), 'reader');
   assert.equal(new ReaderEntryPolicy(false).select(null, 'conversation'), null);
+  // A read that failed is no opinion, not the shipped default: the host's current view must stand.
+  assert.equal(new ReaderEntryPolicy(false).select(null, null), null, 'a failed read leaves the host view alone');
   // A session that HAS recorded a view is never touched, whichever the setting says: that is the "do not fight a later tab
   // choice" rule, and it is what keeps this setting from overriding the reader's own tabs.
   const toConversation = new ReaderEntryPolicy(false);

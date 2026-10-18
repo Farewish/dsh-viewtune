@@ -15,8 +15,8 @@ function isConversationStore(store: StoreDecl | undefined): store is Conversatio
 
 type EntryProps = PropsRuntime<'conversation.input.dock'> & PropsStore<ConversationStore> & {
   policy: ReaderEntryPolicy;
-  /** The reader's 新会话默认视图, as the host record currently has it. */
-  entryView: () => EntryView;
+  /** The reader's 新会话默认视图, or `null` while the host record has not answered / could not be read. */
+  entryView: () => EntryView | null;
 };
 
 function ReaderEntry({ useStore, actions, policy, entryView }: EntryProps) {
@@ -43,10 +43,12 @@ export function installReaderEntry(ctx: Context): () => void {
   // subscription — and handed to the component as a getter, because the effect must see the CURRENT value when a new
   // session mounts.
   //
-  // Until that first read answers, the shipped default stands (`阅读页`), which is exactly the behaviour this plugin had
-  // before the setting existed: a slow or failed read can therefore only ever leave a reader with what they already had.
-  let entryView: EntryView = 'reader';
+  // Until that first read answers, the plugin has NO opinion; a slow or failed read leaves the host's current view
+  // alone, which is exactly the behaviour this plugin had before the setting existed. The shipped 阅读页 default is
+  // applied only when the host actually answered (an empty record is a new install, not a failure).
+  let entryView: EntryView | null = null;
   void loadHostSettings().then(read => {
+    if (read.kind === 'unavailable') return;
     entryView = entryViewOf(read.kind === 'stored' ? read.record.entryView : undefined);
   }, () => undefined);
   const unsubscribe = subscribeToHostSettings(record => { entryView = entryViewOf(record.entryView); });

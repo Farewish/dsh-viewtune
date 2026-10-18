@@ -1129,6 +1129,8 @@ interface SegmentHeaderItem {
 interface RunBodyItem {
   readonly kind: 'runBody';
   readonly key: string;
+  /** The stretch this body belongs to, so its disclosure and its focus target can share one id. */
+  readonly segmentId: string;
   readonly rows: readonly ReaderFlowEntry[];
   /** The stretch's own open state, which is what `ProcessFragment` animates between. */
   readonly open: boolean;
@@ -1310,7 +1312,15 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
    */
   const [openSegments, setOpenSegments] = useState<ReadonlySet<string>>(() => new Set<string>());
   // One ref for every stretch header: it exists so a focus return has somewhere to land, and the headers share the flow's own button.
-  const segmentButton = useRef<HTMLButtonElement>(null);
+  const segmentButtons = useRef(new Map<string, HTMLButtonElement>());
+  const segmentFocusRefs = useRef(new Map<string, { current: HTMLElement | null }>());
+  /** Stable per-segment focus target, updated to whichever header button is currently mounted. */
+  const segmentFocusRef = (segmentId: string) => {
+    let ref = segmentFocusRefs.current.get(segmentId);
+    if (ref === undefined) { ref = { current: null }; segmentFocusRefs.current.set(segmentId, ref); }
+    ref.current = segmentButtons.current.get(segmentId) ?? null;
+    return ref;
+  };
   const renderFlow = useMemo(() => {
     // GOVERNED BY THE 总流程折叠开关, which is the reader's own convention: the outer disclosure (「用时 N 秒」/「执行过程」) owns the whole process, and
     // a 次级 header may only exist while it is OPEN. The steps below are already hidden by their own `open={expanded}` wrappers, but a header sits
@@ -1406,7 +1416,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
        * transition never runs and the reader saw no animation at all. A closed body costs the component's own margin compensation instead of the
        * blank space an unwrapped row used to leave.
        */
-      augmented.push({ kind: 'runBody', key: `${id}:body`, rows: rest, open: runOpen });
+      augmented.push({ kind: 'runBody', key: `${id}:body`, segmentId: id, rows: rest, open: runOpen });
     }
     return { list: augmented, partOf };
   }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
@@ -1454,17 +1464,31 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
           thinking) and once outside it (showing the narration) — so `item.key` alone is no longer unique. React treats duplicate keys as an error
           and renders duplicate, unstable rows for them, which is exactly what the reader saw: every time a 次级 run was opened, the narration
           appeared one more time. */}
-      {renderFlow.list.map((item, index) => item.kind === 'segmentHeader' ? <Fragment key={`${item.key}#${String(index)}`}>
-        <Disclosure open={openSegments.has(item.segmentId)} onToggle={() => toggleSegment(item.segmentId)} controls={`${flowId}:${item.segmentId}`} buttonRef={segmentButton} meta={false} ariaLabel={`${openSegments.has(item.segmentId) ? '收起' : '展开'}${item.label}`} label={<span className={css.segmentLabel}>{item.label}</span>} />
-      </Fragment> : item.kind === 'runBody' ? <Fragment key={`${item.key}#${String(index)}`}>
-        {/* ONE animated container per stretch, and it is the flow's own child — which is what lets `ProcessFragment` measure the rows, animate the
-            height between `open` values, and pull their `row-gap` out of the layout while it is closed (see the note in its own source). */}
-        <ProcessFragment open={item.open && expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key}>
-          <div className={css.runBodyInner}>{item.rows.map(row => <Fragment key={row.key}>{renderMember(row, 'reasoning')}</Fragment>)}</div>
-        </ProcessFragment>
-      </Fragment> : <Fragment key={`${item.key}#${String(index)}`}>
-        {renderMember(item, item.kind === 'node' && renderFlow.partOf.get(index) !== undefined ? renderFlow.partOf.get(index)! : 'both')}
-      </Fragment>)}
+      {renderFlow.list.map((item, index) => {
+        if (item.kind === 'segmentHeader') {
+          const open = openSegments.has(item.segmentId);
+          return <Fragment key={`${item.key}#${String(index)}`}>
+            <Disclosure open={open} onToggle={() => toggleSegment(item.segmentId)} controls={open ? `${flowId}:${item.segmentId}` : undefined}
+              buttonRef={node => {
+                if (node === null) segmentButtons.current.delete(item.segmentId);
+                else segmentButtons.current.set(item.segmentId, node);
+              }} meta={false} ariaLabel={`${open ? '收起' : '展开'}${item.label}`} label={<span className={css.segmentLabel}>{item.label}</span>} />
+          </Fragment>;
+        }
+        if (item.kind === 'runBody') {
+          return <Fragment key={`${item.key}#${String(index)}`}>
+            {/* ONE animated container per stretch, and it is the flow's own child — which is what lets `ProcessFragment` measure the rows, animate the
+                height between `open` values, and pull their `row-gap` out of the layout while it is closed (see the note in its own source). */}
+            <ProcessFragment id={`${flowId}:${item.segmentId}`} open={item.open && expanded} motion={motion} onRead={pinProcess}
+              returnFocusTo={segmentFocusRef(item.segmentId)} nodeKey={item.key}>
+              <div className={css.runBodyInner}>{item.rows.map(row => <Fragment key={row.key}>{renderMember(row, 'reasoning')}</Fragment>)}</div>
+            </ProcessFragment>
+          </Fragment>;
+        }
+        return <Fragment key={`${item.key}#${String(index)}`}>
+          {renderMember(item, item.kind === 'node' && renderFlow.partOf.get(index) !== undefined ? renderFlow.partOf.get(index)! : 'both')}
+        </Fragment>;
+      })}
     </div>
     {showDeliverablesRow(boundary.status, [...deliverables, ...deliverableGroups.commits.map(commit => commit.hash ?? commit.subject)]) && <DeliverablesRow groups={deliverableGroups} changes={deliverableChanges} display={deliverableDisplay} recordCommits={recordCommits} reviewInSidebar={reviewInSidebar} turnNumber={turnNumber} sessionId={props.sessionId} openChangesReview={props.openChangesReview} openFile={openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
@@ -2240,7 +2264,7 @@ export function Reader(props: ReaderProps) {
     // and the next pass (this effect re-runs on every commit) lands.
     const targetIndex = groups.findIndex(group => group.turn === pendingReveal);
     if (targetIndex >= 0 && hiddenTurnKeys.has(groups[targetIndex]!.key)) {
-      setRevealed(current => revealForTurn(targetIndex, groups.length, foldWindow, current));
+      setRevealed(current => revealForTurn(targetIndex, groups.filter(group => group.turn !== null).length, foldWindow, current));
       return;
     }
     if (revealTurn(pendingReveal)) {

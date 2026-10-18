@@ -23,9 +23,10 @@ export class ReaderEntryPolicy {
    *
    * `?reader` in the URL is an explicit request and still wins whatever the setting says. Otherwise the only session this
    * touches is one that has recorded NO view at all — a brand new session — and there the reader's setting decides:
-   * 阅读页 switches it, 对话页 leaves it on the host's conversation view.
+   * 阅读页 switches it, 对话页 leaves it on the host's conversation view. `null` means "no opinion" (the record could
+   * not be read), which leaves the host's choice alone just like 对话页.
    */
-  select(view: string | null | undefined, defaultView: EntryView = 'reader'): 'reader' | null {
+  select(view: string | null | undefined, defaultView: EntryView | null = 'reader'): 'reader' | null {
     const requested = !this.entered && this.requested;
     if (!this.entered) {
       this.entered = true;
