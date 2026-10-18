@@ -54,7 +54,7 @@ export interface ReaderInjected {
    * sidebar preview can honour; the system opener ignores it. The mode is an argument because this
    * face has no live store to read — see `open-file.ts` on why `createReaderStore()` cannot answer it.
    */
-  openFile: (path: string, options?: { mode?: DeliverableOpenMode; line?: number }) => Promise<void> | void;
+  openFile: (path: string, options?: { mode?: DeliverableOpenMode; line?: number; allowHostOpen?: boolean }) => Promise<void> | void;
   /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
   revealFile?: (path: string) => Promise<void> | void;
   /**
@@ -79,7 +79,7 @@ export type ReaderProps = PropsRuntime<'conversation.view'>
   & PropsStore<ReturnType<typeof createReaderStore>>
   & ReaderInjected;
 export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage' | 'fillComposer'> & {
-  openFile?: (path: string, options?: { mode?: DeliverableOpenMode; line?: number }) => Promise<void> | void;
+  openFile?: (path: string, options?: { mode?: DeliverableOpenMode; line?: number; allowHostOpen?: boolean }) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
   forkAt?: (seq: number) => void;
   /** Durable closing-message seq of this turn (turn-tail closing), used as the fork anchor. */

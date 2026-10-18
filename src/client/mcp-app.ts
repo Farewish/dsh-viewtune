@@ -40,10 +40,35 @@ export function extractHtmlTitle(html: string): string | undefined {
  * Normalizes user/model generated HTML to ensure a valid HTML5 structure
  * and embeds a dynamic theme listener so dark/light mode switches take effect immediately.
  */
-export function ensureHtmlDocument(rawHtml: string, initialTheme: 'dark' | 'light' = 'light'): string {
+export function ensureHtmlDocument(rawHtml: string, initialTheme: 'dark' | 'light' = 'light', frameNonce?: string): string {
   const isDark = initialTheme === 'dark';
   const trimmed = rawHtml.trim();
 
+  const cspMeta = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\' \'unsafe-eval\' https:; style-src \'unsafe-inline\' https:; img-src data: blob: https:; font-src data: https:; media-src data: blob: https:; connect-src https: http: ws: wss:; frame-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'">';
+  const nonceGuard = frameNonce === undefined || frameNonce === '' ? '' : `<script>
+(function() {
+  var nonce = ${JSON.stringify(frameNonce).replace(/</g, '\\u003c')};
+  var parentPost = window.parent.postMessage.bind(window.parent);
+  window.parent.postMessage = function(message, targetOrigin, transfer) {
+    if (message && typeof message === 'object' && !Array.isArray(message)) {
+      try {
+        var copy = {};
+        for (var key in message) {
+          if (Object.prototype.hasOwnProperty.call(message, key)) copy[key] = message[key];
+        }
+        copy.__viewtuneNonce = nonce;
+        message = copy;
+      } catch (error) {
+        // A non-cloneable message would fail in postMessage anyway; leave it to the host's guard.
+      }
+    }
+    return parentPost(message, targetOrigin, transfer);
+  };
+  // Handshake: the wrapper adds the nonce when the parent WindowProxy accepts the assignment. If
+  // it does not, this message stays bare and the host keeps the origin-only check for compatibility.
+  try { window.parent.postMessage({ method: 'ui/ready' }, '*'); } catch (error) {}
+})();
+</script>`;
   const themeScript = `<script>
 (function() {
   function applyTheme(theme) {
@@ -116,19 +141,21 @@ export function ensureHtmlDocument(rawHtml: string, initialTheme: 'dark' | 'ligh
 
   if (/^<!DOCTYPE/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) {
     if (/<head[\s>]/i.test(trimmed)) {
-      return trimmed.replace(/<head([^>]*)>/i, `<head$1>\n  ${themeScript}`);
+      return trimmed.replace(/<head([^>]*)>/i, `<head$1>\n  ${cspMeta}\n  ${nonceGuard}\n  ${themeScript}`);
     }
     // A document with <html> and no <head> is perfectly legal HTML — the browser infers a head for it — and returning it
     // verbatim, which is what this did, silently skipped BOTH of the things this function exists for: the theme bridge
     // and the height reporter. Such a frame never followed a dark/light switch and never resized to its content, and the
     // doc above promised exactly those. The head goes where the browser would have inferred it.
-    return trimmed.replace(/<html([^>]*)>/i, `<html$1>\n<head>\n  ${themeScript}\n</head>`);
+    return trimmed.replace(/<html([^>]*)>/i, `<html$1>\n<head>\n  ${cspMeta}\n  ${nonceGuard}\n  ${themeScript}\n</head>`);
   }
   return `<!DOCTYPE html>
 <html lang="zh-CN" data-theme="${initialTheme}" class="${isDark ? 'dark' : ''}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${cspMeta}
+  ${nonceGuard}
   ${themeScript}
   <style>
     :root {

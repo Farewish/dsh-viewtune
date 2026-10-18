@@ -182,7 +182,7 @@ export function apply(ctx: Context): void {
 const stored = receipt.value as { data: Uint8Array; attachment?: { mediaType?: string } | undefined };
 return { data: Uint8Array.from(stored.data), mediaType: stored.attachment?.mediaType ?? '' };
         },
-        openFile: async (path: string, options?: { mode?: DeliverableOpenMode; line?: number }) => {          try {
+        openFile: async (path: string, options?: { mode?: DeliverableOpenMode; line?: number; allowHostOpen?: boolean }) => {          try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
             // The system opener is the default and the fallback; the sidebar is opt-in per reader, and
             // the reader's own subscription hands the choice down as `options.mode` — this face cannot
@@ -198,6 +198,10 @@ return { data: Uint8Array.from(stored.data), mediaType: stored.attachment?.media
               }
               : undefined;
             const openExternal = async (absolutePath: string) => {
+              if (options?.allowHostOpen === false) {
+                console.warn('[dsh-better-display] session/openWorkspacePath is not permitted for this peer');
+                return;
+              }
               // `remote` and `remote.session` are services in 0.2.0 (`ctx.get`), and the plugin already declares both in
               // its `inject` list. What is gone is the typed `ctx.remote` PROPERTY 0.1.5 exposed: reading it as a
               // property is what the compiler rejects, and the two lookups below are the same service either way.

@@ -1213,16 +1213,20 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // 0.2.1 publishes the Session-scope access answer; the host's own branch button reads it before
   // offering fork. Without it the click reached a refused RPC and only a console line said so.
   const forkAllowed = props.useAccess?.('session/fork') !== false;
+  // Opening a workspace path is a Session endpoint too; a non-owner peer must not click into a
+  // refused native opener. The Reader passes this through the injected opener.
+  const hostOpenAllowed = props.useAccess?.('session/openWorkspacePath') !== false;
   // The review address needs the 1-based turn number the host validates; the group's key is that number.
   const turnNumber = Number(group.turn);
   const openFile = useCallback(
     (path: string, options?: { line?: number }) => {
       props.openFile(path, {
         mode: openInSidebar ? 'sidebar' : 'external',
+        allowHostOpen: hostOpenAllowed,
         ...(options?.line === undefined ? {} : { line: options.line }),
       });
     },
-    [props.openFile, openInSidebar],
+    [props.openFile, openInSidebar, hostOpenAllowed],
   );
   const fileMentions = useMemo(
     // `typeof` rather than a truthiness test: `openFile` is a required injected prop, so a bare
@@ -1279,7 +1283,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     loadImage: props.loadImage,
     fillComposer: props.fillComposer,
     openFile,
-    revealFile: props.revealFile,
+    revealFile: hostOpenAllowed ? props.revealFile : undefined,
     forkAt: forkAllowed ? props.forkAt : undefined,
     forkSeq,
     fileMentions,

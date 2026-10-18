@@ -74,6 +74,13 @@ test('ensureHtmlDocument wraps bare fragments and preserves complete documents w
   assert.ok(wrapped.startsWith('<!DOCTYPE html>'));
   assert.ok(wrapped.includes('<html lang="zh-CN" data-theme="dark" class="dark"'));
   assert.ok(wrapped.includes(fragment));
+
+  // The frame is sandboxed without allow-same-origin; a self-navigation must not be able to talk to
+  // the host. The nonce lives in the authored document, and the iframe gets a restrictive CSP too.
+  const guarded = ensureHtmlDocument(fragment, 'dark', 'frame-nonce-test');
+  assert.ok(guarded.includes('Content-Security-Policy'));
+  assert.ok(guarded.includes('__viewtuneNonce'));
+  assert.ok(guarded.includes('frame-nonce-test'));
 });
 
 test('a document with <html> and no <head> still gets the bridge and the height reporter', () => {

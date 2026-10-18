@@ -57,6 +57,9 @@ export const McpAppFrame = memo(function McpAppFrame({
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const frameId = useId();
+  const [frameNonce] = useState(() => globalThis.crypto?.randomUUID?.()
+    ?? `frame-${String(Date.now())}-${String(Math.random())}`);
+  const nonceSeen = useRef(false);
 
   const title = useMemo(() => {
     return initialTitle || extractHtmlTitle(html) || '交互式 MCP App';
@@ -67,7 +70,7 @@ export const McpAppFrame = memo(function McpAppFrame({
   // stays stable and the iframe never reloads (which would wipe user state
   // such as checked boxes or selected tabs).
   const [initialTheme] = useState(getHostTheme);
-  const preparedHtml = useMemo(() => ensureHtmlDocument(html, initialTheme), [html, initialTheme]);
+  const preparedHtml = useMemo(() => ensureHtmlDocument(html, initialTheme, frameNonce), [html, initialTheme, frameNonce]);
 
   const fillComposer = useCallback((params: Record<string, unknown>) => {
     // Everything the frame's payload touches is inside this boundary, `formatReceiptPrompt` included: it stringifies the
@@ -180,6 +183,13 @@ export const McpAppFrame = memo(function McpAppFrame({
 
       const data = event.data;
       if (!data || typeof data !== 'object') return;
+      // The per-frame nonce survives only inside the document we authored. A page that navigated
+      // the frame elsewhere cannot know it, even though it still owns the same WindowProxy. The
+      // handshake is best-effort: if a browser refuses to override the cross-origin WindowProxy,
+      // no nonce arrives and the origin check below remains the only fence.
+      const nonce = (data as { __viewtuneNonce?: unknown }).__viewtuneNonce;
+      if (nonce === frameNonce) nonceSeen.current = true;
+      else if (nonceSeen.current) return;
       try {
         dispatch(data as Record<string, unknown>);
       } catch (error) {
