@@ -2,8 +2,8 @@
  * The turn's files and commits, and the three ways to show them.
  *
  * The story this file pins, because it took three corrections from the reader to get right:
- *   · the host publishes `{ changes, presented }` on a turn — NOT `produced`, a field this version never writes, which
- *     is why the row was silently the tool-flow fallback (edited files under 「新增」, the delivered file nowhere);
+ *   · the host publishes `{ produced, presented }` on a turn (0.2.1), and older sessions may carry the
+ *     file list under `changes` (0.2.0) — both are read, so either version renders the same row;
  *   · which of those files were NEW and which were EDITED cannot be told apart, so the reader's call is one 「编辑」 list;
  *   · the second box therefore records the other thing a client CAN tell apart: the turn's commits.
  */
@@ -79,10 +79,32 @@ test('getTurnDeliverables falls back to the tool flow when the host published no
   assert.deepEqual(getTurnDeliverableGroups(turnWith(undefined), flow), { changesSeq: undefined, delivered: [], edited: ['src/client/new-feature.ts', 'src/client/Reader.tsx'] });
 });
 
-test('the old `produced` field is not read, because this version of the host never publishes it', () => {
-  // The first version of this file read `deliverables.produced`. That field does not exist in 0.2.0 — so the row was
-  // always the tool-flow fallback: edited files shown under 「新增」, and the delivered file nowhere.
-  assert.deepEqual(getTurnDeliverableGroups(turnWith({ produced: [{ path: 'src/phantom.ts' }] })), { changesSeq: undefined, delivered: [], edited: [] });
+test('0.2.1 produced list is the edited list; entries after the closing assistant are excluded', () => {
+  // 0.2.1 records the files the turn changed in `produced`, each with the sequence that produced it.
+  // The host's own `producedForClosing` stops at the closing Assistant; a later settlement (seq 20 here)
+  // must not appear in an earlier turn's row.
+  const groups = getTurnDeliverableGroups(turnWith({
+    produced: [
+      { seq: 4, path: 'src/client/Reader.tsx' },
+      { seq: 5, path: 'src/client/Reader.module.css' },
+      { seq: 5, path: 'src/client/Reader.tsx' }, // duplicate
+      { seq: 20, path: 'src/after-close.ts' },
+    ],
+  }));
+  assert.deepEqual(groups.edited, ['src/client/Reader.tsx', 'src/client/Reader.module.css', 'src/after-close.ts']);
+
+  const turn = turnWith({ produced: [{ seq: 4, path: 'before.ts' }, { seq: 20, path: 'after.ts' }] });
+  (turn.data as Map<string, unknown>).set('turn-tail', { closing: { seq: 10 } });
+  assert.deepEqual(getTurnDeliverableGroups(turn).edited, ['before.ts']);
+});
+
+test('produced and the 0.2.0 changes list merge, host entries first', () => {
+  const groups = getTurnDeliverableGroups(turnWith({
+    produced: [{ seq: 1, path: 'a.ts' }],
+    changes: { seq: 9, files: [{ path: 'a.ts' }, { path: 'b.ts' }] },
+  }));
+  assert.deepEqual(groups.edited, ['a.ts', 'b.ts']);
+  assert.equal(groups.changesSeq, 9);
 });
 
 test('created and edited files are ONE list, because the client cannot tell them apart', () => {

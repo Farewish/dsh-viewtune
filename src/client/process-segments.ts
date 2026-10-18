@@ -148,6 +148,36 @@ export interface ProcessCharacter {
   readonly reply?: boolean;
 }
 
+/**
+ * 0.2.0's process-groups boundary set.
+ *
+ * 0.2.1 replaced it with `groupTree`; this remains the fallback for Nodes that publish no position
+ * (sessions recorded before 0.2.1, and kinds that place none).
+ */
+export const INDEPENDENT_NODE_KINDS: ReadonlySet<string> = new Set([
+  'user', 'steering', 'turn-trigger', 'model-retry', 'turn-error', 'turn-max-tokens', 'turn-tail',
+]);
+
+/** 0.2.1's group-tree positions, outermost first (see `contract/group-tree.ts` in the host). */
+const GROUP_TREE_DEPTH: Readonly<Record<string, number>> = { exchange: 0, input: 1, turn: 2, process: 3 };
+
+/**
+ * Whether a Node stands outside its Turn's step run.
+ *
+ * 0.2.1 gives every placed Node a `groupTree` position; every position is at or outside `process`, so
+ * a Node carrying a known one is a single. A Node without a known position joins the run unless the
+ * 0.2.0 set says otherwise. `turn-process` is the one visible difference: 0.2.1 places it at `turn`
+ * (outside), while the 0.2.0 fallback keeps it a member and lets the reader re-home its record above
+ * the stretch header.
+ */
+export function isOutsideStepRun(node: { readonly kind: string; readonly groupTree?: unknown }): boolean {
+  if (typeof node.groupTree === 'string') {
+    const depth = GROUP_TREE_DEPTH[node.groupTree];
+    if (depth !== undefined) return depth <= GROUP_TREE_DEPTH.process!;
+  }
+  return INDEPENDENT_NODE_KINDS.has(node.kind);
+}
+
 /** A run of members — the host's `ProcessGroup`. */
 export interface ProcessGroupRun<T> {
   readonly kind: 'group';

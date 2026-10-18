@@ -563,7 +563,9 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // on every frame of a follower that had already caught up, which is the branch that becomes common as
       // soon as the frames stop being starved. The capture was pure cost, and an expensive one: a
       // querySelectorAll over every anchor plus a rect for each, per frame, for a value nothing looked at.
-      if (!motion || followMode === 'snap' || Math.abs(gap) < 1.5) { writeTop(scroll.scrollHeight, limit); return; }
+      // A negative gap is content SHORTER than the viewport: there is nowhere to glide to. The old
+      // absolute-value test let that case write a clamped position and schedule another frame, forever.
+      if (!motion || followMode === 'snap' || gap < 1.5) { writeTop(scroll.scrollHeight, limit); return; }
       writeTop(scroll.scrollTop + gap * (1 - Math.exp(-delta / 52)), limit);
       followFrame = requestAnimationFrame(follow);
     };

@@ -20,7 +20,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { toolName } from './projection.js';
 import type { ReaderFlowEntry } from './tool-activity.js';
-import { processGroups, processKindOfTool, type ProcessCharacter, type ProcessKind } from './process-segments.js';
+import { isOutsideStepRun, processGroups, processKindOfTool, type ProcessCharacter, type ProcessKind } from './process-segments.js';
 import { stepReading, tokensPerSecondOf } from './turn-reading.js';
 import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
@@ -1034,7 +1034,12 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
             {/* 卡自己的数据为空就不显示 ✓（读者要求：没有编辑就别显示 ✓）—— 标题数的是**差异条目** ✓，所以门控也用同一个
                 数据 ✓：否则会出现「已编辑 0 个文件」那种自相矛盾的一行 ✓（读者截图里的正是它 ✓）。 */}
             {changes.length > 0 && (
-              <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
+              <>
+                <ChangedFilesCard changes={changes} onOpenReview={openReviewFor} onOpenFile={path => { openFile?.(path); }} />
+                {/* The cards mode is a second consumer of the same in-page panel the balanced mode renders:
+                    without this, `openReviewFor`'s in-page fallback set `changesOpen` and nothing read it. */}
+                {changesOpen && <TurnChangesPanel changes={changes} openDiffs={openDiffs} onToggleDiff={toggleDiff} />}
+              </>
             )}
             {/* 交付：宿主那张卡的排版按**数量**分：**两个以上 ⇒ 两列网格** ✓、**恰好一个 ⇒ 整行** ✓（它自己的 `data-single` ✓）。
                 栅格用**内联样式**给出 ✓（不再依赖属性选择器 ✓ —— 那三次失败的正是不生效的选择器 ✓）。
@@ -1092,8 +1097,6 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
 }
 
 /** A synthetic render item: the header of one narration-separated stretch of the process (see 「按旁白分段」). */
-/** The host's INDEPENDENT set: a node kind that stands outside every run (process-groups.js). */
-const INDEPENDENT_NODE_KINDS: ReadonlySet<string> = new Set(['user', 'steering', 'turn-trigger', 'model-retry', 'turn-error', 'turn-max-tokens', 'turn-tail']);
 
 interface SegmentHeaderItem {
   readonly kind: 'segmentHeader';
@@ -1312,7 +1315,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
           reply: blocks.some(block => block.kind === 'text' && (block.text ?? '').trim() !== ''),
         };
       }
-      return INDEPENDENT_NODE_KINDS.has(node.kind) ? { independent: true } : {};
+      return isOutsideStepRun(node) ? { independent: true } : {};
     };
     /**
      * What KIND of work an item is, or `undefined` when it is no work at all.

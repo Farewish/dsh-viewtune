@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
 import { mkdir, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { pipeline } from 'node:stream/promises';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { commitHashes } from './commit-hash.js';
@@ -126,15 +127,33 @@ function sameOrigin(req: IncomingMessage): boolean {
   return true;
 }
 
+/**
+ * Start a platform opener and settle once the process really exists.
+ *
+ * `spawn` reports ENOENT and other launch failures as an asynchronous `'error'` event; without a
+ * listener that is an `uncaughtException`, and this host exits the whole process on one. `unref()`
+ * is what lets the opener outlive this request without keeping the Host's event loop alive.
+ */
+function launchDetached(command: string, args: readonly string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('spawn', () => { child.unref(); resolve(); });
+  });
+}
+
+/** Reveal one file (selected in its folder) in the platform's file manager. */
+async function revealFile(path: string): Promise<void> {
+  if (process.platform === 'darwin') await launchDetached('open', ['-R', path]);
+  else if (process.platform === 'win32') await launchDetached('explorer.exe', [`/select,${path}`]);
+  else await launchDetached('xdg-open', [path]);
+}
+
 /** Reveal one folder in the platform's file manager, so the reader can drop images into it. */
-function revealFolder(path: string): void {
-  if (process.platform === 'darwin') {
-    spawn('open', [path], { detached: true, stdio: 'ignore' });
-  } else if (process.platform === 'win32') {
-    spawn('explorer.exe', [path], { detached: true, stdio: 'ignore' });
-  } else {
-    spawn('xdg-open', [path], { detached: true, stdio: 'ignore' });
-  }
+async function revealFolder(path: string): Promise<void> {
+  if (process.platform === 'darwin') await launchDetached('open', [path]);
+  else if (process.platform === 'win32') await launchDetached('explorer.exe', [path]);
+  else await launchDetached('xdg-open', [path]);
 }
 
 export function apply(ctx: Context): void {
@@ -223,31 +242,31 @@ export function apply(ctx: Context): void {
             json(res, 413, { ok: false, error: 'payload too large' });
             return;
           }
+          let targetPath: string;
           try {
             const data = JSON.parse(body);
-            const targetPath = typeof data.path === 'string' ? data.path.trim() : '';
-            if (!targetPath) {
-              json(res, 400, { ok: false, error: 'Empty path' });
-              return;
-            }
-
-            if (process.platform === 'darwin') {
-              // Exact file reveal in macOS Finder with selection highlight
-              spawn('open', ['-R', targetPath], { detached: true, stdio: 'ignore' });
-            } else if (process.platform === 'win32') {
-              // Exact file selection in Windows Explorer
-              spawn('explorer.exe', [`/select,${targetPath}`], { detached: true, stdio: 'ignore' });
-            } else {
-              spawn('xdg-open', [targetPath], { detached: true, stdio: 'ignore' });
-            }
-
-            json(res, 200, { ok: true });
+            targetPath = typeof data.path === 'string' ? data.path.trim() : '';
           } catch (err) {
             json(res, 400, { ok: false, error: String(err) });
+            return;
           }
+          if (!targetPath) {
+            json(res, 400, { ok: false, error: 'Empty path' });
+            return;
+          }
+          try {
+            await revealFile(targetPath);
+          } catch (error) {
+            // The opener missing (or unable to start) is a failure the reader can be told about; it must never
+            // surface as an uncaughtException and take the Host with it.
+            console.warn(`[viewtune] could not reveal the path: ${String(error)}`);
+            json(res, 500, { ok: false, error: 'reveal failed' });
+            return;
+          }
+          json(res, 200, { ok: true });
         },
       });
-    }, 'dsh-viewtune: /better-display/wallpapers/reveal route');
+    }, 'dsh-viewtune: /better-display/reveal route');
 
     // The reader's settings, kept HERE rather than only in the browser. The client store persists to
     // localStorage, which is keyed by ORIGIN — and this server's port is ephemeral, so every launch is a
@@ -378,7 +397,17 @@ export function apply(ctx: Context): void {
               res.end();
               return;
             }
-            createReadStream(file).pipe(res);
+            /**
+             * `pipeline` owns both ends: an `'error'` on the read stream (the file vanished or became
+             * unreadable between `stat` and `open`) is caught here instead of surfacing as an
+             * uncaughtException that would end the whole Host. The headers are already out at this
+             * point, so the only honest answer left is to close this one response.
+             */
+            try {
+              await pipeline(createReadStream(file), res);
+            } catch {
+              res.destroy();
+            }
           } catch {
             json(res, 404, { ok: false, error: 'gone' });
           }
@@ -402,11 +431,12 @@ export function apply(ctx: Context): void {
           }
           try {
             await mkdir(WALLPAPER_DIR, { recursive: true });
+            await revealFolder(WALLPAPER_DIR);
           } catch (error) {
+            console.warn(`[viewtune] could not reveal the wallpaper folder: ${String(error)}`);
             json(res, 500, { ok: false, error: String(error) });
             return;
           }
-          revealFolder(WALLPAPER_DIR);
           json(res, 200, { ok: true, dir: WALLPAPER_DIR });
         },
       });

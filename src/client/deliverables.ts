@@ -16,23 +16,40 @@ interface PresentedEntry {
 }
 
 /**
- * What the deliverables package publishes ON A TURN in 0.2.0, measured from its own bundle:
+ * What the deliverables package publishes ON A TURN.
+ *
+ * 0.2.1 publishes `produced` — every file the turn changed, with the event sequence that produced it:
  *
  * ```js
- * owner.turn.data.get("deliverables")   // → { changes, presented }
+ * owner.turn.data.get("deliverables") // → { produced, presented, changes?: { seq } }
  * ```
  *
- * `changes` is the 「已编辑 x 个文件」 announcement — the files the turn CHANGED, with added/deleted counts.
- * `presented` is what the assistant explicitly DELIVERED — `presentedForClosing` walks it and keeps the latest
- * declaration of each path. The share package the reader saw on the conversation page lives HERE.
- *
- * The first version of this file read `deliverables.produced`, a field this version of the host does not publish at all
- * — so the row was always showing the tool-flow fallback, which is files the turn touched: that is why edited files
- * appeared under 「新增」 and the genuinely delivered file never appeared anywhere.
+ * 0.2.0 published the file list through `changes` instead (0.2.1 keeps only its `seq`, used by the
+ * review address). Both shapes are read, so a session recorded under either version renders the same
+ * way. `presented` is what the assistant explicitly DELIVERED (the share package lives here).
  */
+interface ProducedEntry {
+  readonly seq?: number;
+  readonly path?: string;
+  readonly argumentPath?: string;
+}
+
 interface DeliverablesData {
+  readonly produced?: readonly ProducedEntry[];
   readonly changes?: unknown;
   readonly presented?: readonly PresentedEntry[];
+}
+
+/**
+ * The closing assistant's sequence, or `undefined` when the turn has no tail record.
+ *
+ * Produced entries after it belong to a later settlement and must not enter this turn's row.
+ */
+function closingSeqOf(turn: TurnLocation | undefined): number | undefined {
+  const tail = (turn?.data as { get(key: string): unknown } | undefined)?.get('turn-tail') as
+    { readonly closing?: { readonly seq?: unknown } } | undefined;
+  const seq = tail?.closing?.seq;
+  return typeof seq === 'number' && Number.isFinite(seq) ? seq : undefined;
 }
 
 /** Extract standard filename without directory components. */
@@ -218,9 +235,22 @@ export function getTurnDeliverableGroups(turn: TurnLocation | undefined, flow?: 
     deliveredByPath.set(clean, description === undefined ? { path: clean } : { path: clean, description });
   }
   const delivered: DeliveredFile[] = [...deliveredByPath.values()];
-  // The change announcement's per-file list, read tolerantly: only its added/deleted totals were certain when this was
-  // first written, so `files`, `paths` and a bare array are all accepted, and anything else contributes nothing rather
-  // than throwing.
+  // (1a) 0.2.1's `produced` list: every file the turn changed, recorded by the host with the sequence
+  // that produced it. Entries after the closing assistant belong to a later settlement and are excluded;
+  // the host's own `producedForClosing` draws the same line.
+  const closingSeq = closingSeqOf(turn);
+  for (const entry of deliverables?.produced ?? []) {
+    const clean = typeof entry?.path === 'string' ? entry.path.trim() : '';
+    if (clean === '') continue;
+    if (closingSeq !== undefined && typeof entry.seq === 'number' && entry.seq > closingSeq) continue;
+    if (seenChanged.has(clean)) continue;
+    seenChanged.add(clean);
+    changed.push(clean);
+  }
+  // (1b) 0.2.0's change announcement, read tolerantly: only its added/deleted totals were certain when
+  // this was first written, so `files`, `paths` and a bare array are all accepted, and anything else
+  // contributes nothing rather than throwing. 0.2.1 keeps only its `seq`, which is why (1a) supplies the
+  // file list there.
   const rawChanges = deliverables?.changes;
   // The announcement's own sequence, which the review address needs: the host publishes it beside the file list and uses
   // it for its own previews (`seq: changes.seq`). Absent when the change data is a bare array, in which case the address

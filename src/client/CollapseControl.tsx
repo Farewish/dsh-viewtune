@@ -45,7 +45,10 @@ export function CollapseControl({ mode, currentOpen, othersOpen, turnKey, allKey
   // The pair's conditions, narrowed by the mode. `all` and `current` mean "only this action", so the other
   // one's condition is not consulted at all — in those modes the button is that action or it is nothing.
   const showCurrent = mode !== 'all' && currentOpen;
-  const showAll = mode !== 'current' && othersOpen;
+  // In `all` mode the action is "collapse every open process", and the turn in view is one of them — so
+  // `currentOpen` alone must offer it. (The earlier pair treated `othersOpen` as the only condition,
+  // which hid the button in a single-turn session with its process open.)
+  const showAll = mode === 'all' ? (currentOpen || othersOpen) : (mode === 'both' && othersOpen);
   const on = showCurrent || showAll;
   // Which action the button IS. With neither applicable it stays 收起, which is invisible either way.
   const primary: 'current' | 'all' = showCurrent ? 'current' : 'all';

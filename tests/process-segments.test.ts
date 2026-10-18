@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PROCESS_DONE_LABELS, processGroups, processKindOfTool, segmentLabelOf } from '../src/client/process-segments.ts';
+import { isOutsideStepRun, PROCESS_DONE_LABELS, processGroups, processKindOfTool, segmentLabelOf } from '../src/client/process-segments.ts';
 import type { ProcessCharacter, ProcessKind } from '../src/client/process-segments.ts';
 
 test('the labels are the host\'s own words, verbatim', () => {
@@ -19,6 +19,25 @@ test('the labels are the host\'s own words, verbatim', () => {
   assert.equal(PROCESS_DONE_LABELS.subagents, '已协调子智能体');
   assert.equal(PROCESS_DONE_LABELS.plan, '更新了计划');
   assert.equal(PROCESS_DONE_LABELS.questions, '向用户提出了问题');
+});
+
+test('0.2.1 groupTree decides step-run membership; the 0.2.0 set is the fallback', () => {
+  // Any `groupTree` position is at or outside `process`, so every placed Node is a single.
+  for (const groupTree of ['exchange', 'input', 'turn', 'process']) {
+    assert.equal(isOutsideStepRun({ kind: 'assistant-step', groupTree }), true);
+  }
+  // `turn-process` is the one kind whose answer changes between versions: 0.2.1 places it at `turn`
+  // (outside the run); a 0.2.0 Node has no position and stays a member so its record can be re-homed.
+  assert.equal(isOutsideStepRun({ kind: 'turn-process', groupTree: 'turn' }), true);
+  assert.equal(isOutsideStepRun({ kind: 'turn-process' }), false);
+  // No position and not in the 0.2.0 set: ordinary process members.
+  assert.equal(isOutsideStepRun({ kind: 'system-prompt' }), false);
+  assert.equal(isOutsideStepRun({ kind: 'tool-call' }), false);
+  assert.equal(isOutsideStepRun({ kind: 'model-retry' }), true);
+  // An unknown future position is not guessed at; it falls back to the kind set, like the host's
+  // `DEPTH[position] === undefined` check.
+  assert.equal(isOutsideStepRun({ kind: 'tool-call', groupTree: 'future-position' }), false);
+  assert.equal(isOutsideStepRun({ kind: 'model-retry', groupTree: 'future-position' }), true);
 });
 
 test('tool names fold into the specific kind, not the general one', () => {
