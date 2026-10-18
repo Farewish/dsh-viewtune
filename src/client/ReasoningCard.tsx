@@ -406,7 +406,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const cancel = () => {
       cancelAnimationFrame(frame); frame = 0;
       clearTimeout(timer); timer = undefined;
-      delete port.dataset.reasoningMoving;
     };
     const manual = () => {
       if (!automatic) return;
@@ -419,7 +418,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       port.style.overflow = 'auto';
       port.scrollTop = top;
       lastPainted = port.scrollTop;
-      port.dataset.reasoningMode = 'manual';
     };
     const follow = () => {
       if (automatic) return;
@@ -429,7 +427,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       port.scrollTop = 0;
       port.style.overflow = 'hidden';
       automatic = true;
-      port.dataset.reasoningMode = 'transform';
     };
     /**
      * The card's own measurements, and the one thing that is cached across the animation.
@@ -663,10 +660,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       void scrollTrack.offsetHeight;
       scrollTrack.style.transition = reasoningMode === 'latest' ? 'transform 180ms var(--reason-ease)' : 'transform var(--reason-step) var(--reason-ease)';
       scrollTrack.style.transform = `translateY(-${target}px)`;
-      port.dataset.reasoningMoving = 'true';
-      port.dataset.reasoningFrom = String(from);
-      port.dataset.reasoningTarget = String(target);
-      port.dataset.reasoningBegan = String(began);
       const tick = (now: number) => {
         frame = 0;
         if (!canFollow()) { cancel(); manual(); return; }
@@ -677,7 +670,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         if (done || edgesMayMove()) measure(false);
         else lastPainted = target;
         if (!done) frame = requestAnimationFrame(tick);
-        else { delete port.dataset.reasoningMoving; schedule(); }
+        else { schedule(); }
       };
       frame = requestAnimationFrame(tick);
     };

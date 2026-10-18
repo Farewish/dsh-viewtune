@@ -32,6 +32,8 @@ test('the steady cadence publishes once per step, and the boundary counts as due
   const step = TEXT_CADENCE_STEP_MS.steady;
   assert.ok(step > 15 && step < 17, `one frame at 60Hz is ${String(step)}ms`);
   assert.equal(publishDue(step, 0, 'steady'), true, 'exactly one step later is due — `>` would halve the cadence');
+  // rAF timestamps are quantized: a 60Hz frame can report 16.666 against a 16.666666… step.
+  assert.equal(publishDue(16.666, 0, 'steady'), true, 'a quantized 60Hz timestamp still publishes');
   assert.equal(publishDue(step - 0.01, 0, 'steady'), false, 'a hair earlier is not');
   assert.equal(publishDue(step * 4, 0, 'steady'), true, 'a long frame does not lose its publication');
   // The deadline is measured from the LAST publication, so a slow frame cannot let two through at once: the cadence

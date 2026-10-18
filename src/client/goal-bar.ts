@@ -170,7 +170,7 @@ export function goalBarCss(): string {
     `}`,
     `/* The marker is the one animated thing here, and a reader who asked for less movement gets none of it. */`,
     `@media (prefers-reduced-motion: reduce) {`,
-    `  ${GOAL_BAR_SELECTOR}::after { transition: none; }`,
+    `  ${GOAL_BAR_SELECTOR} > [class*="_bar"]::after { transition: none; }`,
     `}`,
   ].join('\n');
 }

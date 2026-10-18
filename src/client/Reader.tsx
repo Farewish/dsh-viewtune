@@ -306,12 +306,15 @@ const TurnTriggerNode = memo(function TurnTriggerNode({ data }: { data: { source
   const Icon = TRIGGER_ICONS[reading.icon];
   const time = turnTriggerTime(data.time);
   const text = turnTriggerText(data.content);
+  const dateTime = time !== null && Number.isFinite(time) && Math.abs(time) <= 8_640_000_000_000_000
+    ? new Date(time).toISOString()
+    : undefined;
   return <section className={css.turnTrigger} data-reader-turn-trigger data-reader-anchor>
     <button type="button" className={css.turnTriggerHeader} aria-expanded={open} aria-controls={bodyId}
       onClick={() => { setOpen(value => !value); }}>
       <span className={css.turnTriggerIcon} aria-hidden><Icon size={14} /></span>
       <span className={css.turnTriggerTitle}>{reading.title}</span>
-      {time !== null && <time className={css.turnTriggerTime} dateTime={new Date(time).toISOString()}>{formatMessageClock(time)}</time>}
+      {time !== null && <time className={css.turnTriggerTime} dateTime={dateTime}>{formatMessageClock(time)}</time>}
       <svg className={open ? css.turnTriggerChevronOpen : css.turnTriggerChevron} viewBox="0 0 16 16" width={12} height={12}
         fill="none" stroke="currentColor" aria-hidden>
         <path d="m4 6 4 4 4-4" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
@@ -1141,10 +1144,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const processButton = useRef<HTMLButtonElement>(null);
   const setExpanded = useCallback((value: boolean) => props.actions.setExpanded(choiceKey, value), [props.actions, choiceKey]);
   const pinProcess = useCallback(() => setExpanded(true), [setExpanded]);
-  // A turn may open with a system prompt and carry several user/steering messages
-  // (system prompt, the user's message, injected context, steering). Collect every
-  // one of them so they all render in the turn's leading slot, above the process
-  // disclosure, in source order.
+  // A turn may open with user/steering messages (system prompts and injected context are process rows in
+  // 0.2.1, not leading messages). Collect every user/steering message so they all render in the turn's
+  // leading slot, above the process disclosure, in source order.
   // A subscription must not allocate. The snapshot hook compares what the selector returns by identity
   // and is notified on every streamed chunk, so an array built in here is a new value every time — and
   // this turn then re-rendered on every delta of every OTHER turn: one full `readerFlow` pass, the
@@ -2101,7 +2103,7 @@ export function Reader(props: ReaderProps) {
     if (!scroll.detached) { setRoomBelow(false); return; }
     const port = root.current?.closest<HTMLElement>('[data-conversation-scroll]');
     setRoomBelow(port !== null && port !== undefined && port.scrollHeight - port.clientHeight > 24);
-  }, [scroll.detached, groups.length]);
+  }, [scroll.detached, groups.length, order.length]);
   /**
    * The reader coming back to the bottom ends a pin — and with it the focus that pin was holding.
    *

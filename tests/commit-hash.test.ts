@@ -17,6 +17,12 @@ test('a repeated subject keeps the NEWEST hash, because git log is newest-first'
   assert.deepEqual(parseCommitLog(join([`aaa1111${SEP}Same subject`, `bbb2222${SEP}Same subject`])), { 'Same subject': 'aaa1111' });
 });
 
+test('a subject that collides with a prototype member is still a subject', () => {
+  const parsed = parseCommitLog(join([`aaa1111${SEP}toString`, `bbb2222${SEP}__proto__`]));
+  assert.equal(parsed['toString'], 'aaa1111');
+  assert.equal(parsed['__proto__'], 'bbb2222');
+});
+
 test('subjects are matched whole: a near miss is not a hash for the line the reader sees', () => {
   const parsed = parseCommitLog(join([`aaa1111${SEP}Fix the frame`]));
   assert.equal(parsed['Fix the frame'], 'aaa1111');

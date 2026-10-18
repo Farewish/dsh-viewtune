@@ -38,7 +38,9 @@ const FIELD_SEPARATOR = '\u001f';
  * commit that is not the one shown.
  */
 export function parseCommitLog(text: string): Record<string, string> {
-  const bySubject: Record<string, string> = {};
+  // A null-prototype map: a commit subject may legally be `toString` or `__proto__`, and a plain `{}`
+  // would read those as inherited members and never record the hash.
+  const bySubject: Record<string, string> = Object.create(null) as Record<string, string>;
   for (const line of text.split('\n')) {
     const separator = line.indexOf(FIELD_SEPARATOR);
     if (separator <= 0) continue;
@@ -47,7 +49,7 @@ export function parseCommitLog(text: string): Record<string, string> {
     if (hash === '' || subject === '' || bySubject[subject] !== undefined) continue;
     bySubject[subject] = hash;
   }
-  return bySubject;
+  return { ...bySubject };
 }
 
 /**
@@ -118,7 +120,7 @@ export async function commitHashesResult(cwd: string, subjects: readonly string[
     return { hashes: {}, queried: false };
   }
   const wanted = new Set(subjects);
-  const found: Record<string, string> = {};
+  const found: Record<string, string> = Object.create(null) as Record<string, string>;
   let queried = false;
   for (const dir of await candidateDirs(cwd)) {
     let stdout = '';
@@ -143,7 +145,7 @@ export async function commitHashesResult(cwd: string, subjects: readonly string[
     }
     if (Object.keys(found).length === wanted.size) break;
   }
-  return { hashes: found, queried };
+  return { hashes: { ...found }, queried };
 }
 
 /** The hash map alone, for callers that need no cacheability answer. */

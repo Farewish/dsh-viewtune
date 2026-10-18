@@ -39,11 +39,11 @@ export function textCadenceOf(value: unknown): TextCadence {
 /**
  * Is a publication due at `now`, given when the last one happened?
  *
- * The comparison is `>=` rather than `>`: a display whose frame interval is exactly the step would otherwise
- * publish every OTHER frame, halving the cadence a reader asked for. `now` and `lastPublished` come from the same
- * clock (the rAF timestamp), so the difference never mixes time origins.
+ * The comparison allows five microseconds of slack: the step is 1000/60 = 16.666666…ms while rAF timestamps are
+ * quantized (a 60Hz frame can report 16.666), and a strict `>=` would then skip every other frame and halve the
+ * cadence the reader asked for. The slack is far below one frame at any refresh rate, so it cannot over-publish.
  */
 export function publishDue(now: number, lastPublished: number, cadence: TextCadence): boolean {
   const step = TEXT_CADENCE_STEP_MS[cadence];
-  return step === 0 || now - lastPublished >= step;
+  return step === 0 || now - lastPublished + 0.005 >= step;
 }

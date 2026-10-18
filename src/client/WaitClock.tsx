@@ -28,11 +28,45 @@ export const WAIT_COUNT_FROM_MS = 3_000;
 export function WaitClock({ startTime }: { startTime: number | null }) {
   const [mountedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
+  const [counting, setCounting] = useState(false);
   const anchor = startTime ?? mountedAt;
+  // Do not start the 250ms clock while the number is still hidden: that was twelve empty renders
+  // before the readout could appear at all. A single timer wakes up at the threshold instead.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, []);
+    setCounting(false);
+    const delay = Math.max(0, WAIT_COUNT_FROM_MS - (Date.now() - anchor));
+    const id = setTimeout(() => {
+      setNow(Date.now());
+      setCounting(true);
+    }, delay);
+    return () => clearTimeout(id);
+  }, [anchor]);
+  useEffect(() => {
+    if (!counting) return;
+    let id: ReturnType<typeof setInterval> | undefined;
+    const tick = () => setNow(Date.now());
+    const start = () => {
+      if (id !== undefined) return;
+      tick();
+      id = setInterval(tick, 250);
+    };
+    const stop = () => {
+      if (id === undefined) return;
+      clearInterval(id);
+      id = undefined;
+    };
+    // A background tab has no reader looking at the number; stop the clock and catch up on return.
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') stop();
+      else start();
+    };
+    start();
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [counting]);
   const waited = Math.max(0, now - anchor);
   const overtime = waited >= WAIT_OVERTIME_MS;
   // Nothing at all renders before the wait is worth a number. Keeping the readout mounted and merely

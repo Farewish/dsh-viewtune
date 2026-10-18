@@ -521,6 +521,9 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       const value = Math.max(0, Math.min(top, limit));
       scroll.scrollTop = value;
       lastWrittenTop = value;
+      // A scrollbar drag does not move `scrollTop` through this function, but every WRITE does; recording
+      // it here keeps `previousTop` from being a stale position the next growth would judge against.
+      lastSeenTop = value;
     };
     /**
      * Is the reader typing INSIDE THIS VIEW's transcript — as opposed to in the composer?
