@@ -2,8 +2,12 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { DiffHunk, ReadBlockLine, SearchFileGroup } from '@deepseek-ai/dsh-client-ui-primitives';
 import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlock, WebBlock,
-  IconApiOutlineRegular, IconBrowseOutlineRegular, IconChecklistOutlineRegular, IconEditOutlineRegular,
-  IconQuestionOutlineRegular, IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
+  IconAlarmClockOutlineRegular, IconApiOutlineRegular, IconArchiveOutlineRegular, IconBranchOutlineRegular,
+  IconBrowseOutlineRegular, IconChecklistOutlineRegular, IconCodeOutlineRegular, IconCordisPluginOutlineRegular,
+  IconDatabaseOutlineRegular, IconEditOutlineRegular, IconFlatListOutlineRegular, IconFolderOpenOutlineRegular,
+  IconGlobeOutlineRegular, IconGoalOutlineRegular, IconInspectOutlineRegular, IconPauseOutlineRegular,
+  IconPlanOutlineRegular, IconPluginPinwheelOutlineRegular, IconQuestionOutlineRegular, IconQueueOutlineRegular,
+  IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular, IconUsersOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
@@ -12,6 +16,8 @@ import { activityPhase, activitySummary, callDiffHunks, diffHunksOf, executionFa
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
+import { isStructuredTool } from './tool-result-model.js';
+import { ToolResultCard } from './ToolResultCards.js';
 import { questionCardModel } from './native/question-card-model.js';
 import { McpAppFrame, StreamingMcpAppPlaceholder } from './McpAppFrame.js';
 import { diffBlockLabels, jsonTreeLabels, readBlockLabels, searchBlockLabels, terminalBlockLabels, webBlockLabels } from './primitive-labels.js';
@@ -29,6 +35,56 @@ const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running
 // weight, so the port first guessed "smaller glyph → heavier stroke"; the platform's own usage says otherwise, and it is
 // the closer evidence for what these rows should look like.
 const ICONS = { write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineRegular, search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, question: IconQuestionOutlineRegular, todo: IconChecklistOutlineRegular, other: IconSparkleRegular } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
+
+/**
+ * Named tools whose leading glyph is more specific than their category. Category still decides the
+ * row's colour and title fallback; this only replaces the 14px mark.
+ */
+const NAME_ICONS: Record<string, typeof IconSparkleRegular> = {
+  job_output: IconQueueOutlineRegular,
+  job_list: IconFlatListOutlineRegular,
+  job_kill: IconPauseOutlineRegular,
+  cordis_inspect_list: IconInspectOutlineRegular,
+  cordis_inspect_query: IconInspectOutlineRegular,
+  cordis_inspect_self: IconInspectOutlineRegular,
+  plugin_manager: IconCordisPluginOutlineRegular,
+  plugin_market: IconPluginPinwheelOutlineRegular,
+  list_mcp_resources: IconDatabaseOutlineRegular,
+  list_mcp_resource_templates: IconDatabaseOutlineRegular,
+  read_mcp_resource: IconDatabaseOutlineRegular,
+  create_goal: IconGoalOutlineRegular,
+  get_goal: IconGoalOutlineRegular,
+  update_goal: IconGoalOutlineRegular,
+  schedule_create: IconAlarmClockOutlineRegular,
+  schedule_delete: IconAlarmClockOutlineRegular,
+  schedule_list: IconAlarmClockOutlineRegular,
+  schedule_update: IconAlarmClockOutlineRegular,
+  exit_plan_mode: IconPlanOutlineRegular,
+  lsp: IconCodeOutlineRegular,
+  list_subagent_models: IconUsersOutlineRegular,
+  subagent: IconUsersOutlineRegular,
+  subagent_fork: IconUsersOutlineRegular,
+  interrupt_agent: IconUsersOutlineRegular,
+  list_agents: IconUsersOutlineRegular,
+  send_message: IconUsersOutlineRegular,
+  spawn_teammate: IconUsersOutlineRegular,
+  wait_agent: IconUsersOutlineRegular,
+  team_task_create: IconUsersOutlineRegular,
+  team_task_get: IconUsersOutlineRegular,
+  team_task_list: IconUsersOutlineRegular,
+  team_task_update: IconUsersOutlineRegular,
+  working_directory: IconFolderOpenOutlineRegular,
+  create_worktree: IconBranchOutlineRegular,
+  workflow: IconBranchOutlineRegular,
+  ralph: IconBranchOutlineRegular,
+  load_workspace_dependencies: IconArchiveOutlineRegular,
+  stagehand_act: IconGlobeOutlineRegular,
+  stagehand_extract: IconGlobeOutlineRegular,
+  stagehand_navigate: IconGlobeOutlineRegular,
+  stagehand_observe: IconGlobeOutlineRegular,
+  stagehand_screenshot: IconGlobeOutlineRegular,
+  stagehand_tabs: IconGlobeOutlineRegular,
+};
 
 /** The delivery row's leading mark: this view's phase mapped onto the dot's states. */
 const DOT_STATE = { preparing: 'ongoing', running: 'ongoing', returned: 'done', succeeded: 'done', failed: 'error', interrupted: 'warning' } as const satisfies Record<ToolPhase, StateDotState>;
@@ -137,6 +193,9 @@ function ResultView({ entry, model, phase, ...render }: BlockRenderProps & { ent
       </div>)}
     </div>;
   }
+  // Newer 0.2.1 tools return receipts, registry views and job transcripts. Their expanded body is a
+  // structured card; the collapsed row keeps its own title/summary and is handled above.
+  if (isStructuredTool(model.name)) return <ToolResultCard name={model.name} text={text} args={model.args} />;
   if (model.category === 'terminal') {
     const facts = executionFacts(block);
     const output = text.replace(/\n\[(?:exit code: \d+|killed by signal: [^\]\n]+)\]$/, '');
@@ -218,7 +277,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
     return () => document.removeEventListener('selectionchange', track);
   }, []);
   const facts = executionFacts(entry.block);
-  const Icon = model.name === 'skill' ? IconSkillOutlineRegular : model.category === 'delivery' ? null : ICONS[model.category];
+  const Icon = NAME_ICONS[model.name] ?? (model.name === 'skill' ? IconSkillOutlineRegular : model.category === 'delivery' ? null : ICONS[model.category]);
   const block = entry.block;
   // What this call — and anything it ran underneath it — changed on disk. Empty for the calls that
   // changed nothing, which is most of them, so the counts leave an ordinary row alone.

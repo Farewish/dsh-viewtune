@@ -52,6 +52,10 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   glob: 'search',
   write: 'write',
   edit: 'edit',
+  // Third-party compatibility names; 0.2.1's official set does not register them.
+  str_replace_editor: 'write',
+  apply_patch: 'write',
+  patch: 'write',
   run_code: 'code',
   // The inspect verbs read: they report on the host's own registries, so they belong to the read row
   // family and carry their own titles below.
@@ -64,6 +68,64 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   cordis_run: 'others',
   cordis_stop: 'others',
   cordis_undefine: 'others',
+  // Background jobs, persistent terminals and the inspect verbs are all process-control rows.
+  job_output: 'bash',
+  job_list: 'bash',
+  job_kill: 'bash',
+  terminal_open: 'bash',
+  terminal_send: 'bash',
+  terminal_read: 'bash',
+  terminal_signal: 'bash',
+  terminal_close: 'bash',
+  terminal_list: 'bash',
+  // Registry / discovery reads.
+  list_mcp_resources: 'read',
+  list_mcp_resource_templates: 'read',
+  read_mcp_resource: 'read',
+  lsp: 'read',
+  session_trace: 'read',
+  session_event_trace: 'read',
+  session_event_read: 'read',
+  working_directory: 'read',
+  // Session search is a discovery row, not a generic one.
+  session_search: 'search',
+  session_event_search: 'search',
+  // Actions whose payload is a receipt, a plan or a coordination message: no file/program slot.
+  plugin_manager: 'others',
+  plugin_market: 'others',
+  stagehand_act: 'others',
+  stagehand_extract: 'others',
+  stagehand_navigate: 'others',
+  stagehand_observe: 'others',
+  stagehand_screenshot: 'others',
+  stagehand_tabs: 'others',
+  exit_plan_mode: 'others',
+  create_goal: 'others',
+  get_goal: 'others',
+  update_goal: 'others',
+  schedule_create: 'others',
+  schedule_delete: 'others',
+  schedule_list: 'others',
+  schedule_update: 'others',
+  ralph: 'others',
+  skill: 'others',
+  list_subagent_models: 'others',
+  subagent: 'others',
+  subagent_fork: 'others',
+  interrupt_agent: 'others',
+  list_agents: 'others',
+  send_message: 'others',
+  spawn_teammate: 'others',
+  wait_agent: 'others',
+  team_task_create: 'others',
+  team_task_get: 'others',
+  team_task_list: 'others',
+  team_task_update: 'others',
+  create_worktree: 'others',
+  workflow: 'others',
+  load_workspace_dependencies: 'others',
+  render_ui: 'others',
+  show_widget: 'others',
 }
 
 /**
@@ -81,9 +143,9 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
  * was the one cordis call with no name at all.
  */
 const TOOL_TITLES: Record<string, string> = {
-  cordis_inspect_list: 'List Inspect Providers',
-  cordis_inspect_query: 'Query Inspect Provider',
-  cordis_inspect_self: 'Inspect Session',
+  cordis_inspect_list: '检查运行时',
+  cordis_inspect_query: '检查提供方',
+  cordis_inspect_self: '检查会话',
   cordis_define: 'Define Cordis Plugin',
   cordis_run: 'Run Cordis Plugin',
   cordis_stop: 'Stop Cordis Plugin',
@@ -93,6 +155,62 @@ const TOOL_TITLES: Record<string, string> = {
   present: 'Deliveries',
   read_image: 'Read image',
   todo_write: 'Todo',
+  web_fetch: '读取网页',
+  web_search: '搜索网页',
+  job_output: '任务输出',
+  job_list: '任务列表',
+  job_kill: '终止任务',
+  terminal_open: '打开终端',
+  terminal_send: '发送到终端',
+  terminal_read: '读取终端',
+  terminal_signal: '终端信号',
+  terminal_close: '关闭终端',
+  terminal_list: '终端列表',
+  plugin_manager: '插件管理',
+  plugin_market: '插件市场',
+  list_mcp_resources: 'MCP 资源',
+  list_mcp_resource_templates: 'MCP 资源模板',
+  read_mcp_resource: '读取 MCP 资源',
+  lsp: '语言服务',
+  session_search: '搜索会话',
+  session_event_search: '搜索事件',
+  session_trace: '会话轨迹',
+  session_event_trace: '事件轨迹',
+  session_event_read: '读取事件',
+  working_directory: '工作目录',
+  stagehand_act: '浏览器操作',
+  stagehand_extract: '浏览器提取',
+  stagehand_navigate: '浏览器导航',
+  stagehand_observe: '浏览器观察',
+  stagehand_screenshot: '浏览器截图',
+  stagehand_tabs: '浏览器标签页',
+  exit_plan_mode: '计划评审',
+  create_goal: '创建目标',
+  get_goal: '读取目标',
+  update_goal: '更新目标',
+  schedule_create: '创建计划',
+  schedule_delete: '删除计划',
+  schedule_list: '计划列表',
+  schedule_update: '更新计划',
+  ralph: 'Ralph 循环',
+  skill: '技能',
+  list_subagent_models: '子代理模型',
+  subagent: '子代理',
+  subagent_fork: '子代理（分支）',
+  interrupt_agent: '中断代理',
+  list_agents: '代理列表',
+  send_message: '发送消息',
+  spawn_teammate: '派生队友',
+  wait_agent: '等待代理',
+  team_task_create: '创建团队任务',
+  team_task_get: '读取团队任务',
+  team_task_list: '团队任务列表',
+  team_task_update: '更新团队任务',
+  create_worktree: '创建工作树',
+  workflow: '工作流',
+  load_workspace_dependencies: '加载工作区依赖',
+  render_ui: '渲染界面',
+  show_widget: '显示组件',
 }
 
 /** One list-shaped argument field as records, ignoring entries of another shape. */
@@ -108,6 +226,11 @@ function records(value: unknown): Record<string, unknown>[] {
  * raw arguments, which is how half a JSON object — `{"questions":[{"id"…` — used to reach the
  * summary slot beside the words "Tool call".
  */
+const joined = (...values: (string | undefined)[]): string | undefined => {
+  const parts = values.filter((value): value is string => value !== undefined && value !== '')
+  return parts.length === 0 ? undefined : parts.join(' · ')
+}
+
 const TOOL_SUMMARIES: Record<string, (args: Record<string, unknown>) => string | undefined> = {
   ask_user_question: (args) => {
     const lines = records(args.questions).flatMap((question) => {
@@ -130,6 +253,63 @@ const TOOL_SUMMARIES: Record<string, (args: Record<string, unknown>) => string |
     if (todos.length === 0) return undefined
     return `${todos.filter(todo => todo.status === 'completed').length}/${todos.length} 完成`
   },
+  job_output: (args) => joined(stringValue(args, 'job_id'), args.wait === true ? '等待中' : undefined),
+  job_list: () => '后台任务',
+  job_kill: (args) => joined(stringValue(args, 'job_id'), stringValue(args, 'reason')),
+  cordis_inspect_list: () => '所有检查提供方',
+  cordis_inspect_query: (args) => joined(stringValue(args, 'platform'), stringValue(args, 'provider'), stringValue(args, 'method')),
+  cordis_inspect_self: () => '当前会话',
+  terminal_open: (args) => joined(stringValue(args, 'name'), stringValue(args, 'type')),
+  terminal_send: (args) => joined(stringValue(args, 'sessionId', 'session_id', 'id'), firstLineOrUndefined(stringValue(args, 'input', 'data'))),
+  terminal_read: (args) => joined(stringValue(args, 'sessionId', 'session_id', 'id'), stringValue(args, 'offset')),
+  terminal_signal: (args) => joined(stringValue(args, 'sessionId', 'session_id', 'id'), stringValue(args, 'signal')),
+  terminal_close: (args) => stringValue(args, 'sessionId', 'session_id', 'id'),
+  terminal_list: () => '所有终端',
+  plugin_manager: (args) => joined(stringValue(args, 'action'), stringValue(args, 'target', 'name')),
+  plugin_market: (args) => joined(stringValue(args, 'action'), stringValue(args, 'name', 'target', 'query')),
+  list_mcp_resources: (args) => stringValue(args, 'server', 'name'),
+  list_mcp_resource_templates: (args) => stringValue(args, 'server', 'name'),
+  read_mcp_resource: (args) => joined(stringValue(args, 'server', 'name'), stringValue(args, 'uri', 'template')),
+  lsp: (args) => joined(stringValue(args, 'operation'), stringValue(args, 'file', 'path', 'query')),
+  session_search: (args) => stringValue(args, 'query'),
+  session_event_search: (args) => stringValue(args, 'query'),
+  session_trace: (args) => stringValue(args, 'session_id', 'sessionId'),
+  session_event_trace: (args) => stringValue(args, 'session_id', 'sessionId', 'seq'),
+  session_event_read: (args) => joined(stringValue(args, 'session_id', 'sessionId'), stringValue(args, 'seq')),
+  working_directory: (args) => stringValue(args, 'cd'),
+  stagehand_act: (args) => joined(stringValue(args, 'action'), stringValue(args, 'instruction')),
+  stagehand_extract: (args) => stringValue(args, 'instruction', 'query'),
+  stagehand_navigate: (args) => stringValue(args, 'url'),
+  stagehand_observe: (args) => stringValue(args, 'instruction', 'query'),
+  stagehand_screenshot: (args) => stringValue(args, 'name', 'path'),
+  stagehand_tabs: () => '浏览器标签页',
+  exit_plan_mode: (args) => firstLineOrUndefined(stringValue(args, 'plan')),
+  create_goal: (args) => firstLineOrUndefined(stringValue(args, 'objective')),
+  get_goal: () => '当前目标',
+  update_goal: (args) => joined(stringValue(args, 'action'), stringValue(args, 'goal_id')),
+  schedule_create: (args) => joined(firstLineOrUndefined(stringValue(args, 'title')), stringValue(args, 'time')),
+  schedule_delete: (args) => stringValue(args, 'id'),
+  schedule_list: () => '当前会话计划',
+  schedule_update: (args) => joined(stringValue(args, 'id'), firstLineOrUndefined(stringValue(args, 'title'))),
+  ralph: (args) => firstLineOrUndefined(stringValue(args, 'objective')),
+  skill: (args) => stringValue(args, 'name'),
+  list_subagent_models: (args) => joined(stringValue(args, 'provider'), stringValue(args, 'model')),
+  subagent: (args) => firstLineOrUndefined(stringValue(args, 'description', 'prompt')),
+  subagent_fork: (args) => firstLineOrUndefined(stringValue(args, 'description', 'prompt')),
+  interrupt_agent: (args) => stringValue(args, 'agent_id', 'agentId', 'name'),
+  list_agents: (args) => stringValue(args, 'scope'),
+  send_message: (args) => joined(stringValue(args, 'agent_id', 'agentId', 'name'), firstLineOrUndefined(stringValue(args, 'message'))),
+  spawn_teammate: (args) => joined(stringValue(args, 'name'), firstLineOrUndefined(stringValue(args, 'description'))),
+  wait_agent: (args) => stringValue(args, 'name', 'agent_id'),
+  team_task_create: (args) => firstLineOrUndefined(stringValue(args, 'title')),
+  team_task_get: (args) => stringValue(args, 'id'),
+  team_task_list: () => '团队任务',
+  team_task_update: (args) => joined(stringValue(args, 'id'), stringValue(args, 'action')),
+  create_worktree: (args) => joined(stringValue(args, 'branch'), stringValue(args, 'path')),
+  workflow: (args) => joined(stringValue(args, 'description', 'name'), firstLineOrUndefined(stringValue(args, 'script'))),
+  load_workspace_dependencies: () => '工作区依赖',
+  render_ui: (args) => stringValue(args, 'title'),
+  show_widget: (args) => stringValue(args, 'title'),
 }
 
 /**
@@ -139,6 +319,11 @@ const TOOL_SUMMARIES: Record<string, (args: Record<string, unknown>) => string |
  */
 export function classifyTool(toolName: string): ToolRowVariant {
   return TOOL_VARIANTS[toolName] ?? 'others'
+}
+
+/** The tool-owned title, or undefined when this name has no dedicated row title. */
+export function toolTitleOf(toolName: string): string | undefined {
+  return TOOL_TITLES[toolName]
 }
 
 /** Everything ToolRow needs, derived once from the frozen slice. */
@@ -192,6 +377,10 @@ function parseArgs(argsRaw: string): unknown {
 function firstLine(text: string): string {
   const nl = text.indexOf('\n')
   return nl === -1 ? text : text.slice(0, nl)
+}
+
+function firstLineOrUndefined(text: string | undefined): string | undefined {
+  return text === undefined ? undefined : firstLine(text)
 }
 
 function pickString(args: Record<string, unknown>, keys: readonly string[]): string | undefined {

@@ -148,10 +148,10 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
   const category: ToolCategory = /^(write|edit|apply_patch|patch|str_replace_editor)$/.test(name) ? 'write'
     // `web_fetch` is a READ row in the product's own tool table (`tool-call-model.ts` classifies it
     // the same way); keeping it in `web` here made the two tables disagree about one call.
-    : /^(read|read_file|read_image|web_fetch)$/.test(name) ? 'read'
-    : /^(bash|shell|terminal|terminal_send|exec_command|pwsh)$/.test(name) ? 'terminal'
-    : /^(grep|glob|find|search)$/.test(name) ? 'search'
-    : /^(web_search|web_open)$/.test(name) ? 'web'
+    : /^(read|read_file|read_image|web_fetch|cordis_inspect_list|cordis_inspect_query|cordis_inspect_self|list_mcp_resources|list_mcp_resource_templates|read_mcp_resource|session_trace|session_event_trace|session_event_read|working_directory|lsp)$/.test(name) ? 'read'
+    : /^(bash|shell|terminal|terminal_send|exec_command|pwsh|job_output|job_list|job_kill|terminal_open|terminal_read|terminal_signal|terminal_close|terminal_list)$/.test(name) ? 'terminal'
+    : /^(grep|glob|find|search|session_search|session_event_search)$/.test(name) ? 'search'
+    : /^(stagehand_act|stagehand_extract|stagehand_navigate|stagehand_observe|stagehand_screenshot|stagehand_tabs|web_search|web_open)$/.test(name) ? 'web'
     // Three calls the product renders with its own keyed card, each its own kind of thing rather
     // than a machine step: they take their product counterpart's glyph and title instead of the
     // generic sparkle. The product's read_image row is a read row, so it is one here too.
