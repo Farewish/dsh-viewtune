@@ -514,7 +514,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   const argsRaw = (done ? block.call?.argsRaw : block.phase === 'start' ? block.argsRaw : undefined) ?? ''
   const argsObject = argsObjectOf((block as unknown as { args?: unknown }).args)
   const resultName = done ? (block as unknown as { name?: string }).name : undefined
-  const effectiveName = toolName !== '' ? toolName : resultName ?? ''
+  const effectiveName = toolName !== '' ? toolName : resultName !== undefined && resultName !== '' ? resultName : ''
   const variant = classifyTool(effectiveName)
   const state: ToolRowState = !done ? 'running'
     : block.error?.code === 'interrupted' ? 'stopped'

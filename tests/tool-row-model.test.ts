@@ -104,6 +104,20 @@ test('web_fetch is a read row in both tables', () => {
   assert.equal(toolRowModel('web_fetch', block).variant, 'read');
 });
 
+test('a settled result whose call head left the window still names its command row', () => {
+  // 0.2.1 keeps `name` on the result node when `call` is null. Reading only `call.name` made this a
+  // generic "工具调用" row, which lost the terminal category and therefore the expanded command view.
+  const result = {
+    kind: 'tool-result', seq: 1, time: 0, callId: 'call:bash', name: 'bash',
+    call: null, callTime: null, content: [{ type: 'text', text: 'hi\n[exit code: 0]' }], isError: false, subCalls: [],
+    args: { keys: () => ['command'], text: (key: string) => key === 'command' ? 'echo hi' : undefined, value: () => undefined },
+  } as unknown as ToolCallBlock;
+  const summary = activitySummary({ block: result });
+  assert.equal(summary.name, 'bash');
+  assert.equal(summary.category, 'terminal');
+  assert.equal(summary.command, 'echo hi');
+});
+
 test('each of those calls is its own kind of row, which is what the icon table keys off', () => {
   const summary = (name: string, args: unknown) => activitySummary({ block: call(name, args) });
   assert.equal(summary('ask_user_question', { questions: [] }).category, 'question');

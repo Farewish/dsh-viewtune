@@ -106,10 +106,45 @@ function runningArgs(block: RunningToolCall | undefined): string | undefined {
 
 export function toolIdentity(entry: Pick<ToolActivityEntry, 'block' | 'draft'>) {
   const block = entry.block;
+  // 0.2.1's `ToolResultNode` carries the wire name itself, and `call` is null whenever window
+  // truncation left the paired call outside it. Reading only `call.name` turned such a result into
+  // an anonymous "工具调用" row — no terminal category, so its expanded body lost the command view.
+  const resultName = block !== undefined && 'kind' in block
+    ? (block as unknown as { name?: unknown }).name
+    : undefined;
+  const settledName = typeof resultName === 'string' && resultName !== '' ? resultName : undefined;
   return {
-    name: block ? 'kind' in block ? block.call?.name ?? entry.draft?.name ?? '工具调用' : block.name : entry.draft?.name ?? '工具调用',
-    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : runningArgs(block) ?? entry.draft?.argsRaw ?? '' : entry.draft?.argsRaw ?? '',
+    name: block
+      ? 'kind' in block
+        ? block.call?.name || settledName || entry.draft?.name || '工具调用'
+        : block.name || entry.draft?.name || '工具调用'
+      : entry.draft?.name || '工具调用',
+    raw: block
+      ? 'kind' in block
+        ? block.call?.argsRaw || entry.draft?.argsRaw || argsTextOf(block) || ''
+        : runningArgs(block) || entry.draft?.argsRaw || ''
+      : entry.draft?.argsRaw || '',
   };
+}
+
+/** Argument JSON rebuilt from a 0.2.1 lazy `ToolArgs` view, for a result whose call head is gone. */
+function argsTextOf(block: ToolCallBlock): string | undefined {
+  const view = (block as unknown as { args?: { keys?: () => readonly string[]; text?: (key: string) => string | undefined; value?: (key: string) => unknown } }).args;
+  if (view === undefined || typeof view.keys !== 'function' || typeof view.text !== 'function' || typeof view.value !== 'function') return undefined;
+  const keys = view.keys();
+  if (keys.length === 0) return undefined;
+  const object: Record<string, unknown> = {};
+  for (const key of keys) {
+    const text = view.text(key);
+    if (text !== undefined) { object[key] = text; continue }
+    const value = view.value(key);
+    if (value !== undefined) object[key] = value;
+  }
+  try {
+    return JSON.stringify(object);
+  } catch {
+    return undefined;
+  }
 }
 
 export function executionFacts(block: ToolCallBlock | undefined): { exitCode?: number; signal?: string } {
