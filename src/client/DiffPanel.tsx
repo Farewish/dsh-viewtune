@@ -98,16 +98,15 @@ export function DiffStatButton({ hunks, label, open, onToggle }: {
   /**
    * What these two numbers ARE, said in full rather than assumed.
    *
-   * `diffTotals` counts the content lines of each SIDE — the whole old text and the whole new text — not the lines that
-   * differ, so a one-line edit to a 812-line file reports 812 and 813. The badge keeps the familiar `+N/-M` shape, which
-   * is also the host's own tool-row convention and reads correctly for a `write` (nothing on the old side); the label is
-   * where the difference is stated, because `+N/-M` alone means "changed lines" to anyone who has used a diff view.
+   * `diffTotals` counts the `+` and `-` lines in the host's hunks; context lines are not included. It is NOT the whole
+   * old/new text, so a one-line edit to a large file reports 1 and 1. The badge keeps the familiar `+N/-M` shape, and
+   * the label says both what it counts and what it leaves out.
    */
-  const description = `差异视图：新内容 ${String(totals.added)} 行、原内容 ${String(totals.removed)} 行`;
+  const description = `差异视图：新增 ${String(totals.added)} 行、删除 ${String(totals.removed)} 行`;
   return <span className={css.diffStatRoot}>
     <button type="button" className={css.diffStatButton} aria-expanded={open}
       aria-label={`${label} · ${description}`}
-      title={`${description}（行数按两侧全文统计，不是最小差异的行数）`}
+      title={`${description}（只统计新增/删除行，不含上下文）`}
       onClick={event => {
         // The row itself is a disclosure; this click is about the diff, not about opening it.
         event.stopPropagation();

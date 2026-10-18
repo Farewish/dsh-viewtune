@@ -646,7 +646,7 @@ const cases = [
   },
   {
     label: 'the diff badge’s label reverted to “changed lines”, which is not what those two numbers are',
-    search: '差异视图：新内容',
+    search: '差异视图：新增',
     replace: '改动 ',
     guards: ['scripts/guard/check-bundle-markers.mjs'],
   },

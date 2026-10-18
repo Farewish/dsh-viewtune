@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { HoverCard } from '@deepseek-ai/dsh-client-ui-primitives';
 import { fileNameOf, previewKindOf } from './path-preview.js';
@@ -25,6 +25,7 @@ export const PathPreview = memo(function PathPreview({ path, line, resolveImageU
 }) {
   const kind = previewKindOf(path);
   const source = kind === 'image' ? resolveImageUrl?.(path) : undefined;
+  const [failed, setFailed] = useState(false);
   return (
     <HoverCard
       anchor={children}
@@ -33,7 +34,7 @@ export const PathPreview = memo(function PathPreview({ path, line, resolveImageU
       openDelayMs={260}
       content={
         <span className={css.pathPreviewBody}>
-          {source !== undefined && <img className={css.pathPreviewImage} src={source} alt="" />}
+          {source !== undefined && !failed && <img className={css.pathPreviewImage} src={source} alt="" onError={() => setFailed(true)} />}
           <span className={css.pathPreviewName}>{line === undefined ? fileNameOf(path) : `${fileNameOf(path)}:${String(line)}`}</span>
           <span className={css.pathPreviewPath}>{path}</span>
         </span>

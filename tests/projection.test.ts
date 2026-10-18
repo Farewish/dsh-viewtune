@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, isProcessStepOf, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, isProcessStepOf, processChoiceKey, processExpanded, terminalLabel } from '../src/client/projection.ts';
 import type { TurnBoundary } from '../src/client/projection.ts';
 import { activityPhase, activitySummary, inputFields, readerFlow } from '../src/client/tool-activity.ts';
 
@@ -23,10 +23,8 @@ test('RC1 system prompts belong to process details', () => {
 test('canonical cancellation is interrupted while genuine failures stay failed', () => {
   const cancelled = { kind: 'tool-result', isError: true, error: { code: 'ABORTED', name: 'AbortError' }, content: [{ type: 'text', text: 'Error: tool call aborted' }], subCalls: [] } as unknown as ToolCallBlock;
   assert.equal(activityPhase({ block: cancelled }), 'interrupted');
-  assert.equal(toolFailed(cancelled), false);
   const failure = { ...cancelled, error: { code: 'OTHER' }, content: [{ type: 'text', text: 'failure' }], meta: { exitCode: 7 } } as ToolCallBlock;
   assert.equal(activityPhase({ block: failure }, true), 'failed');
-  assert.equal(toolFailed(failure), true);
 });
 
 test('reasoning and body retain original order, content and identities across streaming appends', () => {
@@ -183,7 +181,7 @@ test('missing historical boundaries remain explicit uncertainty', () => {
 test('a failed child tool is not hidden by a successful parent summary', () => {
   const failed = { kind: 'tool-result', isError: true, content: [], subCalls: [] } as unknown as ToolCallBlock;
   const parent = { kind: 'tool-result', isError: false, content: [], subCalls: [failed] } as unknown as ToolCallBlock;
-  assert.equal(toolFailed(parent), true);
+  assert.equal(activityPhase({ block: parent }), 'failed');
 });
 
 test('tool input is visible before execution, including native-hidden tool-only steps', () => {
@@ -219,7 +217,6 @@ test('partial argument parsing respects JSON nesting, escapes and unfinished uni
 
 test('a nonzero terminal exit is a failure even when the tool transport is non-error', () => {
   const block = { kind: 'tool-result', isError: false, content: [], meta: { exitCode: 7 }, subCalls: [] } as unknown as ToolCallBlock;
-  assert.equal(toolFailed(block), true);
   assert.equal(activityPhase({ block }), 'failed');
   assert.equal(activityPhase({ block: { ...block, meta: null } as ToolCallBlock }), 'returned');
   assert.equal(activityPhase({}, true), 'interrupted');

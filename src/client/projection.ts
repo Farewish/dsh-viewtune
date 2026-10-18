@@ -1,6 +1,5 @@
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { activityPhase } from './tool-activity.js';
 
 export interface ReaderGroup { key: string; turn: number | null; keys: readonly string[] }
 export interface TurnBoundary { status: 'open' | 'closed' | 'unknown'; reason: string | null; latestStep: number; closingStep: number | null }
@@ -120,10 +119,6 @@ export function assistantSegments(blocks: readonly AssistantBlock[]): { kind: 'r
     }
   });
   return segments.filter(segment => segment.kind !== 'reasoning' || hasReasoningBody(segment.blocks));
-}
-
-export function toolFailed(block: ToolCallBlock): boolean {
-  return activityPhase({ block }) === 'failed';
 }
 
 export function toolName(block: ToolCallBlock): string {

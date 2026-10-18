@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, changesReviewAddress, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, CHANGES_REVIEW_KIND, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS, UNKNOWN_COMMIT } from '../src/client/deliverables.ts';
+import { basename, changesReviewAddress, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, DELIVERABLE_BOX_CAP, DELIVERABLE_DISPLAYS, UNKNOWN_COMMIT } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 /** A turn whose data map holds whatever the deliverables package published for it. */
@@ -167,7 +167,6 @@ test('the changes-review address is spelled exactly as the host spells it', () =
   // `dsh-resource://changes-review/session/<encodeURIComponent(sessionId)>/<seq>/<turn>` — what the deliverables package's
   // own `changesReviewAddress` builds and what its `canOpen` parses (`seq` digits, `turn` a 1-based integer). This address
   // is the ONE route a View has to the host's review, so its spelling is pinned rather than assumed.
-  assert.equal(CHANGES_REVIEW_KIND, 'changes-review');
   assert.equal(
     changesReviewAddress({ sessionId: 'session-abc', seq: 7272, turn: 51 }),
     'dsh-resource://changes-review/session/session-abc/7272/51',

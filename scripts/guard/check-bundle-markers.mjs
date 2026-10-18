@@ -1914,11 +1914,11 @@ const markers = [
     && bundle.includes('const diffs = diffHunksOf(meta);')
     && !bundle.includes('function diffHunks(value) {')],
   ['the diff badge states which two numbers it is showing', () =>
-    // `diffTotals` counts each SIDE's content lines, not the changed ones, so a one-line edit to a long file reads as
-    // hundreds. The `+N/-M` shape is kept (it is the host's own convention and is right for a write); the label and the
-    // tooltip say what the numbers are.
-    bundle.includes('\u5dee\u5f02\u89c6\u56fe\uff1a\u65b0\u5185\u5bb9')
-    && bundle.includes('\u884c\u6570\u6309\u4e24\u4fa7\u5168\u6587\u7edf\u8ba1')],
+    // `diffTotals` counts the host's `+`/`-` lines, and context lines are excluded; a one-line edit to a long
+    // file reads as 1/1, not hundreds. The `+N/-M` shape is kept (the host's own convention, right for a write);
+    // the label and tooltip say what the numbers are and what they leave out.
+    bundle.includes('\u5dee\u5f02\u89c6\u56fe\uff1a\u65b0\u589e')
+    && bundle.includes('\u4e0d\u542b\u4e0a\u4e0b\u6587')],
   ['a macOS Option combination reaches the binding it was recorded as', () =>
     // Option is macOS's dead-key modifier, so Option+C reports `key: 'ç'` and the shipped `Alt+C` never matched — while
     // re-recording appeared to fix it by storing `Alt+Ç`. The physical key (`code`) is not composed, so it is the

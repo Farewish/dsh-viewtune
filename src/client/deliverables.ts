@@ -451,9 +451,6 @@ export function turnChanges(flow?: readonly ReaderFlowEntry[]): readonly TurnCha
   return [...byPath.values()];
 }
 
-/** The tab kind the deliverables package owns for its changes review. */
-export const CHANGES_REVIEW_KIND = 'changes-review';
-
 /** The address prefix a changes-review resource lives under, read from the package's own builder. */
 const CHANGES_REVIEW_ADDRESS = 'dsh-resource://changes-review/session/';
 

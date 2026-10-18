@@ -1,4 +1,4 @@
-import { memo, useRef } from 'react';
+import { memo, useRef, useState } from 'react';
 import css from './markdown/MarkdownText.module.css';
 import readerCss from './Reader.module.css';
 
@@ -15,6 +15,14 @@ import readerCss from './Reader.module.css';
 export const LightboxImage = memo(function LightboxImage({ src, alt }: { src: string; alt: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <span className={css.imageFrame} data-image-error>
+      <div className={readerCss.imagePlaceholder} role="img" aria-label={alt === '' ? '图片未能加载' : `图片未能加载：${alt}`}>
+        <span>图片未能加载</span>
+      </div>
+    </span>;
+  }
   return (
     <span className={css.imageFrame}>
       <button
@@ -24,7 +32,7 @@ export const LightboxImage = memo(function LightboxImage({ src, alt }: { src: st
         aria-label={`放大图片${alt === '' ? '' : `：${alt}`}`}
         onClick={() => { dialog.current?.showModal(); }}
       >
-        <img className={css.image} src={src} alt={alt} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+        <img className={css.image} src={src} alt={alt} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
       </button>
       <dialog
         ref={dialog}
@@ -34,7 +42,7 @@ export const LightboxImage = memo(function LightboxImage({ src, alt }: { src: st
         onClick={event => { if (event.target === dialog.current) dialog.current?.close(); }}
       >
         <button type="button" autoFocus className={readerCss.dialogClose} aria-label="关闭图片预览" onClick={() => { dialog.current?.close(); }}>×</button>
-        <img src={src} alt={alt} />
+        <img src={src} alt={alt} onError={() => setFailed(true)} />
       </dialog>
     </span>
   );
