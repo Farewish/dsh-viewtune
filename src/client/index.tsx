@@ -182,14 +182,20 @@ export function apply(ctx: Context): void {
 const stored = receipt.value as { data: Uint8Array; attachment?: { mediaType?: string } | undefined };
 return { data: Uint8Array.from(stored.data), mediaType: stored.attachment?.mediaType ?? '' };
         },
-        openFile: async (path: string, options?: { mode?: DeliverableOpenMode }) => {          try {
+        openFile: async (path: string, options?: { mode?: DeliverableOpenMode; line?: number }) => {          try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
             // The system opener is the default and the fallback; the sidebar is opt-in per reader, and
             // the reader's own subscription hands the choice down as `options.mode` — this face cannot
             // read it for itself (`createReaderStore()` is a handle, not a live instance).
             const sidebar = sidebarRightFace();
             const openSidebar = typeof sidebar?.openResource === 'function'
-              ? (address: string) => { sidebar.openResource!(address, guideReplacement(sessionId)); }
+              ? (address: string, extra?: { params?: { line?: number } }) => {
+                const replacement = guideReplacement(sessionId);
+                sidebar.openResource!(address, {
+                  ...(replacement ?? {}),
+                  ...(extra?.params === undefined ? {} : { params: extra.params }),
+                });
+              }
               : undefined;
             const openExternal = async (absolutePath: string) => {
               // `remote` and `remote.session` are services in 0.2.0 (`ctx.get`), and the plugin already declares both in
@@ -209,6 +215,7 @@ return { data: Uint8Array.from(stored.data), mediaType: stored.attachment?.media
             };
             await openDeliverableFile({
               path,
+              line: options?.line,
               mode: deliverableOpenModeOf(options?.mode),
               sessionId,
               cwd,

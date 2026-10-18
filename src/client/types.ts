@@ -50,10 +50,11 @@ export interface ReaderInjected {
   fillComposer: (text: string) => boolean;
   /**
    * Open a workspace file or directory: the system app, or the right sidebar when `options.mode`
-   * asks for it (the default is the system app). The mode is an argument because this face has no
-   * live store to read — see `open-file.ts` on why `createReaderStore()` cannot answer that question.
+   * asks for it (the default is the system app). `options.line` is the Markdown `#L12` target the
+   * sidebar preview can honour; the system opener ignores it. The mode is an argument because this
+   * face has no live store to read — see `open-file.ts` on why `createReaderStore()` cannot answer it.
    */
-  openFile: (path: string, options?: { mode?: DeliverableOpenMode }) => Promise<void> | void;
+  openFile: (path: string, options?: { mode?: DeliverableOpenMode; line?: number }) => Promise<void> | void;
   /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
   revealFile?: (path: string) => Promise<void> | void;
   /**
@@ -73,7 +74,7 @@ export type ReaderProps = PropsRuntime<'conversation.view'>
   & PropsStore<ReturnType<typeof createReaderStore>>
   & ReaderInjected;
 export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage' | 'fillComposer'> & {
-  openFile?: (path: string) => Promise<void> | void;
+  openFile?: (path: string, options?: { mode?: DeliverableOpenMode; line?: number }) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
   forkAt?: (seq: number) => void;
   /** Durable closing-message seq of this turn (turn-tail closing), used as the fork anchor. */

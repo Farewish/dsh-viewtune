@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { commitHashes, parseCommitLog } from '../src/commit-hash.ts';
+import { commitHashes, commitHashesResult, parseCommitLog } from '../src/commit-hash.ts';
 
 const SEP = '\u001f';
 const join = (lines: readonly string[]): string => lines.join('\n');
@@ -33,4 +33,10 @@ test('commitHashes answers an empty record rather than throwing when there is no
   assert.deepEqual(await commitHashes('', ['anything']), {});
   assert.deepEqual(await commitHashes('no/such/directory/at/all', ['anything']), {});
   assert.deepEqual(await commitHashes('.', []), {});
+});
+
+test('an answer nobody could ask for is marked unqueried, so the client does not cache it', async () => {
+  assert.deepEqual(await commitHashesResult('no/such/directory/at/all', ['anything']), { hashes: {}, queried: false });
+  assert.deepEqual(await commitHashesResult('', ['anything']), { hashes: {}, queried: false });
+  assert.deepEqual(await commitHashesResult('.', []), { hashes: {}, queried: true });
 });

@@ -92,23 +92,34 @@ async function candidateDirs(cwd: string): Promise<readonly string[]> {
   return found;
 }
 
+/** A lookup's answer plus whether any repository actually answered it. */
+export interface CommitHashesResult {
+  readonly hashes: Record<string, string>;
+  /** False when nothing could be asked (missing cwd, no git, every invocation failed). */
+  readonly queried: boolean;
+}
+
 /**
  * The short hashes of the subjects asked for, in whichever repository under `cwd` actually carries them.
  *
  * Answers only what it can prove: a subject no repository carries is simply absent, and any failure (not a repository, git missing, a timeout)
  * answers an empty record rather than throwing — a lane that cannot show a hash must never break the reading view. Discovery is safe by
  * construction: a candidate is accepted only because a WANTED SUBJECT matched inside it, so a wrong directory cannot produce a wrong hash.
+ *
+ * `queried` separates "the host looked and did not find it" from "the host could not look": the client
+ * may cache the first answer and must retry the second.
  */
-export async function commitHashes(cwd: string, subjects: readonly string[]): Promise<Record<string, string>> {
-  if (subjects.length === 0) return {};
+export async function commitHashesResult(cwd: string, subjects: readonly string[]): Promise<CommitHashesResult> {
+  if (subjects.length === 0) return { hashes: {}, queried: true };
   try {
     const info = await stat(cwd);
-    if (!info.isDirectory()) return {};
+    if (!info.isDirectory()) return { hashes: {}, queried: false };
   } catch {
-    return {};
+    return { hashes: {}, queried: false };
   }
   const wanted = new Set(subjects);
   const found: Record<string, string> = {};
+  let queried = false;
   for (const dir of await candidateDirs(cwd)) {
     let stdout = '';
     try {
@@ -119,6 +130,7 @@ export async function commitHashes(cwd: string, subjects: readonly string[]): Pr
         windowsHide: true,
       });
       stdout = result.stdout;
+      queried = true;
     } catch {
       // Not a repository (or git is unavailable): the next candidate may be.
       continue;
@@ -131,5 +143,10 @@ export async function commitHashes(cwd: string, subjects: readonly string[]): Pr
     }
     if (Object.keys(found).length === wanted.size) break;
   }
-  return found;
+  return { hashes: found, queried };
+}
+
+/** The hash map alone, for callers that need no cacheability answer. */
+export async function commitHashes(cwd: string, subjects: readonly string[]): Promise<Record<string, string>> {
+  return (await commitHashesResult(cwd, subjects)).hashes;
 }

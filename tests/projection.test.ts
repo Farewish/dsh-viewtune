@@ -15,6 +15,9 @@ const completed: TurnBoundary = { ...active, status: 'closed', reason: 'complete
 
 test('RC1 system prompts belong to process details', () => {
   assert.equal(hasProcessContent({ kind: 'system-prompt', visibility: 'visible', data: { text: 'system' } } as ChatConversationViewNode, completed), true);
+  // A compaction node carries no groupTree in 0.2.1, so the host counts it as process; without this the
+  // turn had no disclosure header at all when compaction was its only process row.
+  assert.equal(hasProcessContent({ kind: 'compaction', visibility: 'visible', data: {} } as ChatConversationViewNode, completed), true);
 });
 
 test('canonical cancellation is interrupted while genuine failures stay failed', () => {

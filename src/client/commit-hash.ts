@@ -58,7 +58,13 @@ function schedule(cwd: string, cache: Cache): void {
       body: JSON.stringify({ cwd, subjects }),
     }).then(async response => {
       if (!response.ok) throw new Error(`commit-hashes ${String(response.status)}`);
-      const data = await response.json() as { hashes?: Record<string, string> };
+      const data = await response.json() as { hashes?: Record<string, string>; queried?: boolean };
+      if (data.queried === false) {
+        // The host could not ask (missing cwd, no git, every invocation failed). That is not a negative
+        // answer, so nothing is cached: the next mount must try again.
+        for (const subject of subjects) settle(cache, subject, undefined);
+        return;
+      }
       for (const subject of subjects) {
         // Absent is an ANSWER too: the host looked and did not find it, so asking again would only cost a request.
         const hash = data.hashes?.[subject] ?? '';

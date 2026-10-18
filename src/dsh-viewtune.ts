@@ -5,7 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { pipeline } from 'node:stream/promises';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { commitHashes } from './commit-hash.js';
+import { commitHashesResult } from './commit-hash.js';
 import type { Context } from '@deepseek-ai/cordis';
 import { contentTypeOf, listWallpapers, resolveWallpaperFile, seedDefaultWallpaper, wallpaperDirOf } from './wallpaper-files.js';
 import { SETTINGS_MAX_BYTES, readSettings, settingsFileOf, writeSettings } from './viewtune-settings.js';
@@ -238,8 +238,8 @@ export function apply(ctx: Context): void {
               json(res, 400, { ok: false, error: 'Empty cwd' });
               return;
             }
-            const recent = typeof data.recent === 'number' ? data.recent : 0;
-            json(res, 200, { ok: true, hashes: await commitHashes(cwd, subjects) });
+            const result = await commitHashesResult(cwd, subjects);
+            json(res, 200, { ok: true, hashes: result.hashes, queried: result.queried });
           } catch (err) {
             json(res, 400, { ok: false, error: String(err) });
           }

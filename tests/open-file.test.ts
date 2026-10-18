@@ -22,10 +22,14 @@ test('a workspace-relative image destination becomes the app file route, and not
     'the host receives the path resolved against the session workdir',
   );
   assert.equal(
-    decodeURIComponent(workspaceImageUrl('/home/me/proj', 'a%20b.png', origin)!.slice(built!.indexOf('path=') + 'path='.length)),
+    decodeURIComponent(workspaceImageUrl('/home/me/proj', 'a b.png', origin)!.slice(built!.indexOf('path=') + 'path='.length)),
     resolveWorkspacePath('/home/me/proj', 'a b.png'),
-    'a percent-encoded path is decoded first, so the host receives the real name',
+    'the already-decoded path is passed through once, not decoded a second time',
   );
+  // `parseFileLink` decodes once before this is called. A second decode would turn a double-encoded
+  // `%252e%252e` into `..`; a literal `..` segment is refused outright.
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', '../secret.png', origin), undefined, 'a parent segment cannot escape the workspace');
+  assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'pics/../../secret.png', origin), undefined);
   // Handed to the renderer's own allowlist, which already knows what to do with them.
   assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'http://x/y.png', origin), undefined, 'an absolute http(s) URL is untouched');
   assert.equal(workspaceImageUrl('D:\\DSH\\proj', '/api/file?path=x', origin), undefined, 'a same-origin route is untouched');
@@ -33,7 +37,9 @@ test('a workspace-relative image destination becomes the app file route, and not
   assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'data:image/png;base64,AA', origin), undefined, 'a data URL is not a workspace path');
   // Without a workdir there is nothing to resolve against, and a bad escape is not a path this can serve.
   assert.equal(workspaceImageUrl(undefined, 'pics/a.png', origin), undefined, 'no cwd means no resolution');
-  assert.equal(workspaceImageUrl('D:\\DSH\\proj', 'a%ZZ.png', origin), undefined, 'a malformed escape falls back to the alt text');
+  // A literal percent is a literal filename now: the destination was decoded once by `parseFileLink`,
+  // so this function encodes it for the route rather than decoding it again.
+  assert.ok(workspaceImageUrl('D:\\DSH\\proj', 'a%ZZ.png', origin)?.includes('a%25ZZ.png'), 'a literal percent is encoded, not re-decoded');
 });
 
 // Fixture file names deliberately avoid a `.ts` extension: this repository's test runner rewrites
@@ -106,6 +112,17 @@ test('sidebar mode uses the opener when there is one, and falls back loudly when
   assert.deepEqual(sidebar, ['dsh-resource://file/session/s-1/src/a.md']);
   assert.deepEqual(opened, [], 'the system app is not also asked to open it');
   assert.deepEqual(warnings, []);
+
+  // A Markdown `#L12` target rides the sidebar opener as its line parameter.
+  const withLine: { address: string; options: unknown }[] = [];
+  assert.equal(await openDeliverableFile({
+    ...common, mode: 'sidebar', line: 12,
+    openSidebar: (address, options) => { withLine.push({ address, options }); },
+  }), 'sidebar');
+  assert.deepEqual(withLine, [{
+    address: 'dsh-resource://file/session/s-1/src/a.md',
+    options: { params: { line: 12 } },
+  }]);
 
   // No opener registered on this host: the click still opens the file, and says why in the console.
   assert.equal(await openDeliverableFile({ ...common, mode: 'sidebar' }), 'external');

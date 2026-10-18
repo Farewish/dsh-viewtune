@@ -818,7 +818,7 @@ const ChangedFilesCard = memo(function ChangedFilesCard({ changes, onOpenReview,
  *
  * One component rather than three copies: the row appears in all three display modes and they must not drift.
  */
-const CommitBubble = memo(function CommitBubble({ commit, newestIndex }: { commit: CommitRecord; newestIndex: number }) {
+const CommitBubble = memo(function CommitBubble({ commit }: { commit: CommitRecord }) {
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   // The flash is a timer owned by this bubble; unmounting without clearing it calls back into a gone component.
@@ -1032,7 +1032,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
                     // A commit is not a file: it has no path to open or reveal, so it is a plain bubble — the message as the
                     // label, the short hash in the tooltip (see `CommitBubble`).
                     : groups.commits.map((commit, index) => (
-                      <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} newestIndex={groups.commits.length - 1 - index} />
+                      <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
                     ))}
                 </DeliverablesBox>
               );
@@ -1084,7 +1084,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
               <DeliverablesBox region={commitsRegion} open={boxOpen[commitsRegion.id] === true}
                 onToggle={() => { setBoxOpen(current => ({ ...current, [commitsRegion.id]: current[commitsRegion.id] !== true })); }}>
                 {groups.commits.map((commit, index) => (
-                  <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} newestIndex={groups.commits.length - 1 - index} />
+                  <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
                 ))}
               </DeliverablesBox>
             )}
@@ -1099,7 +1099,7 @@ function DeliverablesRow({ groups, changes, display, recordCommits, reviewInSide
           <span className={css.commitsLabel}>提交</span>
           <div className={css.commitsList}>
             {groups.commits.map((commit, index) => (
-              <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} newestIndex={groups.commits.length - 1 - index} />
+              <CommitBubble key={`${commit.hash ?? 'commit'}:${String(index)}`} commit={commit} />
             ))}
           </div>
         </div>
@@ -1209,7 +1209,12 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // The review address needs the 1-based turn number the host validates; the group's key is that number.
   const turnNumber = Number(group.turn);
   const openFile = useCallback(
-    (path: string) => { props.openFile(path, { mode: openInSidebar ? 'sidebar' : 'external' }); },
+    (path: string, options?: { line?: number }) => {
+      props.openFile(path, {
+        mode: openInSidebar ? 'sidebar' : 'external',
+        ...(options?.line === undefined ? {} : { line: options.line }),
+      });
+    },
     [props.openFile, openInSidebar],
   );
   const fileMentions = useMemo(
@@ -1278,7 +1283,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // A Markdown link whose destination is a local path is the owner's to open — the host calls it a file link and its
     // MarkdownDelegate documents that an absent handler leaves plain text, which is what this view used to do. Same opener
     // as everything else here, so 「产物用侧边栏打开」 decides between the system app and the sidebar as usual.
-    openFileLink: (path: string) => { openFile(path); },
+    openFileLink: (path: string, line?: number) => { openFile(path, line === undefined ? undefined : { line }); },
     metrics,
   };
   const terminal = terminalLabel(boundary.reason);
@@ -1309,7 +1314,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     // convention: while a turn is running the whole process is shown directly and no 次级 header exists at all, so there is nothing to fold and
     // nothing that could hide work in progress.
     if (!segmentByNarration || !expanded || boundary.status !== 'closed') {
-      return { list: flow as readonly (ReaderFlowEntry | SegmentHeaderItem | RunBodyItem)[], partOf: new Map<number, 'both' | 'reasoning' | 'body'>(), openOf: new Map<number, boolean>() };
+      return { list: flow as readonly (ReaderFlowEntry | SegmentHeaderItem | RunBodyItem)[], partOf: new Map<number, 'both' | 'reasoning' | 'body'>() };
     }
     // THE HOST'S OWN BOUNDARIES, from `process-groups.js`: only these node kinds stand outside a run. Everything else — a tool call, a command, a
     // question reply, a reasoning step — is a MEMBER of the run it sits in. The earlier version treated anything that was not an assistant step as
@@ -1355,14 +1360,6 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
      * member inside the run read `'body'` and drew the narration a second time (the copy the reader saw 「受次级开关管辖」, which should not exist).
      */
     const partOf = new Map<number, 'both' | 'reasoning' | 'body'>();
-    /**
-     * Whether each row of a 次级 run is OPEN, keyed by the row's position in `augmented`.
-     *
-     * This is what keeps the fold ANIMATED. Leaving a closed run's members out of the list — which the first version did — turned its collapse into an
-     * unmount and its expansion into a mount, and a mount has nothing to animate FROM, so the reader saw the stretch snap open with no motion (their
-     * report: 「次级开关的展开动画在这轮修改中消失了」). Every member is rendered either way, and this is the state its own folding wrapper reads.
-     */
-    const openOf = new Map<number, boolean>();
     let runIndex = 0;
     for (const unit of units) {
       // An independent node or a narration: rendered where it is, with no fold control of its own.
@@ -1384,7 +1381,6 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       const records = unit.members.filter(member => member.kind === 'node' && nodes.get(member.nodeKey)?.kind === 'turn-process');
       const rest = unit.members.filter(member => !records.includes(member));
       for (const record of records) {
-        openOf.set(augmented.length, true);
         augmented.push(record);
       }
       // The host labels a run only once it is closed; a run with no title is a growing tail and is simply shown.
@@ -1407,7 +1403,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
        */
       augmented.push({ kind: 'runBody', key: `${id}:body`, rows: rest, open: runOpen });
     }
-    return { list: augmented, partOf, openOf };
+    return { list: augmented, partOf };
   }, [segmentByNarration, expanded, boundary.status, flow, nodes, group.key, openSegments]);
   const toggleSegment = useCallback((id: string) => {
     setOpenSegments(current => {

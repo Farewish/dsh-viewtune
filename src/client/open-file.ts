@@ -88,8 +88,12 @@ export function workspaceImageUrl(
 ): string | undefined {
   if (cwd === undefined || url === '' || origin === undefined || origin === '') return undefined;
   if (isAbsoluteWorkspacePath(url) || url.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(url)) return undefined;
+  // `url` has already been decoded once by `parseFileLink`. Decoding it again would turn `%252e%252e`
+  // into `..` and let a destination escape the workspace; rejecting `..` segments here keeps the
+  // resolver honest even if a caller hands it an undecoded string.
+  if (url.split(/[\\/]/).some(segment => segment === '..')) return undefined;
   try {
-    const absolute = resolveWorkspacePath(cwd, decodeURIComponent(url));
+    const absolute = resolveWorkspacePath(cwd, url);
     // The HOST's own builder, not a hand-rolled string: it also covers the desktop transport (`dsh-app://app/`) and any
     // deployment prefix, and the upstream document preview uses it for exactly this job
     // (`ui-sidebar-documentpreview/src/client/markdown/path-images.ts`). A base must end in a slash to resolve against.
@@ -110,12 +114,14 @@ export function workspaceImageUrl(
  */
 export async function openDeliverableFile(args: {
   path: string;
+  /** Markdown `#L12` target, honoured by the sidebar opener and ignored by the system app. */
+  line?: number;
   mode: DeliverableOpenMode;
   sessionId: string;
   cwd: string | undefined;
   resolveWorkspacePath: (cwd: string | undefined, path: string) => string;
   openExternal: (absolutePath: string) => Promise<void>;
-  openSidebar?: (address: string) => void;
+  openSidebar?: (address: string, options?: { params?: { line?: number } }) => void;
   fileAddressFor?: (sessionId: string, cwd: string | undefined, path: string) => string;
   warn?: (message: string, extra?: unknown) => void;
 }): Promise<'sidebar' | 'external'> {
@@ -127,7 +133,7 @@ export async function openDeliverableFile(args: {
     } else {
       try {
         const address = (args.fileAddressFor ?? fileAddressFor)(args.sessionId, args.cwd, args.path);
-        args.openSidebar(address);
+        args.openSidebar(address, args.line === undefined ? undefined : { params: { line: args.line } });
         return 'sidebar';
       } catch (error) {
         args.warn?.('[dsh-better-display] sidebar open failed; falling back to system app', error);
