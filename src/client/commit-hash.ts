@@ -14,6 +14,9 @@
 
 export const COMMIT_HASHES_PATH = '/better-display/commit-hashes';
 
+/** A lookup that never answers must still release its waiters; the host's own budget is smaller than this. */
+const COMMIT_HASH_TIMEOUT_MS = 10_000;
+
 interface Cache {
   readonly known: Map<string, string>;
   readonly pending: Set<string>;
@@ -52,10 +55,15 @@ function schedule(cwd: string, cache: Cache): void {
     const subjects = [...cache.pending];
     cache.pending.clear();
     if (subjects.length === 0) return;
+    // The route has its own total git budget; a request that never answers must still release the
+    // waiters rather than leaving the lane pending for the life of the page.
+    const controller = new AbortController();
+    const timer = setTimeout(() => { controller.abort(); }, COMMIT_HASH_TIMEOUT_MS);
     void fetch(COMMIT_HASHES_PATH, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ cwd, subjects }),
+      signal: controller.signal,
     }).then(async response => {
       if (!response.ok) throw new Error(`commit-hashes ${String(response.status)}`);
       const data = await response.json() as { hashes?: Record<string, string>; queried?: boolean };
@@ -74,7 +82,7 @@ function schedule(cwd: string, cache: Cache): void {
     }).catch(() => {
       // Nothing cached, and every waiter is told so: the next mount may ask again, which is the right trade for a server that is briefly away.
       for (const subject of subjects) settle(cache, subject, undefined);
-    });
+    }).finally(() => { clearTimeout(timer); });
   };
   if (typeof requestAnimationFrame === 'function') cache.flush = requestAnimationFrame(send) as unknown as number;
   else cache.flush = setTimeout(send, 0) as unknown as number;

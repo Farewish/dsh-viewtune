@@ -12,7 +12,7 @@
  * @module
  */
 import { execFile } from 'node:child_process';
-import { readdir, stat } from 'node:fs/promises';
+import { opendir, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -23,6 +23,15 @@ const LOG_DEPTH = 3000;
 
 /** The most directories one lookup will stat, so a huge workspace cannot turn a lane render into a filesystem crawl. */
 const REPO_CANDIDATES = 60;
+
+/**
+ * The whole lookup's budget. Each `git log` may take five seconds on its own; without a total, sixty
+ * candidates could hold the route for five minutes. The route is synchronous from the reader's side.
+ */
+const TOTAL_BUDGET_MS = 8_000;
+
+/** One `git log` invocation's own cap, still bounded by the remaining total budget. */
+const GIT_TIMEOUT_MS = 5_000;
 
 /** Directories never worth walking into: build output, dependencies, and version control's own storage. */
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'lib', 'build', '.next', 'out', 'coverage']);
@@ -58,9 +67,10 @@ export function parseCommitLog(text: string): Record<string, string> {
  * The session's own `cwd` is the WORKSPACE ROOT, and that is not always the repository: this project keeps the plugin in a git WORKTREE
  * (`worktree/dsh-viewtune`), so `git log` in the root fails with `fatal: not a git repository` and every subject lookup answered nothing —
  * while a hand-typed worktree path worked. Rather than trust one directory, this offers the candidates that can hold the commit: the directory
- * itself, its ancestors (a repository above the session's folder is a real layout), and its immediate and second-level children (a worktree is
- * exactly that). Bounded on purpose: at most REPO_CANDIDATES directories are stat-ed, so a huge workspace cannot turn one lane render into a
- * filesystem crawl.
+ * itself, its ancestors (a repository above the session's folder is a real layout), and its immediate children (a worktree is exactly that).
+ *
+ * The child scan is streamed and stops at REPO_CANDIDATES, not `readdir`'d wholesale: a workspace can contain more directories than a lane
+ * render should ever enumerate. Grandchildren are deliberately not walked — a worktree is a direct child, and one level is enough to cover it.
  */
 async function candidateDirs(cwd: string): Promise<readonly string[]> {
   const found: string[] = [];
@@ -76,20 +86,21 @@ async function candidateDirs(cwd: string): Promise<readonly string[]> {
     push(parent);
     current = parent;
   }
-  // Children and grandchildren: a git worktree or a nested project lives here.
-  const list = async (dir: string): Promise<readonly string[]> => {
-    try {
-      const entries = await readdir(dir, { withFileTypes: true });
-      return entries.filter(entry => entry.isDirectory() && !SKIP_DIRS.has(entry.name)).map(entry => join(dir, entry.name));
-    } catch {
-      return [];
+  // Immediate children: a git worktree or a nested project lives here. `opendir` lets us stop
+  // after the first REPO_CANDIDATES entries instead of materializing every entry in a huge folder.
+  let handle;
+  try {
+    handle = await opendir(resolve(cwd));
+  } catch {
+    return found;
+  }
+  try {
+    for await (const entry of handle) {
+      if (entry.isDirectory() && !SKIP_DIRS.has(entry.name)) push(join(resolve(cwd), entry.name));
+      if (found.length >= REPO_CANDIDATES) break;
     }
-  };
-  for (const dir of found.slice(0, 2)) {
-    for (const child of await list(dir)) {
-      push(child);
-      for (const grandchild of await list(child)) push(grandchild);
-    }
+  } finally {
+    await handle.close().catch(() => undefined);
   }
   return found;
 }
@@ -122,12 +133,15 @@ export async function commitHashesResult(cwd: string, subjects: readonly string[
   const wanted = new Set(subjects);
   const found: Record<string, string> = Object.create(null) as Record<string, string>;
   let queried = false;
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   for (const dir of await candidateDirs(cwd)) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
     let stdout = '';
     try {
       // `execFile`, never a shell: the directory is the reader's own, and nothing here reaches a command line.
       const result = await run('git', ['-C', dir, 'log', '--all', '--no-merges', `-n${String(LOG_DEPTH)}`, '--format=%h%x1f%s'], {
-        timeout: 5000,
+        timeout: Math.min(GIT_TIMEOUT_MS, remaining),
         maxBuffer: 8 * 1024 * 1024,
         windowsHide: true,
       });
