@@ -922,7 +922,7 @@ const markers = [
     bundle.includes('cordis_inspect_list: "read",')
     && bundle.includes('cordis_inspect_query: "read",')
     && bundle.includes('cordis_inspect_self: "read",')
-    && bundle.includes('cordis_define: "Define Cordis Plugin",')
+    && bundle.includes('cordis_define: "定义 Cordis 插件",')
     && !bundle.includes('cordis_package_inspect: "read",')
     && !bundle.includes('cordis_runtime_inspect: "Inspect",')],
   ['a tool row re-renders when the file vocabulary changes, which is what makes a mention clickable', () =>

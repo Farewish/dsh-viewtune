@@ -2,13 +2,11 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { DiffHunk, ReadBlockLine, SearchFileGroup } from '@deepseek-ai/dsh-client-ui-primitives';
 import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlock, WebBlock,
-  IconAlarmClockOutlineRegular, IconApiOutlineRegular, IconArchiveOutlineRegular, IconBranchOutlineRegular,
-  IconBrowseOutlineRegular, IconChecklistOutlineRegular, IconCodeOutlineRegular, IconCordisPluginOutlineRegular,
-  IconDatabaseOutlineRegular, IconEditOutlineRegular, IconFlatListOutlineRegular, IconFolderOpenOutlineRegular,
-  IconGlobeOutlineRegular, IconGoalOutlineRegular, IconInspectOutlineRegular, IconPauseOutlineRegular,
-  IconPlanOutlineRegular, IconPluginPinwheelOutlineRegular, IconQuestionOutlineRegular, IconQueueOutlineRegular,
-  IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular, IconUsersOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives';
-import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives';
+  IconAgentPresetOutlineRegular, IconApiOutlineRegular, IconBranchOutlineRegular, IconBrowseOutlineRegular,
+  IconChecklistOutlineRegular, IconClockOutlineRegular, IconCodeOutlineRegular, IconCordisPluginOutlineRegular,
+  IconDeliverDocRegular, IconEditOutlineRegular, IconGoalOutlineRegular, IconPlanOutlineRegular,
+  IconQuestionOutlineRegular, IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular,
+  IconUsersOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives';
 import { Blocks, contentBlocks } from './Blocks.js';
 import { ProcessFragment } from './motion.js';
 import { DiffPanel, DiffStatButton } from './DiffPanel.js';
@@ -24,70 +22,72 @@ import { diffBlockLabels, jsonTreeLabels, readBlockLabels, searchBlockLabels, te
 import css from './Reader.module.css';
 
 const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running: '执行中', returned: '已返回', succeeded: '已完成', failed: '失败', interrupted: '已中断' };
-// One glyph per kind of call, each taken from the row its product counterpart uses: the question
-// and todo glyphs are the product's own, and `read_image` belongs to the read family there too.
-// Delivery is deliberately absent: the product's present row leads with a state dot rather than a
-// glyph, this follows it, and the table's key type is what keeps that honest.
-//
-// All `…Regular` (1px stroke), which is what 0.2.0's OWN tool rows use at this same 14px: measured across the platform's
-// client bundles, `dsh-client-ui-tool` renders `IconApiOutlineRegular` / `IconBrowseOutlineRegular` at size 14 and never
-// uses the `…Medium` variant of any of these glyphs. The 0.1.5 names carried a drawn size (`…16` / `…14`) rather than a
-// weight, so the port first guessed "smaller glyph → heavier stroke"; the platform's own usage says otherwise, and it is
-// the closer evidence for what these rows should look like.
-const ICONS = { write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineRegular, search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, question: IconQuestionOutlineRegular, todo: IconChecklistOutlineRegular, other: IconSparkleRegular } satisfies Record<Exclude<ToolCategory, 'delivery'>, unknown>;
+// One glyph per kind of call, taken from the same table the product's generic tool row uses. The
+// specialised names below override this with the glyph the product's own keyed row uses.
+const ICONS = {
+  write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineRegular,
+  search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, question: IconQuestionOutlineRegular,
+  todo: IconChecklistOutlineRegular, delivery: IconDeliverDocRegular, other: IconSparkleRegular,
+} satisfies Record<ToolCategory, unknown>;
+
+/** Teammate-coordination tools: the product's detail rows give these the two-person glyph. */
+const TEAMMATE_TOOLS: ReadonlySet<string> = new Set([
+  'spawn_teammate', 'list_agents', 'send_message', 'interrupt_agent', 'wait_agent',
+]);
 
 /**
- * Named tools whose leading glyph is more specific than their category. Category still decides the
- * row's colour and title fallback; this only replaces the 14px mark.
+ * Named tools whose leading glyph is more specific than their category — the same rules as
+ * `ui-tool/src/client/tool/toolviews/details-row.tsx` in 0.2.1, plus the keyed rows for
+ * present/skill/ask/todo.
  */
 const NAME_ICONS: Record<string, typeof IconSparkleRegular> = {
-  job_output: IconQueueOutlineRegular,
-  job_list: IconFlatListOutlineRegular,
-  job_kill: IconPauseOutlineRegular,
-  cordis_inspect_list: IconInspectOutlineRegular,
-  cordis_inspect_query: IconInspectOutlineRegular,
-  cordis_inspect_self: IconInspectOutlineRegular,
-  plugin_manager: IconCordisPluginOutlineRegular,
-  plugin_market: IconPluginPinwheelOutlineRegular,
-  list_mcp_resources: IconDatabaseOutlineRegular,
-  list_mcp_resource_templates: IconDatabaseOutlineRegular,
-  read_mcp_resource: IconDatabaseOutlineRegular,
+  present: IconDeliverDocRegular,
+  skill: IconSkillOutlineRegular,
+  ask_user_question: IconQuestionOutlineRegular,
+  todo_write: IconChecklistOutlineRegular,
+  subagent: IconAgentPresetOutlineRegular,
+  subagent_fork: IconAgentPresetOutlineRegular,
+  list_subagent_models: IconAgentPresetOutlineRegular,
+  job_output: IconChecklistOutlineRegular,
+  job_list: IconChecklistOutlineRegular,
+  job_kill: IconChecklistOutlineRegular,
+  terminal_open: IconCodeOutlineRegular,
+  terminal_send: IconCodeOutlineRegular,
+  terminal_read: IconCodeOutlineRegular,
+  terminal_signal: IconCodeOutlineRegular,
+  terminal_close: IconCodeOutlineRegular,
+  terminal_list: IconCodeOutlineRegular,
+  session_search: IconSearchOutlineRegular,
+  session_event_search: IconSearchOutlineRegular,
+  session_trace: IconSearchOutlineRegular,
+  session_event_trace: IconSearchOutlineRegular,
+  session_event_read: IconSearchOutlineRegular,
+  lsp: IconSearchOutlineRegular,
+  schedule_create: IconClockOutlineRegular,
+  schedule_delete: IconClockOutlineRegular,
+  schedule_list: IconClockOutlineRegular,
+  schedule_update: IconClockOutlineRegular,
   create_goal: IconGoalOutlineRegular,
   get_goal: IconGoalOutlineRegular,
   update_goal: IconGoalOutlineRegular,
-  schedule_create: IconAlarmClockOutlineRegular,
-  schedule_delete: IconAlarmClockOutlineRegular,
-  schedule_list: IconAlarmClockOutlineRegular,
-  schedule_update: IconAlarmClockOutlineRegular,
-  exit_plan_mode: IconPlanOutlineRegular,
-  lsp: IconCodeOutlineRegular,
-  list_subagent_models: IconUsersOutlineRegular,
-  subagent: IconUsersOutlineRegular,
-  subagent_fork: IconUsersOutlineRegular,
-  interrupt_agent: IconUsersOutlineRegular,
-  list_agents: IconUsersOutlineRegular,
-  send_message: IconUsersOutlineRegular,
-  spawn_teammate: IconUsersOutlineRegular,
-  wait_agent: IconUsersOutlineRegular,
-  team_task_create: IconUsersOutlineRegular,
-  team_task_get: IconUsersOutlineRegular,
-  team_task_list: IconUsersOutlineRegular,
-  team_task_update: IconUsersOutlineRegular,
-  working_directory: IconFolderOpenOutlineRegular,
-  create_worktree: IconBranchOutlineRegular,
+  cordis_inspect_list: IconCordisPluginOutlineRegular,
+  cordis_inspect_query: IconCordisPluginOutlineRegular,
+  cordis_inspect_self: IconCordisPluginOutlineRegular,
+  cordis_define: IconCordisPluginOutlineRegular,
+  cordis_run: IconCordisPluginOutlineRegular,
+  cordis_stop: IconCordisPluginOutlineRegular,
+  cordis_undefine: IconCordisPluginOutlineRegular,
+  team_task_create: IconChecklistOutlineRegular,
+  team_task_get: IconChecklistOutlineRegular,
+  team_task_list: IconChecklistOutlineRegular,
+  team_task_update: IconChecklistOutlineRegular,
   workflow: IconBranchOutlineRegular,
   ralph: IconBranchOutlineRegular,
-  load_workspace_dependencies: IconArchiveOutlineRegular,
-  stagehand_act: IconGlobeOutlineRegular,
-  stagehand_extract: IconGlobeOutlineRegular,
-  stagehand_navigate: IconGlobeOutlineRegular,
-  stagehand_observe: IconGlobeOutlineRegular,
-  stagehand_screenshot: IconGlobeOutlineRegular,
-  stagehand_tabs: IconGlobeOutlineRegular,
+  exit_plan_mode: IconPlanOutlineRegular,
 };
 
-/** The delivery row's leading mark: this view's phase mapped onto the dot's states. */
-const DOT_STATE = { preparing: 'ongoing', running: 'ongoing', returned: 'done', succeeded: 'done', failed: 'error', interrupted: 'warning' } as const satisfies Record<ToolPhase, StateDotState>;
+for (const name of TEAMMATE_TOOLS) NAME_ICONS[name] = IconUsersOutlineRegular;
+
 const number = new Intl.NumberFormat('zh-CN');
 const language = (path: string | undefined) => path?.split('.').at(-1);
 const duration = (ms: number) => ms < 1000 ? `${Math.round(ms)} 毫秒` : `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} 秒`;
@@ -277,14 +277,14 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
     return () => document.removeEventListener('selectionchange', track);
   }, []);
   const facts = executionFacts(entry.block);
-  const Icon = NAME_ICONS[model.name] ?? (model.name === 'skill' ? IconSkillOutlineRegular : model.category === 'delivery' ? null : ICONS[model.category]);
+  const Icon = NAME_ICONS[model.name] ?? ICONS[model.category];
   const block = entry.block;
   // What this call — and anything it ran underneath it — changed on disk. Empty for the calls that
   // changed nothing, which is most of them, so the counts leave an ordinary row alone.
   const diffHunks = useMemo(() => callDiffHunks(block, model.name, model.args), [block, model.name, model.args]);
   const native = block ? toolRowModel(model.name, block) : null;
   const skillName = typeof model.args?.name === 'string' ? model.args.name.split('\n')[0] : model.raw.split('\n')[0];
-  const rowTitle = model.name === 'skill' ? 'Skill' : native?.title ?? VARIANT_TITLES[classifyTool(model.name)];
+  const rowTitle = native?.title ?? VARIANT_TITLES[classifyTool(model.name)];
   const rowSummary = phase === 'interrupted' ? '已停止 · 调用记录保留' : model.name === 'skill' ? skillName : native?.errorSummary ?? native?.summary
     ?? (classifyTool(model.name) === 'others' ? `${model.name} · ${model.target ?? model.title}` : model.target ?? model.title);
   const showState = phase === 'preparing' || phase === 'running' || phase === 'failed' || phase === 'interrupted';
@@ -301,7 +301,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const activate = (index: number) => { const item = tabs[(index + tabs.length) % tabs.length]!; setTab(item[0]); tabRefs.current[(index + tabs.length) % tabs.length]?.focus(); };
   if (depth > 6) return <p className={css.meta}>更深的嵌套调用可在原对话查看。</p>;
   return <div ref={element => { control.current = element?.querySelector<HTMLElement>('[data-disclosure-row]') ?? null; }} className={css.toolActivity} data-reader-tool-call={entry.callId} data-tool-phase={phase} data-tool-args-length={model.raw.length} data-tool-category={model.category} data-expanded={open} data-ud-check="reader-tool-activity">
-    <DisclosureRow icon={Icon === null ? <StateDot state={DOT_STATE[phase]} /> : <Icon size={14} />} title={rowTitle} open={open} expandable expandOnRowClick keepContentWhenOpen
+    <DisclosureRow icon={<Icon size={14} />} title={rowTitle} open={open} expandable expandOnRowClick keepContentWhenOpen
       onToggle={() => { onRead(); setOpen(value => !value); }} rowClassName={css.nativeToolRow}
       collapsedContent={<><span className={css.rowSeparator} aria-hidden /><span className={css.nativeToolSummary} title={rowSummary} data-reader-tool-summary>{rowSummary}</span>
         {showState && <span className={css.toolState} data-phase={phase}>{LABEL[phase]}</span>}

@@ -44,7 +44,7 @@ const callWith = (name: string, args: unknown) => ({
 test('every 0.2.1 tool has a process-row title and variant', () => {
   for (const name of TOOLS) {
     const row = toolRowModel(name, call(name));
-    assert.notEqual(row.title, 'Tool call', `${name} still falls back to the generic title`);
+    assert.notEqual(row.title, '工具调用', `${name} still falls back to the generic title`);
     assert.ok(row.variant.length > 0, name);
     assert.equal(classifyTool(name).length > 0, true, name);
   }
@@ -52,14 +52,14 @@ test('every 0.2.1 tool has a process-row title and variant', () => {
 
 test('job and inspect rows carry the id or target in the collapsed summary', () => {
   const job = toolRowModel('job_output', callWith('job_output', { job_id: 'job-7', wait: true }));
-  assert.equal(job.title, 'Read job output');
+  assert.equal(job.title, '读取任务输出');
   assert.match(job.summary, /job-7/);
-  assert.match(job.summary, /waiting/);
+  assert.match(job.summary, /等待中/);
 
   const inspect = toolRowModel('cordis_inspect_query', callWith('cordis_inspect_query', {
     platform: 'host', provider: 'cordis', method: 'services',
   }));
-  assert.equal(inspect.title, 'Query runtime');
+  assert.equal(inspect.title, '查询运行时');
   assert.match(inspect.summary, /host/);
   assert.match(inspect.summary, /cordis/);
 });

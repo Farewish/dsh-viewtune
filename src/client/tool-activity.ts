@@ -160,7 +160,7 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
     : name === 'present' ? 'delivery'
     : 'other';
   const title = category === 'write' ? `${name === 'write' ? '写入' : '修改'}${file ? ` ${file}` : name === 'apply_patch' ? '代码补丁' : '文件'}`
-    : category === 'read' ? name === 'web_fetch' ? '读取网页' : `读取${file ? ` ${file}` : '文件'}`
+    : category === 'read' ? name === 'web_fetch' ? '网页获取' : `读取${file ? ` ${file}` : '文件'}`
     : category === 'terminal' ? description || '运行命令'
     : category === 'search' ? name === 'glob' ? '查找文件' : '搜索内容'
     : category === 'web' ? name === 'web_search' ? '搜索网页' : '读取网页'

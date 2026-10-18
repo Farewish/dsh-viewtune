@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import css from './Reader.module.css';
+import css from './ToolResultCards.module.css';
 import { toolTitleOf } from './native/tool-call-model.js';
 
 type ToolArgs = Record<string, unknown> | undefined;
@@ -40,11 +40,11 @@ function displayValue(value: unknown): string {
 
 function FactGrid({ value }: { value: Record<string, unknown> }): ReactNode {
   const entries = Object.entries(value);
-  if (entries.length === 0) return <p className={css.toolDetailNote}>没有可展示的字段。</p>;
-  return <dl className={css.toolFacts}>
-    {entries.map(([key, item]) => <div key={key} className={css.toolFactRow}>
-      <dt className={css.toolFactKey}>{key}</dt>
-      <dd className={css.toolFactValue}>{displayValue(item)}</dd>
+  if (entries.length === 0) return <p className={css.note}>没有可展示的字段。</p>;
+  return <dl className={css.facts}>
+    {entries.map(([key, item]) => <div key={key} className={css.factRow}>
+      <dt className={css.factKey}>{key}</dt>
+      <dd className={css.factValue}>{displayValue(item)}</dd>
     </div>)}
   </dl>;
 }
@@ -56,10 +56,10 @@ function Body({ text, name }: { text: string; name: string }): ReactNode {
     return <FactGrid value={parsed as Record<string, unknown>} />;
   }
   if (parsed !== undefined && Array.isArray(parsed)) {
-    return <pre className={css.toolCardOutput}>{JSON.stringify(parsed, null, 2)}</pre>;
+    return <pre className={css.output}>{JSON.stringify(parsed, null, 2)}</pre>;
   }
-  if (body.trim() === '') return <p className={css.toolDetailNote}>没有可展示的内容。</p>;
-  return <pre className={css.toolCardOutput}>{body}</pre>;
+  if (body.trim() === '') return <p className={css.note}>没有可展示的内容。</p>;
+  return <pre className={css.output}>{body}</pre>;
 }
 
 /**
@@ -75,14 +75,14 @@ export function ToolResultCard({ name, text, args }: { name: string; text: strin
   const inspectTarget = name === 'cordis_inspect_query'
     ? [stringOf(args, 'platform'), stringOf(args, 'provider'), stringOf(args, 'method')].filter((part): part is string => part !== undefined).join(' · ')
     : undefined;
-  return <div className={css.toolResultCard} data-reader-tool-result-card data-tool-card={name}>
-    <div className={css.toolResultHead}>
-      <span className={css.toolResultTitle}>{title}</span>
-      {jobId !== undefined && <span className={css.toolResultMeta}>任务 {jobId}</span>}
-      {inspectTarget !== undefined && inspectTarget !== '' && <span className={css.toolResultMeta}>{inspectTarget}</span>}
-      {status !== undefined && <span className={css.toolResultStatus}>{status}</span>}
+  return <div className={css.card} data-reader-tool-result-card data-tool-card={name}>
+    <div className={css.head}>
+      <span className={css.title}>{title}</span>
+      {jobId !== undefined && <span className={css.meta}>任务 {jobId}</span>}
+      {inspectTarget !== undefined && inspectTarget !== '' && <span className={css.meta}>{inspectTarget}</span>}
+      {status !== undefined && <span className={css.status}>{status}</span>}
     </div>
-    <div className={css.toolResultBody}>
+    <div className={css.body}>
       <Body text={text} name={name} />
     </div>
   </div>;

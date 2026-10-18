@@ -31,23 +31,23 @@ test('the calls the product renders with its own cards are named here, not calle
   const question = toolRowModel('ask_user_question', call('ask_user_question', {
     questions: [{ id: 'a', question: '要改动吗？' }, { id: 'b', question: '范围？' }],
   }));
-  assert.equal(question.title, 'Question');
+  assert.equal(question.title, '提问');
   assert.equal(question.summary, '2 个问题 · 要改动吗？');
 
   const delivery = toolRowModel('present', call('present', {
     files: [{ path: '/w/one.md', description: '一' }, { path: '/w/two.md' }],
   }));
-  assert.equal(delivery.title, 'Deliveries');
+  assert.equal(delivery.title, '交付文件');
   assert.equal(delivery.summary, '2 个文件 · one.md、two.md');
 
   const todo = toolRowModel('todo_write', call('todo_write', {
     todos: [{ content: 'a', status: 'completed' }, { content: 'b', status: 'in_progress' }],
   }));
-  assert.equal(todo.title, 'Todo');
+  assert.equal(todo.title, '更新任务清单');
   assert.equal(todo.summary, '1/2 完成');
 
   const image = toolRowModel('read_image', call('read_image', { file_path: '/w/shot.png' }));
-  assert.equal(image.title, 'Read image');
+  assert.equal(image.title, '读取图片');
   assert.equal(image.summary, '/w/shot.png');
 });
 
@@ -58,13 +58,13 @@ test('a third delivery is elided, and a genuinely unknown tool keeps the generic
   assert.equal(many.summary, '3 个文件 · a.md、b.md 等');
 
   const unknown = toolRowModel('mcp__x__y', call('mcp__x__y', { query: 'hello' }));
-  assert.equal(unknown.title, 'Tool call');
+  assert.equal(unknown.title, '工具调用');
   assert.equal(unknown.summary, 'mcp__x__y · hello');
 });
 
 test('a list payload with nothing to read falls back to the raw arguments', () => {
   const empty = toolRowModel('todo_write', call('todo_write', { todos: [] }));
-  assert.equal(empty.title, 'Todo');
+  assert.equal(empty.title, '更新任务清单');
   assert.equal(empty.summary, '{"todos":[]}');
 });
 
@@ -72,7 +72,7 @@ test('a call whose arguments have not arrived yet is named by its id, not filled
   // The `preparing` half carries no `argsRaw` at all in 0.2.0, and this row must not invent one: the same fallback the
   // row has always used (the call id) is what a preparing row shows, and `runningArgs` is the single place that decides.
   const row = toolRowModel('todo_write', preparing('todo_write'));
-  assert.equal(row.title, 'Todo');
+  assert.equal(row.title, '更新任务清单');
   assert.equal(row.summary, 'call-2');
   assert.equal(row.body, null);
 });
@@ -92,7 +92,7 @@ test('a result whose call left the window keeps the name the result carries', ()
     call: null, callTime: null, content: [], isError: false, subCalls: [],
   } as unknown as ToolCallBlock);
   assert.equal(row.variant, 'read');
-  assert.notEqual(row.title, 'Tool call');
+  assert.notEqual(row.title, '工具调用');
   assert.equal(row.summary, 'call-4');
 });
 
@@ -100,7 +100,7 @@ test('web_fetch is a read row in both tables', () => {
   const block = call('web_fetch', { url: 'https://example.com' });
   const summary = activitySummary({ block });
   assert.equal(summary.category, 'read');
-  assert.equal(summary.title, '读取网页');
+  assert.equal(summary.title, '网页获取');
   assert.equal(toolRowModel('web_fetch', block).variant, 'read');
 });
 
