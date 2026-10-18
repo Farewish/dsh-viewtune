@@ -1,6 +1,7 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import { Fragment, createContext, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
+import type { ComponentProps } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import {
@@ -82,14 +83,6 @@ type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
   nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
 };
 
-/**
- * The one empty key list, shared so its identity is stable.
- *
- * `mainKeys` is memoized on the array a turn's user/steering split produced, and a fresh `[]` on a turn
- * with no leading messages would defeat that memo on every render — the exact per-delta cost the
- * primitive-publishing subscription above exists to avoid.
- */
-const NO_KEYS: readonly string[] = [];
 /**
  * The one empty expansion map, shared so its identity is stable.
  *
@@ -420,6 +413,30 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
     <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />
   </div>;
+});
+
+type NodeSeatProps = ComponentProps<typeof AssistantNode> & ComponentProps<typeof ProcessNode>;
+
+/** Process nodes that also have a summary/notice body in `MainNode` (the two used to render together). */
+const PROCESS_WITH_MAIN = new Set(['command', 'model-retry', 'manual-compaction']);
+/** Process-only nodes: `MainNode` returns null for these. */
+const PROCESS_ONLY = new Set(['context', 'system-prompt', 'turn-process']);
+
+/**
+ * One subscription per rendered row, then the one seat that kind needs.
+ *
+ * The previous shape mounted `ProcessNode`, `AssistantNode`, and `MainNode` together for every
+ * node; two of the three then returned null after their own `useChat` selector had already
+ * subscribed. This gate selects the seat from the same snapshot first, so a text delta wakes one
+ * seat rather than three, and a hidden row mounts none.
+ */
+const NodeSeat = memo(function NodeSeat(props: NodeSeatProps) {
+  const node = props.useChat(snapshot => snapshot.nodes.get(props.nodeKey));
+  if (!node || node.visibility === 'hidden') return null;
+  if (isNode(node, 'assistant-step')) return <AssistantNode {...props} />;
+  if (PROCESS_ONLY.has(node.kind)) return <ProcessNode {...props} />;
+  if (PROCESS_WITH_MAIN.has(node.kind)) return <Fragment><ProcessNode {...props} /><MainNode {...props} /></Fragment>;
+  return <MainNode {...props} />;
 });
 
 function GroupStatus({ group, sessionId, useChat, useSession, useSessionStatus, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSession' | 'useSessionStatus'> & { group: ReaderGroup; motion: boolean }) {
@@ -1155,14 +1172,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // deliverables scan, and element creation for the whole transcript, per character. The selector
   // therefore publishes a primitive, and the array is derived from it below, so a chunk that does not
   // change this turn's classification costs nothing at all.
-  const turnUserSignature = props.useChat(snapshot => group.keys.filter(key => {
-    const kind = snapshot.nodes.get(key)?.kind;
-    return kind === 'user' || kind === 'steering';
-  }).join('\u0000'));
-  const turnUserKeys = useMemo(
-    () => turnUserSignature === '' ? NO_KEYS : turnUserSignature.split('\u0000'),
-    [turnUserSignature],
-  );
+  const turnUserKeys = group.userKeys;
   // Memoized on the split above: `flow` and everything built from it keys on this identity, and a
   // rebuilt array here would put the rest of this component back on the per-delta path.
   const mainKeys = useMemo(() => group.keys.filter(key => !turnUserKeys.includes(key)), [group, turnUserKeys]);
@@ -1443,9 +1453,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
    */
   const renderMember = (item: ReaderFlowEntry, segments: 'both' | 'reasoning' | 'body' = 'both'): ReactNode => item.kind === 'node'
     ? <Fragment>
-      <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-      <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} segments={segments} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} /></BlockBoundary>
-      <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
+      <BlockBoundary><NodeSeat {...shared} t={props.t} boundary={boundary} nodeKey={item.nodeKey} open={expanded} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} segments={segments} /></BlockBoundary>
     </Fragment>
     : <Fragment>
       <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>

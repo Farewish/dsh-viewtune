@@ -168,6 +168,7 @@ test('structural grouping retains keys and source order and excludes host-hidden
   const byKey = new Map(nodes.map(row => [row.key, row]));
   const result = groupNodes(nodes.map(row => row.key), key => byKey.get(key));
   assert.deepEqual(result.map(group => group.keys), [['1'], ['2', '3'], ['5']]);
+  assert.deepEqual(result.map(group => group.userKeys), [['1'], [], []]);
   assert.deepEqual(result.flatMap(group => group.keys), ['1', '2', '3', '5']);
   assert.equal(result[1]?.key, groupNodes([...nodes.map(row => row.key), 'missing'], key => byKey.get(key))[1]?.key);
 });

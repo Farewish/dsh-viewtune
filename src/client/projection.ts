@@ -1,7 +1,7 @@
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
 
-export interface ReaderGroup { key: string; turn: number | null; keys: readonly string[] }
+export interface ReaderGroup { key: string; turn: number | null; keys: readonly string[]; userKeys: readonly string[] }
 export interface TurnBoundary { status: 'open' | 'closed' | 'unknown'; reason: string | null; latestStep: number; closingStep: number | null }
 
 // Run on structural publication, not on each text delta. Node seats subscribe by key.
@@ -19,10 +19,17 @@ export function groupNodes(order: readonly string[], get: (key: string) => ChatC
     if (!node || node.visibility === 'hidden') continue;
     const turn = node.location.kind === 'step' || node.location.kind === 'turn' ? node.location.turn.turn : null;
     const previous = groups.at(-1);
+    const isUser = node.kind === 'user' || node.kind === 'steering';
     if (turn !== null && previous?.turn === turn) {
       (previous.keys as string[]).push(key);
+      if (isUser) (previous.userKeys as string[]).push(key);
     } else {
-      groups.push({ key: turn === null ? `node:${key}` : seenTurns.has(turn) ? `turn:${turn}:${key}` : `turn:${turn}`, turn, keys: [key] });
+      groups.push({
+        key: turn === null ? `node:${key}` : seenTurns.has(turn) ? `turn:${turn}:${key}` : `turn:${turn}`,
+        turn,
+        keys: [key],
+        userKeys: isUser ? [key] : [],
+      });
       if (turn !== null) seenTurns.add(turn);
     }
   }

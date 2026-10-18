@@ -433,14 +433,21 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       const selection = document.getSelection();
       return selection && !selection.isCollapsed && selection.anchorNode && content.contains(selection.anchorNode);
     };
+    let anchorCache: HTMLElement[] | null = null;
+    const anchors = () => {
+      if (anchorCache === null) anchorCache = Array.from(content.querySelectorAll<HTMLElement>('[data-reader-anchor]'));
+      return anchorCache;
+    };
+    const structure = new MutationObserver(() => { anchorCache = null; });
+    structure.observe(content, { childList: true, subtree: true });
     const capture = () => {
       const top = scroll.getBoundingClientRect().top;
       // Bisection, not a walk over every anchor: this runs on every scroll event and on every growth while the reader
       // holds their own place, and the two scans in this file were measured together at 10k–16k rect reads per second.
-      // The NodeList is measured directly — the walk's `Array.from` was another whole-list allocation per call.
-      const anchors = content.querySelectorAll<HTMLElement>('[data-reader-anchor]');
-      const index = firstRowPastIndex(anchors, top, ANCHOR_LINE_OFFSET_PX);
-      const candidate = index < anchors.length ? anchors[index]! : undefined;
+      // The cached list is rebuilt only when the structural observer below invalidates it, not on every captured scroll.
+      const rows = anchors();
+      const index = firstRowPastIndex(rows, top, ANCHOR_LINE_OFFSET_PX);
+      const candidate = index < rows.length ? rows[index]! : undefined;
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
     };
     const onScroll = () => {
@@ -627,7 +634,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     scroll.addEventListener('touchmove', onTouch, { passive: true });
     scroll.addEventListener('keydown', onKey);
     return () => {
-      cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect();
+      cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect(); structure.disconnect();
       scroll.removeEventListener('scroll', onScroll); scroll.removeEventListener('wheel', onWheel);
       scroll.removeEventListener('touchstart', onTouch); scroll.removeEventListener('touchmove', onTouch);
       scroll.removeEventListener('keydown', onKey);

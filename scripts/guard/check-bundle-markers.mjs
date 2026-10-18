@@ -161,7 +161,7 @@ const markers = [
   // The handler still has to RUN before the browser applies the notch, or the scroll events that
   // notch causes are measured before wheelUntil is set and re-render the card mid-gesture.
   ['wheel-handler-runs-before-the-scroll', () => /addEventListener\("wheel", onWheel, \{\s*passive: false\s*\}\)/.test(bundle)],
-  ['all user/steering nodes collected', 'group.keys.filter((key) => {\n\t\t\t\tconst kind = snapshot.nodes.get(key)?.kind;'],
+  ['all user/steering nodes collected', 'if (isUser) previous.userKeys.push(key);'],
   // The whitespace between two revealed words has to be a KEYED child in both reveal paths. As a bare string it was
   // matched by position, so each word folding into the settled prefix rebuilt the live window's strings — measured at
   // 8,492 new text nodes under the reasoning container in two seconds. Each marker carries the `inline` expression of

@@ -42,7 +42,8 @@ const actions = bundle.indexOf('Reader_module_css_default.answerActions');
 const checks = {
   'turn order is user -> disclosure -> flow': turn.indexOf('\t\t\t\t\tturnUserKeys.map') < turn.indexOf('\n\t\t\t\t\thasProcess &&')
     && turn.indexOf('\n\t\t\t\t\thasProcess &&') < turn.indexOf('id: flowId'),
-  'all user/steering nodes are collected': bundle.includes('group.keys.filter((key) => {\n\t\t\t\tconst kind = snapshot.nodes.get(key)?.kind;'),
+  'all user/steering nodes are collected': bundle.includes('if (isUser) previous.userKeys.push(key);')
+    && bundle.includes('const turnUserKeys = group.userKeys;'),
   'every user message is rendered in the leading slot': bundle.includes('turnUserKeys.map((userKey) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BlockBoundary, {'),
   'user nodes are excluded from the flow, through a memoized key list': bundle.includes('const mainKeys = (0, react.useMemo)(() => group.keys.filter((key) => !turnUserKeys.includes(key)), [group, turnUserKeys]);'),
   'MainNode still draws user nodes as a fallback': bundle.includes('if (isNode(node, "user") || isNode(node, "steering")) {\n\t\t\t\tconst blocks = contentBlocks(node.data.content);'),

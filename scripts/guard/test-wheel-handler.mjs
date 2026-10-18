@@ -159,6 +159,9 @@ function scrollCard(port, talk) {
   sandbox.port = port;
   sandbox.text = { offsetHeight: port.scrollHeight };
   sandbox.automatic = false;
+  sandbox.scrollFrame = 0;
+  sandbox.requestAnimationFrame = (callback) => { callback(); return 1; };
+  sandbox.cancelAnimationFrame = () => {};
   sandbox.measure = () => events.push('measure');
   sandbox.pause = () => events.push('pause');
   port.parentElement = talk.host;

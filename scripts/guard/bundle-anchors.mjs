@@ -75,11 +75,15 @@ export function keyframeOf(css, local) {
  */
 export function moduleCssLiteral(text, moduleFile) {
   const owners = [...text.matchAll(/const tagId(\$\d+)? = "([^"]+)"/g)];
+  const literals = [];
   for (const owner of owners) {
     if (!owner[2].endsWith(`/${moduleFile}`)) continue;
-    return cssLiteralFor(text, owner[1] ?? '');
+    literals.push(cssLiteralFor(text, owner[1] ?? ''));
   }
-  throw new Error(`no stylesheet named ${moduleFile} in the bundle`);
+  if (literals.length === 0) throw new Error(`no stylesheet named ${moduleFile} in the bundle`);
+  // A bundle can carry more than one literal for the same module (one per chunk entry). The full
+  // stylesheet is the longest; the short duplicate is an emission artefact and lacks classes.
+  return literals.reduce((longest, css) => css.length > longest.length ? css : longest);
 }
 
 /** The `css` / `css$N` literal bound to one `tagId` suffix. */

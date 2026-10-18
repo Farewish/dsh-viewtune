@@ -208,10 +208,17 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * again. That is exactly the shape of the report: the first thinking card of a turn never expanded while every
      * later one did. Watching the scroller is also what the rule says in as many words.
      */
-    const request = () => { if (atTail()) { recordCardHeight(); onFocusChange(focusKey, true); } };
+    let frame = 0;
+    const request = () => {
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (atTail()) { recordCardHeight(); onFocusChange(focusKey, true); }
+      });
+    };
     request();
     scroller.addEventListener('scroll', request, { passive: true });
-    return () => scroller.removeEventListener('scroll', request);
+    return () => { if (frame !== 0) cancelAnimationFrame(frame); scroller.removeEventListener('scroll', request); };
   }, [expanded, focusExpand, focused, following, active, reasoningMode, focusKey, onFocusChange]);
   /**
    * The card's height right now, recorded before the focus is REQUESTED.
@@ -381,6 +388,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const scrollTrack = track.current;
     if (!text || !scrollTrack) return;
     let frame = 0;
+    let scrollFrame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let nextAt = performance.now() + REASON_HOLD;
     let alive = true;
@@ -616,6 +624,16 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       if (next !== lastEdges) { lastEdges = next; setEdges(next); }
       if (recordHeight && !resize.current) lastHeight.current = port.clientHeight;
     };
+    // A folded, inactive, or manual-mode card is not driven by the follower. It still needs ONE
+    // measurement so its overflow/edge attributes are truthful, but none of the document-level
+    // selection/visibility listeners, scroll/wheel handlers, or ResizeObservers below.
+    if (!allowed) {
+      measure(false);
+      return () => {
+        stopFollow.current = () => {};
+        compensateNow.current = () => {};
+      };
+    }
     stopFollow.current = () => { cancel(); manual(); measure(false); };
     // Handed out so the grant can take the ceiling jump out of the space above BEFORE the browser paints (see the focused
     // effect): on the next measure would be one painted frame of the card hanging below the fold.
@@ -691,9 +709,16 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // interrupts the native scrolling — that is the stutter. Edges settle once
       // the gesture stops.
       if (Date.now() < wheelUntil) return;
-      measure();
-      // Focus/keyboard-induced native scroll wins even while the track moves.
-      if (automatic && port.scrollTop > 1) pause();
+      // Scrollbar drags and keyboard scrolling never pass through `onWheel`, so they used to run
+      // two getComputedStyle reads and an offsetHeight synchronously for every event. Coalesce the
+      // whole burst into one frame; the preview/line-height values cannot change during a scroll.
+      if (scrollFrame !== 0) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        measure(false);
+        // Focus/keyboard-induced native scroll wins even while the track moves.
+        if (automatic && port.scrollTop > 1) pause();
+      });
     };
     // No notch is ever taken away from the browser, and the card's position is never written by
     // script. The browser alone decides what a notch does:
@@ -740,7 +765,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     measure(false); schedule();
     return () => {
       alive = false; cancel(); manual(); observer.disconnect();
-      cancelAnimationFrame(heightChase);
+      cancelAnimationFrame(heightChase); cancelAnimationFrame(scrollFrame);
       wheelUntil = 0;
       port.removeEventListener('scroll', onScroll); port.removeEventListener('wheel', onWheel);
       document.removeEventListener('selectionchange', onSelection);

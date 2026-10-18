@@ -226,7 +226,7 @@ want('the effect asks it for the turn in view', 'let firstVisible = currentTurnO
 // "the viewport" means one container in both places. Hence 2 occurrences, not 1.
 want('uses the same scrollport as the reading scroll', 'content.closest("[data-conversation-scroll]") ?? content;', 2);
 want('and listens to that scroller itself', 'scroller.addEventListener("scroll", schedule, { passive: true });', 1);
-want('throttled to one read per frame', 'frame = requestAnimationFrame(() => {', 1);
+want('throttled to one read per frame', 'let frame = 0;\n\t\t\t\tconst schedule = () => {\n\t\t\t\t\tif (frame !== 0) return;\n\t\t\t\t\tframe = requestAnimationFrame(() => {', 1);
 want('state only changes on a real move', 'setCurrentTurn((previous) => previous === firstVisible ? previous : firstVisible);', 1);
 want('cleans up its listeners', 'scroller.removeEventListener("scroll", schedule);', 1);
 
