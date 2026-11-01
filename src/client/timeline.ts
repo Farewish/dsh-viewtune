@@ -32,35 +32,78 @@ interface LoadedTurnNavigationItem {
  * such a turn asked to load something already present (a silent no-op), and the reading view's history button decided there
  * was more to fetch and re-offered its "load everything" escape hatch after everything had been loaded.
  */
+interface OutlineEntry {
+  readonly turn: number;
+  readonly seq: number;
+  readonly prompt: string;
+  readonly response: string;
+}
+
+interface OutlineBase {
+  readonly entries: ReadonlyMap<number, OutlineEntry>;
+  /** Ascending, computed once per outline array. */
+  readonly turns: readonly number[];
+}
+
+const EMPTY_OUTLINE: OutlineBase = { entries: new Map(), turns: [] };
+
+/**
+ * The validated, sorted outline, cached by the projection array's identity.
+ *
+ * `useProjection` keeps the array stable until the host's outline changes; the reading view re-merges
+ * it whenever a turn becomes rendered or gains a deliverable. Without this cache every such pass
+ * re-validated every raw entry and sorted the whole log again.
+ */
+const outlineBases = new WeakMap<object, OutlineBase>();
+
+function outlineBase(outline: readonly unknown[]): OutlineBase {
+  const cached = outlineBases.get(outline);
+  if (cached !== undefined) return cached;
+  const entries = new Map<number, OutlineEntry>();
+  for (const raw of outline) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const entry = raw as RawOutlineEntry;
+    if (typeof entry.turn !== 'number' || !Number.isSafeInteger(entry.turn) || entry.turn < 0) continue;
+    if (typeof entry.seq !== 'number' || !Number.isSafeInteger(entry.seq) || entry.seq < 0) continue;
+    entries.set(entry.turn, {
+      turn: entry.turn,
+      seq: entry.seq,
+      prompt: typeof entry.prompt === 'string' ? entry.prompt.trim() : '',
+      response: typeof entry.response === 'string' ? entry.response.trim() : '',
+    });
+  }
+  const base: OutlineBase = { entries, turns: [...entries.keys()].sort((a, b) => a - b) };
+  outlineBases.set(outline, base);
+  return base;
+}
+
 export function mergeTimelineItems(
   loaded: readonly LoadedTurnNavigationItem[] | undefined,
   outline: unknown,
   turnsWithDeliverables?: ReadonlySet<number>,
   rendered?: ReadonlyMap<number, string>,
 ): readonly TimelineItem[] {
+  const base = Array.isArray(outline) ? outlineBase(outline) : EMPTY_OUTLINE;
   const byTurn = new Map<number, TimelineItem>();
+  const order = [...base.turns];
+  let sorted = true;
 
-  // 1. Process host whole-log outline (if available)
-  if (Array.isArray(outline)) {
-    for (const raw of outline) {
-      if (typeof raw !== 'object' || raw === null) continue;
-      const entry = raw as RawOutlineEntry;
-      if (typeof entry.turn !== 'number' || !Number.isSafeInteger(entry.turn) || entry.turn < 0) continue;
-      if (typeof entry.seq !== 'number' || !Number.isSafeInteger(entry.seq) || entry.seq < 0) continue;
-      const renderedKey = rendered?.get(entry.turn);
-
-      byTurn.set(entry.turn, {
-        turn: entry.turn,
-        prompt: typeof entry.prompt === 'string' ? entry.prompt.trim() : '',
-        response: typeof entry.response === 'string' ? entry.response.trim() : '',
-        hasDeliverables: turnsWithDeliverables?.has(entry.turn) ?? false,
-        // Present in the node store = loaded, whatever the windowed navigation list says.
-        anchor: renderedKey === undefined ? { kind: 'unloaded', seq: entry.seq } : { kind: 'loaded', key: renderedKey },
-      });
-    }
+  // 1. The cached outline, with the live render/deliverable facts applied.
+  for (const turn of base.turns) {
+    const entry = base.entries.get(turn)!;
+    const renderedKey = rendered?.get(turn);
+    byTurn.set(turn, {
+      turn,
+      prompt: entry.prompt,
+      response: entry.response,
+      hasDeliverables: turnsWithDeliverables?.has(turn) ?? false,
+      // Present in the node store = loaded, whatever the windowed navigation list says.
+      anchor: renderedKey === undefined ? { kind: 'unloaded', seq: entry.seq } : { kind: 'loaded', key: renderedKey },
+    });
   }
 
-  // 2. Overlay loaded items (taking loaded anchor, preferring freshest previews)
+  // 2. Overlay loaded items (taking loaded anchor, preferring freshest previews). A loaded turn that
+  // was absent from the outline is appended; only then can the order need a sort.
   if (Array.isArray(loaded)) {
     for (const item of loaded) {
       if (typeof item.turn !== 'number') continue;
@@ -76,9 +119,14 @@ export function mergeTimelineItems(
         hasDeliverables,
         anchor: { kind: 'loaded', key: item.anchorKey },
       });
+      if (preview === undefined) {
+        if (order.length > 0 && item.turn < order[order.length - 1]!) sorted = false;
+        order.push(item.turn);
+      }
     }
   }
 
   if (byTurn.size === 0) return [];
-  return [...byTurn.values()].sort((a, b) => a.turn - b.turn);
+  if (!sorted) order.sort((a, b) => a - b);
+  return order.map(turn => byTurn.get(turn)!);
 }

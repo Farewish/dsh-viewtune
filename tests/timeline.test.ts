@@ -81,3 +81,15 @@ test('a turn present in the node store is loaded even when the windowed navigati
   assert.equal(withStore[2]!.anchor.kind, 'loaded', 'the STORE is what proves turn 3 is loaded');
   assert.equal(withStore[2]!.anchor.kind === 'loaded' && withStore[2]!.anchor.key, 'store-3', 'and it carries the store key');
 });
+
+test('out-of-order outline and navigation entries still merge in ascending turn order', () => {
+  const outline = [
+    { turn: 2, seq: 20, prompt: 'two', response: '' },
+    { turn: 1, seq: 10, prompt: 'one', response: '' },
+  ];
+  const loaded = [
+    { turn: 3, anchorKey: 'nav-3', prompt: 'three', response: '' },
+    { turn: 1, anchorKey: 'nav-1', prompt: 'one', response: '' },
+  ];
+  assert.deepEqual(mergeTimelineItems(loaded, outline).map(item => item.turn), [1, 2, 3]);
+});
