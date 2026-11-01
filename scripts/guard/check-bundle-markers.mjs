@@ -737,7 +737,10 @@ const markers = [
     && (bundle.match(/commitFoldDraft\(\)/g) ?? []).length === 1],
   ['…and a new turn clearing the stored choices, so the earlier ones fold by themselves', () => {
     const gated = (bundle.match(/autoCollapseEarlier && liveTurn !== null/g) ?? []).length;
-    return gated === 2 && bundle.includes('clearExpanded');
+    return gated === 1
+      && bundle.includes('autoCollapsedTurn.current = liveTurn')
+      && bundle.includes('autoCollapseEarlier && previous !== null && previous !== liveTurn')
+      && bundle.includes('clearExpanded');
   }],
   // The follow mode, gated in BOTH places the follower can move the tail: the frame loop and the resize observer. One
   // gate would leave the other path gliding, which is exactly the kind of half-fix this switch cannot afford — the

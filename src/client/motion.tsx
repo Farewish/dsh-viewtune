@@ -428,20 +428,46 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     let lastSeenTop = 0;
     /** The last position seen while suspended, so a scroll that did not move BACKWARDS can be told from a takeover. */
     let lastSuspendedTop = 0;
+    const readingAnchor = (): { turn: number; offset: number } | undefined => {
+      const viewTop = scroll.getBoundingClientRect().top;
+      for (const row of scroll.querySelectorAll<HTMLElement>('[data-reader-turn]')) {
+        const turn = Number(row.dataset.readerTurn);
+        const rect = row.getBoundingClientRect();
+        if (Number.isSafeInteger(turn) && rect.bottom > viewTop + ANCHOR_LINE_OFFSET_PX) {
+          return { turn, offset: rect.top - viewTop };
+        }
+      }
+      return undefined;
+    };
     const remembered = recallReadingScroll(memoryKey);
     if (remembered !== undefined && !remembered.following) {
       // Restore before the first paint and before the tail write at the end of this effect. The
-      // one-frame retry covers content that is still laying out in the mount commit; a reader
-      // gesture cancels it in the handlers below.
+      // bounded retry lets late layout (a fold, content-visibility, a still-arriving page) settle
+      // without the reader losing a gesture; an explicit gesture cancels it in the handlers below.
       following.current = false;
       touched.current = true;
       setDetached(true);
       scroll.scrollTop = remembered.top;
       lastSeenTop = scroll.scrollTop;
-      restoreFrame = requestAnimationFrame(() => {
-        restoreFrame = 0;
-        if (!following.current) scroll.scrollTop = remembered.top;
-      });
+      const restore = (attempt = 0): void => {
+        if (following.current) { restoreFrame = 0; return; }
+        const anchor = remembered.anchor;
+        const row = anchor === undefined
+          ? undefined
+          : [...scroll.querySelectorAll<HTMLElement>('[data-reader-turn]')]
+            .find(candidate => Number(candidate.dataset.readerTurn) === anchor.turn);
+        if (anchor !== undefined && row !== undefined) {
+          const delta = row.getBoundingClientRect().top - scroll.getBoundingClientRect().top - anchor.offset;
+          scroll.scrollTop += delta;
+          if (Math.abs(delta) <= 1 && attempt >= 2) { restoreFrame = 0; return; }
+        } else if (anchor === undefined) {
+          // No anchor to converge on: the absolute position is all this session left.
+          scroll.scrollTop = remembered.top;
+        }
+        if (attempt >= 8) { restoreFrame = 0; return; }
+        restoreFrame = requestAnimationFrame(() => { restore(attempt + 1); });
+      };
+      restore();
     }
     cancelFollow.current = () => {
       cancelAnimationFrame(followFrame);
@@ -660,7 +686,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     scroll.addEventListener('keydown', onKey);
     const unsubscribeScroll = subscribeScroll(scroll, onScroll);
     return () => {
-      rememberReadingScroll(memoryKey, scroll.scrollTop, following.current);
+      rememberReadingScroll(memoryKey, scroll.scrollTop, following.current, readingAnchor());
       cancelRestore();
       cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect(); structure.disconnect();
       unsubscribeScroll(); scroll.removeEventListener('wheel', onWheel);

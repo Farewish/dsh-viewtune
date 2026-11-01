@@ -51,7 +51,7 @@ import { changedSettingsKeys, createSettingsWriter, hostRecordOf, loadHostSettin
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
-import { landTurn, scrollerOf } from './conversation-scroll.js';
+import { flowTop, landTurn, scrollerOf, READING_LINE_OFFSET_PX } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
 import { insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
@@ -1863,6 +1863,12 @@ export function Reader(props: ReaderProps) {
     for (const turn of timeline.turns.values()) if (turn.status === 'open') open = turn.turn;
     return open;
   }, [timeline]);
+  /**
+   * The live turn this mount has already seen. Auto-collapse clears stored expansion choices when a
+   * NEW turn starts, never merely because the reader left this page and came back: doing that on
+   * mount folded the whole transcript once and moved the restored scroll position with it.
+   */
+  const autoCollapsedTurn = useRef<number | null>(null);
   // Whether any turn is still RUNNING. It gates the tail-follow (see `useReadingScroll`): with nothing arriving,
   // following the bottom is not keeping up with anything, it is only fighting the reader's own scrolling.
   const live = liveTurn !== null;
@@ -1974,7 +1980,10 @@ export function Reader(props: ReaderProps) {
   // running turn then falls back to its own default (open) and every other turn to `foldEarlier`'s (folded), while a
   // click on a disclosure still works — a choice always wins over a default, which is what keeps that control alive.
   useEffect(() => {
-    if (autoCollapseEarlier && liveTurn !== null) props.actions.clearExpanded();
+    if (liveTurn === null) { autoCollapsedTurn.current = null; return; }
+    const previous = autoCollapsedTurn.current;
+    autoCollapsedTurn.current = liveTurn;
+    if (autoCollapseEarlier && previous !== null && previous !== liveTurn) props.actions.clearExpanded();
   }, [autoCollapseEarlier, liveTurn, props.actions]);
   const openTurnKeys = useMemo(() => {
     const open = new Set<string>();
@@ -2264,12 +2273,20 @@ export function Reader(props: ReaderProps) {
     if (last !== undefined && last.turn === turn) scroll.jump();
     else {
       scroll.release();
-      landTurn(targetRow, scrollerOf(el));
-      // The turns carry `content-visibility: auto`, so an off-screen one reports its PLACEHOLDER box and this first landing
-      // can be off by the difference between the estimate and the real height. One frame later the target is near the
-      // viewport and the browser has laid it out for real, so a second landing is exact. Two passes rather than a loop:
-      // the second read is of a real box, so there is nothing left to converge on.
-      requestAnimationFrame(() => { if (targetRow.isConnected) landTurn(targetRow, scrollerOf(el)); });
+      const scroller = scrollerOf(el);
+      // The turns carry `content-visibility: auto`, so an off-screen one reports its PLACEHOLDER box and the first
+      // landing can be off by the difference between the estimate and the real height. A single second pass was not
+      // enough when a fold or a layout change also landed in the same commit: keep re-landing until the row is on the
+      // reading line, or until the bounded retries run out. Each pass reads a real box, so this converges rather than
+      // oscillating.
+      const settle = (attempt = 0): void => {
+        if (!targetRow.isConnected) return;
+        landTurn(targetRow, scroller);
+        const remaining = flowTop(targetRow, scroller) - READING_LINE_OFFSET_PX;
+        if (Math.abs(remaining) <= 1 || attempt >= 8) return;
+        requestAnimationFrame(() => { settle(attempt + 1); });
+      };
+      settle();
     }
     setActiveTurn(turn);
     return true;

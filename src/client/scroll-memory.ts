@@ -10,14 +10,21 @@ export interface SavedReadingScroll {
   readonly top: number;
   /** Whether the reader was still following the live tail. */
   readonly following: boolean;
+  /** The turn on the reading line and its offset from the scrollport top, when a row existed. */
+  readonly anchor?: { readonly turn: number; readonly offset: number };
 }
 
 const saved = new Map<string, SavedReadingScroll>();
 
 /** Remember one reader's position; an empty key opts out. */
-export function rememberReadingScroll(key: string, top: number, following: boolean): void {
+export function rememberReadingScroll(
+  key: string,
+  top: number,
+  following: boolean,
+  anchor?: { turn: number; offset: number },
+): void {
   if (key === '') return;
-  saved.set(key, { top: Math.max(0, top), following });
+  saved.set(key, { top: Math.max(0, top), following, ...(anchor === undefined ? {} : { anchor }) });
 }
 
 /** The last remembered position for a session, if any. */

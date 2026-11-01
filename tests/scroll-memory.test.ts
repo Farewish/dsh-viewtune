@@ -9,6 +9,8 @@ test('reading scroll is remembered per key and the latest position wins', () => 
   rememberReadingScroll('session-b', 40, false);
   assert.deepEqual(recallReadingScroll('session-a'), { top: 240, following: true });
   assert.deepEqual(recallReadingScroll('session-b'), { top: 40, following: false });
+  rememberReadingScroll('session-c', 50, false, { turn: 4, offset: -10 });
+  assert.deepEqual(recallReadingScroll('session-c'), { top: 50, following: false, anchor: { turn: 4, offset: -10 } });
   rememberReadingScroll('', 999, false);
   assert.equal(recallReadingScroll(''), undefined);
 });
