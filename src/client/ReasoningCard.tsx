@@ -790,8 +790,16 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     // own end point — or, after a clamp, run backwards.
     const from = lastHeight.current > 0 ? lastHeight.current : port.clientHeight;
     resize.current?.cancel(); resize.current = null;
+    // The stylesheet animates `max-height` too. At this point the toggle has already changed the
+    // ceiling, but a running max-height transition can still hold the box at its OLD value (24px
+    // for a folded card), so `clientHeight` would report the folded height as the target — and the
+    // effect would conclude there is nothing to animate. Disable transitions for the measurement
+    // only; the ceiling snaps to its final value, and the restored transition has nothing to run.
+    const previousTransition = port.style.transition;
+    port.style.transition = 'none';
     port.style.maxHeight = ''; port.style.height = '';
     const target = port.clientHeight;
+    port.style.transition = previousTransition;
     if (!changed || !motion || from < 1 || Math.abs(target - from) < 1) {
       lastHeight.current = target;
       return;
