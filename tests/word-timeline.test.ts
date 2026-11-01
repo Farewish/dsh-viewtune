@@ -101,6 +101,19 @@ test('a long stream keeps the per-frame word list independent of how much has ar
   assert.ok(short > 1, 'and the newest words do still get their own identities');
 });
 
+test('settled births are compacted instead of retained for the whole stream', () => {
+  const timeline = new WordTimeline();
+  timeline.begin('', true, 0, 0);
+  let text = '';
+  for (let index = 0; index < 1500; index++) {
+    text += `word${String(index)} `;
+    timeline.begin(text, true, 0, index * 20);
+  }
+  const births = (timeline as unknown as { births: readonly unknown[] }).births.length;
+  // The live window is ~30 words at this cadence; the 64-entry compaction threshold is the ceiling.
+  assert.ok(births < 200, `the birth table retained ${String(births)} settled entries`);
+});
+
 test('stop, motion-off and authoritative replacement cancel old births', () => {
   const timeline = new WordTimeline();
   timeline.begin('', true, 0, 0);

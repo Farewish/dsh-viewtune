@@ -100,6 +100,13 @@ export class WordTimeline {
         this.floor = Math.max(this.floor, entry.end);
         this.settled += 1;
       }
+      // The settled prefix is dead weight: `bornAt` never reads below `floor`, so it can be dropped.
+      // Compact in batches rather than on every `begin` (splice is O(n)); this caps the table at the
+      // live reveal window plus at most 63 already-settled entries.
+      if (this.settled >= 64) {
+        this.births.splice(0, this.settled);
+        this.settled = 0;
+      }
     }
     this.source = source;
     this.enabled = enabled;
