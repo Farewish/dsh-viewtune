@@ -386,6 +386,11 @@
    while flex-start keeps it there throughout the animation. */
 .reasonCard[data-folded] { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; padding: 10px 10px 2px 16px; }
 .reasonCard[data-folded] .reasonHeading { flex: none; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
+/* The heading's asymmetric padding keeps it at the row's visual centre (top 11 of 42). The other
+   two children are centred in the CONTENT box, which that padding has shifted down by 4px: drop
+   them by half the padding difference so the one-line row reads centred as a whole. */
+.reasonCard[data-folded] .reasonViewport,
+.reasonCard[data-folded] .reasonFooter { align-self: center; position: relative; top: -4px; }
 /* One line EXACTLY: `.reasonText` has `line-height: 24px`, so a shorter ceiling cuts into the glyphs (the reader saw the
    bottom half of the line clipped) and the fade ramp the scroller wears would land on top of it (they saw the lower half
    blurred by a gradient). The mask is cleared here explicitly: it outspecifics `[data-edges=…]`, and
