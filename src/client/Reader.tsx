@@ -125,11 +125,9 @@ const JsonRecord = memo(function JsonRecord({ label, payload }: { label: string;
   return <div className={css.jsonCard}><JsonBlock label={label} payload={payload} truncatedLabel={truncatedJsonLabel} /></div>;
 });
 
-const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motion, onRead, returnFocusTo }: Pick<ReaderProps, 'useChat' | 't'> & {
-  nodeKey: string; open: boolean; motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
+const ProcessNodeContent = memo(function ProcessNodeContent({ t, node, nodeKey, open, motion, onRead, returnFocusTo }: Pick<ReaderProps, 't'> & {
+  node: ChatConversationViewNode; nodeKey: string; open: boolean; motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
 }) {
-  const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
-  if (!node || node.visibility === 'hidden') return null;
   let content: ReactNode = null;
   if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
   else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={`${css.toolRaw} ${css.systemPrompt}`}>{node.data.text}</pre></details>;
@@ -139,7 +137,8 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, segments = 'both', ...render }: SeatProps & {
+const AssistantNodeContent = memo(function AssistantNodeContent({ node, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, segments = 'both', ...render }: Omit<SeatProps, 'useChat'> & {
+  node: ChatConversationViewNode;
   /**
    * Which of the step's parts to render (the host's `groupPart`). A step commonly carries its thinking AND the narration that follows it in the same
    * node; the host renders those as two entries — the thinking INSIDE the run, the narration OUTSIDE it — and 「按旁白分段」 splits the same way, so
@@ -156,8 +155,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
    * cannot work it out on its own (its own `following` tracks its inner scroller). */
   pageAtTail: boolean;
 }) {
-  const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
-  if (!node || node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
+  if (node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
   const data = node.data;
   const parts = assistantSegments(data.blocks);
   const earlier = isEarlierNarration(data, boundary);
@@ -321,9 +319,8 @@ const TurnTriggerNode = memo(function TurnTriggerNode({ data }: { data: { source
   </section>;
 });
 
-const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
-  const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
-  if (!node || node.visibility === 'hidden') return null;
+const MainNodeContent = memo(function MainNodeContent({ node, nodeKey, boundary, pinned, processOpen = false, ...render }: Omit<SeatProps, 'useChat'> & { node: ChatConversationViewNode }) {
+  if (node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) {
     const blocks = contentBlocks(node.data.content);
     // THE FILES take the host's own layout — one `attachmentRow` of 240px `fileCard`s, copied from its shipped stylesheet — while the
@@ -415,28 +412,41 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   </div>;
 });
 
-type NodeSeatProps = ComponentProps<typeof AssistantNode> & ComponentProps<typeof ProcessNode>;
+type NodeSeatProps = Pick<ReaderProps, 'useChat'>
+  & Omit<ComponentProps<typeof AssistantNodeContent>, 'node'>
+  & Omit<ComponentProps<typeof ProcessNodeContent>, 'node'>
+  & Omit<ComponentProps<typeof MainNodeContent>, 'node'>;
 
-/** Process nodes that also have a summary/notice body in `MainNode` (the two used to render together). */
+/** The leading user/steering rows still mount a node by key outside `NodeSeat`. */
+const MainNode = memo(function MainNode(props: SeatProps) {
+  const { useChat, ...render } = props;
+  const node = useChat(snapshot => snapshot.nodes.get(props.nodeKey));
+  if (!node || node.visibility === 'hidden') return null;
+  return <MainNodeContent {...render} node={node} />;
+});
+
+/** Process nodes that also have a summary/notice body in `MainNodeContent` (the two used to render together). */
 const PROCESS_WITH_MAIN = new Set(['command', 'model-retry', 'manual-compaction']);
-/** Process-only nodes: `MainNode` returns null for these. */
+/** Process-only nodes: `MainNodeContent` returns null for these. */
 const PROCESS_ONLY = new Set(['context', 'system-prompt', 'turn-process']);
 
 /**
  * One subscription per rendered row, then the one seat that kind needs.
  *
- * The previous shape mounted `ProcessNode`, `AssistantNode`, and `MainNode` together for every
- * node; two of the three then returned null after their own `useChat` selector had already
- * subscribed. This gate selects the seat from the same snapshot first, so a text delta wakes one
- * seat rather than three, and a hidden row mounts none.
+ * The previous shape mounted `ProcessNodeContent`, `AssistantNodeContent`, and `MainNodeContent`
+ * together for every node; two of the three then returned null after their own `useChat` selector
+ * had already subscribed. This gate selects the seat from the same snapshot first, so a text delta
+ * wakes one seat rather than three, and a hidden row mounts none. The selected content receives the
+ * node as a prop, so it does not subscribe a second time.
  */
 const NodeSeat = memo(function NodeSeat(props: NodeSeatProps) {
-  const node = props.useChat(snapshot => snapshot.nodes.get(props.nodeKey));
+  const { useChat, ...content } = props;
+  const node = useChat(snapshot => snapshot.nodes.get(props.nodeKey));
   if (!node || node.visibility === 'hidden') return null;
-  if (isNode(node, 'assistant-step')) return <AssistantNode {...props} />;
-  if (PROCESS_ONLY.has(node.kind)) return <ProcessNode {...props} />;
-  if (PROCESS_WITH_MAIN.has(node.kind)) return <Fragment><ProcessNode {...props} /><MainNode {...props} /></Fragment>;
-  return <MainNode {...props} />;
+  if (isNode(node, 'assistant-step')) return <AssistantNodeContent {...content} node={node} />;
+  if (PROCESS_ONLY.has(node.kind)) return <ProcessNodeContent {...content} node={node} />;
+  if (PROCESS_WITH_MAIN.has(node.kind)) return <Fragment><ProcessNodeContent {...content} node={node} /><MainNodeContent {...content} node={node} /></Fragment>;
+  return <MainNodeContent {...content} node={node} />;
 });
 
 function GroupStatus({ group, sessionId, useChat, useSession, useSessionStatus, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSession' | 'useSessionStatus'> & { group: ReaderGroup; motion: boolean }) {

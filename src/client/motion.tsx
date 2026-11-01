@@ -11,6 +11,7 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
  */
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, scrollTakeover, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 import type { FollowMode } from './reading-scroll.js';
+import { readerResizeActive } from './resize-signal.js';
 export { ANCHOR_LINE_OFFSET_PX, FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
 export function useMotionAllowed(enabled: boolean): boolean {
@@ -463,7 +464,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
        * too, and the card clears it when the size settles), so the verdict waits. The positions are still recorded, so the next
        * real move is judged against where the layout actually is rather than against the clamp.
        */
-      if (content.querySelector('[data-reader-resizing]') !== null) {
+      if (readerResizeActive()) {
         lastSeenTop = scroll.scrollTop;
         lastSuspendedTop = scroll.scrollTop;
         return;
@@ -604,7 +605,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
         // was pushed off the top (it looked like it expanded upward) while one below stayed put — 「靠上就向上扩张，靠下就向下
         // 扩张，应该统一向下」. The card publishes `data-reader-resizing` for the length of its own resize, and the capture
         // below still runs, so the new layout becomes the baseline that later growth is measured against.
-        const resizing = content.querySelector('[data-reader-resizing]') !== null;
+        const resizing = readerResizeActive();
         /**
          * …AND ONLY FOR GROWTH. A negative delta is content ABOVE the anchor getting shorter, and compensating THAT pulled the
          * page up under the reader — measured in their own log with this library armed:

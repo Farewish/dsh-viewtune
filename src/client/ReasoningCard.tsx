@@ -4,6 +4,7 @@ import { REASON_HOLD, REASON_LATEST_STEP, REASON_STEP, reasoningTarget, stepLine
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { focusedHeight } from './focus-expand.js';
 import { isNearTail } from './reading-scroll.js';
+import { beginReaderResize } from './resize-signal.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -78,6 +79,8 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const [edges, setEdges] = useState('none');
   const lastHeight = useRef(0);
   const resize = useRef<Animation | null>(null);
+  /** The release for the deadline-based resize marker (the motion-on path owns its own local release). */
+  const resizeEnd = useRef<(() => void) | null>(null);
   /** Every delayed write this card owns, cleared on unmount instead of reaching back into a detached node. */
   const timers = useRef(new Set<number>());
   const later = useCallback((run: () => void, delay: number) => {
@@ -799,6 +802,9 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * Reported as 「自动跟随会在思考卡片变成一行的时候跟丢」 with 焦点思考 off, where this fold is the only size change there is.
      */
     cardRoot()?.setAttribute('data-reader-resizing', '');
+    const endResize = beginReaderResize();
+    let ended = false;
+    const end = () => { if (!ended) { ended = true; endResize(); } };
     const animation = port.animate([{ height: `${from}px` }, { height: `${target}px` }], { duration: 300, easing: EASING, fill: 'both' });
     resize.current = animation;
     // `fill: 'both'` holds the height this animation started from, and the `max-height: none`
@@ -817,18 +823,21 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // …and the reader-initiated resize is over: the page may compensate growth again. See `toggleReading` for why this
       // marker exists at all; the deadline in that handler is the backstop for the 动效-off path, where no animation runs.
       cardRoot()?.removeAttribute('data-reader-resizing');
+      end();
       // …and if this resize was the reader OPENING the card, this is the moment its new height is real, so the bottom can be
       // lined up with the composer. See `alignCardBottom`.
       if (pendingAlign.current) { pendingAlign.current = false; alignCardBottom(); }
     };
     animation.onfinish = settle;
     const deadline = window.setTimeout(settle, 300 + 240);
-    return () => { window.clearTimeout(deadline); };
+    return () => { window.clearTimeout(deadline); end(); };
   }, [expanded, folded, motion, selected]);
   useEffect(() => () => { window.cancelAnimationFrame(alignFrame.current); resize.current?.cancel(); }, []);
   useEffect(() => () => {
     for (const id of timers.current) window.clearTimeout(id);
     timers.current.clear();
+    resizeEnd.current?.();
+    resizeEnd.current = null;
   }, []);
 
   /**
@@ -909,8 +918,15 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      */
     const root = cardRoot();
     if (root !== null) {
+      resizeEnd.current?.();
+      const endResize = beginReaderResize();
+      resizeEnd.current = endResize;
       root.setAttribute('data-reader-resizing', '');
-      later(() => { if (root.isConnected) root.removeAttribute('data-reader-resizing'); }, 600);
+      later(() => {
+        if (root.isConnected) root.removeAttribute('data-reader-resizing');
+        endResize();
+        if (resizeEnd.current === endResize) resizeEnd.current = null;
+      }, 600);
     }
     setExpanded(value => !value);
     /**
