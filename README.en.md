@@ -34,6 +34,8 @@ working — this plugin adds its own parts and does not replace the host.
 
 ## Install
 
+> **Platform version: this build targets DSH `0.2.1-rc.5`.** The client half is a precompiled bundle whose platform export names are fixed at build time, so this artifact serves rc.5 only and is not guaranteed to load on older DSH releases.
+
 Build in the plugin directory first (dependencies are managed by the host with **pnpm**):
 
 ```bash
