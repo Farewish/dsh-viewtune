@@ -386,6 +386,8 @@
    while flex-start keeps it there throughout the animation. */
 .reasonCard[data-folded] { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; padding: 10px 10px 2px 16px; }
 .reasonCard[data-folded] .reasonHeading { flex: none; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
+/* A one-line card with no footer is 4px shorter; its heading needs the other 2px of the centre. */
+.reasonCard[data-folded]:not(:has([data-ud-check="reasoning-controls"])) .reasonHeading { position: relative; top: -2px; }
 /* The heading's asymmetric padding keeps it at the row's visual centre (top 11 of 42). The other
    two children are centred in the CONTENT box, which that padding has shifted down by 4px: drop
    them by half the padding difference so the one-line row reads centred as a whole. */

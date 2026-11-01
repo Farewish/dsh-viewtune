@@ -78,6 +78,8 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const [expanded, setExpanded] = useState(false);
   const [following, setFollowing] = useState(true);
   const [overflow, setOverflow] = useState(false);
+  /** Whether the one-line fold shows the whole thinking text (and therefore needs no expand control). */
+  const [foldedFits, setFoldedFits] = useState(false);
   const [edges, setEdges] = useState('none');
   const lastHeight = useRef(0);
   const resize = useRef<Animation | null>(null);
@@ -116,6 +118,8 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * remount starts folded again.
    */
   const folded = fold && !expanded && !focused && !active;
+  /** A one-line card whose text already fits has nothing to expand, so it carries no controls at all. */
+  const showControls = overflow || expanded || (folded && !foldedFits);
   /**
    * The card's SIZE state, as the two things that change its viewport's height: the reader having opened it, and the fold to
    * one line. Both must animate, and the fold did not: this ref used to hold `expanded` alone, so a card that folded when the
@@ -566,6 +570,12 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       // Note the card's OWN growth (see ownGrowthAt): the height is already in hand, so this costs nothing.
       const ownHeight = text.offsetHeight;
       if (ownHeight !== lastOwnHeight.current) { lastOwnHeight.current = ownHeight; ownGrowthAt.current = performance.now(); }
+      if (folded) {
+        // The folded leaf is `nowrap` + `overflow:hidden`, so its scrollWidth is the full text width.
+        // If it is no wider than the viewport, the one line already shows everything.
+        const fits = text.scrollWidth <= port.clientWidth + 1;
+        setFoldedFits(current => current === fits ? current : fits);
+      }
       /**
        * 「焦点思考展开」 asks the stylesheet for a taller ceiling, in whole lines, while this card holds the focus.
        *
@@ -1035,7 +1045,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         <div ref={content} className={css.reasonText} data-reader-reasoning-text>{children}</div>
       </div>
     </div>
-    {(overflow || expanded || folded) && <div className={css.reasonFooter} data-ud-check="reasoning-controls">
+    {showControls && <div className={css.reasonFooter} data-ud-check="reasoning-controls">
       {/* The control belongs to the FOLLOWING, not to the animation: pausing is just as meaningful when the card jumps to
           the newest line directly, which is what 动效 off does. Gating it on `motion` hid the button from exactly the
           readers who had turned animation off — the other half of the bug above. */}
