@@ -51,7 +51,7 @@ import { changedSettingsKeys, createSettingsWriter, hostRecordOf, loadHostSettin
 import { WaitClock } from './WaitClock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { DEFAULT_SHORTCUTS, matchesShortcut, shortcutLabel } from './shortcuts.js';
-import { flowTop, landTurn, scrollerOf, READING_LINE_OFFSET_PX } from './conversation-scroll.js';
+import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, firstRowWhere, followModeOf } from './reading-scroll.js';
 import { insideWindow, olderHistoryState, renderedTurnsOf, revealForTurn, revealStepOf, turnFoldOf } from './turn-fold.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
@@ -2287,8 +2287,10 @@ export function Reader(props: ReaderProps) {
       const settle = (attempt = 0): void => {
         if (!targetRow.isConnected) return;
         landTurn(targetRow, scroller);
-        const remaining = flowTop(targetRow, scroller) - READING_LINE_OFFSET_PX;
-        if (Math.abs(remaining) <= 1 || attempt >= 8) return;
+        // Keep the landing alive for a short, bounded window. `content-visibility` can swap a
+        // placeholder for the real row AFTER the first read, and a fold can change the rows above
+        // in the same commit; writing the same scrollTop is free, so do not stop at the first match.
+        if (attempt >= 16 || !targetRow.isConnected) return;
         requestAnimationFrame(() => { settle(attempt + 1); });
       };
       settle();

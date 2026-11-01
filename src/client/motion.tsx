@@ -395,6 +395,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
   const endedAt = useRef(0);
   const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
   const cancelFollow = useRef<() => void>(() => {});
+  const jumpFrame = useRef(0);
   const [detached, setDetached] = useState(false);
   useLayoutEffect(() => {
     liveRef.current = live;
@@ -545,6 +546,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     };
     const onWheel = (event: WheelEvent) => {
       cancelRestore();
+      cancelAnimationFrame(jumpFrame.current); jumpFrame.current = 0;
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
       // Any wheel takes over, not only an upward one — see wheelClaimsScroll for why that
       // distinction is the difference between gliding and stepping on a long transcript — except
@@ -555,12 +557,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     };
     const onTouch = () => {
       cancelRestore();
+      cancelAnimationFrame(jumpFrame.current); jumpFrame.current = 0;
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLElement && event.target.closest('textarea,input,[contenteditable=true]')) return;
       if (['PageUp', 'Home', 'ArrowUp'].includes(event.key)) {
         cancelRestore();
+        cancelAnimationFrame(jumpFrame.current); jumpFrame.current = 0;
         cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
         touched.current = true; following.current = false; setDetached(true); capture();
       }
@@ -688,6 +692,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     return () => {
       rememberReadingScroll(memoryKey, scroll.scrollTop, following.current, readingAnchor());
       cancelRestore();
+      cancelAnimationFrame(jumpFrame.current); jumpFrame.current = 0;
       cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect(); structure.disconnect();
       unsubscribeScroll(); scroll.removeEventListener('wheel', onWheel);
       scroll.removeEventListener('touchstart', onTouch); scroll.removeEventListener('touchmove', onTouch);
@@ -696,15 +701,26 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
   }, [root, motion, followMode, memoryKey]);
   const jump = useCallback(() => {
     cancelFollow.current();
+    cancelAnimationFrame(jumpFrame.current);
     anchor.current = null;
     following.current = true;
+    // A deliberate return to the tail re-arms the follower's mount grace: content still laying out
+    // after this write (content-visibility, a folded row) must still be followed down.
+    touched.current = false;
     setDetached(false);
-    if (port.current) {
-      port.current.scrollTop = port.current.scrollHeight;
-    }
+    let attempts = 0;
+    const settle = (): void => {
+      const scroll = port.current;
+      if (scroll === null || !following.current) { jumpFrame.current = 0; return; }
+      scroll.scrollTop = scroll.scrollHeight;
+      if (attempts++ < 12) jumpFrame.current = requestAnimationFrame(settle);
+      else jumpFrame.current = 0;
+    };
+    settle();
   }, []);
   const release = useCallback(() => {
     cancelFollow.current();
+    cancelAnimationFrame(jumpFrame.current); jumpFrame.current = 0;
     following.current = false;
     anchor.current = null;
     // …and this ends the MOUNT grace too (`touched`). A release is a deliberate decision to leave the tail — the rail
