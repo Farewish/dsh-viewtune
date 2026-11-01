@@ -27,7 +27,7 @@ import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
 import { subscribeScroll } from './scroll-bus.js';
-import { StreamMotionContext } from './streaming.js';
+import { recallFoldState, rememberFoldState } from './fold-memory.js';import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, isProcessStepOf, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
 import { entryViewOf } from './entry-policy.js';
@@ -1898,17 +1898,22 @@ export function Reader(props: ReaderProps) {
   const reviewInSidebar = props.useStore(state => state.reviewInSidebar) === true;
   const foldBeforeRef = useRef(foldBefore);
   foldBeforeRef.current = foldBefore;
-  const [foldWindow, setFoldWindow] = useState(foldBefore);
-  const [revealed, setRevealed] = useState(0);
-  const committedTurn = useRef<number | null>(null);
+  const savedFold = useMemo(() => recallFoldState(props.sessionId), [props.sessionId]);
+  const [foldWindow, setFoldWindow] = useState(savedFold?.foldWindow ?? foldBefore);
+  const [revealed, setRevealed] = useState(savedFold?.revealed ?? 0);
+  const committedTurn = useRef<number | null>(savedFold?.liveTurn ?? null);
   useEffect(() => {
     // Once per new turn: a turn ENDING must not yank away turns the reader just revealed, and a setting edit must not
-    // apply until the next one starts. The ref carries the latest setting without making it a dependency.
+    // apply until the next one starts. The ref carries the latest setting without making it a dependency. On a remount
+    // the committed turn comes from the per-session memory, so coming back from another page does not look like one.
     if (liveTurn === null || committedTurn.current === liveTurn) return;
     committedTurn.current = liveTurn;
     setFoldWindow(foldBeforeRef.current);
     setRevealed(0);
   }, [liveTurn]);
+  useEffect(() => {
+    rememberFoldState(props.sessionId, { liveTurn, foldWindow, revealed });
+  }, [props.sessionId, liveTurn, foldWindow, revealed]);
   const renderedTurns = renderedTurnsOf(foldWindow, revealed);
   /**
    * The turn groups the window leaves out, by key.
