@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { classSel, hasDecls, keyframeOf, moduleCssLiteral, pillBoundaryClass, ruleDecls } from './bundle-anchors.mjs';
+import { classSel, hasDecls, keyframeOf, moduleCssLiteral, moduleCssLiterals, pillBoundaryClass, ruleDecls } from './bundle-anchors.mjs';
 import { fileURLToPath } from 'node:url';
 
 /** The checkout this guard lives in (see the note in run.mjs). */
@@ -510,7 +510,8 @@ const markers = [
       const match = /z-index:(\d+)/.exec(css.slice(at, css.indexOf('}', at)));
       return match === null ? Number.NaN : Number(match[1]);
     };
-    const railCss = moduleCssLiteral(bundle, 'TimelineRail.module.css');
+    const railCss = moduleCssLiterals(bundle, 'TimelineRail.module.css').find(css => css.includes('_slot'))
+      ?? moduleCssLiteral(bundle, 'TimelineRail.module.css');
     const toolbar = zIndexOf(readerCss, classSel(readerCss, 'toolbar'));
     const rail = zIndexOf(railCss, classSel(railCss, 'slot'));
     return Number.isFinite(toolbar) && Number.isFinite(rail) && toolbar > rail;

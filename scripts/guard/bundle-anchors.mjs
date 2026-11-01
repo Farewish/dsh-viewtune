@@ -73,7 +73,7 @@ export function keyframeOf(css, local) {
  * @param moduleFile - the stylesheet's file name, e.g. `Reader.module.css`.
  * @returns the CSS text.
  */
-export function moduleCssLiteral(text, moduleFile) {
+export function moduleCssLiterals(text, moduleFile) {
   const owners = [...text.matchAll(/const tagId(\$\d+)? = "([^"]+)"/g)];
   const literals = [];
   for (const owner of owners) {
@@ -81,6 +81,11 @@ export function moduleCssLiteral(text, moduleFile) {
     literals.push(cssLiteralFor(text, owner[1] ?? ''));
   }
   if (literals.length === 0) throw new Error(`no stylesheet named ${moduleFile} in the bundle`);
+  return literals;
+}
+
+export function moduleCssLiteral(text, moduleFile) {
+  const literals = moduleCssLiterals(text, moduleFile);
   // A bundle can carry more than one literal for the same module (one per chunk entry). The full
   // stylesheet is the longest; the short duplicate is an emission artefact and lacks classes.
   return literals.reduce((longest, css) => css.length > longest.length ? css : longest);
