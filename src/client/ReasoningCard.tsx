@@ -6,6 +6,7 @@ import { focusedHeight } from './focus-expand.js';
 import { isNearTail } from './reading-scroll.js';
 import { beginReaderResize } from './resize-signal.js';
 import { subscribeScroll } from './scroll-bus.js';
+import { IconThinkOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -1021,8 +1022,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
 
   return <div className={css.reasonCard} data-reader-reasoning-card data-reader-anchor data-expanded={expanded} data-focus={focused} data-following={allowed} data-overflow={overflow} data-folded={folded ? '' : undefined} data-ud-motion="reader-reasoning-size">
     <div className={css.reasonHeading} data-reader-reasoning-heading data-ud-check="reasoning-identity">
-      {folded && <svg className={css.reasonFoldIcon} width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"><path d="M8 2.5a4 4 0 0 0-2.3 7.3v1.7h4.6v-1.7A4 4 0 0 0 8 2.5Z" /><path d="M6.4 13.5h3.2" /></svg>}
-      <span className={css.reasonLabel} data-reader-reasoning-label>思考</span>
+      <span className={css.reasonIdentity}>
+        <span className={css.reasonIcon} aria-hidden="true"><IconThinkOutlineRegular size={14} /></span>
+        <span className={css.reasonLabel} data-reader-reasoning-label>思考</span>
+      </span>
       {!folded && <span>步骤 {step}</span>}
     </div>
     <div ref={viewport} id={controls} className={css.reasonViewport} data-reader-reasoning-scroll data-edges={edges}
