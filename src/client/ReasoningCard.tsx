@@ -571,9 +571,11 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       const ownHeight = text.offsetHeight;
       if (ownHeight !== lastOwnHeight.current) { lastOwnHeight.current = ownHeight; ownGrowthAt.current = performance.now(); }
       if (folded) {
-        // The folded leaf is `nowrap` + `overflow:hidden`, so its scrollWidth is the full text width.
-        // If it is no wider than the viewport, the one line already shows everything.
-        const fits = text.scrollWidth <= port.clientWidth + 1;
+        // The folded viewport clips vertically; a block-level Markdown leaf keeps its scrollWidth at
+        // the container width even when its text wraps, so width alone lied and hid the toggle on
+        // clipped cards. One line fits only when the laid-out text is no taller than the viewport
+        // and no wider than it either (an unbreakable URL can overflow horizontally).
+        const fits = text.scrollHeight <= port.clientHeight + 1 && text.scrollWidth <= port.clientWidth + 1;
         setFoldedFits(current => current === fits ? current : fits);
       }
       /**
