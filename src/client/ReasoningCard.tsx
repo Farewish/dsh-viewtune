@@ -623,10 +623,14 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       if (next !== lastEdges) { lastEdges = next; setEdges(next); }
       if (recordHeight && !resize.current) lastHeight.current = port.clientHeight;
     };
-    // A folded, inactive, or manual-mode card is not driven by the follower. It still needs ONE
-    // measurement so its overflow/edge attributes are truthful, but none of the document-level
-    // selection/visibility listeners, scroll/wheel handlers, or ResizeObservers below.
-    if (!allowed) {
+    // A closed, inactive card is a static preview: one measurement keeps its overflow/edge
+    // attributes truthful, but the follower machinery below is not mounted. A FOLDED card and a
+    // reader-EXPANDED card are different: both still need this effect's height animation when the
+    // fold or the toggle changes their size, even though neither is "allowed" to follow. Gating the
+    // whole effect on `allowed` is what removed those open/close animations.
+    if (!allowed && !folded && !expanded) {
+      // `measure(false)`: recording `lastHeight` here would read the NEW size before the resize
+      // effect and erase the animation's start point.
       measure(false);
       return () => {
         stopFollow.current = () => {};
@@ -780,7 +784,11 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     const sizeState = `${String(expanded)}:${String(folded)}`;
     const changed = sizeState !== previousSize.current;
     previousSize.current = sizeState;
-    const from = resize.current ? port.clientHeight : lastHeight.current;
+    // The height BEFORE this render's size state. `lastHeight` is the settled height, updated by
+    // every completed animation and by the idle measurement; reading `port.clientHeight` here would
+    // read the NEW CSS ceiling (the toggle already committed), which made the animation start at its
+    // own end point — or, after a clamp, run backwards.
+    const from = lastHeight.current > 0 ? lastHeight.current : port.clientHeight;
     resize.current?.cancel(); resize.current = null;
     port.style.maxHeight = ''; port.style.height = '';
     const target = port.clientHeight;
@@ -888,16 +896,17 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     // Resize the same transcript without changing follow intent or position.
     // Wheel, selection and viewport focus still explicitly pause following.
     onRead();
-    // A card that is tall because of the FOCUS has nothing to toggle in `expanded`: the focus is what holds it open, so the
-    // press has to hand the focus back, or the button would do nothing at all. That is the reader's report — after taking a
-    // focused card over by reading inside it, the toggle never came back and there was no way to close the card.
-    if (focused && !expanded) {
+    // A card held open by the FOCUS has nothing to toggle in `expanded`: the focus is what makes it
+    // tall. Clear it first. When `expanded` is also true the press is a real close, so fall through
+    // and let the size effect animate to the preview; leaving the focus set here was the reverse
+    // animation — the CSS focus ceiling kept the card tall while the close ran.
+    if (focused) {
       // …and leave the tail on the reader's behalf FIRST: handing the focus back on its own ends the follow's suspension,
       // and the follower then snapped the page to the newest line — the reader's 「点击收起似乎会立刻跳转到最新」. Closing
       // the card is a decision to stop following, so it releases the page exactly as a rail jump does.
       onLeaveTail();
       onFocusChange(focusKey, false);
-      return;
+      if (!expanded) return;
     }
     /**
      * …and THIS resize is the reader's own doing, so the page must not drag itself to keep some other anchor still.
@@ -924,6 +933,10 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
         if (resizeEnd.current === endResize) resizeEnd.current = null;
       }, 600);
     }
+    // Freeze the current rendered height before the state change. The resize layout effect runs
+    // after React has applied the new ceiling, so without this snapshot a collapse can start at the
+    // PREVIEW height and animate the card open again.
+    if (viewport.current !== null) lastHeight.current = viewport.current.clientHeight;
     setExpanded(value => !value);
     /**
      * …and opening the card also lines its bottom up with the composer, once the new height is really in place: the size
