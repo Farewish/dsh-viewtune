@@ -397,7 +397,7 @@
    `[data-following=true][data-overflow=true]` cannot match a folded card because the follower is off for one. The reader
    later confirmed the ramp is not a permanent feature of the card at all — it appears while content loads — which is why
    this state is the one kept, with no `data-edges` override: the expanded card keeps reading the real edges. */
-.reasonCard[data-folded] .reasonViewport { flex: 1 1 auto; min-width: 0; height: 24px; max-height: 24px; overflow: hidden; mask-image: none; -webkit-mask-image: none; }
+.reasonCard[data-folded] .reasonViewport { flex: 1 1 auto; min-width: 0; height: 24px; max-height: 24px; overflow: hidden !important; mask-image: none; -webkit-mask-image: none; }
 .reasonCard[data-folded] .reasonText { padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reasonCard[data-folded] .reasonFooter { flex: none; padding: 0; margin: 0; }
 .reasonHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 16px 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }

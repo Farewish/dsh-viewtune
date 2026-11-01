@@ -636,12 +636,13 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
       if (next !== lastEdges) { lastEdges = next; setEdges(next); }
       if (recordHeight && !resize.current) lastHeight.current = port.clientHeight;
     };
-    // A closed, inactive card is a static preview: one measurement keeps its overflow/edge
-    // attributes truthful, but the follower machinery below is not mounted. A FOLDED card and a
-    // reader-EXPANDED card are different: both still need this effect's height animation when the
-    // fold or the toggle changes their size, even though neither is "allowed" to follow. Gating the
-    // whole effect on `allowed` is what removed those open/close animations.
-    if (!allowed && !folded && !expanded) {
+    // A card that is not allowed to follow has no follower machinery to keep: mounted scroll/wheel
+    // listeners, document selection/visibility listeners, and ResizeObservers were the residual cost
+    // of a one-line folded card. The height animation is a separate layout effect, so it still runs.
+    if (!allowed) {
+      // `manual()` may have written `overflow:auto` inline before the fold; leaving it there made a
+      // folded card scrollable under its 24px clip. CSS owns overflow in this state.
+      port.style.removeProperty('overflow');
       // `measure(false)`: recording `lastHeight` here would read the NEW size before the resize
       // effect and erase the animation's start point.
       measure(false);
