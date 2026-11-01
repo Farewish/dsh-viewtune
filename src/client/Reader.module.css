@@ -380,7 +380,7 @@
    own component state, never part of the record). */
 .reasonIcon { display: inline-flex; flex: none; align-self: center; align-items: center; color: var(--dsw-alias-label-secondary); }
 .reasonIdentity { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-.reasonCard[data-folded] { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; }
+.reasonCard[data-folded] { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; padding: 6px 10px 6px 16px; }
 .reasonCard[data-folded] .reasonHeading { flex: none; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
 /* One line EXACTLY: `.reasonText` has `line-height: 24px`, so a shorter ceiling cuts into the glyphs (the reader saw the
    bottom half of the line clipped) and the fade ramp the scroller wears would land on top of it (they saw the lower half
