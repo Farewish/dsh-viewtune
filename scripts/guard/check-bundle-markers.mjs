@@ -686,7 +686,7 @@ const markers = [
   ['…and a pin ends when the reader comes back to the bottom of the page', () =>
     bundle.includes('const returned = wasDetached.current && !scroll.detached;')
     && bundle.includes('if (!returned || pinnedCard === null) return;')],
-  ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live, followMode, focusedCard !== null)'],
+  ['…and the page stops following the tail while a card holds it, told apart from a reader takeover', 'useReadingScroll(root, motion, live, followMode, focusedCard !== null, props.sessionId)'],
   ['…because a suspension only yields to a scroll that moved BACKWARDS, which is what a reader taking over does', 'if (suspendedRef.current && scroll.scrollTop >= lastSuspendedTop) {'],
   ['…with the expansion ON unless a record says otherwise', 'focusExpand: true'],
   ['…and that record read the defensive way', 'state.focusExpand) !== false'],

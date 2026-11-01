@@ -2135,7 +2135,7 @@ export function Reader(props: ReaderProps) {
       observer?.disconnect();
     };
   }, [turnSignature, renderedTurns]);
-  const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null);
+  const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null, props.sessionId);
   /**
    * Whether there is anything below to return TO.
    *

@@ -13,6 +13,7 @@ import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, scrollTakeover, w
 import type { FollowMode } from './reading-scroll.js';
 import { readerResizeActive } from './resize-signal.js';
 import { subscribeScroll } from './scroll-bus.js';
+import { recallReadingScroll, rememberReadingScroll } from './scroll-memory.js';
 export { ANCHOR_LINE_OFFSET_PX, FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
 export function useMotionAllowed(enabled: boolean): boolean {
@@ -339,7 +340,7 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
  */
 const OUTPUT_TAIL_MS = 400;
 
-export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true, followMode: FollowMode = 'glide', suspended = false): {
+export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, live = true, followMode: FollowMode = 'glide', suspended = false, memoryKey = ''): {
   detached: boolean;
   jump: () => void;
   /** Stop tail-follow so a rail landing is not pulled back to the live bottom. */
@@ -420,12 +421,28 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     const scroll = content.closest<HTMLElement>('[data-conversation-scroll]') ?? content;
     port.current = scroll;
     let followFrame = 0;
+    let restoreFrame = 0;
     let lastFrameAt = 0;
     let lastWrittenTop: number | null = null;
     /** The last position this handler saw, so an upward move can be told from a layout change — see `scrollTakeover`. */
     let lastSeenTop = 0;
     /** The last position seen while suspended, so a scroll that did not move BACKWARDS can be told from a takeover. */
     let lastSuspendedTop = 0;
+    const remembered = recallReadingScroll(memoryKey);
+    if (remembered !== undefined && !remembered.following) {
+      // Restore before the first paint and before the tail write at the end of this effect. The
+      // one-frame retry covers content that is still laying out in the mount commit; a reader
+      // gesture cancels it in the handlers below.
+      following.current = false;
+      touched.current = true;
+      setDetached(true);
+      scroll.scrollTop = remembered.top;
+      lastSeenTop = scroll.scrollTop;
+      restoreFrame = requestAnimationFrame(() => {
+        restoreFrame = 0;
+        if (!following.current) scroll.scrollTop = remembered.top;
+      });
+    }
     cancelFollow.current = () => {
       cancelAnimationFrame(followFrame);
       followFrame = 0;
@@ -453,6 +470,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
     };
     const onScroll = () => {
+      rememberReadingScroll(memoryKey, scroll.scrollTop, following.current);
       // While a follow animation is actively driving scroll, do not cancel following midway.
       if (followFrame !== 0) return;
       // Our easing frames must not be mistaken for a user leaving the bottom.
@@ -496,7 +514,11 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       // whole-transcript `querySelectorAll` plus a rect per anchor, for a value nothing was going to look at.
       if (!following.current) capture();
     };
+    const cancelRestore = () => {
+      if (restoreFrame !== 0) { cancelAnimationFrame(restoreFrame); restoreFrame = 0; }
+    };
     const onWheel = (event: WheelEvent) => {
+      cancelRestore();
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
       // Any wheel takes over, not only an upward one — see wheelClaimsScroll for why that
       // distinction is the difference between gliding and stepping on a long transcript — except
@@ -506,11 +528,13 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
       if (!wheelAtBottom(event.deltaY, gap) && wheelClaimsScroll(event.deltaY)) { touched.current = true; following.current = false; setDetached(true); capture(); }
     };
     const onTouch = () => {
+      cancelRestore();
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLElement && event.target.closest('textarea,input,[contenteditable=true]')) return;
       if (['PageUp', 'Home', 'ArrowUp'].includes(event.key)) {
+        cancelRestore();
         cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
         touched.current = true; following.current = false; setDetached(true); capture();
       }
@@ -636,12 +660,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     scroll.addEventListener('keydown', onKey);
     const unsubscribeScroll = subscribeScroll(scroll, onScroll);
     return () => {
+      rememberReadingScroll(memoryKey, scroll.scrollTop, following.current);
+      cancelRestore();
       cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect(); structure.disconnect();
       unsubscribeScroll(); scroll.removeEventListener('wheel', onWheel);
       scroll.removeEventListener('touchstart', onTouch); scroll.removeEventListener('touchmove', onTouch);
       scroll.removeEventListener('keydown', onKey);
     };
-  }, [root, motion, followMode]);
+  }, [root, motion, followMode, memoryKey]);
   const jump = useCallback(() => {
     cancelFollow.current();
     anchor.current = null;
