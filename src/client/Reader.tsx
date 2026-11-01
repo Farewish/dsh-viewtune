@@ -26,6 +26,7 @@ import { stepReading, tokensPerSecondOf } from './turn-reading.js';
 import { reasoningFollowModeOf, reasoningRateOf } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelections, useReadingScroll } from './motion.js';
+import { subscribeScroll } from './scroll-bus.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, isProcessStepOf, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, commitClipboard, commitLabel, commitTitle, createProducedFileMentions, deliverableDisplayOf, dirname, getTurnDeliverableGroups, getTurnDeliverables, needsExpand, showDeliverablesRow, turnChanges, turnCommits, UNKNOWN_COMMIT } from './deliverables.js';
@@ -2121,7 +2122,7 @@ export function Reader(props: ReaderProps) {
       if (frame !== 0) return;
       frame = requestAnimationFrame(() => { frame = 0; measure(); });
     };
-    scroller.addEventListener('scroll', schedule, { passive: true });
+    const unsubscribeScroll = subscribeScroll(scroller, measure);
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     observer?.observe(scroller);
     // …and the CONTENT, not only the scroller: a transcript that grows inside a fixed scrollport fires nothing on the
@@ -2130,7 +2131,7 @@ export function Reader(props: ReaderProps) {
     observer?.observe(content);
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame);
-      scroller.removeEventListener('scroll', schedule);
+      unsubscribeScroll();
       observer?.disconnect();
     };
   }, [turnSignature, renderedTurns]);

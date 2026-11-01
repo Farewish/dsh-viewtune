@@ -5,6 +5,7 @@ import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { focusedHeight } from './focus-expand.js';
 import { isNearTail } from './reading-scroll.js';
 import { beginReaderResize } from './resize-signal.js';
+import { subscribeScroll } from './scroll-bus.js';
 import css from './Reader.module.css';
 
 const EASING = 'cubic-bezier(.22,1,.36,1)';
@@ -211,17 +212,12 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
      * again. That is exactly the shape of the report: the first thinking card of a turn never expanded while every
      * later one did. Watching the scroller is also what the rule says in as many words.
      */
-    let frame = 0;
     const request = () => {
-      if (frame !== 0) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        if (atTail()) { recordCardHeight(); onFocusChange(focusKey, true); }
-      });
+      if (atTail()) { recordCardHeight(); onFocusChange(focusKey, true); }
     };
     request();
-    scroller.addEventListener('scroll', request, { passive: true });
-    return () => { if (frame !== 0) cancelAnimationFrame(frame); scroller.removeEventListener('scroll', request); };
+    const unsubscribeScroll = subscribeScroll(scroller, request);
+    return unsubscribeScroll;
   }, [expanded, focusExpand, focused, following, active, reasoningMode, focusKey, onFocusChange]);
   /**
    * The card's height right now, recorded before the focus is REQUESTED.

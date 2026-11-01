@@ -12,6 +12,7 @@ const EASING = 'cubic-bezier(.22,1,.36,1)';
 import { ANCHOR_LINE_OFFSET_PX, firstRowPastIndex, isNearTail, scrollTakeover, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 import type { FollowMode } from './reading-scroll.js';
 import { readerResizeActive } from './resize-signal.js';
+import { subscribeScroll } from './scroll-bus.js';
 export { ANCHOR_LINE_OFFSET_PX, FOLLOW_TAIL_PX, FOLLOW_MODES, WHEEL_EPSILON_PX, firstRowPastIndex, followModeOf, isNearTail, wheelAtBottom, wheelClaimsScroll } from './reading-scroll.js';
 
 export function useMotionAllowed(enabled: boolean): boolean {
@@ -629,14 +630,14 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean, 
     });
     observer.observe(content);
     if (scroll !== content) observer.observe(scroll);
-    scroll.addEventListener('scroll', onScroll, { passive: true });
     scroll.addEventListener('wheel', onWheel, { passive: true });
     scroll.addEventListener('touchstart', onTouch, { passive: true });
     scroll.addEventListener('touchmove', onTouch, { passive: true });
     scroll.addEventListener('keydown', onKey);
+    const unsubscribeScroll = subscribeScroll(scroll, onScroll);
     return () => {
       cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect(); structure.disconnect();
-      scroll.removeEventListener('scroll', onScroll); scroll.removeEventListener('wheel', onWheel);
+      unsubscribeScroll(); scroll.removeEventListener('wheel', onWheel);
       scroll.removeEventListener('touchstart', onTouch); scroll.removeEventListener('touchmove', onTouch);
       scroll.removeEventListener('keydown', onKey);
     };
