@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { REASON_HOLD, REASON_LATEST_STEP, REASON_STEP, reasoningTarget, stepLines } from './reasoning-follow.js';
 import type { ReasoningFollowMode } from './reasoning-follow.js';
 import { focusedHeight } from './focus-expand.js';
@@ -39,7 +39,7 @@ const HEIGHT_CHASE_MS = 400;
 const CHASE_STILL_FRAMES = 4;
 
 /** One real transcript: reference transform while following, native scroll while reading. */
-export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, alignBottom, focusKey, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail }: {
+export function ReasoningCard({ children, step, active, motion, selected, onRead, reasoningMode, rate, focusExpand, fold, alignBottom, focusKey, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTailRef }: {
   children: ReactNode; step: number; active: boolean; motion: boolean; selected: boolean; onRead: () => void;
   reasoningMode: ReasoningFollowMode; rate: number;
   focusExpand: boolean; fold: boolean; focusKey: string; focused: boolean; onFocusChange: (key: string, focused: boolean) => void;
@@ -62,7 +62,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * `following` tracks ITS inner scroller, so a wheel over the transcript moves the reader away without the card
    * ever noticing (see the compensation's gate).
    */
-  pageAtTail: boolean;
+  pageAtTailRef: RefObject<boolean>;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   /**
@@ -138,14 +138,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   const compensateNow = useRef<() => void>(() => {});
   /** The focus, readable from the frame loop's closure without putting it in that effect's dependencies. */
   const focusedRef = useRef(false);
-  /**
-   * Whether the reader is still at the page's tail, readable from the same closures.
-   *
-   * A ref for the same reason `focusedRef` is one: the compensation runs from the observer's and the chase loop's
-   * closures, which are not re-created when this prop changes. Seeded true, because a card that has not seen a scroll
-   * event yet has not seen the reader leave — and the focus it is about to ask for requires being at the tail anyway.
-   */
-  const pageAtTailRef = useRef(true);
   /** The ceiling the focus has published — what the card last ASKED to be. */
   const focusHeight = useRef(0);
   /**
@@ -314,7 +306,6 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
    * Read by the compensation, which the observer calls in the same commit as a growth — so this has to be current for
    * that commit rather than one paint later, exactly like `focusedRef`.
    */
-  useLayoutEffect(() => { pageAtTailRef.current = pageAtTail; }, [pageAtTail]);
   /**
    * The focus follows this card's OWN writing, not the step it happens to sit in.
    *

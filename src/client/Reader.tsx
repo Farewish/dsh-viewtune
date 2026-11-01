@@ -138,7 +138,7 @@ const ProcessNodeContent = memo(function ProcessNodeContent({ t, node, nodeKey, 
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNodeContent = memo(function AssistantNodeContent({ node, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTail, segments = 'both', ...render }: Omit<SeatProps, 'useChat'> & {
+const AssistantNodeContent = memo(function AssistantNodeContent({ node, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focused, onFocusChange, onFocusPin, onLeaveTail, pageAtTailRef, segments = 'both', ...render }: Omit<SeatProps, 'useChat'> & {
   node: ChatConversationViewNode;
   /**
    * Which of the step's parts to render (the host's `groupPart`). A step commonly carries its thinking AND the narration that follows it in the same
@@ -154,7 +154,7 @@ const AssistantNodeContent = memo(function AssistantNodeContent({ node, nodeKey,
   onFocusPin: (key: string, pinned: boolean) => void;
   /** Whether the READER is still at the page's tail: the focused card's compensation is gated on it, and the card
    * cannot work it out on its own (its own `following` tracks its inner scroller). */
-  pageAtTail: boolean;
+  pageAtTailRef: RefObject<boolean>;
 }) {
   if (node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
   const data = node.data;
@@ -177,7 +177,7 @@ const AssistantNodeContent = memo(function AssistantNodeContent({ node, nodeKey,
           A reasoning block is content INSIDE a step, so an empty one can neither add a step nor shift a number: dropping its
           card removes a blank row and nothing else. Verified against the three places the count is read — the boundary's
           `latestStep`, the pill's `totalSteps` (`turn.steps.length`) and this label — all of which come from the host. */}
-      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} fold={reasoningFold} alignBottom={expandBottomAlign} focusKey={nodeKey} onLeaveTail={onLeaveTail} focused={focused} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail}>
+      <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead} reasoningMode={reasoningFollow} rate={reasoningRate} focusExpand={focusExpand} fold={reasoningFold} alignBottom={expandBottomAlign} focusKey={nodeKey} onLeaveTail={onLeaveTail} focused={focused} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTailRef={pageAtTailRef}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && index === parts.length - 1 && data.blocks.at(-1)?.kind === 'reasoning'}
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
@@ -1164,7 +1164,7 @@ interface RunBodyItem {
   readonly open: boolean;
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, segmentByNarration, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTail, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; segmentByNarration: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTail: boolean; live?: boolean }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, foldEarlier, segmentByNarration, deliverableDisplay, recordCommits, reasoningFollow, reasoningRate, focusExpand, reasoningFold, expandBottomAlign, focusedCard, onLeaveTail, onFocusChange, onFocusPin, pageAtTailRef, live, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; foldEarlier: boolean; segmentByNarration: boolean; deliverableDisplay: DeliverableDisplay; recordCommits: boolean; reasoningFollow: ReasoningFollowMode; reasoningRate: number; focusExpand: boolean; reasoningFold: boolean; expandBottomAlign: boolean; focusedCard: string | null; onLeaveTail: () => void; onFocusChange: (key: string, focused: boolean) => void; onFocusPin: (key: string, pinned: boolean) => void; pageAtTailRef: RefObject<boolean>; live?: boolean }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
@@ -1464,7 +1464,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
    */
   const renderMember = (item: ReaderFlowEntry, segments: 'both' | 'reasoning' | 'body' = 'both'): ReactNode => item.kind === 'node'
     ? <Fragment>
-      <BlockBoundary><NodeSeat {...shared} t={props.t} boundary={boundary} nodeKey={item.nodeKey} open={expanded} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={pageAtTail} segments={segments} /></BlockBoundary>
+      <BlockBoundary><NodeSeat {...shared} t={props.t} boundary={boundary} nodeKey={item.nodeKey} open={expanded} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} focused={focusedCard === item.nodeKey} onLeaveTail={onLeaveTail} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTailRef={pageAtTailRef} segments={segments} /></BlockBoundary>
     </Fragment>
     : <Fragment>
       <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
@@ -2150,6 +2150,11 @@ export function Reader(props: ReaderProps) {
     };
   }, [turnSignature, renderedTurns]);
   const scroll = useReadingScroll(root, motion, live, followMode, focusedCard !== null, props.sessionId);
+  // A stable ref, not a prop: `scroll.detached` flips on the first upward wheel at the bottom, and putting
+  // that boolean in TurnGroup's props re-rendered every turn's Markdown for a value only the focused
+  // reasoning card reads.
+  const pageAtTailRef = useRef(!scroll.detached);
+  pageAtTailRef.current = !scroll.detached;
   /**
    * Whether there is anything below to return TO.
    *
@@ -2508,7 +2513,7 @@ export function Reader(props: ReaderProps) {
         }}>一次性加载到最早（较慢）</button>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} segmentByNarration={segmentByNarration} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} onLeaveTail={scroll.release} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTail={!scroll.detached} live={group.turn !== null && group.turn === liveTurn} />)}
+      {groups.map(group => hiddenTurnKeys.has(group.key) ? null : <TurnGroup key={group.key} {...props} group={group} segmentByNarration={segmentByNarration} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} foldEarlier={foldEarlier} deliverableDisplay={deliverableDisplay} recordCommits={recordCommits} reasoningFollow={reasoningFollow} reasoningRate={reasoningRate} focusExpand={focusExpand} reasoningFold={reasoningFold} expandBottomAlign={expandBottomAlign} onLeaveTail={scroll.release} focusedCard={focusedCard} onFocusChange={onFocusChange} onFocusPin={onFocusPin} pageAtTailRef={pageAtTailRef} live={group.turn !== null && group.turn === liveTurn} />)}
       {visibleSubmissions.map(submission => (
         <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
           {submission.attachments.some(item => item.type === 'image') && (

@@ -617,10 +617,10 @@ const markers = [
     // card must not shrink under them), so without this gate the compensation keeps writing on every line of reasoning
     // while they read somewhere else — reported as 「只有在卡片变高的时候」 the page being pulled back under an otherwise
     // fine upward scroll. The state cannot be worked out inside the card: its own `following` tracks ITS inner
-    // scroller, which a wheel over the transcript never reaches, so it arrives as the `pageAtTail` prop and is read
-    // through a ref (the compensation runs from closures the prop cannot re-create).
+    // scroller, which a wheel over the transcript never reaches, so it arrives as the Reader's stable
+    // `pageAtTailRef`. That ref keeps the flip out of every TurnGroup's props.
     && bundle.includes('if (!pageAtTailRef.current) return;')
-    && bundle.includes('pageAtTailRef.current = pageAtTail;')
+    && bundle.includes('pageAtTailRef.current = !scroll.detached;')
     && bundle.includes('scroller.scrollTop += grew')],
   ['…recording it on every measure, so growth from a LATER commit is taken too', () =>
     // The reading row is React state set from `measure`, so it lands one commit after the height write; and the focus
